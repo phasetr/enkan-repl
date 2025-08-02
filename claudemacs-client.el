@@ -77,11 +77,6 @@
   :type 'string
   :group 'claudemacs-client)
 
-(defcustom claudemacs-client-max-history-size 50
-  "Maximum number of items to keep in input history."
-  :type 'integer
-  :group 'claudemacs-client)
-
 (defcustom claudemacs-client-use-persistent-files t
   "Whether to use persistent files instead of temporary files."
   :type 'boolean
@@ -103,8 +98,6 @@
   :type 'string
   :group 'claudemacs-client)
 
-(defvar claudemacs-client-input-history '()
-  "History of texts sent to claudemacs.")
 
 ;;;; Core Functions
 
@@ -169,7 +162,6 @@ Write your text here and use the following keys:
 - C-c C-c: Send from cursor to end
 - C-c C-r: Send selected region
 - C-c C-b: Send entire file
-- C-c C-h: Insert from history
 
 -----
 
@@ -214,7 +206,7 @@ Write your text here and use the following keys:
 (defun claudemacs-client--get-target-directory-for-buffer ()
   "Get the target directory for current buffer.
 For persistent files, extract directory from filename.
-For other buffers, use current default-directory."
+For other buffers, use current `default-directory'."
   (if (and buffer-file-name
            (string-match-p "cec-.+\\.org$" (file-name-nondirectory buffer-file-name)))
       ;; This is a persistent file, extract directory from filename
@@ -262,7 +254,7 @@ If DIRECTORY is provided, check for claudemacs in that directory.
 Otherwise, use current `default-directory'."
   (when-let ((claude-buffer (claudemacs-client--get-buffer-for-directory directory)))
     (with-current-buffer claude-buffer
-      (and (boundp 'eat--process) 
+      (and (boundp 'eat--process)
            eat--process
            (process-live-p eat--process)))))
 
@@ -275,17 +267,9 @@ Otherwise, use current `default-directory'."
         (with-current-buffer claude-buffer
           (eat--send-string eat--process text)
           (eat--send-string eat--process "\r")
-          (claudemacs-client--save-to-history text)
           t))
     nil))
 
-(defun claudemacs-client--save-to-history (text)
-  "Save TEXT to input history, maintaining maximum size."
-  (push text claudemacs-client-input-history)
-  (when (> (length claudemacs-client-input-history)
-           claudemacs-client-max-history-size)
-    (setq claudemacs-client-input-history
-          (butlast claudemacs-client-input-history))))
 
 ;;;; Public API
 
@@ -385,8 +369,7 @@ This function creates a file for composing Claude text."
           (insert "Write your text here and use the following keys:\n\n")
           (insert "- C-c C-c: Send from cursor to end\n")
           (insert "- C-c C-r: Send selected region\n")
-          (insert "- C-c C-b: Send entire file\n")
-          (insert "- C-c C-h: Insert from history\n\n")
+          (insert "- C-c C-b: Send entire file\n\n")
           (insert "-----\n\n")))
 
       (switch-to-buffer input-buffer)
@@ -407,18 +390,7 @@ This function creates a file for composing Claude text."
   (use-local-map (copy-keymap (current-local-map)))
   (local-set-key (kbd "C-c C-c") #'claudemacs-client-send-from-cursor)
   (local-set-key (kbd "C-c C-r") #'claudemacs-client-send-region-interactive)
-  (local-set-key (kbd "C-c C-b") #'claudemacs-client-send-buffer)
-  (local-set-key (kbd "C-c C-h") #'claudemacs-client-insert-from-history))
-
-;;;###autoload
-(defun claudemacs-client-insert-from-history ()
-  "Insert previously sent text from history."
-  (interactive)
-  (if claudemacs-client-input-history
-      (let ((selected (completing-read "Insert from history: "
-                                       claudemacs-client-input-history)))
-        (insert selected))
-    (message "No history available")))
+  (local-set-key (kbd "C-c C-b") #'claudemacs-client-send-buffer))
 
 
 ;;;###autoload
@@ -427,8 +399,7 @@ This function creates a file for composing Claude text."
   (interactive)
   (let* ((target-dir (claudemacs-client--get-target-directory-for-buffer))
          (claude-buffer (claudemacs-client--get-buffer-for-directory target-dir)))
-    (message "claudemacs-client | History: %d items | Connection: %s | Target: %s"
-             (length claudemacs-client-input-history)
+    (message "claudemacs-client | Connection: %s | Target: %s"
              (if claude-buffer
                  (format "Connected (%s)" (buffer-name claude-buffer))
                "Not connected")
@@ -465,8 +436,8 @@ This function creates a file for composing Claude text."
     (message "Target directory: %s" target-dir)
     (message "Claude buffer: %s" (if claude-buffer (buffer-name claude-buffer) "None"))
     (message "Can send text: %s" (if can-send "YES" "NO"))
-    (message "All claudemacs buffers: %S" 
-             (mapcar #'buffer-name 
+    (message "All claudemacs buffers: %S"
+             (mapcar #'buffer-name
                      (seq-filter (lambda (buf)
                                    (string-match-p "claude" (buffer-name buf)))
                                  (buffer-list))))))
