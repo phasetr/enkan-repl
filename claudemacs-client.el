@@ -49,7 +49,7 @@
 ;; C-M-d (global binding)
 ;;
 ;; Acknowledgments:
-;; This project is built on top of claudemacs. We thank the original
+;; This project is built on top of claudemacs.  We thank the original
 ;; authors for their excellent work.
 
 ;;; Code:
@@ -59,6 +59,11 @@
 ;; Compatibility check
 (when (locate-library "claudemacs")
   (require 'claudemacs))
+
+;; Declare external functions to avoid byte-compiler warnings
+(declare-function eat--send-string "eat" (process string))
+(defvar eat--process)
+(defvar eat-mode)
 
 ;;;; Custom Variables
 
@@ -150,7 +155,7 @@
 
 ;;;###autoload
 (defun claudemacs-client-create-input-buffer ()
-  "Create or switch to a dedicated input buffer for composing text to send to Claude."
+  "Create or switch to a dedicated input buffer for composing Claude text."
   (interactive)
   (let ((buffer-name claudemacs-client-input-buffer-name))
     (let ((input-buffer (get-buffer-create buffer-name)))
@@ -158,7 +163,9 @@
         ;; Set up org mode for better editing experience
         (when (fboundp 'org-mode)
           (unless (eq major-mode 'org-mode)
+            ;; Temporarily disable org-mode-hook to avoid side effects
             (let ((org-mode-hook nil))
+              (ignore org-mode-hook)  ; Suppress unused variable warning
               (org-mode))))
 
         ;; Set up key bindings
