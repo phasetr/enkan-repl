@@ -220,7 +220,7 @@ Write your text here and use the following keys:
         (if (claudemacs-client--can-send-text) "[OK]Claude" "[NO]Claude"))
   (force-mode-line-update))
 
-;; Define custom faces that override theme settings
+;; Define custom faces with strong colors to override UI themes
 (defface claudemacs-client-connected-face
   '((t (:foreground "#00ff00" :weight bold :inherit mode-line)))
   "Face for claudemacs connected status."
@@ -401,15 +401,6 @@ This function creates a buffer for composing Claude text."
       (goto-char (point-max))
       (message "Claude input buffer ready. C-c C-c to send from cursor."))))
 
-(defvar claudemacs-client-input-buffer-map nil
-  "Keymap for claudemacs-client input buffers.")
-
-(unless claudemacs-client-input-buffer-map
-  (setq claudemacs-client-input-buffer-map (make-sparse-keymap))
-  (define-key claudemacs-client-input-buffer-map (kbd "C-c C-c") #'claudemacs-client-send-from-cursor)
-  (define-key claudemacs-client-input-buffer-map (kbd "C-c C-r") #'claudemacs-client-send-region-interactive)
-  (define-key claudemacs-client-input-buffer-map (kbd "C-c C-b") #'claudemacs-client-send-buffer)
-  (define-key claudemacs-client-input-buffer-map (kbd "C-c C-h") #'claudemacs-client-insert-from-history))
 
 (defun claudemacs-client-send-region-interactive ()
   "Interactive version of send region that handles no region case."
@@ -464,48 +455,36 @@ This function creates a buffer for composing Claude text."
 ;;;###autoload
 (define-key global-map (kbd "C-M-d") #'claudemacs-client-create-input-buffer)
 
-;;;###autoload
-(defun claudemacs-client-force-face-colors ()
-  "Force face colors to override theme settings."
-  (interactive)
-  (set-face-attribute 'claudemacs-client-connected-face nil
-                      :foreground "#00ff00" 
-                      :weight 'bold)
-  (set-face-attribute 'claudemacs-client-disconnected-face nil
-                      :foreground "#ff0000"
-                      :weight 'bold)
-  (force-mode-line-update)
-  (message "Forced face colors updated"))
+
+;;;; Mode Line Integration
 
 ;;;###autoload
-(defun claudemacs-client-test-mode-line-colors ()
-  "Test mode line color display for debugging."
+(defun claudemacs-client-setup-mode-line ()
+  "Set up mode line display for claudemacs-client status."
   (interactive)
-  (message "Testing mode line colors...")
-  (setq claudemacs-client-connection-status "[OK]Claude")
-  (force-mode-line-update)
-  (message "Connected status (green): %s" (claudemacs-client--mode-line-status))
-  (sit-for 3)
-  (setq claudemacs-client-connection-status "[NO]Claude") 
-  (force-mode-line-update)
-  (message "Disconnected status (red): %s" (claudemacs-client--mode-line-status))
-  (sit-for 3)
-  (claudemacs-client--update-connection-status)
-  (message "Mode line color test completed. Status restored to actual state."))
+  (setq-default mode-line-misc-info
+    (append mode-line-misc-info
+            '((:eval (when (and (boundp 'claudemacs-client-mode)
+                                claudemacs-client-mode
+                                (boundp 'claudemacs-client-connection-status)
+                                claudemacs-client-connection-status)
+                       (concat " " (claudemacs-client--mode-line-status)))))))
+  (force-mode-line-update t)
+  (message "claudemacs-client mode line display enabled"))
+
+;; Automatically set up mode line when package is loaded
+(claudemacs-client-setup-mode-line)
 
 ;;;###autoload
-(defun claudemacs-client-toggle-connection-status ()
-  "Toggle connection status for testing purposes."
+(defun claudemacs-client-version ()
+  "Show the version of claudemacs-client."
   (interactive)
-  (if (and claudemacs-client-connection-status
-           (string-prefix-p "[OK]" claudemacs-client-connection-status))
-      (progn
-        (setq claudemacs-client-connection-status "[NO]Claude")
-        (message "Connection status: DISCONNECTED (red)"))
-    (progn
-      (setq claudemacs-client-connection-status "[OK]Claude")
-      (message "Connection status: CONNECTED (green)")))
-  (force-mode-line-update))
+  (message "claudemacs-client version 0.0.0"))
+
+;;;; Debug and Utility Functions
+
+;; These functions are primarily for debugging and troubleshooting.
+;; They can be safely removed in production environments if needed.
 
 ;;;###autoload
 (defun claudemacs-client-debug-mode-line ()
@@ -537,30 +516,48 @@ This function creates a buffer for composing Claude text."
       (message "Status string with properties: %S" 
                (claudemacs-client--mode-line-status)))))
 
-;;;; Mode Line Integration
+;;;###autoload
+(defun claudemacs-client-toggle-connection-status ()
+  "Toggle connection status for testing purposes."
+  (interactive)
+  (if (and claudemacs-client-connection-status
+           (string-prefix-p "[OK]" claudemacs-client-connection-status))
+      (progn
+        (setq claudemacs-client-connection-status "[NO]Claude")
+        (message "Connection status: DISCONNECTED (red)"))
+    (progn
+      (setq claudemacs-client-connection-status "[OK]Claude")
+      (message "Connection status: CONNECTED (green)")))
+  (force-mode-line-update))
 
 ;;;###autoload
-(defun claudemacs-client-setup-mode-line ()
-  "Set up mode line display for claudemacs-client status."
+(defun claudemacs-client-test-mode-line-colors ()
+  "Test mode line color display for debugging."
   (interactive)
-  (setq-default mode-line-misc-info
-    (append mode-line-misc-info
-            '((:eval (when (and (boundp 'claudemacs-client-mode)
-                                claudemacs-client-mode
-                                (boundp 'claudemacs-client-connection-status)
-                                claudemacs-client-connection-status)
-                       (concat " " (claudemacs-client--mode-line-status)))))))
-  (force-mode-line-update t)
-  (message "claudemacs-client mode line display enabled"))
-
-;; Automatically set up mode line when package is loaded
-(claudemacs-client-setup-mode-line)
+  (message "Testing mode line colors...")
+  (setq claudemacs-client-connection-status "[OK]Claude")
+  (force-mode-line-update)
+  (message "Connected status (green): %s" (claudemacs-client--mode-line-status))
+  (sit-for 3)
+  (setq claudemacs-client-connection-status "[NO]Claude") 
+  (force-mode-line-update)
+  (message "Disconnected status (red): %s" (claudemacs-client--mode-line-status))
+  (sit-for 3)
+  (claudemacs-client--update-connection-status)
+  (message "Mode line color test completed. Status restored to actual state."))
 
 ;;;###autoload
-(defun claudemacs-client-version ()
-  "Show the version of claudemacs-client."
+(defun claudemacs-client-force-face-colors ()
+  "Force face colors to override strong UI themes."
   (interactive)
-  (message "claudemacs-client version 0.0.0"))
+  (set-face-attribute 'claudemacs-client-connected-face nil
+                      :foreground "#00ff00" 
+                      :weight 'bold)
+  (set-face-attribute 'claudemacs-client-disconnected-face nil
+                      :foreground "#ff0000"
+                      :weight 'bold)
+  (force-mode-line-update)
+  (message "Face colors forced to override strong themes"))
 
 (provide 'claudemacs-client)
 
