@@ -367,13 +367,17 @@ Wrapper function that uses pure function internally."
   "Send the text in region from START to END to claudemacs."
   (interactive "r")
   (when (use-region-p)
-    (let
-        ((content (buffer-substring-no-properties start end))
+    (let*
+        ((raw-content (buffer-substring-no-properties start end))
+         (content (string-trim raw-content))
          (target-dir (claudemacs-client--get-target-directory-for-buffer)))
       (if
-          (claudemacs-client--send-text content target-dir)
-          (message "Region sent to Claude (%d characters)" (length content))
-        (message "❌ Cannot send - no matching claudemacs buffer found for this directory")))))
+          (and content (not (string-empty-p content)))
+          (if
+              (claudemacs-client--send-text content target-dir)
+              (message "Region sent to Claude (%d characters)" (length content))
+            (message "❌ Cannot send - no matching claudemacs buffer found for this directory"))
+        (message "No content to send (empty or whitespace only)")))))
 
 ;;;###autoload
 (defun claudemacs-client-send-buffer ()
@@ -392,17 +396,18 @@ Wrapper function that uses pure function internally."
 (defun claudemacs-client-send-rest-of-buffer ()
   "Send rest of buffer from cursor position to end to claudemacs."
   (interactive)
-  (let
-      ((content (buffer-substring-no-properties (point) (point-max)))
+  (let*
+      ((raw-content (buffer-substring-no-properties (point) (point-max)))
+       (content (string-trim raw-content))
        (target-dir (claudemacs-client--get-target-directory-for-buffer)))
     (if
-        (or (not content) (string-match-p "\\`[[:space:]]*\\'" content))
-        (message "No content from cursor to end of file")
-      (if
-          (claudemacs-client--send-text content target-dir)
-          (message "Rest of buffer sent to Claude (%d characters)"
-                   (length content))
-        (message "❌ Cannot send - no matching claudemacs buffer found for this directory")))))
+        (and content (not (string-empty-p content)))
+        (if
+            (claudemacs-client--send-text content target-dir)
+            (message "Rest of buffer sent to Claude (%d characters)"
+                     (length content))
+          (message "❌ Cannot send - no matching claudemacs buffer found for this directory"))
+      (message "No content from cursor to end of file"))))
 
 (defun claudemacs-client--create-project-input-file (target-directory)
   "Create project input file for TARGET-DIRECTORY from template.

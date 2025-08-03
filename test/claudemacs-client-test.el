@@ -949,6 +949,90 @@
       (when (file-exists-p temp-dir)
         (delete-directory temp-dir t)))))
 
+;;; Tests for Send Functions with Trimming
+
+(ert-deftest test-send-region-trims-whitespace ()
+  "Test that send-region trims leading and trailing whitespace."
+  (with-temp-buffer
+    (insert "  \n\t  Hello World  \n\t  ")
+    (let ((start (point-min))
+          (end (point-max))
+          (sent-text nil)
+          (message-text nil))
+      ;; Mock functions
+      (cl-letf (((symbol-function 'use-region-p) (lambda () t))
+                ((symbol-function 'claudemacs-client--get-target-directory-for-buffer) 
+                 (lambda () "/test/dir"))
+                ((symbol-function 'claudemacs-client--send-text) 
+                 (lambda (text dir) 
+                   (setq sent-text text)
+                   t))
+                ((symbol-function 'message) 
+                 (lambda (fmt &rest args) 
+                   (setq message-text (apply #'format fmt args)))))
+        (claudemacs-client-send-region start end)
+        ;; Should trim whitespace
+        (should (string= sent-text "Hello World"))
+        (should (string-match-p "Region sent to Claude" message-text))))))
+
+(ert-deftest test-send-region-empty-after-trim ()
+  "Test that send-region handles empty content after trimming."
+  (with-temp-buffer
+    (insert "  \n\t  \n  ")
+    (let ((start (point-min))
+          (end (point-max))
+          (message-text nil))
+      ;; Mock functions
+      (cl-letf (((symbol-function 'use-region-p) (lambda () t))
+                ((symbol-function 'claudemacs-client--get-target-directory-for-buffer) 
+                 (lambda () "/test/dir"))
+                ((symbol-function 'message) 
+                 (lambda (fmt &rest args) 
+                   (setq message-text (apply #'format fmt args)))))
+        (claudemacs-client-send-region start end)
+        ;; Should detect empty content
+        (should (string-match-p "No content to send" message-text))))))
+
+(ert-deftest test-send-rest-of-buffer-trims-whitespace ()
+  "Test that send-rest-of-buffer trims leading and trailing whitespace."
+  (with-temp-buffer
+    (insert "Some content\n")
+    (insert "  \n\t  Hello World  \n\t  ")
+    (goto-char (+ (point-min) 13)) ; Position after "Some content\n"
+    (let ((sent-text nil)
+          (message-text nil))
+      ;; Mock functions
+      (cl-letf (((symbol-function 'claudemacs-client--get-target-directory-for-buffer) 
+                 (lambda () "/test/dir"))
+                ((symbol-function 'claudemacs-client--send-text) 
+                 (lambda (text dir) 
+                   (setq sent-text text)
+                   t))
+                ((symbol-function 'message) 
+                 (lambda (fmt &rest args) 
+                   (setq message-text (apply #'format fmt args)))))
+        (claudemacs-client-send-rest-of-buffer)
+        ;; Should trim whitespace
+        (should (string= sent-text "Hello World"))
+        (should (string-match-p "Rest of buffer sent to Claude" message-text))))))
+
+(ert-deftest test-send-rest-of-buffer-empty-after-trim ()
+  "Test that send-rest-of-buffer handles empty content after trimming."
+  (with-temp-buffer
+    (insert "Some content\n")
+    (insert "  \n\t  \n  ")
+    (goto-char (+ (point-min) 13)) ; Position after "Some content\n"
+    (let ((message-text nil))
+      ;; Mock functions
+      (cl-letf (((symbol-function 'claudemacs-client--get-target-directory-for-buffer) 
+                 (lambda () "/test/dir"))
+                ((symbol-function 'message) 
+                 (lambda (fmt &rest args) 
+                   (setq message-text (apply #'format fmt args)))))
+        (claudemacs-client-send-rest-of-buffer)
+        ;; Should detect no content
+        (should (string-match-p "No content from cursor to end" message-text))))))
+
 ;;; Tests for Template Output Function
 
 (ert-deftest test-output-template-creates-buffer ()
