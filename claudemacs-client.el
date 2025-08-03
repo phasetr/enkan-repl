@@ -314,8 +314,8 @@ Wrapper function that uses pure function internally."
       (message "❌ Cannot send - no matching claudemacs buffer found for this directory"))))
 
 ;;;###autoload
-(defun claudemacs-client-send-from-cursor ()
-  "Send text from cursor position to end of buffer to claudemacs."
+(defun claudemacs-client-send-rest-of-buffer ()
+  "Send rest of buffer from cursor position to end to claudemacs."
   (interactive)
   (let
     ((content (buffer-substring-no-properties (point) (point-max)))
@@ -323,7 +323,7 @@ Wrapper function that uses pure function internally."
     (if (or (not content) (string-match-p "\\`[[:space:]]*\\'" content))
       (message "No content from cursor to end of file")
       (if (claudemacs-client--send-text content target-dir)
-        (message "Text from cursor sent to Claude (%d characters)"
+        (message "Rest of buffer sent to Claude (%d characters)"
           (length content))
         (message "❌ Cannot send - no matching claudemacs buffer found for this directory")))))
 
@@ -361,7 +361,7 @@ This function finds existing input file or creates new one if needed."
   "Set up key bindings for the Claude input file."
   ;; Set up key bindings using buffer-local keymap
   (use-local-map (copy-keymap (current-local-map)))
-  (local-set-key (kbd "C-c C-c") #'claudemacs-client-send-from-cursor)
+  (local-set-key (kbd "C-c C-c") #'claudemacs-client-send-rest-of-buffer)
   (local-set-key (kbd "C-c C-r") #'claudemacs-client-send-region-interactive)
   (local-set-key (kbd "C-c C-b") #'claudemacs-client-send-buffer))
 

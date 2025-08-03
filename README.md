@@ -17,7 +17,7 @@ Welcome to the freedom of Emacs world - we provide the tools, you create the exp
 
 ### Author's Personal Approach
 
-"I cannot remember keybindings unless I use them daily, and transient menus are even more hopeless. From the early prototype stage of this package, I have not set any keybindings and only remember `send-region` and `send-from-cursor`, executing them via `M-x` with fuzzy search. When using Claude Code, I'm focused and only use these functions, so they always appear at the top of the completion list and can be executed immediately."
+"I cannot remember keybindings unless I use them daily, and transient menus are even more hopeless. From the early prototype stage of this package, I have not set any keybindings and only remember `send-region` and `send-rest-of-buffer`, executing them via `M-x` with fuzzy search. When using Claude Code, I'm focused and only use these functions, so they always appear at the top of the completion list and can be executed immediately."
 
 This personal workflow is the foundation for our function-name-first design philosophy. Common keybindings like `C-c C-r` for send-region are widely used, but we leave all efficiency optimizations to your expertise.
 
@@ -27,17 +27,17 @@ This personal workflow is the foundation for our function-name-first design phil
 - Claude Code's limitation: difficult to preserve personal comments and context
 - Avoid building complex history features - use files for persistence instead
 - Files allow complete preservation of past comments and thought processes
-- Add content chronologically at the bottom, use `send-region` or `send-from-cursor` to send specific parts
+- Add content chronologically at the bottom, use `send-region` or `send-rest-of-buffer` to send specific parts
 - When inspiration strikes after Claude Code execution, write it down in the file - no more forgotten ideas
 
 **Workflow Flexibility**
 - Always use `send-region`? Write new comments below the current content
-- Always use `send-from-cursor`? Write notes slightly above the cursor position
+- Always use `send-rest-of-buffer`? Write notes slightly above the cursor position
 - File persistence means your workflow adapts to your thinking patterns
 
 **Filename-Buffer Mapping**
 - File-local variables and parsing file contents are tedious
-- Use filename encoding for simple, unambiguous claudemacs buffer correspondence
+- Use filename encoding for simple, unambiguous (2025-8-temporal) claudemacs buffer correspondence
 - Ugly but functional: filename directly encodes the target directory
 
 **Org-mode Choice**
@@ -47,7 +47,7 @@ This personal workflow is the foundation for our function-name-first design phil
 ## Features
 
 - 🚀 **Enhanced Text Sending**: Send regions, buffers, or cursor-to-end text to claudemacs
-- 📝 **Persistent Input Files**: Org-mode enabled files with multi-language template support
+- 📝 **Persistent Input Files**: Org-mode enabled files with multi-language template support (Being Japanese, I want Japanese templates to be easily usable)
 - 🔍 **Directory-Based Targeting**: Automatically match files to appropriate claudemacs buffers (depends on claudemacs buffer naming convention)
 - 📁 **Template Customization**: External template files for maximum flexibility
 
@@ -91,7 +91,7 @@ This personal workflow is the foundation for our function-name-first design phil
 
 - `claudemacs-client-open-project-input` - Open or create project input file
 - `claudemacs-client-send-region` - Send selected text to claudemacs
-- `claudemacs-client-send-from-cursor` - Send text from cursor to end
+- `claudemacs-client-send-rest-of-buffer` - Send rest of buffer from cursor position
 - `claudemacs-client-send-buffer` - Send entire buffer
 - `claudemacs-client-status` - Show connection status and diagnostics
 
@@ -103,13 +103,16 @@ This personal workflow is the foundation for our function-name-first design phil
 ;; Use Japanese templates
 (setq claudemacs-client-template-language "ja")
 
-;; Use custom template file
+;; Use custom template file (overrides language setting): The author himself uses a custom template
 (setq claudemacs-client-custom-template-path "~/my-claude-template.org")
+
+;; Note: "custom" language uses English template as base
+;; For true customization, use claudemacs-client-custom-template-path
 ```
 
 ### Template Customization
 
-Use `M-x claudemacs-client-output-template` to output a standard template to a new buffer for customization.
+Use `M-x claudemacs-client-output-template` to output a English template to a new buffer for customization.
 
 ## Troubleshooting
 

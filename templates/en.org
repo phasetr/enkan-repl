@@ -1,0 +1,28 @@
+* Claude Input File
+Project: %s
+
+** Claudemacs Startup Code
+Note: This functions starts claudemacs itself, not claudemacs-client.
+
+(claudemacs-start)
+
+** Window Layout Setup
+Note: This layout uses split-window-right as the author's preference.
+Customize this block for your desired window layout.
+
+(claudemacs-client-setup-window-layout)
+
+** Essential Functions
+- Send region: M-x claudemacs-client-send-region
+- Send rest of buffer: M-x claudemacs-client-send-rest-of-buffer
+- Send buffer: M-x claudemacs-client-send-buffer
+
+** Diagnostics
+- Status check: (claudemacs-client-status)
+
+** Template Customization
+- Output standard template: (claudemacs-client-output-template)
+
+** Thought/memo
+You may write extensive notes to organize your thoughts,
+not just content to send to Claude Code.
