@@ -4,7 +4,7 @@ Project: %s
 ** Claudemacs Startup Code
 Note: This is the startup command for claudemacs itself, not for claudemacs-client.
 
-(start-claudemacs-new-session)
+(start-claudemacs)
 
 ** Window Layout Setup
 Note: This layout uses split-window-right as the author's preference.
