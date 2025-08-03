@@ -162,40 +162,23 @@ Returns template content as string, or nil if no template found."
 
 ;;;; File Template and Content Management
 
-(defun claudemacs-client--get-file-template-with-startup-code (project-path)
-  "Generate file template with startup code for PROJECT-PATH.
-Now loads template from external file based on language setting."
-  (let ((template-content (claudemacs-client--load-template claudemacs-client-template-language)))
-    (if template-content
-        (format template-content project-path)
-      ;; Fallback to basic template if external template loading fails
-      (format "* Claude Input File
-Project: %s
-
-** Startup Code
-(claudemacs-start)
-
-** Layout Setup
-(claudemacs-client-setup-window-layout)
-
-** Essential Functions
-- Send region: M-x claudemacs-client-send-region
-- Send rest of buffer: M-x claudemacs-client-send-rest-of-buffer
-- Send buffer: M-x claudemacs-client-send-buffer
-
-** Thought/memo
-" project-path))))
-
 (defun claudemacs-client--initialize-project-file (file-path)
   "Initialize a new project file at FILE-PATH with template content."
   (let*
     ((directory (file-name-directory file-path))
       (project-path (claudemacs-client--decode-full-path
-                      (file-name-base (file-name-nondirectory file-path)))))
+                      (file-name-base (file-name-nondirectory file-path))))
+      (template-content (claudemacs-client--load-template claudemacs-client-template-language)))
     (unless (file-exists-p directory)
       (make-directory directory t))
     (with-temp-file file-path
-      (insert (claudemacs-client--get-file-template-with-startup-code project-path)))
+      (if template-content
+          (insert (format template-content project-path))
+        ;; Fallback to en.org template if external template loading fails
+        (let ((fallback-content (claudemacs-client--load-template "en")))
+          (if fallback-content
+              (insert (format fallback-content project-path))
+            (error "No template files found - unable to initialize project file")))))
     file-path))
 
 (defun claudemacs-client--find-project-file (file-path)
@@ -384,27 +367,10 @@ This function finds existing input file or creates new one if needed."
         (unless (eq major-mode 'org-mode)
           (let ((org-mode-hook nil))
             (ignore org-mode-hook)  ; Suppress unused variable warning
-            (org-mode))))
-      ;; Set up key bindings
-      (claudemacs-client--setup-input-file-keys))
+            (org-mode)))))
     (switch-to-buffer buffer)
     (goto-char (point-max))
     (message "Project input file ready: %s" (file-name-nondirectory file-path))))
-
-(defun claudemacs-client-send-region-interactive ()
-  "Interactive version of send region that handles no region case."
-  (interactive)
-  (if (use-region-p)
-    (claudemacs-client-send-region (region-beginning) (region-end))
-    (message "No region selected")))
-
-(defun claudemacs-client--setup-input-file-keys ()
-  "Set up key bindings for the Claude input file."
-  ;; Set up key bindings using buffer-local keymap
-  (use-local-map (copy-keymap (current-local-map)))
-  (local-set-key (kbd "C-c C-c") #'claudemacs-client-send-rest-of-buffer)
-  (local-set-key (kbd "C-c C-r") #'claudemacs-client-send-region-interactive)
-  (local-set-key (kbd "C-c C-b") #'claudemacs-client-send-buffer))
 
 ;;;###autoload
 (defun claudemacs-client-start ()
@@ -448,7 +414,8 @@ Otherwise, use current language setting."
             (princ template-content))
           (with-current-buffer buffer-name
             (when (fboundp 'org-mode)
-              (org-mode)))
+              (let ((org-mode-hook nil))
+                (org-mode))))
           (message "Template output to buffer: %s" buffer-name)
           t)
       (message "Template not found for language: %s" target-language)
