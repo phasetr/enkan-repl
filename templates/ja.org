@@ -2,7 +2,7 @@
 プロジェクト: %s
 
 ** Claudemacs新規起動
-注意：これは claudemacs 自体の起動コマンドで, claudemacs-client の起動ではない.
+注意：これは claudemacs 自体の起動コマンドで, claudemacs-client の起動ではありません.
 
 (start-claudemacs)
 
@@ -25,4 +25,4 @@
 - 標準テンプレート出力: (claudemacs-client-output-template)
 
 ** 考え・メモ
-ここに書くのは必ずしも claude code に送信する内容だけでなくてもよい.
+ここに書くのは必ずしも claude code に送信する内容だけでなくてもかまいません.
