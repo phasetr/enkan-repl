@@ -36,7 +36,7 @@
 ;; Features:
 ;; - Send text from files, buffers, and regions to claudemacs
 ;; - Dedicated input file with org-mode support
-;; - History management for sent content
+;; - File-based project management with persistent storage
 ;; - Multi-project support (planned)
 ;; - Enhanced key bindings for efficient workflow
 ;;
