@@ -327,7 +327,7 @@
 (ert-deftest test-find-matching-buffer-pure-edge-cases ()
   "Test edge cases for buffer finding."
   ;; Buffer list with invalid plist - missing :buffer means plist-get returns nil
-  (let ((invalid-buffer-list (list (list :name "*claude*" 
+  (let ((invalid-buffer-list (list (list :name "*claude*"
                                      ;; Missing :buffer key means buffer is nil
                                      :default-directory "/path/"
                                      :eat-mode nil))))
@@ -335,7 +335,7 @@
       (should-not (claudemacs-client--find-matching-buffer-pure
                     invalid-buffer-list
                     "/path/"))))
-  
+
   ;; Buffer with malformed name
   (let ((buffer-list (list (list :buffer 'test-buffer
                              :name ""  ; Empty name
@@ -345,7 +345,7 @@
       (should-not (claudemacs-client--find-matching-buffer-pure
                     buffer-list
                     "/path/"))))
-  
+
   ;; Buffer with nil name
   (let ((buffer-list (list (list :buffer 'test-buffer
                              :name nil
@@ -367,7 +367,7 @@
                    ((symbol-function 'process-live-p) (lambda (proc) nil)))
           (should-not (claudemacs-client--can-send-text-pure test-buffer))))
       (kill-buffer test-buffer)))
-  
+
   ;; Buffer where process-live-p throws error
   (let ((test-buffer (generate-new-buffer "*test-claude*")))
     (unwind-protect
@@ -394,7 +394,7 @@
           (should (claudemacs-client--send-text-pure long-text test-buffer))
           (should (equal sent-strings (list "\r" long-text)))))
       (kill-buffer test-buffer)))
-  
+
   ;; Text with special characters
   (let ((test-buffer (generate-new-buffer "*test-claude*"))
          (special-text "Hello\n\t\r\nWorld! 🎉 Ñice tëxt")
@@ -409,7 +409,7 @@
           (should (claudemacs-client--send-text-pure special-text test-buffer))
           (should (equal sent-strings (list "\r" special-text)))))
       (kill-buffer test-buffer)))
-  
+
   ;; Buffer gets killed during sending (edge case)
   (let ((test-buffer (generate-new-buffer "*test-claude*")))
     (with-current-buffer test-buffer
@@ -417,7 +417,7 @@
       (cl-letf (((symbol-function 'boundp) (lambda (sym) (eq sym 'eat--process)))
                  ((symbol-function 'process-live-p) (lambda (proc) t))
                  ((symbol-function 'eat--send-string)
-                   (lambda (proc text) 
+                   (lambda (proc text)
                      (kill-buffer test-buffer)  ; Kill buffer during send
                      nil)))
         ;; This should still try to send, but buffer will be dead
@@ -436,14 +436,14 @@
 
 (ert-deftest test-find-matching-buffer-pure-large-buffer-list ()
   "Test buffer finding with large buffer list."
-  (let ((large-buffer-list 
+  (let ((large-buffer-list
           (cl-loop for i from 1 to 1000 collect
             (list :buffer (intern (format "buffer%d" i))
               :name (format "*buffer%d*" i)
               :default-directory (format "/path%d/" i)
               :eat-mode nil))))
     ;; Add target buffer at the end
-    (setq large-buffer-list 
+    (setq large-buffer-list
       (append large-buffer-list
         (list (list :buffer 'target-buffer
                 :name "*claudemacs:/target/path/*"

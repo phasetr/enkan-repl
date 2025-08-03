@@ -143,8 +143,8 @@ Write your text here and use the following keys:
 
 " project-path project-path project-path))
 
-(defun claudemacs-client--create-project-file (file-path)
-  "Create a new project file at FILE-PATH with template content."
+(defun claudemacs-client--initialize-project-file (file-path)
+  "Initialize a new project file at FILE-PATH with template content."
   (let* ((directory (file-name-directory file-path))
           (project-path (claudemacs-client--decode-full-path
                           (file-name-base (file-name-nondirectory file-path)))))
@@ -154,15 +154,14 @@ Write your text here and use the following keys:
       (insert (claudemacs-client--get-file-template-with-startup-code project-path)))
     file-path))
 
-(defun claudemacs-client--load-project-file (file-path)
-  "Load or create project file at FILE-PATH and return file buffer."
+(defun claudemacs-client--find-project-file (file-path)
+  "Find or create project file at FILE-PATH and return file buffer."
   (if (file-exists-p file-path)
     (find-file file-path)
     (let ((buffer (find-file file-path)))
-      (claudemacs-client--create-project-file file-path)
+      (claudemacs-client--initialize-project-file file-path)
       (revert-buffer t t)
       buffer)))
-
 
 ;;;; Pure Functions for Directory/Buffer Detection
 
@@ -329,7 +328,7 @@ This replaces the temporary file approach with persistent files."
   (interactive)
   (let* ((target-dir (or directory default-directory))
           (file-path (claudemacs-client--get-project-file-path target-dir))
-          (buffer (claudemacs-client--load-project-file file-path)))
+          (buffer (claudemacs-client--find-project-file file-path)))
     (with-current-buffer buffer
       ;; Set up org mode
       (when (fboundp 'org-mode)
