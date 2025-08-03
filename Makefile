@@ -30,7 +30,7 @@ checkdoc: ## Check documentation format
 	$(BATCH) --eval "(checkdoc-file \"claudemacs-client.el\")"
 
 lint: ## Run package-lint checks
-	$(BATCH) -l package-lint --eval "(package-lint-file \"claudemacs-client.el\")"
+	$(BATCH) --eval "(progn (package-initialize) (require 'package-lint) (with-temp-buffer (insert-file-contents \"claudemacs-client.el\") (emacs-lisp-mode) (package-lint-current-buffer)))"
 
 check: test compile checkdoc lint ## Run all quality checks
 
