@@ -167,9 +167,9 @@ Write your text here and use the following keys:
 ;;;; Pure Functions for Directory/Buffer Detection
 
 (defun claudemacs-client--extract-directory-pure (buffer-file-name-arg default-directory-arg)
-  "Pure function: Extract target directory from BUFFER-FILE-NAME-ARG and DEFAULT-DIRECTORY-ARG.
-If BUFFER-FILE-NAME-ARG matches persistent file pattern, decode directory.
-Otherwise, return DEFAULT-DIRECTORY-ARG."
+  "Pure function: Extract target directory from BUFFER-FILE-NAME-ARG.
+Uses DEFAULT-DIRECTORY-ARG if BUFFER-FILE-NAME-ARG doesn't match pattern.
+If BUFFER-FILE-NAME-ARG matches persistent file pattern, decode directory."
   (if (and buffer-file-name-arg
         (string-match-p "cec-.+\\.org$" (file-name-nondirectory buffer-file-name-arg)))
     ;; This is a persistent file, extract directory from filename
@@ -186,8 +186,9 @@ Returns t if directories match, nil otherwise."
       (file-truename target-dir))))
 
 (defun claudemacs-client--find-matching-buffer-pure (buffer-list target-directory)
-  "Pure function: Find claudemacs buffer matching TARGET-DIRECTORY from BUFFER-LIST.
-Returns matching buffer or nil.  BUFFER-LIST should contain buffer objects."
+  "Pure function: Find claudemacs buffer matching TARGET-DIRECTORY.
+BUFFER-LIST should contain buffer objects.
+Returns matching buffer or nil."
   (cl-find-if (lambda (buf-info)
                 (let ((name (plist-get buf-info :name))
                        (default-dir (plist-get buf-info :default-directory))
