@@ -1,27 +1,57 @@
-* Claude Input File
+#+TITLE: Claude Input File
+#+AUTHOR: claudemacs-client
+#+DATE: %<%Y-%m-%d>
 
-** Claudemacs Startup Code
-Note: This is the startup command for claudemacs itself, not for claudemacs-client.
+* Quick Start
 
-(start-claudemacs)
+** 1. Start Claude Code Session
+Execute this to start claudemacs and set up the environment:
 
-** Window Layout Setup
-Note: This layout uses split-window-right as the author's preference.
-Customize this block for your desired window layout.
+#+BEGIN_SRC emacs-lisp
+(claudemacs-client-start-claudemacs)
+#+END_SRC
 
+** 2. Setup Window Layout (Optional)
+Create a convenient window layout for Claude Code interaction:
+
+#+BEGIN_SRC emacs-lisp
 (claudemacs-client-setup-window-layout)
+#+END_SRC
 
-** Essential Functions
-- Send region: M-x claudemacs-client-send-region
-- Send rest of buffer: M-x claudemacs-client-send-rest-of-buffer
-- Send buffer: M-x claudemacs-client-send-buffer
+* Essential Commands
 
-** Diagnostics
-- Status check: (claudemacs-client-status)
+** Sending Content to Claude Code
+- *Send current region*: ~M-x claudemacs-client-send-region~ (or ~C-c r~)
+- *Send current line*: ~M-x claudemacs-client-send-line~ (or ~C-c l~)
+- *Send rest of buffer*: ~M-x claudemacs-client-send-rest-of-buffer~ (or ~C-c t~)
+- *Send entire buffer*: ~M-x claudemacs-client-send-buffer~ (or ~C-c b~)
 
-** Template Customization
-- Output standard template: (claudemacs-client-output-template)
+** Project Management
+- *Open project input file*: ~M-x claudemacs-client-open-project-input~
+- *Output template for customization*: ~M-x claudemacs-client-output-template~
 
-** Thought/memo
-You may write extensive notes to organize your thoughts,
-not just content to send to Claude Code.
+** Troubleshooting
+If you encounter connection issues, run diagnostics:
+
+#+BEGIN_SRC emacs-lisp
+(claudemacs-client-status)
+#+END_SRC
+
+* Working Notes
+
+You can write extensive notes here to organize your thoughts.
+This section is for your personal use - only send specific parts to Claude Code as needed.
+
+** Project Context
+- Description of your current project
+- Key objectives and requirements
+- Important constraints or considerations
+
+** Development Notes
+- Code snippets for testing
+- Architecture decisions
+- TODO items and reminders
+
+** Communication with Claude Code
+Use the sending commands above to share specific sections with Claude Code.
+You don't need to send everything - be selective about what context is relevant.

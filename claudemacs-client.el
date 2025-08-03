@@ -427,6 +427,7 @@ Wrapper function that uses pure function internally."
           (message "❌ Cannot send - no matching claudemacs buffer found for this directory"))
       (message "No content to send (empty or whitespace only)"))))
 
+
 (defun claudemacs-client--create-project-input-file (target-directory)
   "Create project input file for TARGET-DIRECTORY from template.
 Returns the created file path."
@@ -477,7 +478,7 @@ If not exists, create from template then open."
       (message "Project input file ready: %s" (file-name-nondirectory file-path)))))
 
 ;;;###autoload
-(defun start-claudemacs ()
+(defun claudemacs-client-start-claudemacs ()
   "Start claudemacs and change to appropriate directory.
 Determines directory from current buffer filename if it's a persistent file.
 Checks for existing sessions to prevent double startup."
@@ -498,7 +499,7 @@ Checks for existing sessions to prevent double startup."
       (when
           (y-or-n-p (format "Dead claudemacs session found in %s.  Restart? " target-dir))
         (kill-buffer existing-buffer)
-        (start-claudemacs)))
+        (claudemacs-client-start-claudemacs)))
      ;; No existing session - start new one
      (t
       (unwind-protect
@@ -527,7 +528,7 @@ This is the author's preference - customize as needed."
     (let ((claudemacs-buf (claudemacs-client--get-buffer-for-directory target-dir)))
       (if claudemacs-buf
           (switch-to-buffer claudemacs-buf)
-        (message "claudemacs buffer not found. Run (start-claudemacs-new-session) first.")))
+        (message "claudemacs buffer not found. Run (claudemacs-client-start-claudemacs) first.")))
     (other-window -1)
     (message "Window layout setup complete")))
 
@@ -670,10 +671,10 @@ This is the author's preference - customize as needed."
        (can-send
         (princ "✓ Connection is working. You can send text to Claude.\n"))
        ((not claudemacs-sessions)
-        (princ "1. Start claudemacs in target directory: (start-claudemacs)\n")
-        (princ "2. Or run: M-x start-claudemacs\n"))
+        (princ "1. Start claudemacs in target directory: (claudemacs-client-start-claudemacs)\n")
+        (princ "2. Or run: M-x claudemacs-client-start-claudemacs\n"))
        (t
-        (princ "1. Start claudemacs for target directory: (start-claudemacs)\n")
+        (princ "1. Start claudemacs for target directory: (claudemacs-client-start-claudemacs)\n")
         (princ "2. Or switch to existing session directory:\n")
         (dolist (buf claudemacs-sessions)
           (let

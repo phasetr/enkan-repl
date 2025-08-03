@@ -16,7 +16,7 @@
 
 ;; Load the main package and define helper function
 (defvar claudemacs-client-test-package-dir
-  (let ((package-dir (or (and load-file-name 
+  (let ((package-dir (or (and load-file-name
                               (file-name-directory load-file-name))
                          (file-name-directory (locate-library "claudemacs-client-test"))
                          default-directory)))
@@ -482,7 +482,7 @@
   ;; This test documents the intended immutability, even though Emacs Lisp
   ;; doesn't enforce it for defconst
   (should (not (string-empty-p claudemacs-client-default-template-filename)))
-  
+
   ;; Verify the constant is marked as a constant (has defconst property)
   (should (get 'claudemacs-client-default-template-filename 'variable-documentation)))
 
@@ -496,9 +496,9 @@
         (progn
           (with-temp-file temp-template
             (insert test-content))
-          (let ((result (claudemacs-client--load-template-pure 
-                         temp-template 
-                         "/unused/package/dir" 
+          (let ((result (claudemacs-client--load-template-pure
+                         temp-template
+                         "/unused/package/dir"
                          "unused-default.org")))
             (should result)
             (should (string= result test-content))))
@@ -514,9 +514,9 @@
           (let ((default-template (expand-file-name "test-default.org" temp-package-dir)))
             (with-temp-file default-template
               (insert test-content))
-            (let ((result (claudemacs-client--load-template-pure 
-                           nil 
-                           temp-package-dir 
+            (let ((result (claudemacs-client--load-template-pure
+                           nil
+                           temp-package-dir
                            "test-default.org")))
               (should result)
               (should (string= result test-content)))))
@@ -532,9 +532,9 @@
           (with-temp-file temp-template
             (insert test-content))
           ;; Test with ~ path
-          (let ((result (claudemacs-client--load-template-pure 
+          (let ((result (claudemacs-client--load-template-pure
                          "~/test-template.org"
-                         "/unused/package/dir" 
+                         "/unused/package/dir"
                          "unused-default.org")))
             (should result)
             (should (string= result test-content))))
@@ -543,9 +543,9 @@
 
 (ert-deftest test-load-template-pure-nonexistent-custom-file ()
   "Test pure template loading with nonexistent custom file."
-  (let ((result (claudemacs-client--load-template-pure 
-                 "/nonexistent/template.org" 
-                 "/unused/package/dir" 
+  (let ((result (claudemacs-client--load-template-pure
+                 "/nonexistent/template.org"
+                 "/unused/package/dir"
                  "unused-default.org")))
     (should-not result)))
 
@@ -553,9 +553,9 @@
   "Test pure template loading with nonexistent default file."
   (let ((temp-package-dir (make-temp-file "test-package" t)))
     (unwind-protect
-        (let ((result (claudemacs-client--load-template-pure 
-                       nil 
-                       temp-package-dir 
+        (let ((result (claudemacs-client--load-template-pure
+                       nil
+                       temp-package-dir
                        "nonexistent-default.org")))
           (should-not result))
       (when (file-exists-p temp-package-dir)
@@ -569,9 +569,9 @@
           ;; Create empty file
           (with-temp-file temp-template
             (insert ""))
-          (let ((result (claudemacs-client--load-template-pure 
-                         temp-template 
-                         "/unused/package/dir" 
+          (let ((result (claudemacs-client--load-template-pure
+                         temp-template
+                         "/unused/package/dir"
                          "unused-default.org")))
             (should result)
             (should (string= result ""))))
@@ -586,9 +586,9 @@
         (progn
           (with-temp-file temp-template
             (insert test-content))
-          (let ((result (claudemacs-client--load-template-pure 
-                         temp-template 
-                         "/unused/package/dir" 
+          (let ((result (claudemacs-client--load-template-pure
+                         temp-template
+                         "/unused/package/dir"
                          "unused-default.org")))
             (should result)
             (should (string= result test-content))))
@@ -603,9 +603,9 @@
         (progn
           (with-temp-file temp-template
             (insert large-content))
-          (let ((result (claudemacs-client--load-template-pure 
-                         temp-template 
-                         "/unused/package/dir" 
+          (let ((result (claudemacs-client--load-template-pure
+                         temp-template
+                         "/unused/package/dir"
                          "unused-default.org")))
             (should result)
             (should (string= result large-content))))
@@ -616,7 +616,7 @@
   "Test pure template loading edge cases."
   ;; Test with nil parameters
   (should-not (claudemacs-client--load-template-pure nil "/nonexistent" "nonexistent.org"))
-  
+
   ;; Test with empty strings - these should not try to read files
   (should-not (claudemacs-client--load-template-pure nil "/nonexistent" ""))
   (should-not (claudemacs-client--load-template-pure nil "" "nonexistent.org")))
@@ -655,7 +655,7 @@
     (let ((template-content (claudemacs-client--load-template)))
       (should template-content)
       (should (stringp template-content))
-      (should (string-match-p "\\* Claude Input File" template-content)))))
+      (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" template-content)))))
 
 (ert-deftest test-load-template-custom-with-fallback ()
   "Test loading custom template with fallback to default."
@@ -688,13 +688,13 @@
   "Test template loading fallback chain behavior."
   (let ((default-directory claudemacs-client-test-package-dir)
         (claudemacs-client-custom-template-path nil))
-    
+
     ;; Test that default template loading works
     (let ((claudemacs-client-template-file nil))
       (let ((template-content (claudemacs-client--load-template)))
         (should template-content)
-        (should (string-match-p "\\* Claude Input File" template-content))))
-    
+        (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" template-content))))
+
     ;; Test that nonexistent custom file returns nil
     (let ((claudemacs-client-template-file "/nonexistent/path.org"))
       (let ((template-content (claudemacs-client--load-template)))
@@ -714,8 +714,8 @@
           (with-temp-buffer
             (insert-file-contents temp-file)
             (let ((content (buffer-string)))
-              (should (string-match-p "\\* Claude Input File" content))
-              (should (string-match-p "(start-claudemacs)" content)))))
+              (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" content))
+              (should (string-match-p "(claudemacs-client-start-claudemacs)" content)))))
       (when (file-exists-p temp-file)
         (delete-file temp-file)))))
 
@@ -755,9 +755,9 @@
             (insert-file-contents temp-file)
             (let ((content (buffer-string)))
               ;; Should contain default.org content, not hardcoded fallback
-              (should (string-match-p "\\* Claude Input File" content))
-              (should (string-match-p "(start-claudemacs)" content))
-              (should (string-match-p "Claudemacs Startup Code" content)))))
+              (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" content))
+              (should (string-match-p "(claudemacs-client-start-claudemacs)" content))
+              (should (string-match-p "Start Claude Code Session\\|claudemacs-client-start-claudemacs" content)))))
       (when (file-exists-p temp-file)
         (delete-file temp-file)))))
 
@@ -774,10 +774,10 @@
             (insert-file-contents temp-file)
             (let ((content (buffer-string)))
               ;; Should contain default.org content, not hardcoded fallback
-              (should (string-match-p "\\* Claude Input File" content))
-              (should (string-match-p "(start-claudemacs)" content))
-              (should (string-match-p "Claudemacs Startup Code" content))
-              (should (string-match-p "Essential Functions" content))
+              (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" content))
+              (should (string-match-p "(claudemacs-client-start-claudemacs)" content))
+              (should (string-match-p "Start Claude Code Session\\|claudemacs-client-start-claudemacs" content))
+              (should (string-match-p "Essential Commands\\|Send current region" content))
               ;; Should NOT contain the hardcoded fallback format
               (should-not (string-match-p "Project: .*\n\n\\*\\* Thoughts/Notes" content)))))
       (when (file-exists-p temp-file)
@@ -802,9 +802,9 @@
             (insert-file-contents temp-file)
             (let ((content (buffer-string)))
               ;; Should contain default.org content
-              (should (string-match-p "\\* Claude Input File" content))
-              (should (string-match-p "(start-claudemacs)" content))
-              (should (string-match-p "Claudemacs Startup Code" content)))))
+              (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" content))
+              (should (string-match-p "(claudemacs-client-start-claudemacs)" content))
+              (should (string-match-p "Start Claude Code Session\\|claudemacs-client-start-claudemacs" content)))))
       (when (file-exists-p temp-dir)
         (delete-directory temp-dir t)))))
 
@@ -829,7 +829,7 @@
               (should (string-match-p "\\* Custom Template Content" content))
               (should (string-match-p "My Custom Section" content))
               ;; Should NOT contain default.org content
-              (should-not (string-match-p "(start-claudemacs)" content)))))
+              (should-not (string-match-p "(claudemacs-client-start-claudemacs)" content)))))
       (when (file-exists-p temp-template)
         (delete-file temp-template))
       (when (file-exists-p temp-dir)
@@ -852,9 +852,9 @@
             (insert-file-contents temp-file)
             (let ((content (buffer-string)))
               ;; Should fallback to default.org content
-              (should (string-match-p "\\* Claude Input File" content))
-              (should (string-match-p "(start-claudemacs)" content))
-              (should (string-match-p "Claudemacs Startup Code" content)))))
+              (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" content))
+              (should (string-match-p "(claudemacs-client-start-claudemacs)" content))
+              (should (string-match-p "Start Claude Code Session\\|claudemacs-client-start-claudemacs" content)))))
       (when (file-exists-p temp-dir)
         (delete-directory temp-dir t)))))
 
@@ -872,25 +872,25 @@
           (with-temp-file temp-file
             (insert existing-content))
           (should (file-exists-p temp-file))
-          
+
           ;; Mock find-file to capture what gets opened instead of actually opening
           (let ((opened-file nil)
                 (claudemacs-client-template-file nil))
-            (cl-letf (((symbol-function 'find-file) 
-                       (lambda (file) 
+            (cl-letf (((symbol-function 'find-file)
+                       (lambda (file)
                          (setq opened-file file)
                          (get-buffer-create "*mock-buffer*")))
-                      ((symbol-function 'switch-to-buffer) 
+                      ((symbol-function 'switch-to-buffer)
                        (lambda (buffer) buffer))
-                      ((symbol-function 'goto-char) 
+                      ((symbol-function 'goto-char)
                        (lambda (pos) pos))
-                      ((symbol-function 'point-max) 
+                      ((symbol-function 'point-max)
                        (lambda () 100))
-                      ((symbol-function 'message) 
+                      ((symbol-function 'message)
                        (lambda (&rest args) nil))
-                      ((symbol-function 'org-mode) 
+                      ((symbol-function 'org-mode)
                        (lambda () nil))
-                      ((symbol-function 'fboundp) 
+                      ((symbol-function 'fboundp)
                        (lambda (sym) nil)))
               (let ((default-directory temp-dir))
                 (claudemacs-client-open-project-input))
@@ -915,25 +915,25 @@
           (setq temp-file (claudemacs-client--get-project-file-path temp-dir))
           ;; Ensure file doesn't exist initially
           (should-not (file-exists-p temp-file))
-          
+
           ;; Mock find-file to capture what gets opened instead of actually opening
           (let ((opened-file nil)
                 (claudemacs-client-template-file nil))
-            (cl-letf (((symbol-function 'find-file) 
-                       (lambda (file) 
+            (cl-letf (((symbol-function 'find-file)
+                       (lambda (file)
                          (setq opened-file file)
                          (get-buffer-create "*mock-buffer*")))
-                      ((symbol-function 'switch-to-buffer) 
+                      ((symbol-function 'switch-to-buffer)
                        (lambda (buffer) buffer))
-                      ((symbol-function 'goto-char) 
+                      ((symbol-function 'goto-char)
                        (lambda (pos) pos))
-                      ((symbol-function 'point-max) 
+                      ((symbol-function 'point-max)
                        (lambda () 100))
-                      ((symbol-function 'message) 
+                      ((symbol-function 'message)
                        (lambda (&rest args) nil))
-                      ((symbol-function 'org-mode) 
+                      ((symbol-function 'org-mode)
                        (lambda () nil))
-                      ((symbol-function 'fboundp) 
+                      ((symbol-function 'fboundp)
                        (lambda (sym) nil)))
               (let ((default-directory temp-dir))
                 (claudemacs-client-open-project-input))
@@ -944,8 +944,8 @@
               (with-temp-buffer
                 (insert-file-contents temp-file)
                 (let ((content (buffer-string)))
-                  (should (string-match-p "\\* Claude Input File" content))
-                  (should (string-match-p "(start-claudemacs)" content)))))))
+                  (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" content))
+                  (should (string-match-p "(claudemacs-client-start-claudemacs)" content)))))))
       (when (file-exists-p temp-dir)
         (delete-directory temp-dir t)))))
 
@@ -961,14 +961,14 @@
           (message-text nil))
       ;; Mock functions
       (cl-letf (((symbol-function 'use-region-p) (lambda () t))
-                ((symbol-function 'claudemacs-client--get-target-directory-for-buffer) 
+                ((symbol-function 'claudemacs-client--get-target-directory-for-buffer)
                  (lambda () "/test/dir"))
-                ((symbol-function 'claudemacs-client--send-text) 
-                 (lambda (text dir) 
+                ((symbol-function 'claudemacs-client--send-text)
+                 (lambda (text dir)
                    (setq sent-text text)
                    t))
-                ((symbol-function 'message) 
-                 (lambda (fmt &rest args) 
+                ((symbol-function 'message)
+                 (lambda (fmt &rest args)
                    (setq message-text (apply #'format fmt args)))))
         (claudemacs-client-send-region start end)
         ;; Should trim whitespace
@@ -984,10 +984,10 @@
           (message-text nil))
       ;; Mock functions
       (cl-letf (((symbol-function 'use-region-p) (lambda () t))
-                ((symbol-function 'claudemacs-client--get-target-directory-for-buffer) 
+                ((symbol-function 'claudemacs-client--get-target-directory-for-buffer)
                  (lambda () "/test/dir"))
-                ((symbol-function 'message) 
-                 (lambda (fmt &rest args) 
+                ((symbol-function 'message)
+                 (lambda (fmt &rest args)
                    (setq message-text (apply #'format fmt args)))))
         (claudemacs-client-send-region start end)
         ;; Should detect empty content
@@ -1002,14 +1002,14 @@
     (let ((sent-text nil)
           (message-text nil))
       ;; Mock functions
-      (cl-letf (((symbol-function 'claudemacs-client--get-target-directory-for-buffer) 
+      (cl-letf (((symbol-function 'claudemacs-client--get-target-directory-for-buffer)
                  (lambda () "/test/dir"))
-                ((symbol-function 'claudemacs-client--send-text) 
-                 (lambda (text dir) 
+                ((symbol-function 'claudemacs-client--send-text)
+                 (lambda (text dir)
                    (setq sent-text text)
                    t))
-                ((symbol-function 'message) 
-                 (lambda (fmt &rest args) 
+                ((symbol-function 'message)
+                 (lambda (fmt &rest args)
                    (setq message-text (apply #'format fmt args)))))
         (claudemacs-client-send-rest-of-buffer)
         ;; Should trim whitespace
@@ -1024,10 +1024,10 @@
     (goto-char (+ (point-min) 13)) ; Position after "Some content\n"
     (let ((message-text nil))
       ;; Mock functions
-      (cl-letf (((symbol-function 'claudemacs-client--get-target-directory-for-buffer) 
+      (cl-letf (((symbol-function 'claudemacs-client--get-target-directory-for-buffer)
                  (lambda () "/test/dir"))
-                ((symbol-function 'message) 
-                 (lambda (fmt &rest args) 
+                ((symbol-function 'message)
+                 (lambda (fmt &rest args)
                    (setq message-text (apply #'format fmt args)))))
         (claudemacs-client-send-rest-of-buffer)
         ;; Should detect no content
@@ -1041,14 +1041,14 @@
     (let ((sent-text nil)
           (message-text nil))
       ;; Mock functions
-      (cl-letf (((symbol-function 'claudemacs-client--get-target-directory-for-buffer) 
+      (cl-letf (((symbol-function 'claudemacs-client--get-target-directory-for-buffer)
                  (lambda () "/test/dir"))
-                ((symbol-function 'claudemacs-client--send-text) 
-                 (lambda (text dir) 
+                ((symbol-function 'claudemacs-client--send-text)
+                 (lambda (text dir)
                    (setq sent-text text)
                    t))
-                ((symbol-function 'message) 
-                 (lambda (fmt &rest args) 
+                ((symbol-function 'message)
+                 (lambda (fmt &rest args)
                    (setq message-text (apply #'format fmt args)))))
         (claudemacs-client-send-line)
         ;; Should send only current line
@@ -1063,14 +1063,14 @@
     (let ((sent-text nil)
           (message-text nil))
       ;; Mock functions
-      (cl-letf (((symbol-function 'claudemacs-client--get-target-directory-for-buffer) 
+      (cl-letf (((symbol-function 'claudemacs-client--get-target-directory-for-buffer)
                  (lambda () "/test/dir"))
-                ((symbol-function 'claudemacs-client--send-text) 
-                 (lambda (text dir) 
+                ((symbol-function 'claudemacs-client--send-text)
+                 (lambda (text dir)
                    (setq sent-text text)
                    t))
-                ((symbol-function 'message) 
-                 (lambda (fmt &rest args) 
+                ((symbol-function 'message)
+                 (lambda (fmt &rest args)
                    (setq message-text (apply #'format fmt args)))))
         (claudemacs-client-send-line)
         ;; Should trim whitespace
@@ -1084,10 +1084,10 @@
     (goto-char 10) ; Position in empty line
     (let ((message-text nil))
       ;; Mock functions
-      (cl-letf (((symbol-function 'claudemacs-client--get-target-directory-for-buffer) 
+      (cl-letf (((symbol-function 'claudemacs-client--get-target-directory-for-buffer)
                  (lambda () "/test/dir"))
-                ((symbol-function 'message) 
-                 (lambda (fmt &rest args) 
+                ((symbol-function 'message)
+                 (lambda (fmt &rest args)
                    (setq message-text (apply #'format fmt args)))))
         (claudemacs-client-send-line)
         ;; Should detect empty content
@@ -1101,14 +1101,14 @@
     (let ((sent-text nil)
           (message-text nil))
       ;; Mock functions
-      (cl-letf (((symbol-function 'claudemacs-client--get-target-directory-for-buffer) 
+      (cl-letf (((symbol-function 'claudemacs-client--get-target-directory-for-buffer)
                  (lambda () "/test/dir"))
-                ((symbol-function 'claudemacs-client--send-text) 
-                 (lambda (text dir) 
+                ((symbol-function 'claudemacs-client--send-text)
+                 (lambda (text dir)
                    (setq sent-text text)
                    t))
-                ((symbol-function 'message) 
-                 (lambda (fmt &rest args) 
+                ((symbol-function 'message)
+                 (lambda (fmt &rest args)
                    (setq message-text (apply #'format fmt args)))))
         (claudemacs-client-send-line)
         ;; Should send the single line
@@ -1121,12 +1121,12 @@
     (insert "Test line")
     (let ((message-text nil))
       ;; Mock functions
-      (cl-letf (((symbol-function 'claudemacs-client--get-target-directory-for-buffer) 
+      (cl-letf (((symbol-function 'claudemacs-client--get-target-directory-for-buffer)
                  (lambda () "/test/dir"))
-                ((symbol-function 'claudemacs-client--send-text) 
+                ((symbol-function 'claudemacs-client--send-text)
                  (lambda (text dir) nil)) ; Simulate no buffer found
-                ((symbol-function 'message) 
-                 (lambda (fmt &rest args) 
+                ((symbol-function 'message)
+                 (lambda (fmt &rest args)
                    (setq message-text (apply #'format fmt args)))))
         (claudemacs-client-send-line)
         ;; Should show error message
@@ -1144,14 +1144,14 @@
             (condition-case nil
                 (claudemacs-client-output-template)
               (error nil)))  ; Ignore org-mode hook errors
-          
+
           ;; Check that buffer was created
           (let ((buffer (get-buffer "*claudemacs-template-default*")))
             (should buffer)
             (with-current-buffer buffer
               (should (> (buffer-size) 0))
-              (should (string-match-p "\\* Claude Input File" (buffer-string))))))
-      
+              (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" (buffer-string))))))
+
       ;; Cleanup
       (when (get-buffer "*claudemacs-template-default*")
         (kill-buffer "*claudemacs-template-default*")))))
@@ -1176,16 +1176,16 @@
           ;; Test that template loading works with current language setting
           (let ((template-content (claudemacs-client--load-template)))
             (should template-content)
-            (should (string-match-p "\\* Claude Input File" template-content)))
-          
+            (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" template-content)))
+
           ;; Test that project file initialization uses the loaded template
           (claudemacs-client--initialize-project-file temp-file)
           (should (file-exists-p temp-file))
           (with-temp-buffer
             (insert-file-contents temp-file)
             (let ((content (buffer-string)))
-              (should (string-match-p "\\* Claude Input File" content))))
-          
+              (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" content))))
+
           ;; Test switching to custom template and regenerating
           (let ((temp-custom-template (make-temp-file "test-custom-template" nil ".org"))
                 (temp-file2 (concat claudemacs-client-test-package-dir "cec--tmp--test--integration2.org"))
@@ -1208,10 +1208,10 @@
       (when (file-exists-p temp-file)
         (delete-file temp-file)))))
 
-;;; Tests for start-claudemacs Function
+;;; Tests for claudemacs-client-start-claudemacs Function
 
 (ert-deftest test-start-claudemacs-directory-change ()
-  "Test that start-claudemacs changes default-directory correctly."
+  "Test that claudemacs-client-start-claudemacs changes default-directory correctly."
   (let ((original-dir (expand-file-name default-directory))
         (test-dir (expand-file-name "/tmp/")))
     (unwind-protect
@@ -1222,13 +1222,13 @@
                   ((symbol-function 'claudemacs-client--can-send-text)
                    ;; Mock different results for before/after startup
                    (let ((call-count 0))
-                     (lambda (dir) 
+                     (lambda (dir)
                        (setq call-count (1+ call-count))
                        (> call-count 1))))  ; Return t after first call (simulating successful startup)
-                  ((symbol-function 'claudemacs-transient-menu) 
+                  ((symbol-function 'claudemacs-transient-menu)
                    (lambda () (message "Mock claudemacs-transient-menu called"))))
           (cd original-dir)
-          (start-claudemacs)
+          (claudemacs-client-start-claudemacs)
           (should (string= (expand-file-name default-directory) test-dir)))
       ;; Cleanup
       (cd original-dir))))
@@ -1246,9 +1246,9 @@
                   ((symbol-function 'claudemacs-client--can-send-text)
                    (lambda (dir) t))  ; Simulate live session
                   ((symbol-function 'message)
-                   (lambda (fmt &rest args) 
+                   (lambda (fmt &rest args)
                      (push (apply #'format fmt args) messages))))
-          (start-claudemacs)
+          (claudemacs-client-start-claudemacs)
           ;; Should not change directory when session exists
           (should (string= (expand-file-name default-directory) original-dir))
           ;; Should show appropriate message
@@ -1274,9 +1274,9 @@
                    (lambda (prompt) t))  ; Simulate "yes" to restart
                   ((symbol-function 'kill-buffer)
                    (lambda (buffer) t))
-                  ((symbol-function 'start-claudemacs)
+                  ((symbol-function 'claudemacs-client-start-claudemacs)
                    (lambda () (setq restart-called t))))  ; Mock recursive call
-          (start-claudemacs)
+          (claudemacs-client-start-claudemacs)
           (should restart-called))
       ;; Cleanup
       (when (get-buffer "*mock-dead-claudemacs-buffer*")
@@ -1298,8 +1298,8 @@
                   ((symbol-function 'fboundp)
                    (lambda (func) nil)))  ; Simulate claudemacs-transient-menu not available
           (condition-case err
-              (start-claudemacs)
-            (error 
+              (claudemacs-client-start-claudemacs)
+            (error
              (setq error-caught (error-message-string err))))
           (should error-caught)
           (should (string-match-p "not available" error-caught))
@@ -1322,7 +1322,7 @@
                   ((symbol-function 'claudemacs-transient-menu)
                    (lambda () (error "Simulated startup failure"))))
           (condition-case nil
-              (start-claudemacs)
+              (claudemacs-client-start-claudemacs)
             (error nil))  ; Ignore the error
           ;; Should restore original directory
           (should (string= (expand-file-name default-directory) original-dir)))

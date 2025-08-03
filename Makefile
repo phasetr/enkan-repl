@@ -2,7 +2,7 @@
 EMACS ?= emacs
 BATCH = $(EMACS) --batch -Q
 
-.PHONY: help test compile checkdoc lint check clean install-deps format
+.PHONY: help test test-docs test-all compile checkdoc lint check clean install-deps format docs extract-api generate-template
 
 help: ## Show this help message
 	@echo "claudemacs-client Quality Check Commands"
@@ -23,6 +23,11 @@ install-deps: ## Install required dependencies (package-lint)
 test: ## Run ERT tests
 	$(BATCH) --eval "(add-to-list 'load-path \".\")" -l claudemacs-client.el -l test/claudemacs-client-test.el -f ert-run-tests-batch-and-exit
 
+test-docs: ## Run generate-docs tests
+	$(BATCH) --eval "(add-to-list 'load-path \".\")" -l test/generate-docs-test.el -f ert-run-tests-batch-and-exit
+
+test-all: test test-docs ## Run all tests (core package and development tools)
+
 compile: ## Byte compile with warnings as errors
 	$(BATCH) --eval "(setq byte-compile-error-on-warn t)" --eval "(byte-compile-file \"claudemacs-client.el\")"
 
@@ -40,3 +45,12 @@ check: test compile checkdoc lint format ## Run all quality checks including for
 
 clean: ## Remove compiled files
 	rm -f *.elc
+
+extract-api: ## Extract public API documentation as org file
+	$(BATCH) -l scripts/generate-docs.el --eval "(extract-public-api)"
+
+generate-template: ## Generate default template file
+	$(BATCH) -l scripts/generate-docs.el --eval "(generate-default-template)"
+
+docs: ## Generate all documentation files (API and template)
+	$(BATCH) -l scripts/generate-docs.el --eval "(generate-all-docs)"
