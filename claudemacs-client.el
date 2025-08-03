@@ -373,7 +373,7 @@ This function finds existing input file or creates new one if needed."
     (message "Project input file ready: %s" (file-name-nondirectory file-path))))
 
 ;;;###autoload
-(defun start-claudemacs-new-session ()
+(defun start-claudemacs ()
   "Start claudemacs and change to appropriate directory.
 Determines directory from current buffer filename if it's a persistent file.
 Checks for existing sessions to prevent double startup."
@@ -393,7 +393,7 @@ Checks for existing sessions to prevent double startup."
       (existing-buffer
         (when (y-or-n-p (format "Dead claudemacs session found in %s.  Restart? " target-dir))
           (kill-buffer existing-buffer)
-          (start-claudemacs-new-session)))
+          (start-claudemacs)))
 
       ;; No existing session - start new one
       (t
@@ -409,9 +409,6 @@ Checks for existing sessions to prevent double startup."
           (unless (claudemacs-client--can-send-text target-dir)
             (cd original-default-directory)))))))
 
-;; Backward compatibility alias
-(defalias 'claudemacs-client-start 'start-claudemacs-new-session
-  "Backward compatibility alias for start-claudemacs-new-session.")
 
 ;;;###autoload
 (defun claudemacs-client-setup-window-layout ()
