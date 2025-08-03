@@ -456,34 +456,121 @@ Otherwise, use current language setting."
 
 ;;;###autoload
 (defun claudemacs-client-status ()
-  "Show connection status and diagnostic information."
+  "Show detailed diagnostic information for troubleshooting connection issues."
   (interactive)
   (let* ((target-dir (claudemacs-client--get-target-directory-for-buffer))
          (claude-buffer (claudemacs-client--get-buffer-for-directory target-dir))
          (can-send (claudemacs-client--can-send-text target-dir))
-         (claude-buffers
+         (expected-session (concat "*claudemacs:" target-dir "*"))
+         (all-buffers (buffer-list))
+         (claudemacs-sessions
           (seq-filter
            (lambda (buf)
-             (string-match-p "\\*claudemacs:" (buffer-name buf)))
-           (buffer-list))))
-    (with-output-to-temp-buffer "*claudemacs-client-status*"
-      (princ "═══ claudemacs-client Status ═══\n\n")
-      (princ (format "Current buffer: %s\n" (buffer-name)))
+             (string-match-p "^\\*claudemacs:" (buffer-name buf)))
+           all-buffers))
+         (other-claude-buffers
+          (seq-filter
+           (lambda (buf)
+             (let ((name (buffer-name buf)))
+               (or (string= name "*claude*")
+                   (string= name "*claudemacs*")
+                   (and (with-current-buffer buf
+                          (and (boundp 'eat-mode) eat-mode))
+                        (string-match-p "claude" name)))))
+           all-buffers)))
+    (with-output-to-temp-buffer "*claudemacs-client-diagnostic*"
+      (princ "═══ claudemacs-client Diagnostic Report ═══\n\n")
+      
+      ;; Basic information
       (princ (format "Target directory: %s\n" target-dir))
-      (princ (format "Connection status: %s\n"
-                     (if claude-buffer
-                         (format "✓ Connected (%s)" (buffer-name claude-buffer))
-                       "✗ Not connected")))
-      (princ (format "Can send text: %s\n\n" (if can-send "YES" "NO")))
-      (princ "Available Claude buffers:\n")
-      (if claude-buffers
-          (dolist (buf claude-buffers)
-            (princ (format "  - %s\n" (buffer-name buf))))
-        (princ "  (none found)\n"))
-      (princ "\n" )
-      (princ "Troubleshooting:\n")
-      (princ "- If not connected: Start claudemacs in target directory\n")
-      (princ "- If can't send: Check that Claude buffer has active process\n"))))
+      (princ (format "Current buffer: %s\n\n" (buffer-name)))
+      
+      ;; Session status  
+      (if can-send
+          (princ (format "[✅] Session status: CONNECTED\n  Active session: %s\n\n" 
+                         (buffer-name claude-buffer)))
+        (princ "[❌] Session status: NO MATCHING SESSION FOUND\n\n"))
+      
+      ;; Target directory analysis
+      (princ "Target directory analysis:\n")
+      (princ (format "  Expected session: %s\n" expected-session))
+      (if (get-buffer expected-session)
+          (let ((process-status 
+                 (with-current-buffer expected-session
+                   (if (and (boundp 'eat--process) 
+                            eat--process 
+                            (process-live-p eat--process))
+                       "alive" "dead"))))
+            (princ (format "  → Session exists (process: %s)\n\n" process-status)))
+        (princ "  → This session does not exist\n\n"))
+      
+      ;; Path encoding check
+      (if (and (buffer-file-name)
+               (string-match-p "cec-.+\\.org$" (file-name-nondirectory (buffer-file-name))))
+          (let* ((encoded-name (file-name-base (file-name-nondirectory (buffer-file-name))))
+                 (decoded-path (claudemacs-client--decode-full-path encoded-name))
+                 (re-encoded (claudemacs-client--encode-full-path decoded-path)))
+            (princ "[✅] Path encoding: OK\n")
+            (princ (format "  File: %s\n" (file-name-nondirectory (buffer-file-name))))
+            (princ (format "  → Decoded to: %s\n" decoded-path))
+            (if (string= encoded-name re-encoded)
+                (princ "  → Re-encoding: ✓ Consistent\n")
+              (princ (format "  → Re-encoding: ⚠️  Inconsistent (%s)\n" re-encoded)))
+            (when (string-match-p "--.*--" (file-name-nondirectory (buffer-file-name)))
+              (princ "  ⚠️  Warning: Path contains multiple '--' which may cause parsing issues\n"))
+            (princ "\n"))
+        (princ "[ℹ️] Path encoding: Not applicable (not a persistent file)\n\n"))
+      
+      ;; Found sessions
+      (princ "Found claudemacs sessions:\n")
+      (if claudemacs-sessions
+          (dolist (buf claudemacs-sessions)
+            (let* ((name (buffer-name buf))
+                   (process-status
+                    (with-current-buffer buf
+                      (if (and (boundp 'eat--process) 
+                               eat--process 
+                               (process-live-p eat--process))
+                          "alive" "dead"))))
+              (princ (format "  - %s (process: %s)\n" name process-status))))
+        (princ "  (no claudemacs sessions found)\n"))
+      
+      ;; Other Claude buffers
+      (when other-claude-buffers
+        (princ "\nOther Claude-related buffers:\n")
+        (dolist (buf other-claude-buffers)
+          (let* ((name (buffer-name buf))
+                 (dir (with-current-buffer buf
+                        (when (boundp 'default-directory)
+                          default-directory)))
+                 (process-status
+                  (with-current-buffer buf
+                    (if (and (boundp 'eat--process) 
+                             eat--process 
+                             (process-live-p eat--process))
+                        "alive" "dead"))))
+            (princ (format "  - %s in %s (process: %s)\n" name (or dir "unknown") process-status)))))
+      
+      (princ "\n")
+      
+      ;; Recommended actions
+      (princ "Recommended actions:\n")
+      (cond
+       (can-send
+        (princ "✓ Connection is working. You can send text to Claude.\n"))
+       ((not claudemacs-sessions)
+        (princ "1. Start claudemacs in target directory: (start-claudemacs)\n")
+        (princ "2. Or run: M-x start-claudemacs\n"))
+       (t
+        (princ "1. Start claudemacs for target directory: (start-claudemacs)\n")
+        (princ "2. Or switch to existing session directory:\n")
+        (dolist (buf claudemacs-sessions)
+          (let ((session-path (replace-regexp-in-string 
+                               "^\\*claudemacs:\\(.*\\)\\*$" "\\1" 
+                               (buffer-name buf))))
+            (princ (format "   - %s\n" session-path))))))
+      
+      (princ "\nFor more help: M-x claudemacs-client-open-project-input\n"))))
 
 (provide 'claudemacs-client)
 
