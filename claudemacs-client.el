@@ -362,20 +362,12 @@ This function finds existing input file or creates new one if needed."
   (local-set-key (kbd "C-c C-r") #'claudemacs-client-send-region-interactive)
   (local-set-key (kbd "C-c C-b") #'claudemacs-client-send-buffer))
 
-
 ;;;; Setup
 
 ;; Global key binding
 ;;;###autoload
 (define-key global-map (kbd "C-M-d") #'claudemacs-client-open-project-input)
 
-
-
-;;;###autoload
-(defun claudemacs-client-version ()
-  "Show the version of claudemacs-client."
-  (interactive)
-  (message "claudemacs-client version 0.0.0"))
 
 ;;;; Debug and Utility Functions
 
