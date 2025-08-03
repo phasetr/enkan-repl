@@ -373,7 +373,7 @@ This function finds existing input file or creates new one if needed."
     (message "Project input file ready: %s" (file-name-nondirectory file-path))))
 
 ;;;###autoload
-(defun claudemacs-client-start ()
+(defun start-claudemacs-new-session ()
   "Start claudemacs and change to appropriate directory.
 Determines directory from current buffer filename if it's a persistent file."
   (interactive)
@@ -382,6 +382,10 @@ Determines directory from current buffer filename if it's a persistent file."
     (when (fboundp 'claudemacs-transient-menu)
       (claudemacs-transient-menu))
     (message "Started claudemacs in: %s" target-dir)))
+
+;; Backward compatibility alias
+(defalias 'claudemacs-client-start 'start-claudemacs-new-session
+  "Backward compatibility alias for start-claudemacs-new-session.")
 
 ;;;###autoload
 (defun claudemacs-client-setup-window-layout ()
@@ -395,7 +399,7 @@ This is the author's preference - customize as needed."
     (let ((claudemacs-buf (claudemacs-client--get-buffer-for-directory target-dir)))
       (if claudemacs-buf
           (switch-to-buffer claudemacs-buf)
-        (message "claudemacs buffer not found. Run (claudemacs-client-start) first.")))
+        (message "claudemacs buffer not found. Run (start-claudemacs-new-session) first.")))
     (other-window -1)
     (message "Window layout setup complete")))
 
