@@ -1,5 +1,4 @@
 * Claude Input File
-Project: %s
 
 ** Claudemacs Startup Code
 Note: This is the startup command for claudemacs itself, not for claudemacs-client.

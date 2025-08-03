@@ -76,16 +76,39 @@
   :type 'string
   :group 'claudemacs-client)
 
-(defcustom claudemacs-client-template-language "default"
-  "Template language for claudemacs-client input files.
-Supported values: \"default\" (uses default.org), \"custom\" (uses
-custom-template-path)"
-  :type '(choice (const "default") (const "custom"))
-  :group 'claudemacs-client)
+;;;; Constants
 
-(defcustom claudemacs-client-custom-template-path nil
-  "Path to custom template file.  When set, overrides language setting completely."
-  :type '(choice (const nil) (file :tag "Custom template file"))
+(defconst claudemacs-client-default-template-filename "default.org"
+  "Default template filename for claudemacs-client input files.
+This file should be located in the package directory and contains
+the standard template structure for new project input files.")
+
+(defvar claudemacs-client--package-directory
+  (cond
+   ;; Try load-file-name first (when loading with load command)
+   (load-file-name (file-name-directory load-file-name))
+   ;; Try buffer-file-name (when evaluating in buffer)
+   (buffer-file-name (file-name-directory buffer-file-name))
+   ;; Try to find claudemacs-client.el in load-path
+   ((locate-library "claudemacs-client")
+    (file-name-directory (locate-library "claudemacs-client")))
+   ;; Search for default.org in load-path directories
+   (t (or (cl-some (lambda (dir)
+                     (let ((expanded-dir (expand-file-name dir))
+                           (default-org-path (expand-file-name claudemacs-client-default-template-filename (expand-file-name dir))))
+                       (when (file-exists-p default-org-path)
+                         expanded-dir)))
+                   load-path)
+          ;; Final fallback to current directory
+          default-directory)))
+  "Package directory determined at load time.")
+
+(defcustom claudemacs-client-template-file nil
+  "Template file path for claudemacs-client input files.
+When nil, uses the default template (default.org).
+When set to a file path, uses that file as the template."
+  :type '(choice (const :tag "Use default template" nil)
+                 (file :tag "Custom template file"))
   :group 'claudemacs-client)
 
 ;;;; Core Functions
@@ -95,12 +118,13 @@ custom-template-path)"
 (defun claudemacs-client--encode-full-path (path)
   "Encode PATH by replacing forward slashes with the configured separator.
 Example: \\='/Users/phasetr/project1/\\=' -> \\='cec--Users--phasetr--project1\\='"
-  (let
-      ((cleaned-path
+  (let*
+      ((expanded-path (expand-file-name path))
+       (cleaned-path
         (if
-            (string-suffix-p "/" path)
-            (substring path 0 -1)
-          path)))
+            (string-suffix-p "/" expanded-path)
+            (substring expanded-path 0 -1)
+          expanded-path)))
     (concat "cec" (replace-regexp-in-string "/" claudemacs-client-path-separator cleaned-path))))
 
 (defun claudemacs-client--decode-full-path (encoded-name)
@@ -122,8 +146,8 @@ If DIRECTORY is nil, use the current `default-directory'."
 
 ;;;; Template Loading Functions
 
-(defun claudemacs-client--get-template-path (language)
-  "Get template file path for LANGUAGE.
+(defun claudemacs-client--get-template-path (template-name)
+  "Get template file path for TEMPLATE-NAME.
 Returns nil if template file doesn't exist."
   (let*
       ((package-dir
@@ -132,35 +156,48 @@ Returns nil if template file doesn't exist."
          (load-file-name (file-name-directory load-file-name))
          ;; Try buffer-file-name (when evaluating in buffer)
          (buffer-file-name (file-name-directory buffer-file-name))
+         ;; Try to find claudemacs-client.el in load-path
+         ((locate-library "claudemacs-client")
+          (file-name-directory (locate-library "claudemacs-client")))
          ;; Fallback to current directory
          (t default-directory)))
-       (template-file (format "templates/%s.org" language))
+       (template-file (concat template-name ".org"))
        (template-path (expand-file-name template-file package-dir)))
     (when
         (file-exists-p template-path)
       template-path)))
 
-(defun claudemacs-client--load-template (language)
-  "Load template content for LANGUAGE with fallback mechanism.
+(defun claudemacs-client--load-template-pure (custom-template-file package-dir default-template-name)
+  "Pure function: Load template content from specified paths.
+CUSTOM-TEMPLATE-FILE: Custom template file path (can be nil).
+PACKAGE-DIR: Package directory for default template.
+DEFAULT-TEMPLATE-NAME: Default template filename.
 Returns template content as string, or nil if no template found."
-  (let
-      ((template-path
-        (cond
-         ;; Custom template file overrides everything
-         ((and (string= language "custom")
-               claudemacs-client-custom-template-path
-               (file-exists-p claudemacs-client-custom-template-path))
-          claudemacs-client-custom-template-path)
-         ;; Default template
-         ((string= language "default")
-          (claudemacs-client--get-template-path "default"))
-         ;; Final fallback to default
-         (t
-          (claudemacs-client--get-template-path "default")))))
-    (when template-path
+  (let ((template-path
+         (cond
+          ;; If custom template file is specified, use it
+          (custom-template-file
+           (expand-file-name custom-template-file))
+          ;; Otherwise, look for default template in package directory
+          (t (expand-file-name default-template-name package-dir)))))
+    (when (and template-path (file-exists-p template-path))
       (with-temp-buffer
         (insert-file-contents template-path)
         (buffer-string)))))
+
+(defun claudemacs-client--get-package-directory ()
+  "Get package directory for template files.
+Returns directory path where default templates are located."
+  claudemacs-client--package-directory)
+
+(defun claudemacs-client--load-template ()
+  "Load template content based on claudemacs-client-template-file setting.
+Returns template content as string, or nil if no template found.
+Wrapper function that uses pure function internally."
+  (claudemacs-client--load-template-pure
+   claudemacs-client-template-file
+   (claudemacs-client--get-package-directory)
+   claudemacs-client-default-template-filename))
 
 ;;;; File Template and Content Management
 
@@ -168,24 +205,28 @@ Returns template content as string, or nil if no template found."
   "Initialize a new project file at FILE-PATH with template content."
   (let*
       ((directory (file-name-directory file-path))
-       (project-path (claudemacs-client--decode-full-path
-                      (file-name-base (file-name-nondirectory file-path))))
-       (template-content (claudemacs-client--load-template claudemacs-client-template-language)))
+       (project-path-raw (claudemacs-client--decode-full-path
+                          (file-name-base (file-name-nondirectory file-path))))
+       (project-path (expand-file-name project-path-raw))
+       (template-content (claudemacs-client--load-template)))
     (unless (file-exists-p directory)
       (make-directory directory t))
     (with-temp-file file-path
       (if template-content
-          (insert (format template-content project-path))
-        ;; Fallback to default template if external template loading fails
-        (let ((fallback-content (claudemacs-client--load-template "default")))
-          (if fallback-content
-              (insert (format fallback-content project-path))
-            (error "No template files found - unable to initialize project file")))))
+          (insert template-content)
+        ;; Fallback to default.org content if template loading fails
+        (condition-case nil
+            (insert-file-contents (expand-file-name claudemacs-client-default-template-filename
+                                                    (claudemacs-client--get-package-directory)))
+          (error
+           ;; Final fallback if default.org cannot be read
+           (insert (format "* Claude Input File\nProject: %s\n\n** Thoughts/Notes\n" project-path))))))
     file-path))
 
 (defun claudemacs-client--find-project-file (file-path)
   "Find or create project file at FILE-PATH and return file buffer."
-  (if (file-exists-p file-path)
+  (if
+      (file-exists-p file-path)
       (find-file file-path)
     (let ((buffer (find-file file-path)))
       (claudemacs-client--initialize-project-file file-path)
@@ -363,26 +404,54 @@ Wrapper function that uses pure function internally."
                    (length content))
         (message "❌ Cannot send - no matching claudemacs buffer found for this directory")))))
 
+(defun claudemacs-client--create-project-input-file (target-directory)
+  "Create project input file for TARGET-DIRECTORY from template.
+Returns the created file path."
+  (let*
+      ((file-path (claudemacs-client--get-project-file-path target-directory))
+       (template-source (cond
+                         ;; If custom template is specified and exists, use it
+                         ((and claudemacs-client-template-file
+                               (file-exists-p claudemacs-client-template-file))
+                          claudemacs-client-template-file)
+                         ;; Otherwise, use default.org
+                         (t (expand-file-name claudemacs-client-default-template-filename
+                                              (claudemacs-client--get-package-directory))))))
+    ;; Ensure target directory exists
+    (unless (file-exists-p (file-name-directory file-path))
+      (make-directory (file-name-directory file-path) t))
+
+    ;; Copy template file to target location
+    (copy-file template-source file-path)
+    file-path))
+
 ;;;###autoload
 (defun claudemacs-client-open-project-input (&optional directory)
   "Open or create project input file for DIRECTORY.
 If DIRECTORY is nil, use current `default-directory'.
-This function finds existing input file or creates new one if needed."
+If project input file exists, open it directly.
+If not exists, create from template then open."
   (interactive)
   (let*
       ((target-dir (or directory default-directory))
-       (file-path (claudemacs-client--get-project-file-path target-dir))
-       (buffer (claudemacs-client--find-project-file file-path)))
-    (with-current-buffer buffer
-      ;; Set up org mode
-      (when (fboundp 'org-mode)
-        (unless (eq major-mode 'org-mode)
-          (let ((org-mode-hook nil))
-            (ignore org-mode-hook)  ; Suppress unused variable warning
-            (org-mode)))))
-    (switch-to-buffer buffer)
-    (goto-char (point-max))
-    (message "Project input file ready: %s" (file-name-nondirectory file-path))))
+       (file-path (claudemacs-client--get-project-file-path target-dir)))
+
+    ;; Create file if it doesn't exist
+    (unless (file-exists-p file-path)
+      (claudemacs-client--create-project-input-file target-dir))
+
+    ;; Open the file
+    (let ((buffer (find-file file-path)))
+      (with-current-buffer buffer
+        ;; Set up org mode
+        (when (fboundp 'org-mode)
+          (unless (eq major-mode 'org-mode)
+            (let ((org-mode-hook nil))
+              (ignore org-mode-hook)  ; Suppress unused variable warning
+              (org-mode)))))
+      (switch-to-buffer buffer)
+      (goto-char (point-max))
+      (message "Project input file ready: %s" (file-name-nondirectory file-path)))))
 
 ;;;###autoload
 (defun start-claudemacs ()
@@ -440,17 +509,14 @@ This is the author's preference - customize as needed."
     (message "Window layout setup complete")))
 
 ;;;###autoload
-(defun claudemacs-client-output-template (&optional language)
-  "Output template content to a new buffer for customization.
-If LANGUAGE is specified, use that language template.
-Otherwise, use current language setting."
+(defun claudemacs-client-output-template ()
+  "Output current template content to a new buffer for customization."
   (interactive)
-  (let*
-      ((target-language (or language claudemacs-client-template-language))
-       (template-content (claudemacs-client--load-template target-language))
-       (buffer-name (format "*claudemacs-template-%s*" target-language)))
-    (if
-        template-content
+  (let* ((template-content (claudemacs-client--load-template))
+         (template-file (or claudemacs-client-template-file "default"))
+         (buffer-name (format "*claudemacs-template-%s*"
+                              (file-name-base template-file))))
+    (if template-content
         (progn
           (with-output-to-temp-buffer buffer-name
             (princ template-content))
@@ -461,7 +527,7 @@ Otherwise, use current language setting."
                 (org-mode))))
           (message "Template output to buffer: %s" buffer-name)
           t)
-      (message "Template not found for language: %s" target-language)
+      (message "Template not found: %s" template-file)
       nil)))
 
 ;;; Debug and Utility Functions

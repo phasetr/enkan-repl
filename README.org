@@ -87,20 +87,23 @@ This personal workflow is the foundation for our function-name-first design phil
 - =claudemacs-client-status= - Show connection status and diagnostics
 
 ** Configuration
-*** Template Language
+*** Template Configuration
 #+begin_src elisp
-;; Use Japanese templates
-(setq claudemacs-client-template-language "ja")
+;; Use default template (uses templates/default.org from package)
+(setq claudemacs-client-template-file nil)
 
-;; Use custom template file (overrides language setting): The author himself uses a custom template
-(setq claudemacs-client-custom-template-path "~/my-claude-template.org")
+;; Use custom template file
+(setq claudemacs-client-template-file "~/my-claude-template.org")
 
-;; Note: "custom" language uses English template as base
-;; For true customization, use claudemacs-client-custom-template-path
+;; Use template from another package or system location
+(setq claudemacs-client-template-file "/usr/local/share/emacs/claude-templates/my-template.org")
+
+;; Use project-specific template
+(setq claudemacs-client-template-file (expand-file-name "claude-template.org" user-emacs-directory))
 #+end_src
 
 *** Template Customization
-Use =M-x claudemacs-client-output-template= to output a English template to a new buffer for customization.
+Use =M-x claudemacs-client-output-template= to output the default template to a new buffer for customization.
 
 ** Troubleshooting
 If you see "❌ Cannot send - no matching claudemacs buffer found for this directory":
