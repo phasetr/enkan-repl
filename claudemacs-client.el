@@ -95,10 +95,10 @@ Supported languages: \"en\" (English), \"ja\" (Japanese)"
   "Encode PATH by replacing forward slashes with the configured separator.
 Example: \\='/Users/phasetr/project1/\\=' -> \\='cec--Users--phasetr--project1\\='"
   (let
-    ((cleaned-path
-       (if (string-suffix-p "/" path)
-         (substring path 0 -1)
-         path)))
+      ((cleaned-path
+        (if (string-suffix-p "/" path)
+            (substring path 0 -1)
+          path)))
     (concat "cec" (replace-regexp-in-string "/" claudemacs-client-path-separator cleaned-path))))
 
 (defun claudemacs-client--decode-full-path (encoded-name)
@@ -112,9 +112,9 @@ Example: \\='cec--Users--phasetr--project1\\=' -> \\='/Users/phasetr/project1/\\
   "Get the full path for the project file based on DIRECTORY.
 If DIRECTORY is nil, use the current `default-directory'."
   (let*
-    ((target-dir (or directory default-directory))
-      (encoded-name (claudemacs-client--encode-full-path target-dir))
-      (filename (concat encoded-name ".org")))
+      ((target-dir (or directory default-directory))
+       (encoded-name (claudemacs-client--encode-full-path target-dir))
+       (filename (concat encoded-name ".org")))
     (expand-file-name filename target-dir)))
 
 ;;;; Template Loading Functions
@@ -123,15 +123,15 @@ If DIRECTORY is nil, use the current `default-directory'."
   "Get template file path for LANGUAGE.
 Returns nil if template file doesn't exist."
   (let* ((package-dir
-           (cond
-             ;; Try load-file-name first (when loading with load command)
-             (load-file-name (file-name-directory load-file-name))
-             ;; Try buffer-file-name (when evaluating in buffer)
-             (buffer-file-name (file-name-directory buffer-file-name))
-             ;; Fallback to current directory
-             (t default-directory)))
-          (template-file (format "templates/%s.org" language))
-          (template-path (expand-file-name template-file package-dir)))
+          (cond
+           ;; Try load-file-name first (when loading with load command)
+           (load-file-name (file-name-directory load-file-name))
+           ;; Try buffer-file-name (when evaluating in buffer)
+           (buffer-file-name (file-name-directory buffer-file-name))
+           ;; Fallback to current directory
+           (t default-directory)))
+         (template-file (format "templates/%s.org" language))
+         (template-path (expand-file-name template-file package-dir)))
     (when (file-exists-p template-path)
       template-path)))
 
@@ -139,22 +139,22 @@ Returns nil if template file doesn't exist."
   "Load template content for LANGUAGE with fallback mechanism.
 Returns template content as string, or nil if no template found."
   (let ((template-path
-          (cond
-            ;; Custom template file overrides everything
-            ((and claudemacs-client-custom-template-path
-               (file-exists-p claudemacs-client-custom-template-path))
-              claudemacs-client-custom-template-path)
-            ;; Language-specific template
-            ((claudemacs-client--get-template-path language)
-              (claudemacs-client--get-template-path language))
-            ;; Fallback to English for "custom" language
-            ((and (string= language "custom")
-               (claudemacs-client--get-template-path "en"))
-              (claudemacs-client--get-template-path "en"))
-            ;; Final fallback to English
-            ((claudemacs-client--get-template-path "en")
-              (claudemacs-client--get-template-path "en"))
-            (t nil))))
+         (cond
+          ;; Custom template file overrides everything
+          ((and claudemacs-client-custom-template-path
+                (file-exists-p claudemacs-client-custom-template-path))
+           claudemacs-client-custom-template-path)
+          ;; Language-specific template
+          ((claudemacs-client--get-template-path language)
+           (claudemacs-client--get-template-path language))
+          ;; Fallback to English for "custom" language
+          ((and (string= language "custom")
+                (claudemacs-client--get-template-path "en"))
+           (claudemacs-client--get-template-path "en"))
+          ;; Final fallback to English
+          ((claudemacs-client--get-template-path "en")
+           (claudemacs-client--get-template-path "en"))
+          (t nil))))
     (when template-path
       (with-temp-buffer
         (insert-file-contents template-path)
@@ -165,26 +165,26 @@ Returns template content as string, or nil if no template found."
 (defun claudemacs-client--initialize-project-file (file-path)
   "Initialize a new project file at FILE-PATH with template content."
   (let*
-    ((directory (file-name-directory file-path))
-      (project-path (claudemacs-client--decode-full-path
+      ((directory (file-name-directory file-path))
+       (project-path (claudemacs-client--decode-full-path
                       (file-name-base (file-name-nondirectory file-path))))
-      (template-content (claudemacs-client--load-template claudemacs-client-template-language)))
+       (template-content (claudemacs-client--load-template claudemacs-client-template-language)))
     (unless (file-exists-p directory)
       (make-directory directory t))
     (with-temp-file file-path
       (if template-content
-        (insert (format template-content project-path))
+          (insert (format template-content project-path))
         ;; Fallback to en.org template if external template loading fails
         (let ((fallback-content (claudemacs-client--load-template "en")))
           (if fallback-content
-            (insert (format fallback-content project-path))
+              (insert (format fallback-content project-path))
             (error "No template files found - unable to initialize project file")))))
     file-path))
 
 (defun claudemacs-client--find-project-file (file-path)
   "Find or create project file at FILE-PATH and return file buffer."
   (if (file-exists-p file-path)
-    (find-file file-path)
+      (find-file file-path)
     (let ((buffer (find-file file-path)))
       (claudemacs-client--initialize-project-file file-path)
       (revert-buffer t t)
@@ -197,10 +197,10 @@ Returns template content as string, or nil if no template found."
 Uses DEFAULT-DIRECTORY-ARG if BUFFER-FILE-NAME-ARG doesn't match pattern.
 If BUFFER-FILE-NAME-ARG matches persistent file pattern, decode directory."
   (if (and buffer-file-name-arg
-        (string-match-p "cec-.+\\.org$" (file-name-nondirectory buffer-file-name-arg)))
-    ;; This is a persistent file, extract directory from filename
-    (claudemacs-client--decode-full-path
-      (file-name-base (file-name-nondirectory buffer-file-name-arg)))
+           (string-match-p "cec-.+\\.org$" (file-name-nondirectory buffer-file-name-arg)))
+      ;; This is a persistent file, extract directory from filename
+      (claudemacs-client--decode-full-path
+       (file-name-base (file-name-nondirectory buffer-file-name-arg)))
     ;; Use current directory
     default-directory-arg))
 
@@ -209,32 +209,32 @@ If BUFFER-FILE-NAME-ARG matches persistent file pattern, decode directory."
 Returns t if directories match, nil otherwise."
   (when buffer-default-directory
     (string= (file-truename buffer-default-directory)
-      (file-truename target-dir))))
+             (file-truename target-dir))))
 
 (defun claudemacs-client--find-matching-buffer-pure (buffer-list target-directory)
   "Pure function: Find claudemacs buffer matching TARGET-DIRECTORY.
 BUFFER-LIST should contain buffer objects.
 Returns matching buffer or nil."
   (cl-find-if
-    (lambda (buf-info)
-      (let ((name (plist-get buf-info :name))
-             (default-dir (plist-get buf-info :default-directory))
-             (eat-mode (plist-get buf-info :eat-mode))
-             (buffer (plist-get buf-info :buffer)))
-        (and (buffer-live-p buffer)
-          name       ; Ensure name is not nil
-          ;; Check for directory-specific claudemacs buffer
-          (or (and (string-match-p "^\\*claudemacs:" name)
-                (string-prefix-p (concat "*claudemacs:" target-directory) name))
-            ;; Fallback to generic buffers only if they match directory
-            (and (or (string= name "*claude*")
-                   (string= name "*claudemacs*"))
-              (claudemacs-client--buffer-matches-directory-pure default-dir target-directory))
-            ;; Check for eat-mode buffers with claude in name
-            (and eat-mode
-              (string-match-p "claude" name)
-              (claudemacs-client--buffer-matches-directory-pure default-dir target-directory))))))
-    buffer-list))
+   (lambda (buf-info)
+     (let ((name (plist-get buf-info :name))
+           (default-dir (plist-get buf-info :default-directory))
+           (eat-mode (plist-get buf-info :eat-mode))
+           (buffer (plist-get buf-info :buffer)))
+       (and (buffer-live-p buffer)
+            name       ; Ensure name is not nil
+            ;; Check for directory-specific claudemacs buffer
+            (or (and (string-match-p "^\\*claudemacs:" name)
+                     (string-prefix-p (concat "*claudemacs:" target-directory) name))
+                ;; Fallback to generic buffers only if they match directory
+                (and (or (string= name "*claude*")
+                         (string= name "*claudemacs*"))
+                     (claudemacs-client--buffer-matches-directory-pure default-dir target-directory))
+                ;; Check for eat-mode buffers with claude in name
+                (and eat-mode
+                     (string-match-p "claude" name)
+                     (claudemacs-client--buffer-matches-directory-pure default-dir target-directory))))))
+   buffer-list))
 
 (defun claudemacs-client--can-send-text-pure (claude-buffer)
   "Pure function: Check if CLAUDE-BUFFER can receive text.
@@ -242,8 +242,8 @@ Returns t if buffer has live eat process, nil otherwise."
   (when claude-buffer
     (with-current-buffer claude-buffer
       (and (boundp 'eat--process)
-        eat--process
-        (process-live-p eat--process)))))
+           eat--process
+           (process-live-p eat--process)))))
 
 (defun claudemacs-client--send-text-pure (text claude-buffer)
   "Pure function: Send TEXT to CLAUDE-BUFFER.
@@ -269,22 +269,22 @@ Wrapper function that uses pure function internally."
 If DIRECTORY is nil, use current `default-directory'.
 Wrapper function that uses pure function internally."
   (let*
-    ((target-dir (or directory default-directory))
-      (buffer-info-list
+      ((target-dir (or directory default-directory))
+       (buffer-info-list
         (mapcar
-          (lambda (buf)
-            (list
-              :buffer buf
-              :name (buffer-name buf)
-              :default-directory
-              (with-current-buffer buf
-                (when (boundp 'default-directory)
-                  default-directory))
-              :eat-mode
-              (with-current-buffer buf
-                (and (boundp 'eat-mode) eat-mode))))
-          (buffer-list)))
-      (match-info (claudemacs-client--find-matching-buffer-pure buffer-info-list target-dir)))
+         (lambda (buf)
+           (list
+            :buffer buf
+            :name (buffer-name buf)
+            :default-directory
+            (with-current-buffer buf
+              (when (boundp 'default-directory)
+                default-directory))
+            :eat-mode
+            (with-current-buffer buf
+              (and (boundp 'eat-mode) eat-mode))))
+         (buffer-list)))
+       (match-info (claudemacs-client--find-matching-buffer-pure buffer-info-list target-dir)))
     (when match-info
       (plist-get match-info :buffer))))
 
@@ -319,10 +319,10 @@ Wrapper function that uses pure function internally."
   (interactive "r")
   (when (use-region-p)
     (let
-      ((content (buffer-substring-no-properties start end))
-        (target-dir (claudemacs-client--get-target-directory-for-buffer)))
+        ((content (buffer-substring-no-properties start end))
+         (target-dir (claudemacs-client--get-target-directory-for-buffer)))
       (if (claudemacs-client--send-text content target-dir)
-        (message "Region sent to Claude (%d characters)" (length content))
+          (message "Region sent to Claude (%d characters)" (length content))
         (message "❌ Cannot send - no matching claudemacs buffer found for this directory")))))
 
 ;;;###autoload
@@ -330,11 +330,11 @@ Wrapper function that uses pure function internally."
   "Send the entire current buffer to claudemacs."
   (interactive)
   (let
-    ((content (buffer-substring-no-properties (point-min) (point-max)))
-      (target-dir (claudemacs-client--get-target-directory-for-buffer)))
+      ((content (buffer-substring-no-properties (point-min) (point-max)))
+       (target-dir (claudemacs-client--get-target-directory-for-buffer)))
     (if (claudemacs-client--send-text content target-dir)
-      (message "File sent to Claude: %s (%d characters)"
-        (buffer-name) (length content))
+        (message "File sent to Claude: %s (%d characters)"
+                 (buffer-name) (length content))
       (message "❌ Cannot send - no matching claudemacs buffer found for this directory"))))
 
 ;;;###autoload
@@ -342,13 +342,13 @@ Wrapper function that uses pure function internally."
   "Send rest of buffer from cursor position to end to claudemacs."
   (interactive)
   (let
-    ((content (buffer-substring-no-properties (point) (point-max)))
-      (target-dir (claudemacs-client--get-target-directory-for-buffer)))
+      ((content (buffer-substring-no-properties (point) (point-max)))
+       (target-dir (claudemacs-client--get-target-directory-for-buffer)))
     (if (or (not content) (string-match-p "\\`[[:space:]]*\\'" content))
-      (message "No content from cursor to end of file")
+        (message "No content from cursor to end of file")
       (if (claudemacs-client--send-text content target-dir)
-        (message "Rest of buffer sent to Claude (%d characters)"
-          (length content))
+          (message "Rest of buffer sent to Claude (%d characters)"
+                   (length content))
         (message "❌ Cannot send - no matching claudemacs buffer found for this directory")))))
 
 ;;;###autoload
@@ -358,9 +358,9 @@ If DIRECTORY is nil, use current `default-directory'.
 This function finds existing input file or creates new one if needed."
   (interactive)
   (let*
-    ((target-dir (or directory default-directory))
-      (file-path (claudemacs-client--get-project-file-path target-dir))
-      (buffer (claudemacs-client--find-project-file file-path)))
+      ((target-dir (or directory default-directory))
+       (file-path (claudemacs-client--get-project-file-path target-dir))
+       (buffer (claudemacs-client--find-project-file file-path)))
     (with-current-buffer buffer
       ;; Set up org mode
       (when (fboundp 'org-mode)
@@ -379,35 +379,35 @@ Determines directory from current buffer filename if it's a persistent file.
 Checks for existing sessions to prevent double startup."
   (interactive)
   (let* ((target-dir (claudemacs-client--get-target-directory-for-buffer))
-          (existing-buffer (claudemacs-client--get-buffer-for-directory target-dir))
-          (can-send (claudemacs-client--can-send-text target-dir))
-          (original-default-directory default-directory))
+         (existing-buffer (claudemacs-client--get-buffer-for-directory target-dir))
+         (can-send (claudemacs-client--can-send-text target-dir))
+         (original-default-directory default-directory))
 
     ;; Check for existing session
     (cond
-      (can-send
-        (message "Claudemacs session already running in: %s (buffer: %s)"
-          target-dir (buffer-name existing-buffer)))
+     (can-send
+      (message "Claudemacs session already running in: %s (buffer: %s)"
+               target-dir (buffer-name existing-buffer)))
 
-      ;; Dead session exists - offer to restart
-      (existing-buffer
-        (when (y-or-n-p (format "Dead claudemacs session found in %s.  Restart? " target-dir))
-          (kill-buffer existing-buffer)
-          (start-claudemacs)))
+     ;; Dead session exists - offer to restart
+     (existing-buffer
+      (when (y-or-n-p (format "Dead claudemacs session found in %s.  Restart? " target-dir))
+        (kill-buffer existing-buffer)
+        (start-claudemacs)))
 
-      ;; No existing session - start new one
-      (t
-        (unwind-protect
+     ;; No existing session - start new one
+     (t
+      (unwind-protect
           (progn
             (cd target-dir)
             (if (fboundp 'claudemacs-transient-menu)
-              (progn
-                (claudemacs-transient-menu)
-                (message "Started claudemacs in: %s" target-dir))
+                (progn
+                  (claudemacs-transient-menu)
+                  (message "Started claudemacs in: %s" target-dir))
               (error "Claudemacs-transient-menu not available.  Is claudemacs package loaded?")))
-          ;; Restore original directory if startup failed
-          (unless (claudemacs-client--can-send-text target-dir)
-            (cd original-default-directory)))))))
+        ;; Restore original directory if startup failed
+        (unless (claudemacs-client--can-send-text target-dir)
+          (cd original-default-directory)))))))
 
 
 ;;;###autoload
@@ -421,7 +421,7 @@ This is the author's preference - customize as needed."
     (other-window 1)
     (let ((claudemacs-buf (claudemacs-client--get-buffer-for-directory target-dir)))
       (if claudemacs-buf
-        (switch-to-buffer claudemacs-buf)
+          (switch-to-buffer claudemacs-buf)
         (message "claudemacs buffer not found. Run (start-claudemacs-new-session) first.")))
     (other-window -1)
     (message "Window layout setup complete")))
@@ -433,19 +433,19 @@ If LANGUAGE is specified, use that language template.
 Otherwise, use current language setting."
   (interactive)
   (let* ((target-language (or language claudemacs-client-template-language))
-          (template-content (claudemacs-client--load-template target-language))
-          (buffer-name (format "*claudemacs-template-%s*" target-language)))
+         (template-content (claudemacs-client--load-template target-language))
+         (buffer-name (format "*claudemacs-template-%s*" target-language)))
     (if template-content
-      (progn
-        (with-output-to-temp-buffer buffer-name
-          (princ template-content))
-        (with-current-buffer buffer-name
-          (when (fboundp 'org-mode)
-            (let ((org-mode-hook nil))
-              (ignore org-mode-hook)  ; Suppress unused variable warning
-              (org-mode))))
-        (message "Template output to buffer: %s" buffer-name)
-        t)
+        (progn
+          (with-output-to-temp-buffer buffer-name
+            (princ template-content))
+          (with-current-buffer buffer-name
+            (when (fboundp 'org-mode)
+              (let ((org-mode-hook nil))
+                (ignore org-mode-hook)  ; Suppress unused variable warning
+                (org-mode))))
+          (message "Template output to buffer: %s" buffer-name)
+          t)
       (message "Template not found for language: %s" target-language)
       nil)))
 
@@ -459,26 +459,26 @@ Otherwise, use current language setting."
   "Show connection status and diagnostic information."
   (interactive)
   (let* ((target-dir (claudemacs-client--get-target-directory-for-buffer))
-          (claude-buffer (claudemacs-client--get-buffer-for-directory target-dir))
-          (can-send (claudemacs-client--can-send-text target-dir))
-          (claude-buffers
-            (seq-filter
-              (lambda (buf)
-                (string-match-p "\\*claudemacs:" (buffer-name buf)))
-              (buffer-list))))
+         (claude-buffer (claudemacs-client--get-buffer-for-directory target-dir))
+         (can-send (claudemacs-client--can-send-text target-dir))
+         (claude-buffers
+          (seq-filter
+           (lambda (buf)
+             (string-match-p "\\*claudemacs:" (buffer-name buf)))
+           (buffer-list))))
     (with-output-to-temp-buffer "*claudemacs-client-status*"
       (princ "═══ claudemacs-client Status ═══\n\n")
       (princ (format "Current buffer: %s\n" (buffer-name)))
       (princ (format "Target directory: %s\n" target-dir))
       (princ (format "Connection status: %s\n"
-               (if claude-buffer
-                 (format "✓ Connected (%s)" (buffer-name claude-buffer))
-                 "✗ Not connected")))
+                     (if claude-buffer
+                         (format "✓ Connected (%s)" (buffer-name claude-buffer))
+                       "✗ Not connected")))
       (princ (format "Can send text: %s\n\n" (if can-send "YES" "NO")))
       (princ "Available Claude buffers:\n")
       (if claude-buffers
-        (dolist (buf claude-buffers)
-          (princ (format "  - %s\n" (buffer-name buf))))
+          (dolist (buf claude-buffers)
+            (princ (format "  - %s\n" (buffer-name buf))))
         (princ "  (none found)\n"))
       (princ "\n" )
       (princ "Troubleshooting:\n")

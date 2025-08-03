@@ -2,7 +2,7 @@
 EMACS ?= emacs
 BATCH = $(EMACS) --batch -Q
 
-.PHONY: help test compile checkdoc lint check clean install-deps
+.PHONY: help test compile checkdoc lint check clean install-deps format
 
 help: ## Show this help message
 	@echo "claudemacs-client Quality Check Commands"
@@ -32,7 +32,11 @@ checkdoc: ## Check documentation format
 lint: ## Run package-lint checks
 	$(BATCH) --eval "(progn (package-initialize) (require 'package-lint) (with-temp-buffer (insert-file-contents \"claudemacs-client.el\") (emacs-lisp-mode) (package-lint-current-buffer)))"
 
-check: test compile checkdoc lint ## Run all quality checks
+format: ## Auto-format elisp files using built-in indent-region (spaces only)
+	$(BATCH) --eval "(progn (find-file \"claudemacs-client.el\") (setq-local indent-tabs-mode nil) (untabify (point-min) (point-max)) (mark-whole-buffer) (indent-region (point-min) (point-max)) (save-buffer))"
+	$(BATCH) --eval "(progn (find-file \"test/claudemacs-client-test.el\") (setq-local indent-tabs-mode nil) (untabify (point-min) (point-max)) (mark-whole-buffer) (indent-region (point-min) (point-max)) (save-buffer))"
+
+check: test compile checkdoc lint format ## Run all quality checks including formatting
 
 clean: ## Remove compiled files
 	rm -f *.elc
