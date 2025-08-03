@@ -16,6 +16,32 @@ dist/
 # Undo-tree save-files
 *.~undo-tree
 
+# Test coverage files
+*.elc.coverage
+*-coverage.dat
+coverage/
+.coverage/
+test/coverage-analysis.md
+
+# Test artifacts
+*-test.log
+test-results/
+.test-cache/
+
+# Emacs temporary files
+\#*\#
+.\#*
+.DS_Store
+
+# Package management
+elpa/
+straight/
+quelpa/
+
+# Temporary org files
+*.org~
+*.org.bak
+
 # Claude Code
 .claude/
 

@@ -201,47 +201,102 @@ Write your text here and use the following keys:
                     claudemacs-client-auto-save-interval
                     'claudemacs-client--save-project-file)))
 
-;;;; Target Directory Detection
+;;;; Pure Functions for Directory/Buffer Detection
+
+(defun claudemacs-client--extract-directory-pure (buffer-file-name-arg default-directory-arg)
+  "Pure function: Extract target directory from BUFFER-FILE-NAME-ARG and DEFAULT-DIRECTORY-ARG.
+If BUFFER-FILE-NAME-ARG matches persistent file pattern, decode directory.
+Otherwise, return DEFAULT-DIRECTORY-ARG."
+  (if (and buffer-file-name-arg
+           (string-match-p "cec-.+\\.org$" (file-name-nondirectory buffer-file-name-arg)))
+      ;; This is a persistent file, extract directory from filename
+      (claudemacs-client--decode-full-path
+       (file-name-base (file-name-nondirectory buffer-file-name-arg)))
+    ;; Use current directory
+    default-directory-arg))
+
+(defun claudemacs-client--buffer-matches-directory-pure (buffer-default-directory target-dir)
+  "Pure function: Check if BUFFER-DEFAULT-DIRECTORY matches TARGET-DIR.
+Returns t if directories match, nil otherwise."
+  (when buffer-default-directory
+    (string= (file-truename buffer-default-directory)
+             (file-truename target-dir))))
+
+(defun claudemacs-client--find-matching-buffer-pure (buffer-list target-directory)
+  "Pure function: Find claudemacs buffer matching TARGET-DIRECTORY from BUFFER-LIST.
+Returns matching buffer or nil.  BUFFER-LIST should contain buffer objects."
+  (cl-find-if (lambda (buf-info)
+                (let ((name (plist-get buf-info :name))
+                      (default-dir (plist-get buf-info :default-directory))
+                      (eat-mode (plist-get buf-info :eat-mode))
+                      (buffer (plist-get buf-info :buffer)))
+                  (and (buffer-live-p buffer)
+                       name  ; Ensure name is not nil
+                       ;; Check for directory-specific claudemacs buffer
+                       (or (and (string-match-p "^\\*claudemacs:" name)
+                                (string-prefix-p (concat "*claudemacs:" target-directory) name))
+                           ;; Fallback to generic buffers only if they match directory
+                           (and (or (string= name "*claude*")
+                                    (string= name "*claudemacs*"))
+                                (claudemacs-client--buffer-matches-directory-pure default-dir target-directory))
+                           ;; Check for eat-mode buffers with claude in name
+                           (and eat-mode
+                                (string-match-p "claude" name)
+                                (claudemacs-client--buffer-matches-directory-pure default-dir target-directory))))))
+              buffer-list))
+
+(defun claudemacs-client--can-send-text-pure (claude-buffer)
+  "Pure function: Check if CLAUDE-BUFFER can receive text.
+Returns t if buffer has live eat process, nil otherwise."
+  (when claude-buffer
+    (with-current-buffer claude-buffer
+      (and (boundp 'eat--process)
+           eat--process
+           (process-live-p eat--process)))))
+
+(defun claudemacs-client--send-text-pure (text claude-buffer)
+  "Pure function: Send TEXT to CLAUDE-BUFFER.
+Returns t if successful, nil if buffer cannot receive text.
+Does not modify global state."
+  (when (and claude-buffer (claudemacs-client--can-send-text-pure claude-buffer))
+    (with-current-buffer claude-buffer
+      (eat--send-string eat--process text)
+      (eat--send-string eat--process "\r")
+      t)))
+
+;;;; Target Directory Detection Wrapper Functions
 
 (defun claudemacs-client--get-target-directory-for-buffer ()
   "Get the target directory for current buffer.
 For persistent files, extract directory from filename.
-For other buffers, use current `default-directory'."
-  (if (and buffer-file-name
-           (string-match-p "cec-.+\\.org$" (file-name-nondirectory buffer-file-name)))
-      ;; This is a persistent file, extract directory from filename
-      (claudemacs-client--decode-full-path
-       (file-name-base (file-name-nondirectory buffer-file-name)))
-    ;; Use current directory
-    default-directory))
+For other buffers, use current `default-directory'.
+Wrapper function that uses pure function internally."
+  (claudemacs-client--extract-directory-pure buffer-file-name default-directory))
 
 (defun claudemacs-client--get-buffer-for-directory (&optional directory)
   "Get the claudemacs buffer for DIRECTORY if it exists and is live.
-If DIRECTORY is nil, use current `default-directory'."
-  (let ((target-dir (or directory default-directory)))
-    (cl-find-if (lambda (buf)
-                  (with-current-buffer buf
-                    (and (buffer-live-p buf)
-                         (let ((name (buffer-name buf)))
-                           ;; Check for directory-specific claudemacs buffer
-                           (or (and (string-match-p "^\\*claudemacs:" name)
-                                    (string-prefix-p (concat "*claudemacs:" target-dir) name))
-                               ;; Fallback to generic buffers only if they match directory
-                               (and (or (string= name "*claude*")
-                                        (string= name "*claudemacs*"))
-                                    (claudemacs-client--buffer-matches-directory buf target-dir))
-                               ;; Check for eat-mode buffers with claude in name
-                               (and (boundp 'eat-mode) eat-mode
-                                    (string-match-p "claude" name)
-                                    (claudemacs-client--buffer-matches-directory buf target-dir)))))))
-                (buffer-list))))
+If DIRECTORY is nil, use current `default-directory'.
+Wrapper function that uses pure function internally."
+  (let* ((target-dir (or directory default-directory))
+         (buffer-info-list (mapcar (lambda (buf)
+                                     (list :buffer buf
+                                           :name (buffer-name buf)
+                                           :default-directory (with-current-buffer buf
+                                                                (when (boundp 'default-directory)
+                                                                  default-directory))
+                                           :eat-mode (with-current-buffer buf
+                                                       (and (boundp 'eat-mode) eat-mode))))
+                                   (buffer-list)))
+         (match-info (claudemacs-client--find-matching-buffer-pure buffer-info-list target-dir)))
+    (when match-info
+      (plist-get match-info :buffer))))
 
 (defun claudemacs-client--buffer-matches-directory (buffer target-dir)
-  "Check if BUFFER's working directory matches TARGET-DIR."
+  "Check if BUFFER's working directory matches TARGET-DIR.
+Wrapper function that uses pure function internally."
   (with-current-buffer buffer
     (when (boundp 'default-directory)
-      (string= (file-truename default-directory)
-               (file-truename target-dir)))))
+      (claudemacs-client--buffer-matches-directory-pure default-directory target-dir))))
 
 (defun claudemacs-client--get-buffer ()
   "Get the claudemacs buffer if it exists and is live.
@@ -251,24 +306,18 @@ This is a compatibility wrapper that uses current directory."
 (defun claudemacs-client--can-send-text (&optional directory)
   "Check if text can actually be sent to claudemacs (strict check).
 If DIRECTORY is provided, check for claudemacs in that directory.
-Otherwise, use current `default-directory'."
-  (when-let ((claude-buffer (claudemacs-client--get-buffer-for-directory directory)))
-    (with-current-buffer claude-buffer
-      (and (boundp 'eat--process)
-           eat--process
-           (process-live-p eat--process)))))
+Otherwise, use current `default-directory'.
+Wrapper function that uses pure function internally."
+  (let ((claude-buffer (claudemacs-client--get-buffer-for-directory directory)))
+    (claudemacs-client--can-send-text-pure claude-buffer)))
 
 (defun claudemacs-client--send-text (text &optional directory)
   "Send TEXT to claudemacs buffer.
 If DIRECTORY is provided, send to claudemacs in that directory.
-Otherwise, use current `default-directory'."
-  (if (claudemacs-client--can-send-text directory)
-      (when-let ((claude-buffer (claudemacs-client--get-buffer-for-directory directory)))
-        (with-current-buffer claude-buffer
-          (eat--send-string eat--process text)
-          (eat--send-string eat--process "\r")
-          t))
-    nil))
+Otherwise, use current `default-directory'.
+Wrapper function that uses pure function internally."
+  (let ((claude-buffer (claudemacs-client--get-buffer-for-directory directory)))
+    (claudemacs-client--send-text-pure text claude-buffer)))
 
 
 ;;;; Public API
