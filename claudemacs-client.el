@@ -415,6 +415,7 @@ Otherwise, use current language setting."
           (with-current-buffer buffer-name
             (when (fboundp 'org-mode)
               (let ((org-mode-hook nil))
+                (ignore org-mode-hook)  ; Suppress unused variable warning
                 (org-mode))))
           (message "Template output to buffer: %s" buffer-name)
           t)
