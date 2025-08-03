@@ -567,7 +567,7 @@
             (insert-file-contents temp-file)
             (let ((content (buffer-string)))
               (should (string-match-p "\\* Claude Input File" content))
-              (should (string-match-p "(claudemacs-start)" content)))))
+              (should (string-match-p "(start-claudemacs-new-session)" content)))))
       (when (file-exists-p temp-file)
         (delete-file temp-file)))))
 
@@ -584,7 +584,7 @@
             (insert-file-contents temp-file)
             (let ((content (buffer-string)))
               (should (string-match-p "\\* Claude 入力ファイル" content))
-              (should (string-match-p "(claudemacs-start)" content)))))
+              (should (string-match-p "(start-claudemacs-new-session)" content)))))
       (when (file-exists-p temp-file)
         (delete-file temp-file)))))
 
@@ -602,7 +602,7 @@
             (insert-file-contents temp-file)
             (let ((content (buffer-string)))
               (should (string-match-p "\\* Claude Input File" content))
-              (should (string-match-p "(claudemacs-start)" content)))))
+              (should (string-match-p "(start-claudemacs-new-session)" content)))))
       (when (file-exists-p temp-file)
         (delete-file temp-file)))))
 

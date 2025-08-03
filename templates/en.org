@@ -2,9 +2,17 @@
 Project: %s
 
 ** Claudemacs Startup Code
-Note: This functions starts claudemacs itself, not claudemacs-client.
+Note: This is the startup command for claudemacs itself, not for claudemacs-client.
+Specifically, it starts as "claude", do not start "claude" with "claude --resume [sessionId]".
 
-(claudemacs-start)
+Note: If you want to use "claude --resume [sessionId]", that is claudemacs's domain,
+so refer to claudemacs documentation or define your own command.
+This is kept here as a personal memo but is not necessarily maintained.
+- Use M-x cd to specify the directory where you want to open a session.
+- Actually open any file in that directory.
+- Run the claudemacs-transient-menu command and select "Start with Resume".
+
+(start-claudemacs-new-session)
 
 ** Window Layout Setup
 Note: This layout uses split-window-right as the author's preference.

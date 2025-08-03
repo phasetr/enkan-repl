@@ -1,10 +1,18 @@
 * Claude 入力ファイル
 プロジェクト: %s
 
-** Claudemacs起動
+** Claudemacs新規起動
 注意：これは claudemacs 自体の起動コマンドで, claudemacs-client の起動ではない.
+特に "claude" による起動で "claude --resume [sessionId]" による起動ではない.
 
-(claudemacs-start)
+注意：もし "claude --resume [sessionId]" したい場合は claudemacs の領分であるため,
+そちらを参照するか自分でコマンドを定義すること.
+ここでは自分用の備忘録として残してあるものの必ずしもメンテナンスしない.
+- M-x cd でセッションを開きたいディレクトリを指定する.
+- 実際にそのディレクトリの適当なファイルを開く.
+- claudemacs-transient-menu コマンドを実行して Start with Resume を選ぶ.
+
+(start-claudemacs-new-session)
 
 ** ウインドウレイアウト設定
 注意：このウインドウレイアウトでは作者の趣味で左にドキュメントの org,
