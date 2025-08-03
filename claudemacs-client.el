@@ -46,7 +46,6 @@
 ;;
 ;; Usage:
 ;; M-x claudemacs-client-open-project-input
-;; C-M-d (global binding)
 ;;
 ;; Acknowledgments:
 ;; This project is built on top of claudemacs.  We thank the original
@@ -362,14 +361,7 @@ This function finds existing input file or creates new one if needed."
   (local-set-key (kbd "C-c C-r") #'claudemacs-client-send-region-interactive)
   (local-set-key (kbd "C-c C-b") #'claudemacs-client-send-buffer))
 
-;;;; Setup
-
-;; Global key binding
-;;;###autoload
-(define-key global-map (kbd "C-M-d") #'claudemacs-client-open-project-input)
-
-
-;;;; Debug and Utility Functions
+;;; Debug and Utility Functions
 
 ;; These functions are primarily for debugging and troubleshooting.
 ;; They can be safely removed in production environments if needed.
