@@ -675,6 +675,127 @@
       (when (file-exists-p temp-file)
         (delete-file temp-file)))))
 
+;;; Tests for start-claudemacs-new-session Function
+
+(ert-deftest test-start-claudemacs-new-session-directory-change ()
+  "Test that start-claudemacs-new-session changes default-directory correctly."
+  (let ((original-dir (expand-file-name default-directory))
+        (test-dir (expand-file-name "/tmp/")))
+    (unwind-protect
+        (cl-letf (((symbol-function 'claudemacs-client--get-target-directory-for-buffer)
+                   (lambda () test-dir))
+                  ((symbol-function 'claudemacs-client--get-buffer-for-directory)
+                   (lambda (dir) nil))
+                  ((symbol-function 'claudemacs-client--can-send-text)
+                   ;; Mock different results for before/after startup
+                   (let ((call-count 0))
+                     (lambda (dir) 
+                       (setq call-count (1+ call-count))
+                       (> call-count 1))))  ; Return t after first call (simulating successful startup)
+                  ((symbol-function 'claudemacs-transient-menu) 
+                   (lambda () (message "Mock claudemacs-transient-menu called"))))
+          (cd original-dir)
+          (start-claudemacs-new-session)
+          (should (string= (expand-file-name default-directory) test-dir)))
+      ;; Cleanup
+      (cd original-dir))))
+
+(ert-deftest test-start-claudemacs-new-session-existing-live-session ()
+  "Test behavior when live session already exists."
+  (let ((test-dir "/tmp/")
+        (original-dir (expand-file-name default-directory))
+        (messages nil))
+    (unwind-protect
+        (cl-letf (((symbol-function 'claudemacs-client--get-target-directory-for-buffer)
+                   (lambda () test-dir))
+                  ((symbol-function 'claudemacs-client--get-buffer-for-directory)
+                   (lambda (dir) (get-buffer-create "*mock-claudemacs-buffer*")))
+                  ((symbol-function 'claudemacs-client--can-send-text)
+                   (lambda (dir) t))  ; Simulate live session
+                  ((symbol-function 'message)
+                   (lambda (fmt &rest args) 
+                     (push (apply #'format fmt args) messages))))
+          (start-claudemacs-new-session)
+          ;; Should not change directory when session exists
+          (should (string= (expand-file-name default-directory) original-dir))
+          ;; Should show appropriate message
+          (should (cl-some (lambda (msg) (string-match-p "already running" msg)) messages)))
+      ;; Cleanup
+      (when (get-buffer "*mock-claudemacs-buffer*")
+        (kill-buffer "*mock-claudemacs-buffer*"))
+      (cd original-dir))))
+
+(ert-deftest test-start-claudemacs-new-session-dead-session ()
+  "Test behavior when dead session exists."
+  (let ((test-dir "/tmp/")
+        (original-dir default-directory)
+        (restart-called nil))
+    (unwind-protect
+        (cl-letf (((symbol-function 'claudemacs-client--get-target-directory-for-buffer)
+                   (lambda () test-dir))
+                  ((symbol-function 'claudemacs-client--get-buffer-for-directory)
+                   (lambda (dir) (get-buffer-create "*mock-dead-claudemacs-buffer*")))
+                  ((symbol-function 'claudemacs-client--can-send-text)
+                   (lambda (dir) nil))  ; Simulate dead session
+                  ((symbol-function 'y-or-n-p)
+                   (lambda (prompt) t))  ; Simulate "yes" to restart
+                  ((symbol-function 'kill-buffer)
+                   (lambda (buffer) t))
+                  ((symbol-function 'start-claudemacs-new-session)
+                   (lambda () (setq restart-called t))))  ; Mock recursive call
+          (start-claudemacs-new-session)
+          (should restart-called))
+      ;; Cleanup
+      (when (get-buffer "*mock-dead-claudemacs-buffer*")
+        (kill-buffer "*mock-dead-claudemacs-buffer*"))
+      (cd original-dir))))
+
+(ert-deftest test-start-claudemacs-new-session-claudemacs-unavailable ()
+  "Test error handling when claudemacs-transient-menu is not available."
+  (let ((test-dir "/tmp/")
+        (original-dir (expand-file-name default-directory))
+        (error-caught nil))
+    (unwind-protect
+        (cl-letf (((symbol-function 'claudemacs-client--get-target-directory-for-buffer)
+                   (lambda () test-dir))
+                  ((symbol-function 'claudemacs-client--get-buffer-for-directory)
+                   (lambda (dir) nil))
+                  ((symbol-function 'claudemacs-client--can-send-text)
+                   (lambda (dir) nil))
+                  ((symbol-function 'fboundp)
+                   (lambda (func) nil)))  ; Simulate claudemacs-transient-menu not available
+          (condition-case err
+              (start-claudemacs-new-session)
+            (error 
+             (setq error-caught (error-message-string err))))
+          (should error-caught)
+          (should (string-match-p "not available" error-caught))
+          ;; Should restore original directory on error
+          (should (string= (expand-file-name default-directory) original-dir)))
+      ;; Cleanup
+      (cd original-dir))))
+
+(ert-deftest test-start-claudemacs-new-session-state-restoration ()
+  "Test that default-directory is restored when startup fails."
+  (let ((test-dir "/tmp/")
+        (original-dir (expand-file-name default-directory)))
+    (unwind-protect
+        (cl-letf (((symbol-function 'claudemacs-client--get-target-directory-for-buffer)
+                   (lambda () test-dir))
+                  ((symbol-function 'claudemacs-client--get-buffer-for-directory)
+                   (lambda (dir) nil))
+                  ((symbol-function 'claudemacs-client--can-send-text)
+                   (lambda (dir) nil))  ; Simulate failed startup
+                  ((symbol-function 'claudemacs-transient-menu)
+                   (lambda () (error "Simulated startup failure"))))
+          (condition-case nil
+              (start-claudemacs-new-session)
+            (error nil))  ; Ignore the error
+          ;; Should restore original directory
+          (should (string= (expand-file-name default-directory) original-dir)))
+      ;; Cleanup
+      (cd original-dir))))
+
 ;;; Test Runner
 
 (defun claudemacs-client-run-all-tests ()
