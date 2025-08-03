@@ -83,9 +83,11 @@
 (defun claudemacs-client--encode-full-path (path)
   "Encode PATH by replacing forward slashes with the configured separator.
 Example: \\='/Users/phasetr/project1/\\=' -> \\='cec--Users--phasetr--project1\\='"
-  (let ((cleaned-path (if (string-suffix-p "/" path)
-                        (substring path 0 -1)
-                        path)))
+  (let
+    ((cleaned-path
+       (if (string-suffix-p "/" path)
+         (substring path 0 -1)
+         path)))
     (concat "cec" (replace-regexp-in-string "/" claudemacs-client-path-separator cleaned-path))))
 
 (defun claudemacs-client--decode-full-path (encoded-name)
@@ -98,9 +100,10 @@ Example: \\='cec--Users--phasetr--project1\\=' -> \\='/Users/phasetr/project1/\\
 (defun claudemacs-client--get-project-file-path (&optional directory)
   "Get the full path for the project file based on DIRECTORY.
 If DIRECTORY is nil, use the current `default-directory'."
-  (let* ((target-dir (or directory default-directory))
-          (encoded-name (claudemacs-client--encode-full-path target-dir))
-          (filename (concat encoded-name ".org")))
+  (let*
+    ((target-dir (or directory default-directory))
+      (encoded-name (claudemacs-client--encode-full-path target-dir))
+      (filename (concat encoded-name ".org")))
     (expand-file-name filename target-dir)))
 
 ;;;; File Template and Content Management
@@ -144,9 +147,10 @@ Write your text here and use the following keys:
 
 (defun claudemacs-client--initialize-project-file (file-path)
   "Initialize a new project file at FILE-PATH with template content."
-  (let* ((directory (file-name-directory file-path))
-          (project-path (claudemacs-client--decode-full-path
-                          (file-name-base (file-name-nondirectory file-path)))))
+  (let*
+    ((directory (file-name-directory file-path))
+      (project-path (claudemacs-client--decode-full-path
+                      (file-name-base (file-name-nondirectory file-path)))))
     (unless (file-exists-p directory)
       (make-directory directory t))
     (with-temp-file file-path
