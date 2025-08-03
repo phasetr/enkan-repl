@@ -76,6 +76,17 @@
   :type 'string
   :group 'claudemacs-client)
 
+(defcustom claudemacs-client-template-language "en"
+  "Template language for claudemacs-client input files.
+Supported languages: \"en\" (English), \"ja\" (Japanese)"
+  :type '(choice (const "en") (const "ja") (const "custom"))
+  :group 'claudemacs-client)
+
+(defcustom claudemacs-client-custom-template-path nil
+  "Path to custom template file.  When set, overrides language setting completely."
+  :type '(choice (const nil) (file :tag "Custom template file"))
+  :group 'claudemacs-client)
+
 ;;;; Core Functions
 
 ;;;; File Naming and Path Management
@@ -106,44 +117,74 @@ If DIRECTORY is nil, use the current `default-directory'."
       (filename (concat encoded-name ".org")))
     (expand-file-name filename target-dir)))
 
+;;;; Template Loading Functions
+
+(defun claudemacs-client--get-template-path (language)
+  "Get template file path for LANGUAGE.
+Returns nil if template file doesn't exist."
+  (let* ((package-dir
+          (cond
+           ;; Try load-file-name first (when loading with load command)
+           (load-file-name (file-name-directory load-file-name))
+           ;; Try buffer-file-name (when evaluating in buffer)
+           (buffer-file-name (file-name-directory buffer-file-name))
+           ;; Fallback to current directory
+           (t default-directory)))
+         (template-file (format "templates/%s.org" language))
+         (template-path (expand-file-name template-file package-dir)))
+    (when (file-exists-p template-path)
+      template-path)))
+
+(defun claudemacs-client--load-template (language)
+  "Load template content for LANGUAGE with fallback mechanism.
+Returns template content as string, or nil if no template found."
+  (let ((template-path
+         (cond
+          ;; Custom template file overrides everything
+          ((and claudemacs-client-custom-template-path
+                (file-exists-p claudemacs-client-custom-template-path))
+           claudemacs-client-custom-template-path)
+          ;; Language-specific template
+          ((claudemacs-client--get-template-path language)
+           (claudemacs-client--get-template-path language))
+          ;; Fallback to English for "custom" language
+          ((and (string= language "custom")
+                (claudemacs-client--get-template-path "en"))
+           (claudemacs-client--get-template-path "en"))
+          ;; Final fallback to English
+          ((claudemacs-client--get-template-path "en")
+           (claudemacs-client--get-template-path "en"))
+          (t nil))))
+    (when template-path
+      (with-temp-buffer
+        (insert-file-contents template-path)
+        (buffer-string)))))
+
 ;;;; File Template and Content Management
 
 (defun claudemacs-client--get-file-template-with-startup-code (project-path)
-  "Generate file template with startup code for PROJECT-PATH."
-  (format "* Claude Input File
-
+  "Generate file template with startup code for PROJECT-PATH.
+Now loads template from external file based on language setting."
+  (let ((template-content (claudemacs-client--load-template claudemacs-client-template-language)))
+    (if template-content
+        (format template-content project-path)
+      ;; Fallback to basic template if external template loading fails
+      (format "* Claude Input File
 Project: %s
 
-** Startup Code (C-c C-e to evaluate)
-#+begin_src elisp
-(progn
-  (cd \"%s\")
-  (claudemacs-transient-menu))
-#+end_src
+** Startup Code
+(claudemacs-start)
 
-** Layout Setup (C-c C-e to evaluate)
-#+begin_src elisp
-(progn
-  (delete-other-windows)
-  (split-window-right)
-  (other-window 1)
-  (let ((claudemacs-buf (get-buffer \"*claudemacs:%s*\")))
-    (if claudemacs-buf
-        (switch-to-buffer claudemacs-buf)
-      (message \"claudemacs buffer not found. Run startup code first.\")))
-  (other-window -1))
-#+end_src
+** Layout Setup
+(claudemacs-client-setup-window-layout)
 
-** Usage
-Write your text here and use the following keys:
+** Essential Functions
+- Send region: M-x claudemacs-client-send-region
+- Send rest of buffer: M-x claudemacs-client-send-rest-of-buffer
+- Send buffer: M-x claudemacs-client-send-buffer
 
-- C-c C-c: Send from cursor to end
-- C-c C-r: Send selected region
-- C-c C-b: Send entire file
-
------
-
-" project-path project-path project-path))
+** Thought/memo
+" project-path))))
 
 (defun claudemacs-client--initialize-project-file (file-path)
   "Initialize a new project file at FILE-PATH with template content."
@@ -364,6 +405,54 @@ This function finds existing input file or creates new one if needed."
   (local-set-key (kbd "C-c C-c") #'claudemacs-client-send-rest-of-buffer)
   (local-set-key (kbd "C-c C-r") #'claudemacs-client-send-region-interactive)
   (local-set-key (kbd "C-c C-b") #'claudemacs-client-send-buffer))
+
+;;;###autoload
+(defun claudemacs-client-start ()
+  "Start claudemacs and change to appropriate directory.
+Determines directory from current buffer filename if it's a persistent file."
+  (interactive)
+  (let ((target-dir (claudemacs-client--get-target-directory-for-buffer)))
+    (cd target-dir)
+    (when (fboundp 'claudemacs-transient-menu)
+      (claudemacs-transient-menu))
+    (message "Started claudemacs in: %s" target-dir)))
+
+;;;###autoload
+(defun claudemacs-client-setup-window-layout ()
+  "Set up window layout with org file on left and claudemacs on right.
+This is the author's preference - customize as needed."
+  (interactive)
+  (let ((target-dir (claudemacs-client--get-target-directory-for-buffer)))
+    (delete-other-windows)
+    (split-window-right)
+    (other-window 1)
+    (let ((claudemacs-buf (claudemacs-client--get-buffer-for-directory target-dir)))
+      (if claudemacs-buf
+          (switch-to-buffer claudemacs-buf)
+        (message "claudemacs buffer not found. Run (claudemacs-client-start) first.")))
+    (other-window -1)
+    (message "Window layout setup complete")))
+
+;;;###autoload
+(defun claudemacs-client-output-template (&optional language)
+  "Output template content to a new buffer for customization.
+If LANGUAGE is specified, use that language template.
+Otherwise, use current language setting."
+  (interactive)
+  (let* ((target-language (or language claudemacs-client-template-language))
+         (template-content (claudemacs-client--load-template target-language))
+         (buffer-name (format "*claudemacs-template-%s*" target-language)))
+    (if template-content
+        (progn
+          (with-output-to-temp-buffer buffer-name
+            (princ template-content))
+          (with-current-buffer buffer-name
+            (when (fboundp 'org-mode)
+              (org-mode)))
+          (message "Template output to buffer: %s" buffer-name)
+          t)
+      (message "Template not found for language: %s" target-language)
+      nil)))
 
 ;;; Debug and Utility Functions
 
