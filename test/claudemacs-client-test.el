@@ -465,11 +465,11 @@
 (ert-deftest test-get-template-path-with-existing-file ()
   "Test getting template path for existing template file."
   (let ((default-directory claudemacs-client-test-package-dir))
-    ;; Test with English template (should exist)
-    (let ((template-path (claudemacs-client--get-template-path "en")))
+    ;; Test with default template (should exist)
+    (let ((template-path (claudemacs-client--get-template-path "default")))
       (should template-path)
       (should (file-exists-p template-path))
-      (should (string-match-p "templates/en\\.org$" template-path)))))
+      (should (string-match-p "templates/default\\.org$" template-path)))))
 
 (ert-deftest test-get-template-path-with-nonexistent-file ()
   "Test getting template path for nonexistent template file."
@@ -483,54 +483,43 @@
         (buffer-file-name nil)
         (default-directory claudemacs-client-test-package-dir))
     ;; Should fallback to default-directory
-    (let ((template-path (claudemacs-client--get-template-path "en")))
+    (let ((template-path (claudemacs-client--get-template-path "default")))
       (should template-path)
       (should (file-exists-p template-path)))))
 
-(ert-deftest test-load-template-english ()
-  "Test loading English template."
+(ert-deftest test-load-template-default ()
+  "Test loading default template."
   (let ((default-directory claudemacs-client-test-package-dir))
-    (let ((template-content (claudemacs-client--load-template "en")))
+    (let ((template-content (claudemacs-client--load-template "default")))
       (should template-content)
       (should (stringp template-content))
       (should (string-match-p "\\* Claude Input File" template-content))
       (should (string-match-p "Project: %s" template-content)))))
 
-(ert-deftest test-load-template-japanese ()
-  "Test loading Japanese template."
-  (let ((default-directory claudemacs-client-test-package-dir))
-    (let ((template-content (claudemacs-client--load-template "ja")))
-      (should template-content)
-      (should (stringp template-content))
-      (should (string-match-p "\\* Claude 入力ファイル" template-content))
-      (should (string-match-p "プロジェクト: %s" template-content)))))
-
-(ert-deftest test-load-template-custom-fallback ()
-  "Test loading custom template falls back to English."
+(ert-deftest test-load-template-custom-with-fallback ()
+  "Test loading custom template with fallback to default."
   (let ((default-directory claudemacs-client-test-package-dir)
         (claudemacs-client-custom-template-path nil))
     (let ((template-content (claudemacs-client--load-template "custom")))
       (should template-content)
       (should (stringp template-content))
-      ;; Should be English content since no custom file specified
-      (should (string-match-p "\\* Claude Input File" template-content)))))
+      (should (string-match-p "\\* Claude Input File" template-content))
+      (should (string-match-p "Project: %s" template-content)))))
 
-(ert-deftest test-load-template-with-custom-path ()
-  "Test loading template with custom template path override."
+(ert-deftest test-load-template-custom-with-path ()
+  "Test loading custom template with explicit path."
   (let ((temp-file (make-temp-file "test-template" nil ".org"))
         (test-content "* Custom Template\nProject: %s\n"))
     (unwind-protect
         (progn
-          ;; Write test content to temp file
           (with-temp-file temp-file
             (insert test-content))
-          
-          ;; Test with custom template path
           (let ((claudemacs-client-custom-template-path temp-file))
-            (let ((template-content (claudemacs-client--load-template "any-language")))
+            (let ((template-content (claudemacs-client--load-template "custom")))
               (should template-content)
               (should (string= template-content test-content)))))
       (delete-file temp-file))))
+
 
 (ert-deftest test-load-template-nonexistent ()
   "Test loading nonexistent template returns nil."
@@ -542,22 +531,22 @@
   (let ((default-directory claudemacs-client-test-package-dir)
         (claudemacs-client-custom-template-path nil))
     
-    ;; Test that nonexistent language falls back to English
+    ;; Test that nonexistent language falls back to default
     (let ((template-content (claudemacs-client--load-template "nonexistent")))
       (should template-content)
       (should (string-match-p "\\* Claude Input File" template-content)))
     
-    ;; Test that custom without file falls back to English  
+    ;; Test that custom without file falls back to default  
     (let ((template-content (claudemacs-client--load-template "custom")))
       (should template-content)
       (should (string-match-p "\\* Claude Input File" template-content)))))
 
 ;;; Tests for Template Generation Function (via initialize-project-file)
 
-(ert-deftest test-initialize-project-file-english ()
-  "Test project file initialization with English template."
+(ert-deftest test-initialize-project-file-default ()
+  "Test project file initialization with default template."
   (let ((default-directory claudemacs-client-test-package-dir)
-        (claudemacs-client-template-language "en")
+        (claudemacs-client-template-language "default")
         (temp-file (make-temp-file "test-project" nil ".org")))
     (unwind-protect
         (progn
@@ -571,10 +560,11 @@
       (when (file-exists-p temp-file)
         (delete-file temp-file)))))
 
-(ert-deftest test-initialize-project-file-japanese ()
-  "Test project file initialization with Japanese template."
+(ert-deftest test-initialize-project-file-custom ()
+  "Test project file initialization with custom template."
   (let ((default-directory claudemacs-client-test-package-dir)
-        (claudemacs-client-template-language "ja")
+        (claudemacs-client-template-language "custom")
+        (claudemacs-client-custom-template-path nil)
         (temp-file (make-temp-file "test-project" nil ".org")))
     (unwind-protect
         (progn
@@ -583,7 +573,7 @@
           (with-temp-buffer
             (insert-file-contents temp-file)
             (let ((content (buffer-string)))
-              (should (string-match-p "\\* Claude 入力ファイル" content))
+              (should (string-match-p "\\* Claude Input File" content))
               (should (string-match-p "(start-claudemacs)" content)))))
       (when (file-exists-p temp-file)
         (delete-file temp-file)))))
@@ -591,11 +581,12 @@
 (ert-deftest test-initialize-project-file-fallback ()
   "Test project file initialization with fallback when template loading fails."
   (let ((default-directory claudemacs-client-test-package-dir)  ; Use valid directory
-        (claudemacs-client-template-language "nonexistent")
+        (claudemacs-client-template-language "custom")
+        (claudemacs-client-custom-template-path "/nonexistent/path.org")
         (temp-file (make-temp-file "test-project" nil ".org")))
     (unwind-protect
         (progn
-          ;; Should use fallback to English template
+          ;; Should use fallback to default template
           (claudemacs-client--initialize-project-file temp-file)
           (should (file-exists-p temp-file))
           (with-temp-buffer
@@ -615,19 +606,19 @@
         (progn
           ;; Call the function - org-mode may fail due to hook conflicts, but that's OK
           (condition-case nil
-              (claudemacs-client-output-template "en")
+              (claudemacs-client-output-template "default")
             (error nil))  ; Ignore org-mode hook errors
           
           ;; Check that buffer was created
-          (let ((buffer (get-buffer "*claudemacs-template-en*")))
+          (let ((buffer (get-buffer "*claudemacs-template-default*")))
             (should buffer)
             (with-current-buffer buffer
               (should (> (buffer-size) 0))
               (should (string-match-p "\\* Claude Input File" (buffer-string))))))
       
       ;; Cleanup
-      (when (get-buffer "*claudemacs-template-en*")
-        (kill-buffer "*claudemacs-template-en*")))))
+      (when (get-buffer "*claudemacs-template-default*")
+        (kill-buffer "*claudemacs-template-default*")))))
 
 (ert-deftest test-output-template-with-nonexistent-language ()
   "Test output-template behavior with nonexistent language."
@@ -642,14 +633,14 @@
 (ert-deftest test-template-system-integration ()
   "Integration test for the complete template system."
   (let ((default-directory claudemacs-client-test-package-dir)
-        (claudemacs-client-template-language "ja")
+        (claudemacs-client-template-language "default")
         (temp-file (make-temp-file "test-integration" nil ".org")))
     (unwind-protect
         (progn
           ;; Test that template loading works with current language setting
           (let ((template-content (claudemacs-client--load-template claudemacs-client-template-language)))
             (should template-content)
-            (should (string-match-p "\\* Claude 入力ファイル" template-content)))
+            (should (string-match-p "\\* Claude Input File" template-content)))
           
           ;; Test that project file initialization uses the loaded template
           (claudemacs-client--initialize-project-file temp-file)
@@ -657,11 +648,12 @@
           (with-temp-buffer
             (insert-file-contents temp-file)
             (let ((content (buffer-string)))
-              (should (string-match-p "\\* Claude 入力ファイル" content))))
+              (should (string-match-p "\\* Claude Input File" content))))
           
           ;; Test switching language and regenerating
-          (let ((claudemacs-client-template-language "en")
-                (temp-file2 (make-temp-file "test-integration-en" nil ".org")))
+          (let ((claudemacs-client-template-language "custom")
+                (claudemacs-client-custom-template-path nil)
+                (temp-file2 (make-temp-file "test-integration-custom" nil ".org")))
             (unwind-protect
                 (progn
                   (claudemacs-client--initialize-project-file temp-file2)
