@@ -1033,6 +1033,105 @@
         ;; Should detect no content
         (should (string-match-p "No content from cursor to end" message-text))))))
 
+(ert-deftest test-send-line-basic ()
+  "Test that send-line sends current line content."
+  (with-temp-buffer
+    (insert "Line 1\nLine 2 with content\nLine 3")
+    (goto-char 15) ; Position in "Line 2 with content"
+    (let ((sent-text nil)
+          (message-text nil))
+      ;; Mock functions
+      (cl-letf (((symbol-function 'claudemacs-client--get-target-directory-for-buffer) 
+                 (lambda () "/test/dir"))
+                ((symbol-function 'claudemacs-client--send-text) 
+                 (lambda (text dir) 
+                   (setq sent-text text)
+                   t))
+                ((symbol-function 'message) 
+                 (lambda (fmt &rest args) 
+                   (setq message-text (apply #'format fmt args)))))
+        (claudemacs-client-send-line)
+        ;; Should send only current line
+        (should (string= sent-text "Line 2 with content"))
+        (should (string-match-p "Line sent to Claude" message-text))))))
+
+(ert-deftest test-send-line-trims-whitespace ()
+  "Test that send-line trims whitespace from current line."
+  (with-temp-buffer
+    (insert "Line 1\n  \t  Line with spaces  \t  \nLine 3")
+    (goto-char 15) ; Position in line with spaces
+    (let ((sent-text nil)
+          (message-text nil))
+      ;; Mock functions
+      (cl-letf (((symbol-function 'claudemacs-client--get-target-directory-for-buffer) 
+                 (lambda () "/test/dir"))
+                ((symbol-function 'claudemacs-client--send-text) 
+                 (lambda (text dir) 
+                   (setq sent-text text)
+                   t))
+                ((symbol-function 'message) 
+                 (lambda (fmt &rest args) 
+                   (setq message-text (apply #'format fmt args)))))
+        (claudemacs-client-send-line)
+        ;; Should trim whitespace
+        (should (string= sent-text "Line with spaces"))
+        (should (string-match-p "Line sent to Claude" message-text))))))
+
+(ert-deftest test-send-line-empty-after-trim ()
+  "Test that send-line handles empty line after trimming."
+  (with-temp-buffer
+    (insert "Line 1\n  \t  \n  \nLine 4")
+    (goto-char 10) ; Position in empty line
+    (let ((message-text nil))
+      ;; Mock functions
+      (cl-letf (((symbol-function 'claudemacs-client--get-target-directory-for-buffer) 
+                 (lambda () "/test/dir"))
+                ((symbol-function 'message) 
+                 (lambda (fmt &rest args) 
+                   (setq message-text (apply #'format fmt args)))))
+        (claudemacs-client-send-line)
+        ;; Should detect empty content
+        (should (string-match-p "No content to send" message-text))))))
+
+(ert-deftest test-send-line-single-line-buffer ()
+  "Test that send-line works with single line buffer."
+  (with-temp-buffer
+    (insert "Only one line")
+    (goto-char 5) ; Position in the line
+    (let ((sent-text nil)
+          (message-text nil))
+      ;; Mock functions
+      (cl-letf (((symbol-function 'claudemacs-client--get-target-directory-for-buffer) 
+                 (lambda () "/test/dir"))
+                ((symbol-function 'claudemacs-client--send-text) 
+                 (lambda (text dir) 
+                   (setq sent-text text)
+                   t))
+                ((symbol-function 'message) 
+                 (lambda (fmt &rest args) 
+                   (setq message-text (apply #'format fmt args)))))
+        (claudemacs-client-send-line)
+        ;; Should send the single line
+        (should (string= sent-text "Only one line"))
+        (should (string-match-p "Line sent to Claude" message-text))))))
+
+(ert-deftest test-send-line-no-buffer-found ()
+  "Test that send-line handles case when no claudemacs buffer is found."
+  (with-temp-buffer
+    (insert "Test line")
+    (let ((message-text nil))
+      ;; Mock functions
+      (cl-letf (((symbol-function 'claudemacs-client--get-target-directory-for-buffer) 
+                 (lambda () "/test/dir"))
+                ((symbol-function 'claudemacs-client--send-text) 
+                 (lambda (text dir) nil)) ; Simulate no buffer found
+                ((symbol-function 'message) 
+                 (lambda (fmt &rest args) 
+                   (setq message-text (apply #'format fmt args)))))
+        (claudemacs-client-send-line)
+        ;; Should show error message
+        (should (string-match-p "Cannot send.*no matching claudemacs buffer" message-text))))))
+
 ;;; Tests for Template Output Function
 
 (ert-deftest test-output-template-creates-buffer ()

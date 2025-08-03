@@ -409,6 +409,24 @@ Wrapper function that uses pure function internally."
           (message "❌ Cannot send - no matching claudemacs buffer found for this directory"))
       (message "No content from cursor to end of file"))))
 
+;;;###autoload
+(defun claudemacs-client-send-line ()
+  "Send the current line to claudemacs."
+  (interactive)
+  (let*
+      ((line-start (line-beginning-position))
+       (line-end (line-end-position))
+       (raw-content (buffer-substring-no-properties line-start line-end))
+       (content (string-trim raw-content))
+       (target-dir (claudemacs-client--get-target-directory-for-buffer)))
+    (if
+        (and content (not (string-empty-p content)))
+        (if
+            (claudemacs-client--send-text content target-dir)
+            (message "Line sent to Claude (%d characters)" (length content))
+          (message "❌ Cannot send - no matching claudemacs buffer found for this directory"))
+      (message "No content to send (empty or whitespace only)"))))
+
 (defun claudemacs-client--create-project-input-file (target-directory)
   "Create project input file for TARGET-DIRECTORY from template.
 Returns the created file path."
