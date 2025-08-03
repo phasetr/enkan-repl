@@ -84,7 +84,7 @@ This allows flexible management: keep files with projects or organize them centr
 
 | Command | Description |
 |---------|-------------|
-| `claudemacs-client-create-input-file` | Create or switch to dedicated input file |
+| `claudemacs-client-open-project-input` | Open or create project input file |
 | `claudemacs-client-send-region` | Send selected text to claudemacs |
 | `claudemacs-client-send-buffer` | Send entire file content |
 | `claudemacs-client-send-from-cursor` | Send text from cursor to end |
@@ -107,7 +107,7 @@ This allows flexible management: keep files with projects or organize them centr
 
 ```elisp
 ;; Alternative global binding
-(global-set-key (kbd "C-c C-a") #'claudemacs-client-create-input-file)
+(global-set-key (kbd "C-c C-a") #'claudemacs-client-open-project-input)
 
 ;; Bind to specific modes
 (define-key org-mode-map (kbd "C-c C-s") #'claudemacs-client-send-region)
