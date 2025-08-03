@@ -72,32 +72,10 @@
   :group 'tools
   :prefix "claudemacs-client-")
 
-(defcustom claudemacs-client-input-file-name "*Claude Input*"
-  "Name of the dedicated input file."
-  :type 'string
-  :group 'claudemacs-client)
-
-(defcustom claudemacs-client-use-persistent-files t
-  "Whether to use persistent files instead of temporary files."
-  :type 'boolean
-  :group 'claudemacs-client)
-
-(defcustom claudemacs-client-project-file-directory nil
-  "Directory to store project files.  nil means use project root."
-  :type '(choice (const :tag "Project Root" nil)
-                 (string :tag "Custom Directory"))
-  :group 'claudemacs-client)
-
-(defcustom claudemacs-client-auto-save-interval 30
-  "Auto-save interval in seconds."
-  :type 'integer
-  :group 'claudemacs-client)
-
 (defcustom claudemacs-client-path-separator "--"
   "String to replace path separators (/) in filenames."
   :type 'string
   :group 'claudemacs-client)
-
 
 ;;;; Core Functions
 
@@ -107,7 +85,7 @@
   "Encode PATH by replacing forward slashes with the configured separator.
 Example: \\='/Users/phasetr/project1/\\=' -> \\='cec--Users--phasetr--project1\\='"
   (let ((cleaned-path (if (string-suffix-p "/" path)
-                          (substring path 0 -1)
+                        (substring path 0 -1)
                         path)))
     (concat "cec" (replace-regexp-in-string "/" claudemacs-client-path-separator cleaned-path))))
 
@@ -120,13 +98,11 @@ Example: \\='cec--Users--phasetr--project1\\=' -> \\='/Users/phasetr/project1/\\
 
 (defun claudemacs-client--get-project-file-path (&optional directory)
   "Get the full path for the project file based on DIRECTORY.
-If DIRECTORY is nil, use the current `default-directory'.
-If `claudemacs-client-project-file-directory' is set, use that as base."
+If DIRECTORY is nil, use the current `default-directory'."
   (let* ((target-dir (or directory default-directory))
-         (encoded-name (claudemacs-client--encode-full-path target-dir))
-         (filename (concat encoded-name ".org"))
-         (base-dir (or claudemacs-client-project-file-directory target-dir)))
-    (expand-file-name filename base-dir)))
+          (encoded-name (claudemacs-client--encode-full-path target-dir))
+          (filename (concat encoded-name ".org")))
+    (expand-file-name filename target-dir)))
 
 ;;;; File Template and Content Management
 
@@ -170,8 +146,8 @@ Write your text here and use the following keys:
 (defun claudemacs-client--create-project-file (file-path)
   "Create a new project file at FILE-PATH with template content."
   (let* ((directory (file-name-directory file-path))
-         (project-path (claudemacs-client--decode-full-path
-                       (file-name-base (file-name-nondirectory file-path)))))
+          (project-path (claudemacs-client--decode-full-path
+                          (file-name-base (file-name-nondirectory file-path)))))
     (unless (file-exists-p directory)
       (make-directory directory t))
     (with-temp-file file-path
@@ -181,25 +157,12 @@ Write your text here and use the following keys:
 (defun claudemacs-client--load-project-file (file-path)
   "Load or create project file at FILE-PATH and return file buffer."
   (if (file-exists-p file-path)
-      (find-file file-path)
+    (find-file file-path)
     (let ((buffer (find-file file-path)))
       (claudemacs-client--create-project-file file-path)
       (revert-buffer t t)
       buffer)))
 
-(defun claudemacs-client--save-project-file ()
-  "Save current file if it's a project file."
-  (when (and buffer-file-name
-             (string-match-p "cec-.+\\.org$" (file-name-nondirectory buffer-file-name)))
-    (save-buffer)))
-
-(defun claudemacs-client--setup-auto-save ()
-  "Set up auto-save timer for current file."
-  (when (and claudemacs-client-auto-save-interval
-             (> claudemacs-client-auto-save-interval 0))
-    (run-with-timer claudemacs-client-auto-save-interval
-                    claudemacs-client-auto-save-interval
-                    'claudemacs-client--save-project-file)))
 
 ;;;; Pure Functions for Directory/Buffer Detection
 
@@ -208,10 +171,10 @@ Write your text here and use the following keys:
 If BUFFER-FILE-NAME-ARG matches persistent file pattern, decode directory.
 Otherwise, return DEFAULT-DIRECTORY-ARG."
   (if (and buffer-file-name-arg
-           (string-match-p "cec-.+\\.org$" (file-name-nondirectory buffer-file-name-arg)))
-      ;; This is a persistent file, extract directory from filename
-      (claudemacs-client--decode-full-path
-       (file-name-base (file-name-nondirectory buffer-file-name-arg)))
+        (string-match-p "cec-.+\\.org$" (file-name-nondirectory buffer-file-name-arg)))
+    ;; This is a persistent file, extract directory from filename
+    (claudemacs-client--decode-full-path
+      (file-name-base (file-name-nondirectory buffer-file-name-arg)))
     ;; Use current directory
     default-directory-arg))
 
@@ -220,30 +183,30 @@ Otherwise, return DEFAULT-DIRECTORY-ARG."
 Returns t if directories match, nil otherwise."
   (when buffer-default-directory
     (string= (file-truename buffer-default-directory)
-             (file-truename target-dir))))
+      (file-truename target-dir))))
 
 (defun claudemacs-client--find-matching-buffer-pure (buffer-list target-directory)
   "Pure function: Find claudemacs buffer matching TARGET-DIRECTORY from BUFFER-LIST.
 Returns matching buffer or nil.  BUFFER-LIST should contain buffer objects."
   (cl-find-if (lambda (buf-info)
                 (let ((name (plist-get buf-info :name))
-                      (default-dir (plist-get buf-info :default-directory))
-                      (eat-mode (plist-get buf-info :eat-mode))
-                      (buffer (plist-get buf-info :buffer)))
+                       (default-dir (plist-get buf-info :default-directory))
+                       (eat-mode (plist-get buf-info :eat-mode))
+                       (buffer (plist-get buf-info :buffer)))
                   (and (buffer-live-p buffer)
-                       name  ; Ensure name is not nil
-                       ;; Check for directory-specific claudemacs buffer
-                       (or (and (string-match-p "^\\*claudemacs:" name)
-                                (string-prefix-p (concat "*claudemacs:" target-directory) name))
-                           ;; Fallback to generic buffers only if they match directory
-                           (and (or (string= name "*claude*")
-                                    (string= name "*claudemacs*"))
-                                (claudemacs-client--buffer-matches-directory-pure default-dir target-directory))
-                           ;; Check for eat-mode buffers with claude in name
-                           (and eat-mode
-                                (string-match-p "claude" name)
-                                (claudemacs-client--buffer-matches-directory-pure default-dir target-directory))))))
-              buffer-list))
+                    name  ; Ensure name is not nil
+                    ;; Check for directory-specific claudemacs buffer
+                    (or (and (string-match-p "^\\*claudemacs:" name)
+                          (string-prefix-p (concat "*claudemacs:" target-directory) name))
+                      ;; Fallback to generic buffers only if they match directory
+                      (and (or (string= name "*claude*")
+                             (string= name "*claudemacs*"))
+                        (claudemacs-client--buffer-matches-directory-pure default-dir target-directory))
+                      ;; Check for eat-mode buffers with claude in name
+                      (and eat-mode
+                        (string-match-p "claude" name)
+                        (claudemacs-client--buffer-matches-directory-pure default-dir target-directory))))))
+    buffer-list))
 
 (defun claudemacs-client--can-send-text-pure (claude-buffer)
   "Pure function: Check if CLAUDE-BUFFER can receive text.
@@ -251,8 +214,8 @@ Returns t if buffer has live eat process, nil otherwise."
   (when claude-buffer
     (with-current-buffer claude-buffer
       (and (boundp 'eat--process)
-           eat--process
-           (process-live-p eat--process)))))
+        eat--process
+        (process-live-p eat--process)))))
 
 (defun claudemacs-client--send-text-pure (text claude-buffer)
   "Pure function: Send TEXT to CLAUDE-BUFFER.
@@ -278,16 +241,16 @@ Wrapper function that uses pure function internally."
 If DIRECTORY is nil, use current `default-directory'.
 Wrapper function that uses pure function internally."
   (let* ((target-dir (or directory default-directory))
-         (buffer-info-list (mapcar (lambda (buf)
-                                     (list :buffer buf
-                                           :name (buffer-name buf)
-                                           :default-directory (with-current-buffer buf
-                                                                (when (boundp 'default-directory)
-                                                                  default-directory))
-                                           :eat-mode (with-current-buffer buf
-                                                       (and (boundp 'eat-mode) eat-mode))))
-                                   (buffer-list)))
-         (match-info (claudemacs-client--find-matching-buffer-pure buffer-info-list target-dir)))
+          (buffer-info-list (mapcar (lambda (buf)
+                                      (list :buffer buf
+                                        :name (buffer-name buf)
+                                        :default-directory (with-current-buffer buf
+                                                             (when (boundp 'default-directory)
+                                                               default-directory))
+                                        :eat-mode (with-current-buffer buf
+                                                    (and (boundp 'eat-mode) eat-mode))))
+                              (buffer-list)))
+          (match-info (claudemacs-client--find-matching-buffer-pure buffer-info-list target-dir)))
     (when match-info
       (plist-get match-info :buffer))))
 
@@ -328,9 +291,9 @@ Wrapper function that uses pure function internally."
   (interactive "r")
   (when (use-region-p)
     (let ((content (buffer-substring-no-properties start end))
-          (target-dir (claudemacs-client--get-target-directory-for-buffer)))
+           (target-dir (claudemacs-client--get-target-directory-for-buffer)))
       (if (claudemacs-client--send-text content target-dir)
-          (message "Region sent to Claude (%d characters)" (length content))
+        (message "Region sent to Claude (%d characters)" (length content))
         (message "❌ Cannot send - no matching claudemacs buffer found for this directory")))))
 
 ;;;###autoload
@@ -338,10 +301,10 @@ Wrapper function that uses pure function internally."
   "Send the entire current buffer to claudemacs."
   (interactive)
   (let ((content (buffer-substring-no-properties (point-min) (point-max)))
-        (target-dir (claudemacs-client--get-target-directory-for-buffer)))
+         (target-dir (claudemacs-client--get-target-directory-for-buffer)))
     (if (claudemacs-client--send-text content target-dir)
-        (message "File sent to Claude: %s (%d characters)"
-                 (buffer-name) (length content))
+      (message "File sent to Claude: %s (%d characters)"
+        (buffer-name) (length content))
       (message "❌ Cannot send - no matching claudemacs buffer found for this directory"))))
 
 ;;;###autoload
@@ -349,12 +312,12 @@ Wrapper function that uses pure function internally."
   "Send text from cursor position to end of buffer to claudemacs."
   (interactive)
   (let ((content (buffer-substring-no-properties (point) (point-max)))
-        (target-dir (claudemacs-client--get-target-directory-for-buffer)))
+         (target-dir (claudemacs-client--get-target-directory-for-buffer)))
     (if (or (not content) (string-match-p "\\`[[:space:]]*\\'" content))
-        (message "No content from cursor to end of file")
+      (message "No content from cursor to end of file")
       (if (claudemacs-client--send-text content target-dir)
-          (message "Text from cursor sent to Claude (%d characters)"
-                   (length content))
+        (message "Text from cursor sent to Claude (%d characters)"
+          (length content))
         (message "❌ Cannot send - no matching claudemacs buffer found for this directory")))))
 
 ;;;###autoload
@@ -364,8 +327,8 @@ If DIRECTORY is nil, use current `default-directory'.
 This replaces the temporary file approach with persistent files."
   (interactive)
   (let* ((target-dir (or directory default-directory))
-         (file-path (claudemacs-client--get-project-file-path target-dir))
-         (buffer (claudemacs-client--load-project-file file-path)))
+          (file-path (claudemacs-client--get-project-file-path target-dir))
+          (buffer (claudemacs-client--load-project-file file-path)))
     (with-current-buffer buffer
       ;; Set up org mode
       (when (fboundp 'org-mode)
@@ -373,64 +336,28 @@ This replaces the temporary file approach with persistent files."
           (let ((org-mode-hook nil))
             (ignore org-mode-hook)  ; Suppress unused variable warning
             (org-mode))))
-      
+
       ;; Set up key bindings
       (claudemacs-client--setup-input-file-keys)
-      
-      ;; Set up auto-save
-      (when claudemacs-client-auto-save-interval
-        (claudemacs-client--setup-auto-save)))
-    
+
+      )
+
     (switch-to-buffer buffer)
     (goto-char (point-max))
     (message "Persistent Claude file ready: %s" (file-name-nondirectory file-path))))
 
 ;;;###autoload
 (defun claudemacs-client-create-input-file ()
-  "Create or switch to input file.
-Uses persistent files if `claudemacs-client-use-persistent-files' is t,
-otherwise uses traditional temporary file."
+  "Create or switch to persistent input file."
   (interactive)
-  (if claudemacs-client-use-persistent-files
-      (claudemacs-client-create-persistent-file)
-    (claudemacs-client--create-traditional-input-file)))
-
-(defun claudemacs-client--create-traditional-input-file ()
-  "Create or switch to a traditional dedicated input file.
-This function creates a file for composing Claude text."
-  (let ((buffer-name claudemacs-client-input-file-name))
-    (let ((input-buffer (get-buffer-create buffer-name)))
-      (with-current-buffer input-buffer
-        ;; Set up org mode for better editing experience
-        (when (fboundp 'org-mode)
-          (unless (eq major-mode 'org-mode)
-            ;; Temporarily disable org-mode-hook to avoid side effects
-            (let ((org-mode-hook nil))
-              (ignore org-mode-hook)  ; Suppress unused variable warning
-              (org-mode))))
-
-        ;; Set up key bindings
-        (claudemacs-client--setup-input-file-keys)
-
-        ;; Add helpful header if file is empty
-        (when (= (point-min) (point-max))
-          (insert "* Claude Input File\n\n")
-          (insert "Write your text here and use the following keys:\n\n")
-          (insert "- C-c C-c: Send from cursor to end\n")
-          (insert "- C-c C-r: Send selected region\n")
-          (insert "- C-c C-b: Send entire file\n\n")
-          (insert "-----\n\n")))
-
-      (switch-to-buffer input-buffer)
-      (goto-char (point-max))
-      (message "Claude input file ready. C-c C-c to send from cursor."))))
+  (claudemacs-client-create-persistent-file))
 
 
 (defun claudemacs-client-send-region-interactive ()
   "Interactive version of send region that handles no region case."
   (interactive)
   (if (use-region-p)
-      (claudemacs-client-send-region (region-beginning) (region-end))
+    (claudemacs-client-send-region (region-beginning) (region-end))
     (message "No region selected")))
 
 (defun claudemacs-client--setup-input-file-keys ()
@@ -447,12 +374,12 @@ This function creates a file for composing Claude text."
   "Show status of claudemacs-client."
   (interactive)
   (let* ((target-dir (claudemacs-client--get-target-directory-for-buffer))
-         (claude-buffer (claudemacs-client--get-buffer-for-directory target-dir)))
+          (claude-buffer (claudemacs-client--get-buffer-for-directory target-dir)))
     (message "claudemacs-client | Connection: %s | Target: %s"
-             (if claude-buffer
-                 (format "Connected (%s)" (buffer-name claude-buffer))
-               "Not connected")
-             target-dir)))
+      (if claude-buffer
+        (format "Connected (%s)" (buffer-name claude-buffer))
+        "Not connected")
+      target-dir)))
 
 ;;;; Setup
 
@@ -478,18 +405,18 @@ This function creates a file for composing Claude text."
   "Debug connection status and directory detection."
   (interactive)
   (let* ((target-dir (claudemacs-client--get-target-directory-for-buffer))
-         (claude-buffer (claudemacs-client--get-buffer-for-directory target-dir))
-         (can-send (claudemacs-client--can-send-text target-dir)))
+          (claude-buffer (claudemacs-client--get-buffer-for-directory target-dir))
+          (can-send (claudemacs-client--can-send-text target-dir)))
     (message "=== Connection Debug Information ===")
     (message "Current buffer: %s" (buffer-name))
     (message "Target directory: %s" target-dir)
     (message "Claude buffer: %s" (if claude-buffer (buffer-name claude-buffer) "None"))
     (message "Can send text: %s" (if can-send "YES" "NO"))
     (message "All claudemacs buffers: %S"
-             (mapcar #'buffer-name
-                     (seq-filter (lambda (buf)
-                                   (string-match-p "claude" (buffer-name buf)))
-                                 (buffer-list))))))
+      (mapcar #'buffer-name
+        (seq-filter (lambda (buf)
+                      (string-match-p "claude" (buffer-name buf)))
+          (buffer-list))))))
 
 (provide 'claudemacs-client)
 
