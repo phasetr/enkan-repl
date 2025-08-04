@@ -292,15 +292,65 @@ Returns t if buffer has live eat process, nil otherwise."
        eat--process
        (process-live-p eat--process)))))
 
+(defvar claudemacs-client-debug-mode nil
+  "When non-nil, enable debug messages for send operations.")
+
+(defun claudemacs-client--debug-message (format-string &rest args)
+  "Print debug message if debug mode is enabled."
+  (when claudemacs-client-debug-mode
+    (apply #'message (concat "[CLAUDEMACS-DEBUG] " format-string) args)))
+
+(defun claudemacs-client--sanitize-content (content)
+  "Sanitize CONTENT to ensure it can be safely sent to claudemacs.
+This function handles edge cases with special characters and ensures
+proper formatting for terminal input. Also addresses Claude Code interpretation issues."
+  (when content
+    (let ((sanitized content))
+      (claudemacs-client--debug-message "Input content: %S" content)
+      ;; Remove any remaining control characters that might interfere with terminal input
+      (setq sanitized (replace-regexp-in-string "[[:cntrl:]]" 
+                                                (lambda (match)
+                                                  (cond
+                                                   ;; Keep normal newlines and tabs
+                                                   ((or (string= match "\n") (string= match "\t")) match)
+                                                   ;; Remove other control characters
+                                                   (t "")))
+                                                sanitized))
+      ;; Ensure content doesn't end with problematic characters
+      ;; This addresses potential issues with Mac's region selection
+      (setq sanitized (replace-regexp-in-string "[\r\x0B\x0C\x0E-\x1F]+\\'" "" sanitized))
+      
+      (claudemacs-client--debug-message "After control char cleanup: %S" sanitized)
+      (claudemacs-client--debug-message "File path pattern match: %s" 
+                                        (if (string-match-p "~/[^[:space:]]*\\.[a-zA-Z0-9]+\\'" sanitized) "YES" "NO"))
+      (claudemacs-client--debug-message "Punctuation pattern match: %s" 
+                                        (if (string-match-p "[.!?。！？]\\'" sanitized) "YES" "NO"))
+      
+      ;; Address Claude Code interpretation issue: if content ends with a file path
+      ;; without punctuation, Claude Code may interpret it as a file reference instead
+      ;; of text content. Add an explanatory marker to ensure it's treated as text.
+      (when (and (string-match-p "~/[^[:space:]]*\\.[a-zA-Z0-9]+\\'" sanitized)
+                 (not (string-match-p "[.!?。！？]\\'" sanitized)))
+        (claudemacs-client--debug-message "Adding end marker to prevent file path interpretation")
+        (setq sanitized (concat sanitized "\n(This text is added by claudemacs-client as a workaround for Claude Code's special interpretation of file paths)")))
+      
+      (claudemacs-client--debug-message "Final sanitized content: %S" sanitized)
+      ;; Final trim to ensure clean content
+      (string-trim sanitized))))
+
 (defun claudemacs-client--send-text-pure (text claude-buffer)
   "Pure function: Send TEXT to CLAUDE-BUFFER.
 Returns t if successful, nil if buffer cannot receive text.
 Does not modify global state."
+  (claudemacs-client--debug-message "send-text-pure called with text length: %d, buffer: %s" 
+                                     (length text) (if claude-buffer (buffer-name claude-buffer) "nil"))
   (when
       (and claude-buffer (claudemacs-client--can-send-text-pure claude-buffer))
+    (claudemacs-client--debug-message "Sending text to claude buffer: %S" (substring text 0 (min 50 (length text))))
     (with-current-buffer claude-buffer
       (eat--send-string eat--process text)
       (eat--send-string eat--process "\r")
+      (claudemacs-client--debug-message "Text sent successfully")
       t)))
 
 ;;;; Target Directory Detection Wrapper Functions
@@ -369,14 +419,18 @@ Wrapper function that uses pure function internally."
   (when (use-region-p)
     (let*
         ((raw-content (buffer-substring-no-properties start end))
-         (content (string-trim raw-content))
+         (content (claudemacs-client--sanitize-content (string-trim raw-content)))
          (target-dir (claudemacs-client--get-target-directory-for-buffer)))
+      (claudemacs-client--debug-message "Raw content length: %d, trimmed: %d" (length raw-content) (length content))
+      (claudemacs-client--debug-message "Content empty?: %s, target-dir: %s" (string-empty-p content) target-dir)
       (if
           (and content (not (string-empty-p content)))
-          (if
-              (claudemacs-client--send-text content target-dir)
-              (message "Region sent to Claude (%d characters)" (length content))
-            (message "❌ Cannot send - no matching claudemacs buffer found for this directory"))
+          (progn
+            (claudemacs-client--debug-message "Attempting to send content")
+            (if
+                (claudemacs-client--send-text content target-dir)
+                (message "Region sent to Claude (%d characters)" (length content))
+              (message "❌ Cannot send - no matching claudemacs buffer found for this directory")))
         (message "No content to send (empty or whitespace only)")))))
 
 ;;;###autoload
@@ -384,7 +438,7 @@ Wrapper function that uses pure function internally."
   "Send the entire current buffer to claudemacs."
   (interactive)
   (let
-      ((content (buffer-substring-no-properties (point-min) (point-max)))
+      ((content (claudemacs-client--sanitize-content (buffer-substring-no-properties (point-min) (point-max))))
        (target-dir (claudemacs-client--get-target-directory-for-buffer)))
     (if
         (claudemacs-client--send-text content target-dir)
@@ -398,7 +452,7 @@ Wrapper function that uses pure function internally."
   (interactive)
   (let*
       ((raw-content (buffer-substring-no-properties (point) (point-max)))
-       (content (string-trim raw-content))
+       (content (claudemacs-client--sanitize-content (string-trim raw-content)))
        (target-dir (claudemacs-client--get-target-directory-for-buffer)))
     (if
         (and content (not (string-empty-p content)))
@@ -417,7 +471,7 @@ Wrapper function that uses pure function internally."
       ((line-start (line-beginning-position))
        (line-end (line-end-position))
        (raw-content (buffer-substring-no-properties line-start line-end))
-       (content (string-trim raw-content))
+       (content (claudemacs-client--sanitize-content (string-trim raw-content)))
        (target-dir (claudemacs-client--get-target-directory-for-buffer)))
     (if
         (and content (not (string-empty-p content)))
@@ -684,6 +738,28 @@ This is the author's preference - customize as needed."
                  (buffer-name buf))))
             (princ (format "   - %s\n" session-path))))))
       (princ "\nFor more help: M-x claudemacs-client-open-project-input\n"))))
+
+;;;###autoload
+(defun claudemacs-client-toggle-debug-mode ()
+  "Toggle debug mode for claudemacs-client operations."
+  (interactive)
+  (setq claudemacs-client-debug-mode (not claudemacs-client-debug-mode))
+  (message "claudemacs-client debug mode: %s" 
+           (if claudemacs-client-debug-mode "ENABLED" "DISABLED")))
+
+;;;###autoload
+(defun claudemacs-client-enable-debug-mode ()
+  "Enable debug mode for claudemacs-client operations."
+  (interactive)
+  (setq claudemacs-client-debug-mode t)
+  (message "claudemacs-client debug mode: ENABLED"))
+
+;;;###autoload
+(defun claudemacs-client-disable-debug-mode ()
+  "Disable debug mode for claudemacs-client operations."
+  (interactive)
+  (setq claudemacs-client-debug-mode nil)
+  (message "claudemacs-client debug mode: DISABLED"))
 
 (provide 'claudemacs-client)
 

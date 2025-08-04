@@ -45,3 +45,18 @@ This document lists all public functions and commands available in claudemacs-cl
    - *Type*: Interactive Command
    - *Autoload*: Yes
    - *Description*: Show detailed diagnostic information for troubleshooting connection issues.
+
+** ~claudemacs-client-toggle-debug-mode~ ()
+   - *Type*: Interactive Command
+   - *Autoload*: Yes
+   - *Description*: Toggle debug mode for claudemacs-client operations.
+
+** ~claudemacs-client-enable-debug-mode~ ()
+   - *Type*: Interactive Command
+   - *Autoload*: Yes
+   - *Description*: Enable debug mode for claudemacs-client operations.
+
+** ~claudemacs-client-disable-debug-mode~ ()
+   - *Type*: Interactive Command
+   - *Autoload*: Yes
+   - *Description*: Disable debug mode for claudemacs-client operations.

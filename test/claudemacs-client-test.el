@@ -621,6 +621,119 @@
   (should-not (claudemacs-client--load-template-pure nil "/nonexistent" ""))
   (should-not (claudemacs-client--load-template-pure nil "" "nonexistent.org")))
 
+;;; Tests for Debug Mode Functions
+
+(ert-deftest test-debug-mode-toggle ()
+  "Test that debug mode can be toggled correctly."
+  (let ((original-debug-mode claudemacs-client-debug-mode))
+    (unwind-protect
+        (progn
+          ;; Start with debug mode disabled
+          (setq claudemacs-client-debug-mode nil)
+          
+          ;; Test toggle from disabled to enabled
+          (claudemacs-client-toggle-debug-mode)
+          (should claudemacs-client-debug-mode)
+          
+          ;; Test toggle from enabled to disabled
+          (claudemacs-client-toggle-debug-mode)
+          (should-not claudemacs-client-debug-mode)
+          
+          ;; Test explicit enable
+          (claudemacs-client-enable-debug-mode)
+          (should claudemacs-client-debug-mode)
+          
+          ;; Test explicit disable
+          (claudemacs-client-disable-debug-mode)
+          (should-not claudemacs-client-debug-mode))
+      
+      ;; Restore original state
+      (setq claudemacs-client-debug-mode original-debug-mode))))
+
+(ert-deftest test-debug-message-functionality ()
+  "Test that debug messages are only shown when debug mode is enabled."
+  (let ((original-debug-mode claudemacs-client-debug-mode)
+        (captured-messages '()))
+    (unwind-protect
+        (progn
+          ;; Mock message function to capture output
+          (cl-letf (((symbol-function 'message)
+                     (lambda (format-string &rest args)
+                       (push (apply #'format format-string args) captured-messages))))
+            
+            ;; Test with debug mode disabled
+            (setq claudemacs-client-debug-mode nil)
+            (claudemacs-client--debug-message "Test debug message 1")
+            (should (= (length captured-messages) 0))
+            
+            ;; Test with debug mode enabled
+            (setq claudemacs-client-debug-mode t)
+            (claudemacs-client--debug-message "Test debug message 2")
+            (should (= (length captured-messages) 1))
+            (should (string-match-p "\\[CLAUDEMACS-DEBUG\\] Test debug message 2" (car captured-messages)))))
+      
+      ;; Restore original state
+      (setq claudemacs-client-debug-mode original-debug-mode))))
+
+;;; Tests for Content Sanitization
+
+(ert-deftest test-sanitize-content-basic ()
+  "Test basic content sanitization functionality."
+  ;; Test normal content passes through unchanged
+  (should (string= (claudemacs-client--sanitize-content "Hello World") "Hello World"))
+  
+  ;; Test content with newlines and tabs is preserved
+  (should (string= (claudemacs-client--sanitize-content "Line 1\nLine 2\tTabbed") "Line 1\nLine 2\tTabbed"))
+  
+  ;; Test nil input
+  (should-not (claudemacs-client--sanitize-content nil))
+  
+  ;; Test empty string
+  (should (string= (claudemacs-client--sanitize-content "") "")))
+
+(ert-deftest test-sanitize-content-control-characters ()
+  "Test that problematic control characters are removed."
+  ;; Test carriage return removal
+  (should (string= (claudemacs-client--sanitize-content "Test\rContent") "TestContent"))
+  
+  ;; Test mixed control characters at end
+  (should (string= (claudemacs-client--sanitize-content "Test Content\r\x0B\x0C") "Test Content"))
+  
+  ;; Test that normal whitespace trimming still works
+  (should (string= (claudemacs-client--sanitize-content "  Test Content  ") "Test Content")))
+
+(ert-deftest test-sanitize-content-problematic-string ()
+  "Test sanitization with the specific problematic string reported by user."
+  (let ((test-string "画像送信サンプルです.\n以下の画像に何が書いてあるか読めますか？\n~/Downloads/send-sample.png"))
+    (let ((sanitized (claudemacs-client--sanitize-content test-string)))
+      (should sanitized)
+      ;; This should now have the marker added to prevent file path interpretation
+      (should (string-match-p "This text is added by claudemacs-client" sanitized))
+      (should-not (string-empty-p sanitized)))))
+
+(ert-deftest test-sanitize-content-file-path-interpretation ()
+  "Test that file paths without punctuation get markers to prevent misinterpretation."
+  ;; Test English content ending with file path (should get marker)
+  (let ((test-string "my test.\nI send a sample message in English with image path and without period.\n~/Downloads/send-sample.png"))
+    (let ((sanitized (claudemacs-client--sanitize-content test-string)))
+      (should sanitized)
+      (should (string-match-p "This text is added by claudemacs-client" sanitized))
+      (should-not (string-empty-p sanitized))))
+  
+  ;; Test content ending with punctuation after file path (should not get marker)
+  (let ((test-string "Check this file: ~/Downloads/send-sample.png."))
+    (let ((sanitized (claudemacs-client--sanitize-content test-string)))
+      (should sanitized)
+      (should (string= sanitized test-string)) ; Should be unchanged
+      (should-not (string-match-p "This text is added by claudemacs-client" sanitized))))
+  
+  ;; Test content not ending with file path (should not get marker)
+  (let ((test-string "This is just normal text without file paths"))
+    (let ((sanitized (claudemacs-client--sanitize-content test-string)))
+      (should sanitized)
+      (should (string= sanitized test-string)) ; Should be unchanged
+      (should-not (string-match-p "This text is added by claudemacs-client" sanitized)))))
+
 ;;; Tests for Template Loading Functions
 
 (ert-deftest test-get-template-path-with-existing-file ()
@@ -1131,6 +1244,71 @@
         (claudemacs-client-send-line)
         ;; Should show error message
         (should (string-match-p "Cannot send.*no matching claudemacs buffer" message-text))))))
+
+(ert-deftest test-send-line-file-path-handling ()
+  "Test that send-line handles file paths correctly with sanitization."
+  (with-temp-buffer
+    (insert "~/Downloads/send-sample.png")
+    (goto-char (point-min))
+    (let ((sent-text nil)
+          (message-text nil))
+      ;; Mock functions
+      (cl-letf (((symbol-function 'claudemacs-client--get-target-directory-for-buffer)
+                 (lambda () "/test/dir"))
+                ((symbol-function 'claudemacs-client--send-text)
+                 (lambda (text dir)
+                   (setq sent-text text)
+                   t))
+                ((symbol-function 'message)
+                 (lambda (fmt &rest args)
+                   (setq message-text (apply #'format fmt args)))))
+        (claudemacs-client-send-line)
+        ;; Should have explanatory text added
+        (should (string-match-p "This text is added by claudemacs-client" sent-text))
+        (should (string-match-p "Line sent to Claude" message-text))))))
+
+(ert-deftest test-send-rest-of-buffer-file-path-handling ()
+  "Test that send-rest-of-buffer handles file paths correctly with sanitization."
+  (with-temp-buffer
+    (insert "Some content\n~/Downloads/send-sample.png")
+    (goto-char (+ (point-min) 13)) ; Position after "Some content\n"
+    (let ((sent-text nil)
+          (message-text nil))
+      ;; Mock functions
+      (cl-letf (((symbol-function 'claudemacs-client--get-target-directory-for-buffer)
+                 (lambda () "/test/dir"))
+                ((symbol-function 'claudemacs-client--send-text)
+                 (lambda (text dir)
+                   (setq sent-text text)
+                   t))
+                ((symbol-function 'message)
+                 (lambda (fmt &rest args)
+                   (setq message-text (apply #'format fmt args)))))
+        (claudemacs-client-send-rest-of-buffer)
+        ;; Should have explanatory text added
+        (should (string-match-p "This text is added by claudemacs-client" sent-text))
+        (should (string-match-p "Rest of buffer sent to Claude" message-text))))))
+
+(ert-deftest test-send-buffer-file-path-handling ()
+  "Test that send-buffer handles file paths correctly with sanitization."
+  (with-temp-buffer
+    (insert "Content with file path:\n~/Downloads/send-sample.png")
+    (let ((sent-text nil)
+          (message-text nil))
+      ;; Mock functions
+      (cl-letf (((symbol-function 'claudemacs-client--get-target-directory-for-buffer)
+                 (lambda () "/test/dir"))
+                ((symbol-function 'claudemacs-client--send-text)
+                 (lambda (text dir)
+                   (setq sent-text text)
+                   t))
+                ((symbol-function 'message)
+                 (lambda (fmt &rest args)
+                   (setq message-text (apply #'format fmt args)))))
+        (claudemacs-client-send-buffer)
+        ;; Should have explanatory text added
+        (should (string-match-p "This text is added by claudemacs-client" sent-text))
+        (should (string-match-p "File sent to Claude" message-text))))))
 
 ;;; Tests for Template Output Function
 
