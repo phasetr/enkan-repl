@@ -361,42 +361,43 @@ If DIRECTORY is nil, use current `default-directory'."
   (let
       ((target-dir (or directory default-directory))
        (matching-buffer nil))
-    (dolist (buf (buffer-list))
-      (let
-          ((name (buffer-name buf))
-           (default-dir
-             (with-current-buffer buf
-               (when (boundp 'default-directory)
-                 default-directory)))
-           (eat-mode
-            (with-current-buffer buf
-              (and (boundp 'eat-mode) eat-mode))))
-        (when
-            (and (buffer-live-p buf)
-                 name     ; Ensure name is not nil
-                 ;; Check for directory-specific claudemacs buffer
-                 (or
-                  (and
-                   (string-match-p "^\\*claudemacs:" name)
-                   (string-prefix-p (concat "*claudemacs:" target-dir) name))
-                  ;; Fallback to generic buffers only if they match directory
-                  (and
+    (cl-block search-buffers
+      (dolist (buf (buffer-list))
+        (let
+            ((name (buffer-name buf))
+             (default-dir
+               (with-current-buffer buf
+                 (when (boundp 'default-directory)
+                   default-directory)))
+             (eat-mode
+              (with-current-buffer buf
+                (and (boundp 'eat-mode) eat-mode))))
+          (when
+              (and (buffer-live-p buf)
+                   name     ; Ensure name is not nil
+                   ;; Check for directory-specific claudemacs buffer
                    (or
-                    (string= name "*claude*")
-                    (string= name "*claudemacs*"))
-                   (when default-dir
-                     (string=
-                      (file-truename default-dir)
-                      (file-truename target-dir))))
-                  ;; Check for eat-mode buffers with claude in name
-                  (and eat-mode
-                       (string-match-p "claude" name)
-                       (when default-dir
-                         (string=
-                          (file-truename default-dir)
-                          (file-truename target-dir))))))
-          (setq matching-buffer buf)
-          (cl-return))))
+                    (and
+                     (string-match-p "^\\*claudemacs:" name)
+                     (string-prefix-p (concat "*claudemacs:" target-dir) name))
+                    ;; Fallback to generic buffers only if they match directory
+                    (and
+                     (or
+                      (string= name "*claude*")
+                      (string= name "*claudemacs*"))
+                     (when default-dir
+                       (string=
+                        (file-truename default-dir)
+                        (file-truename target-dir))))
+                    ;; Check for eat-mode buffers with claude in name
+                    (and eat-mode
+                         (string-match-p "claude" name)
+                         (when default-dir
+                           (string=
+                            (file-truename default-dir)
+                            (file-truename target-dir))))))
+            (setq matching-buffer buf)
+            (cl-return-from search-buffers)))))
     matching-buffer))
 
 (defun claudemacs-repl--buffer-matches-directory (buffer target-dir)
