@@ -654,27 +654,6 @@ This is the author's preference - customize as needed."
   (message "claudemacs-client debug mode: %s"
            (if claudemacs-client-debug-mode "ENABLED" "DISABLED")))
 
-;;;###autoload
-(defun claudemacs-client-send-yes ()
-  "Send \\='y\\=' to claudemacs buffer to automatically respond to yes/no prompt."
-  (interactive)
-  (let ((target-dir (claudemacs-client--get-target-directory-for-buffer)))
-    (if (claudemacs-client--can-send-text target-dir)
-        (progn
-          (claudemacs-client--send-text "y" target-dir)
-          (message "Sent 'y' to Claude"))
-      (message "❌ Cannot send - no matching claudemacs buffer found for this directory"))))
-
-;;;###autoload
-(defun claudemacs-client-send-no ()
-  "Send \\='n\\=' to claudemacs buffer to automatically respond to yes/no prompt."
-  (interactive)
-  (let ((target-dir (claudemacs-client--get-target-directory-for-buffer)))
-    (if (claudemacs-client--can-send-text target-dir)
-        (progn
-          (claudemacs-client--send-text "n" target-dir)
-          (message "Sent 'n' to Claude"))
-      (message "❌ Cannot send - no matching claudemacs buffer found for this directory"))))
 
 ;;;###autoload
 (defun claudemacs-client-send-enter ()

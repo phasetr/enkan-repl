@@ -1288,46 +1288,6 @@
 
 ;;; Tests for Auto-Response Functions
 
-(ert-deftest test-send-yes-functionality ()
-  "Test that send-yes function works correctly."
-  (let ((sent-text nil)
-        (message-text nil))
-    ;; Mock functions
-    (cl-letf (((symbol-function 'claudemacs-client--get-target-directory-for-buffer)
-               (lambda () "/test/dir"))
-              ((symbol-function 'claudemacs-client--can-send-text)
-               (lambda (dir) t))
-              ((symbol-function 'claudemacs-client--send-text)
-               (lambda (text dir)
-                 (setq sent-text text)
-                 t))
-              ((symbol-function 'message)
-               (lambda (fmt &rest args)
-                 (setq message-text (apply #'format fmt args)))))
-      (claudemacs-client-send-yes)
-      (should (string= sent-text "y"))
-      (should (string-match-p "Sent 'y' to Claude" message-text)))))
-
-(ert-deftest test-send-no-functionality ()
-  "Test that send-no function works correctly."
-  (let ((sent-text nil)
-        (message-text nil))
-    ;; Mock functions
-    (cl-letf (((symbol-function 'claudemacs-client--get-target-directory-for-buffer)
-               (lambda () "/test/dir"))
-              ((symbol-function 'claudemacs-client--can-send-text)
-               (lambda (dir) t))
-              ((symbol-function 'claudemacs-client--send-text)
-               (lambda (text dir)
-                 (setq sent-text text)
-                 t))
-              ((symbol-function 'message)
-               (lambda (fmt &rest args)
-                 (setq message-text (apply #'format fmt args)))))
-      (claudemacs-client-send-no)
-      (should (string= sent-text "n"))
-      (should (string-match-p "Sent 'n' to Claude" message-text)))))
-
 (ert-deftest test-send-enter-functionality ()
   "Test that send-enter function works correctly."
   (let ((sent-text nil)
