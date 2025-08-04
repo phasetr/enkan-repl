@@ -42,8 +42,8 @@ module.exports = {
 				prepareCmd: [
 					// Update version in .el file
 					"emacs --batch --load scripts/bump-version.el -- ${nextRelease.version}",
-					// Regenerate default.org with updated version
-					"emacs --batch --load scripts/generate-docs.el --eval '(generate-default-template)'",
+					// Regenerate documentation files with updated functions
+					"emacs --batch --load scripts/generate-docs.el --eval '(generate-all-docs)'",
 				].join(" && "),
 			},
 		],
@@ -56,6 +56,8 @@ module.exports = {
 					"package.json",
 					"claudemacs-repl.el",
 					"default.org",
+					"README.org",
+					"public-api.org",
 				],
 				message:
 					"chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}",

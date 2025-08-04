@@ -365,9 +365,9 @@ If DIRECTORY is nil, use current `default-directory'."
       (let
           ((name (buffer-name buf))
            (default-dir
-             (with-current-buffer buf
-               (when (boundp 'default-directory)
-                 default-directory)))
+            (with-current-buffer buf
+              (when (boundp 'default-directory)
+                default-directory)))
            (eat-mode
             (with-current-buffer buf
               (and (boundp 'eat-mode) eat-mode))))
@@ -461,6 +461,26 @@ NUMBER should be a string (e.g., \\='1\\=', \\='2\\=', \\='3\\=') or empty strin
             (message "Sent '%s' to Claude" number)))
       (message "❌ Cannot send - no matching claudemacs buffer found for this directory"))))
 
+(defun claudemacs-repl--send-escape-directly ()
+  "Send ESC key to claudemacs buffer directly."
+  (let
+      ((claude-buffer
+        (claudemacs-repl--get-buffer-for-directory
+         (claudemacs-repl--get-target-directory-for-buffer))))
+    (if
+        (and claude-buffer
+             (with-current-buffer claude-buffer
+               (and (boundp 'eat--process)
+                    eat--process
+                    (process-live-p eat--process))))
+        (progn
+          (claudemacs-repl--debug-message "Sending ESC key to claude buffer")
+          (with-current-buffer claude-buffer
+            (eat--send-string eat--process "\e")
+            (claudemacs-repl--debug-message "ESC key sent successfully"))
+          (message "Sent ESC to Claude"))
+      (message "❌ Cannot send - no matching claudemacs buffer found for this directory"))))
+
 (defun claudemacs-repl--send-buffer-content (start end content-description &optional skip-empty-check)
   "Send buffer content from START to END with CONTENT-DESCRIPTION.
 START and END define the region to send.
@@ -544,6 +564,12 @@ If SKIP-EMPTY-CHECK is non-nil, send content even if empty."
   "Send \\='3\\=' to claudemacs buffer for numbered choice prompt."
   (interactive)
   (claudemacs-repl--send-numbered-choice "3"))
+
+;;;###autoload
+(defun claudemacs-repl-send-escape ()
+  "Send ESC key to claudemacs buffer."
+  (interactive)
+  (claudemacs-repl--send-escape-directly))
 
 (defun claudemacs-repl--create-project-input-file (target-directory)
   "Create project input file for TARGET-DIRECTORY from template.
