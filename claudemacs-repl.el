@@ -223,45 +223,39 @@ interpretation issues and Mac region selection problems."
     (let ((sanitized content))
       (claudemacs-repl--debug-message "Input content: %S" content)
       (claudemacs-repl--debug-message "Input content length: %d" (length content))
-      
       ;; Step 1: Remove all carriage return characters (\r) immediately
       ;; This is the most likely cause of "extra newlines" on Mac
       (setq sanitized (replace-regexp-in-string "\r" "" sanitized))
       (claudemacs-repl--debug-message "After \\r removal: %S" sanitized)
-      
       ;; Step 2: Normalize all newline variations to single LF
       ;; Handles \r\n, \n\r, and other combinations that might remain
       (setq sanitized (replace-regexp-in-string "\\(\r\n\\|\n\r\\)" "\n" sanitized))
       (claudemacs-repl--debug-message "After newline normalization: %S" sanitized)
-      
       ;; Step 3: Collapse consecutive newlines to single newlines
       ;; This prevents sending empty lines that might confuse Claude Code
       (setq sanitized (replace-regexp-in-string "\n\n+" "\n" sanitized))
       (claudemacs-repl--debug-message "After consecutive newline collapse: %S" sanitized)
-      
       ;; Step 4: Remove other problematic control characters
       ;; Keep only \n (newline) and \t (tab) among control characters
-      (setq sanitized
-            (replace-regexp-in-string
-             "[[:cntrl:]]"
-             (lambda (match)
-               (cond
-                ;; Keep normal newlines and tabs
-                ((or (string= match "\n") (string= match "\t")) match)
-                ;; Remove other control characters
-                (t "")))
-             sanitized))
-      (claudemacs-repl--debug-message "After control char cleanup: %S" sanitized)
-      
+      (setq
+       sanitized
+       (replace-regexp-in-string
+        "[[:cntrl:]]"
+        (lambda (match)
+          (cond
+           ;; Keep normal newlines and tabs
+           ((or (string= match "\n") (string= match "\t")) match)
+           ;; Remove other control characters
+           (t "")))
+        sanitized))
+      (claudemacs-repl--debug-message "After control char cleanup: %S" sanitized);
       ;; Step 5: Remove Unicode line separators that might cause issues
       ;; U+0085 (NEL), U+2028 (LINE SEPARATOR), U+2029 (PARAGRAPH SEPARATOR)
       (setq sanitized (replace-regexp-in-string "[\u0085\u2028\u2029]" "" sanitized))
       (claudemacs-repl--debug-message "After Unicode separator removal: %S" sanitized)
-      
       ;; Step 6: Final cleanup of any remaining problematic characters at end
       (setq sanitized (replace-regexp-in-string "[\x0B\x0C\x0E-\x1F]+\\'" "" sanitized))
       (claudemacs-repl--debug-message "After final cleanup: %S" sanitized)
-      
       ;; Step 7: File path interpretation workaround (existing logic)
       (claudemacs-repl--debug-message
        "File path pattern match: %s"
@@ -269,17 +263,16 @@ interpretation issues and Mac region selection problems."
       (claudemacs-repl--debug-message
        "Punctuation pattern match: %s"
        (if (string-match-p "[.!?。！？]\\'" sanitized) "YES" "NO"))
-      
-      (when (and (string-match-p "~/[^[:space:]]*\\.[a-zA-Z0-9]+\\'" sanitized)
-                 (not (string-match-p "[.!?。！？]\\'" sanitized)))
+      (when
+          (and
+           (string-match-p "~/[^[:space:]]*\\.[a-zA-Z0-9]+\\'" sanitized)
+           (not (string-match-p "[.!?。！？]\\'" sanitized)))
         (claudemacs-repl--debug-message "Adding end marker to prevent file path interpretation")
         (setq sanitized (concat sanitized "\n(This text is added by claudemacs-repl as a workaround for Claude Code's special interpretation of file paths)")))
-      
       ;; Step 8: Final trim and validation
       (setq sanitized (string-trim sanitized))
       (claudemacs-repl--debug-message "Final sanitized content: %S" sanitized)
       (claudemacs-repl--debug-message "Final content length: %d" (length sanitized))
-      
       sanitized)))
 
 ;;;; Target Directory Detection Functions
@@ -301,8 +294,9 @@ For other buffers, use current `default-directory'."
 (defun claudemacs-repl--get-buffer-for-directory (&optional directory)
   "Get the claudemacs buffer for DIRECTORY if it exists and is live.
 If DIRECTORY is nil, use current `default-directory'."
-  (let ((target-dir (or directory default-directory))
-        (matching-buffer nil))
+  (let
+      ((target-dir (or directory default-directory))
+       (matching-buffer nil))
     (dolist (buf (buffer-list))
       (let
           ((name (buffer-name buf))
