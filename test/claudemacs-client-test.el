@@ -1124,7 +1124,7 @@
                    (setq message-text (apply #'format fmt args)))))
         (claudemacs-client-send-rest-of-buffer)
         ;; Should detect no content
-        (should (string-match-p "No content from cursor to end" message-text))))))
+        (should (string-match-p "No content to send (empty or whitespace only)" message-text))))))
 
 (ert-deftest test-send-line-basic ()
   "Test that send-line sends current line content."
@@ -1288,7 +1288,7 @@
         (claudemacs-client-send-buffer)
         ;; Should have explanatory text added
         (should (string-match-p "This text is added by claudemacs-client" sent-text))
-        (should (string-match-p "File sent to Claude" message-text))))))
+        (should (string-match-p "File .* sent to Claude" message-text))))))
 
 ;;; Tests for Auto-Response Functions
 
@@ -1333,6 +1333,52 @@
         (funcall func-name)
         (should (string= sent-text choice))
         (should (string-match-p (format "Sent '%s' to Claude" choice) message-text))))))
+
+;;; Tests for Internal Send Helper Functions
+
+(ert-deftest test-send-numbered-choice-helper ()
+  "Test the internal send-numbered-choice helper function."
+  (let ((message-text nil))
+    (cl-letf (((symbol-function 'claudemacs-client--get-target-directory-for-buffer)
+               (lambda () "/test/dir"))
+              ((symbol-function 'claudemacs-client--can-send-text)
+               (lambda (dir) t))
+              ((symbol-function 'claudemacs-client--send-text)
+               (lambda (text dir) t))
+              ((symbol-function 'message)
+               (lambda (fmt &rest args)
+                 (setq message-text (apply #'format fmt args)))))
+      ;; Test empty string (enter)
+      (claudemacs-client--send-numbered-choice "")
+      (should (string-match-p "Sent enter to Claude" message-text))
+      ;; Test numbered choice
+      (claudemacs-client--send-numbered-choice "1")
+      (should (string-match-p "Sent '1' to Claude" message-text)))))
+
+(ert-deftest test-send-buffer-content-helper ()
+  "Test the internal send-buffer-content helper function."
+  (with-temp-buffer
+    (insert "Test content\n  with whitespace  ")
+    (let ((sent-text nil)
+          (message-text nil))
+      (cl-letf (((symbol-function 'claudemacs-client--send-text)
+                 (lambda (text dir)
+                   (setq sent-text text)
+                   t))
+                ((symbol-function 'message)
+                 (lambda (fmt &rest args)
+                   (setq message-text (apply #'format fmt args)))))
+        ;; Test basic functionality
+        (claudemacs-client--send-buffer-content (point-min) (point-max) "Test")
+        (should (string= sent-text "Test content\n  with whitespace"))
+        (should (string-match-p "Test sent to Claude" message-text))
+        
+        ;; Test skip-empty-check
+        (erase-buffer)
+        (insert "   ")
+        (claudemacs-client--send-buffer-content (point-min) (point-max) "Empty" t)
+        (should (string= sent-text ""))
+        (should (string-match-p "Empty sent to Claude" message-text))))))
 
 ;;; Tests for Template Output Function
 

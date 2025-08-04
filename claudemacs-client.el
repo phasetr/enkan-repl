@@ -200,7 +200,7 @@ Example: \='/Users/project\=' + \='cec\=' + \='--\=' -> \='cec--Users--project\=
 (defun claudemacs-client--decode-full-path-pure (encoded-name prefix separator)
   "Pure function: Decode ENCODED-NAME with PREFIX and SEPARATOR.
 ENCODED-NAME: Encoded filename to decode.
-PREFIX: Expected prefix string (e.g., 'cec').
+PREFIX: Expected prefix string (e.g., \\='cec\\=').
 SEPARATOR: String to replace with '/' (e.g., '--').
 Example: \='cec--Users--project\=' + \='cec\=' + \='--\=' -> \='/Users/project/\='"
   (when (string-prefix-p prefix encoded-name)
@@ -358,79 +358,94 @@ Otherwise, use current `default-directory'."
         (claudemacs-client--debug-message "Text sent successfully")
         t))))
 
-;;;; Public API
+;;;; Send Functions - Internal Helpers
+
+(defun claudemacs-client--send-numbered-choice (number)
+  "Send NUMBER as string to claudemacs buffer for numbered choice prompt.
+NUMBER should be a string (e.g., \\='1\\=', \\='2\\=', \\='3\\=') or empty string for enter."
+  (let ((target-dir (claudemacs-client--get-target-directory-for-buffer)))
+    (if (claudemacs-client--can-send-text target-dir)
+        (progn
+          (claudemacs-client--send-text number target-dir)
+          (if (string-empty-p number)
+              (message "Sent enter to Claude")
+            (message "Sent '%s' to Claude" number)))
+      (message "❌ Cannot send - no matching claudemacs buffer found for this directory"))))
+
+(defun claudemacs-client--send-buffer-content (start end content-description &optional skip-empty-check)
+  "Send buffer content from START to END with CONTENT-DESCRIPTION.
+START and END define the region to send.
+CONTENT-DESCRIPTION is used in success message.
+If SKIP-EMPTY-CHECK is non-nil, send content even if empty."
+  (let* ((raw-content (buffer-substring-no-properties start end))
+         (content (claudemacs-client--sanitize-content (string-trim raw-content)))
+         (target-dir (claudemacs-client--get-target-directory-for-buffer)))
+    (claudemacs-client--debug-message "Raw content length: %d, trimmed: %d"
+                                      (length raw-content) (length content))
+    (claudemacs-client--debug-message "Content empty?: %s, target-dir: %s"
+                                      (string-empty-p content) target-dir)
+    (if (or skip-empty-check (and content (not (string-empty-p content))))
+        (progn
+          (claudemacs-client--debug-message "Attempting to send content")
+          (if (claudemacs-client--send-text content target-dir)
+              (message "%s sent to Claude (%d characters)"
+                       content-description (length content))
+            (message "❌ Cannot send - no matching claudemacs buffer found for this directory")))
+      (message "No content to send (empty or whitespace only)"))))
+
+;;;; Public API - Send Functions
 
 ;;;###autoload
 (defun claudemacs-client-send-region (start end)
   "Send the text in region from START to END to claudemacs."
   (interactive "r")
   (when (use-region-p)
-    (let*
-        ((raw-content (buffer-substring-no-properties start end))
-         (content (claudemacs-client--sanitize-content (string-trim raw-content)))
-         (target-dir (claudemacs-client--get-target-directory-for-buffer)))
-      (claudemacs-client--debug-message "Raw content length: %d, trimmed: %d" (length raw-content) (length content))
-      (claudemacs-client--debug-message "Content empty?: %s, target-dir: %s" (string-empty-p content) target-dir)
-      (if
-          (and content (not (string-empty-p content)))
-          (progn
-            (claudemacs-client--debug-message "Attempting to send content")
-            (if
-                (claudemacs-client--send-text content target-dir)
-                (message "Region sent to Claude (%d characters)" (length content))
-              (message "❌ Cannot send - no matching claudemacs buffer found for this directory")))
-        (message "No content to send (empty or whitespace only)")))))
+    (claudemacs-client--send-buffer-content start end "Region")))
 
 ;;;###autoload
 (defun claudemacs-client-send-buffer ()
   "Send the entire current buffer to claudemacs."
   (interactive)
-  (let
-      ((content
-        (claudemacs-client--sanitize-content
-         (buffer-substring-no-properties (point-min) (point-max))))
-       (target-dir
-        (claudemacs-client--get-target-directory-for-buffer)))
-    (if
-        (claudemacs-client--send-text content target-dir)
-        (message "File sent to Claude: %s (%d characters)"
-                 (buffer-name) (length content))
-      (message "❌ Cannot send - no matching claudemacs buffer found for this directory"))))
+  (claudemacs-client--send-buffer-content 
+   (point-min) (point-max) 
+   (format "File %s" (buffer-name)) t))
 
 ;;;###autoload
 (defun claudemacs-client-send-rest-of-buffer ()
   "Send rest of buffer from cursor position to end to claudemacs."
   (interactive)
-  (let*
-      ((raw-content (buffer-substring-no-properties (point) (point-max)))
-       (content (claudemacs-client--sanitize-content (string-trim raw-content)))
-       (target-dir (claudemacs-client--get-target-directory-for-buffer)))
-    (if
-        (and content (not (string-empty-p content)))
-        (if
-            (claudemacs-client--send-text content target-dir)
-            (message "Rest of buffer sent to Claude (%d characters)"
-                     (length content))
-          (message "❌ Cannot send - no matching claudemacs buffer found for this directory"))
-      (message "No content from cursor to end of file"))))
+  (claudemacs-client--send-buffer-content (point) (point-max) "Rest of buffer"))
 
 ;;;###autoload
 (defun claudemacs-client-send-line ()
   "Send the current line to claudemacs."
   (interactive)
-  (let*
-      ((line-start (line-beginning-position))
-       (line-end (line-end-position))
-       (raw-content (buffer-substring-no-properties line-start line-end))
-       (content (claudemacs-client--sanitize-content (string-trim raw-content)))
-       (target-dir (claudemacs-client--get-target-directory-for-buffer)))
-    (if
-        (and content (not (string-empty-p content)))
-        (if
-            (claudemacs-client--send-text content target-dir)
-            (message "Line sent to Claude (%d characters)" (length content))
-          (message "❌ Cannot send - no matching claudemacs buffer found for this directory"))
-      (message "No content to send (empty or whitespace only)"))))
+  (claudemacs-client--send-buffer-content 
+   (line-beginning-position) (line-end-position) "Line"))
+
+;;;###autoload
+(defun claudemacs-client-send-enter ()
+  "Send enter key to claudemacs buffer."
+  (interactive)
+  (claudemacs-client--send-numbered-choice ""))
+
+;;;###autoload
+(defun claudemacs-client-send-1 ()
+  "Send \\='1\\=' to claudemacs buffer for numbered choice prompt."
+  (interactive)
+  (claudemacs-client--send-numbered-choice "1"))
+
+;;;###autoload
+(defun claudemacs-client-send-2 ()
+  "Send \\='2\\=' to claudemacs buffer for numbered choice prompt."
+  (interactive)
+  (claudemacs-client--send-numbered-choice "2"))
+
+;;;###autoload
+(defun claudemacs-client-send-3 ()
+  "Send \\='3\\=' to claudemacs buffer for numbered choice prompt."
+  (interactive)
+  (claudemacs-client--send-numbered-choice "3"))
 
 (defun claudemacs-client--create-project-input-file (target-directory)
   "Create project input file for TARGET-DIRECTORY from template.
@@ -710,58 +725,6 @@ This is the author's preference - customize as needed."
    "claudemacs-client debug mode: %s"
    (if claudemacs-client-debug-mode "ENABLED" "DISABLED")))
 
-;;;###autoload
-(defun claudemacs-client-send-enter ()
-  "Send enter key to claudemacs buffer."
-  (interactive)
-  (let
-      ((target-dir
-        (claudemacs-client--get-target-directory-for-buffer)))
-    (if
-        (claudemacs-client--can-send-text target-dir)
-        (progn
-          (claudemacs-client--send-text "" target-dir)
-          (message "Sent enter to Claude"))
-      (message "❌ Cannot send - no matching claudemacs buffer found for this directory"))))
-
-;;;###autoload
-(defun claudemacs-client-send-1 ()
-  "Send \\='1\\=' to claudemacs buffer for numbered choice prompt."
-  (interactive)
-  (let
-      ((target-dir
-        (claudemacs-client--get-target-directory-for-buffer)))
-    (if
-        (claudemacs-client--can-send-text target-dir)
-        (progn
-          (claudemacs-client--send-text "1" target-dir)
-          (message "Sent '1' to Claude"))
-      (message "❌ Cannot send - no matching claudemacs buffer found for this directory"))))
-
-;;;###autoload
-(defun claudemacs-client-send-2 ()
-  "Send \\='2\\=' to claudemacs buffer for numbered choice prompt."
-  (interactive)
-  (let
-      ((target-dir
-        (claudemacs-client--get-target-directory-for-buffer)))
-    (if
-        (claudemacs-client--can-send-text target-dir)
-        (progn
-          (claudemacs-client--send-text "2" target-dir)
-          (message "Sent '2' to Claude"))
-      (message "❌ Cannot send - no matching claudemacs buffer found for this directory"))))
-
-;;;###autoload
-(defun claudemacs-client-send-3 ()
-  "Send \\='3\\=' to claudemacs buffer for numbered choice prompt."
-  (interactive)
-  (let ((target-dir (claudemacs-client--get-target-directory-for-buffer)))
-    (if (claudemacs-client--can-send-text target-dir)
-        (progn
-          (claudemacs-client--send-text "3" target-dir)
-          (message "Sent '3' to Claude"))
-      (message "❌ Cannot send - no matching claudemacs buffer found for this directory"))))
 
 ;;;###autoload
 (defun claudemacs-client-enable-debug-mode ()
