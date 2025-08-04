@@ -366,9 +366,9 @@ If DIRECTORY is nil, use current `default-directory'."
         (let
             ((name (buffer-name buf))
              (default-dir
-               (with-current-buffer buf
-                 (when (boundp 'default-directory)
-                   default-directory)))
+              (with-current-buffer buf
+                (when (boundp 'default-directory)
+                  default-directory)))
              (eat-mode
               (with-current-buffer buf
                 (and (boundp 'eat-mode) eat-mode))))
