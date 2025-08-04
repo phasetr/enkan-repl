@@ -456,7 +456,7 @@ NUMBER should be a string (e.g., \\='1\\=', \\='2\\=', \\='3\\=') or empty strin
         (progn
           (claudemacs-repl--send-text number target-dir)
           (if
-              (string-empty-p number)
+              (= (length number) 0)
               (message "Sent enter to Claude")
             (message "Sent '%s' to Claude" number)))
       (message "❌ Cannot send - no matching claudemacs buffer found for this directory"))))
@@ -479,10 +479,10 @@ If SKIP-EMPTY-CHECK is non-nil, send content even if empty."
      (length content))
     (claudemacs-repl--debug-message
      "Content empty?: %s, target-dir: %s"
-     (string-empty-p content)
+     (= (length content) 0)
      target-dir)
     (if
-        (or skip-empty-check (and content (not (string-empty-p content))))
+        (or skip-empty-check (and content (not (= (length content) 0))))
         (progn
           (claudemacs-repl--debug-message "Attempting to send content")
           (if (claudemacs-repl--send-text content target-dir)

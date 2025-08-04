@@ -97,7 +97,7 @@ Returns a list of plists, each containing :name, :args, :docstring,
       (push "   - *Type*: Interactive Command" output-lines))
     (when autoload-p
       (push "   - *Autoload*: Yes" output-lines))
-    (when (not (string-empty-p docstring))
+    (when (not (= (length docstring) 0))
       (push (format "   - *Description*: %s" docstring) output-lines))
     (string-join (nreverse output-lines) "\n")))
 

@@ -481,7 +481,7 @@
   "Test that constant maintains its intended immutable value."
   ;; This test documents the intended immutability, even though Emacs Lisp
   ;; doesn't enforce it for defconst
-  (should (not (string-empty-p claudemacs-repl-default-template-filename)))
+  (should (not (= (length claudemacs-repl-default-template-filename) 0)))
 
   ;; Verify the constant is marked as a constant (has defconst property)
   (should (get 'claudemacs-repl-default-template-filename 'variable-documentation)))
@@ -709,7 +709,7 @@
       (should sanitized)
       ;; This should now have the marker added to prevent file path interpretation
       (should (string-match-p "This text is added by claudemacs-repl" sanitized))
-      (should-not (string-empty-p sanitized)))))
+      (should-not (= (length sanitized) 0)))))
 
 (ert-deftest test-sanitize-content-file-path-interpretation ()
   "Test that file paths without punctuation get markers to prevent misinterpretation."
@@ -718,7 +718,7 @@
     (let ((sanitized (claudemacs-repl--sanitize-content test-string)))
       (should sanitized)
       (should (string-match-p "This text is added by claudemacs-repl" sanitized))
-      (should-not (string-empty-p sanitized))))
+      (should-not (= (length sanitized) 0))))
 
   ;; Test content ending with punctuation after file path (should not get marker)
   (let ((test-string "Check this file: ~/Downloads/send-sample.png."))
