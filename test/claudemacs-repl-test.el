@@ -749,9 +749,12 @@
 (ert-deftest test-load-template-custom-with-fallback ()
   "Test loading custom template with fallback to default."
   (let ((default-directory claudemacs-repl-test-package-dir)
-        (claudemacs-repl-template-file "/nonexistent/path.org"))
+        (claudemacs-repl-template-file "/nonexistent/path.org")
+        (claudemacs-repl--testing-mode t))
     (let ((template-content (claudemacs-repl--load-template)))
-      (should-not template-content))))
+      ;; Should fallback to default template and return content
+      (should template-content)
+      (should (stringp template-content)))))
 
 (ert-deftest test-load-template-custom-with-path ()
   "Test loading custom template with explicit path."
@@ -769,14 +772,20 @@
 
 
 (ert-deftest test-load-template-nonexistent ()
-  "Test loading nonexistent template returns nil."
-  (let ((claudemacs-repl-template-file "/nonexistent/path.org"))
-    (should-not (claudemacs-repl--load-template))))
+  "Test loading nonexistent template falls back to default template."
+  (let ((claudemacs-repl-template-file "/nonexistent/path.org")
+        (claudemacs-repl--testing-mode t)
+        (default-directory claudemacs-repl-test-package-dir))
+    ;; Should fall back to default template and return content
+    (let ((template-content (claudemacs-repl--load-template)))
+      (should template-content)
+      (should (stringp template-content)))))
 
 (ert-deftest test-load-template-fallback-chain ()
   "Test template loading fallback chain behavior."
   (let ((default-directory claudemacs-repl-test-package-dir)
-        (claudemacs-repl-custom-template-path nil))
+        (claudemacs-repl-custom-template-path nil)
+        (claudemacs-repl--testing-mode t))
 
     ;; Test that default template loading works
     (let ((claudemacs-repl-template-file nil))
@@ -784,10 +793,11 @@
         (should template-content)
         (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" template-content))))
 
-    ;; Test that nonexistent custom file returns nil
+    ;; Test that nonexistent custom file falls back to default
     (let ((claudemacs-repl-template-file "/nonexistent/path.org"))
       (let ((template-content (claudemacs-repl--load-template)))
-        (should-not template-content)))))
+        (should template-content)
+        (should (stringp template-content))))))
 
 ;;; Tests for Template Generation Function (via initialize-project-file)
 
@@ -837,6 +847,7 @@
   (let* ((temp-dir (make-temp-file "test-project-fallback" t))
          (default-directory claudemacs-repl-test-package-dir)
          (claudemacs-repl-template-file "/nonexistent/path.org")
+         (claudemacs-repl--testing-mode t)
          (temp-file nil))
     (unwind-protect
         (progn
@@ -931,6 +942,7 @@
 (ert-deftest test-create-project-input-file-with-nonexistent-custom-template ()
   "Test that create-project-input-file falls back to default.org when custom template doesn't exist."
   (let ((claudemacs-repl-template-file "/nonexistent/custom-template.org")
+        (claudemacs-repl--testing-mode t)  ; Enable testing mode
         (temp-dir (make-temp-file "test-project" t))
         (temp-file nil)
         (original-default-org (expand-file-name "default.org" claudemacs-repl-test-package-dir)))
@@ -1406,11 +1418,18 @@
 
 (ert-deftest test-output-template-with-nonexistent-file ()
   "Test output-template behavior with nonexistent template file."
-  (let ((claudemacs-repl-template-file "/nonexistent/path.org"))
-    ;; Should return nil and show message, but not error
-    (should-not (claudemacs-repl-output-template))
-    ;; Should not create buffer
-    (should-not (get-buffer "*claudemacs-repl-template-path*"))))
+  (let ((claudemacs-repl-template-file "/nonexistent/path.org")
+        (claudemacs-repl--testing-mode t)
+        (default-directory claudemacs-repl-test-package-dir))
+    ;; Mock org-mode to avoid org-mode-hook issues in batch mode
+    (cl-letf (((symbol-function 'org-mode) (lambda () (fundamental-mode))))
+      ;; Should fallback to default template and return t
+      (should (claudemacs-repl-output-template))
+      ;; Should create buffer with fallback template content
+      (should (get-buffer "*claudemacs-repl-template-path*"))
+      ;; Cleanup
+      (when (get-buffer "*claudemacs-repl-template-path*")
+        (kill-buffer "*claudemacs-repl-template-path*")))))
 
 ;;; Integration Tests for Template System
 
@@ -1772,6 +1791,88 @@ Does not modify global state."
   (should (string= (claudemacs-repl--sanitize-content "Line1\u0085Line2\u2028Line3\u2029Line4") "Line1Line2Line3Line4"))
   ;; Test real-world Mac selection scenario
   (should (string= (claudemacs-repl--sanitize-content "send-region test\r\n\nwith extra newlines\r") "send-region test\nwith extra newlines")))
+
+;;; Tests for Template Error Handling
+
+(ert-deftest test-handle-missing-template-testing-mode ()
+  "Test missing template handling in testing mode."
+  (let ((template-path "/nonexistent/template.org")
+        (claudemacs-repl--testing-mode t))
+    (let ((result (claudemacs-repl--handle-missing-template template-path)))
+      (should (null result)))))
+
+(ert-deftest test-handle-missing-template-default-choice ()
+  "Test choosing default template when custom template is missing."
+  (let ((template-path "/nonexistent/template.org")
+        (claudemacs-repl--testing-mode nil))  ; Disable testing mode for interactive test
+    ;; Mock read-char-choice to return 'd' (default)
+    (cl-letf (((symbol-function 'read-char-choice)
+               (lambda (prompt choices) ?d))
+              ((symbol-function 'message) 
+               (lambda (&rest args) nil)))
+      (let ((result (claudemacs-repl--handle-missing-template template-path)))
+        (should (null result))))))
+
+(ert-deftest test-handle-missing-template-quit-choice ()
+  "Test quitting when custom template is missing."
+  (let ((template-path "/nonexistent/template.org")
+        (claudemacs-repl--testing-mode nil))
+    ;; Mock read-char-choice to return 'q' (quit)
+    (cl-letf (((symbol-function 'read-char-choice)
+               (lambda (prompt choices) ?q)))
+      (should-error (claudemacs-repl--handle-missing-template template-path)
+                    :type 'user-error))))
+
+(ert-deftest test-handle-missing-template-create-choice ()
+  "Test creating new template when custom template is missing."
+  (let* ((temp-dir (make-temp-file "claudemacs-test-" t))
+         (template-path (expand-file-name "test-template.org" temp-dir))
+         (claudemacs-repl--testing-mode nil))
+    (unwind-protect
+        (progn
+          ;; Mock read-char-choice to return 'c' (create)
+          ;; Mock y-or-n-p to return t (yes)
+          (cl-letf (((symbol-function 'read-char-choice)
+                     (lambda (prompt choices) ?c))
+                    ((symbol-function 'y-or-n-p)
+                     (lambda (prompt) t))
+                    ((symbol-function 'message) 
+                     (lambda (&rest args) nil)))
+            (let ((result (claudemacs-repl--handle-missing-template template-path)))
+              (should (string= result template-path))
+              (should (file-exists-p template-path))
+              ;; Check created content
+              (let ((content (with-temp-buffer
+                               (insert-file-contents template-path)
+                               (buffer-string))))
+                (should (string-match-p "\\* Quick Start" content))
+                (should (string-match-p "Custom Template" content))))))
+      ;; Cleanup
+      (when (file-exists-p temp-dir)
+        (delete-directory temp-dir t)))))
+
+(ert-deftest test-handle-missing-template-select-existing-file ()
+  "Test selecting existing file when custom template is missing."
+  (let* ((temp-dir (make-temp-file "claudemacs-test-" t))
+         (existing-template (expand-file-name "existing.org" temp-dir))
+         (missing-template (expand-file-name "missing.org" temp-dir))
+         (claudemacs-repl--testing-mode nil))
+    (unwind-protect
+        (progn
+          ;; Create existing template
+          (with-temp-file existing-template
+            (insert "* Existing Template\n"))
+          ;; Mock read-char-choice to return 's' (select)
+          ;; Mock read-file-name to return existing file
+          (cl-letf (((symbol-function 'read-char-choice)
+                     (lambda (prompt choices) ?s))
+                    ((symbol-function 'read-file-name)
+                     (lambda (&rest args) existing-template)))
+            (let ((result (claudemacs-repl--handle-missing-template missing-template)))
+              (should (string= result existing-template)))))
+      ;; Cleanup
+      (when (file-exists-p temp-dir)
+        (delete-directory temp-dir t)))))
 
 ;;; Test Runner
 

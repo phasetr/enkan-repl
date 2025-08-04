@@ -161,15 +161,79 @@ If DIRECTORY is nil, use the current `default-directory'."
 Returns directory path where default templates are located."
   claudemacs-repl--package-directory)
 
+(defvar claudemacs-repl--testing-mode nil
+  "When non-nil, disable interactive prompts for testing.")
+
+(defun claudemacs-repl--handle-missing-template (template-path)
+  "Handle missing template file with interactive user choices.
+TEMPLATE-PATH is the path to the missing template file.
+Returns the template path to use, or nil to use default template."
+  ;; In testing mode, just return nil to use default template
+  (if
+      claudemacs-repl--testing-mode
+      nil
+    (let
+        ((choice
+          (read-char-choice
+           (format "Template file not found: %s\n\nChoose action:\n(d) Use default template\n(s) Select different file\n(c) Create new template file\n(q) Quit\n\nYour choice: "
+                   template-path)
+           '(?d ?s ?c ?q))))
+      (cl-case choice
+        (?d
+         (message "Using default template instead")
+         nil)  ; Use default template
+        (?s
+         (let
+             ((selected-file
+               (read-file-name "Select template file: "
+                               user-emacs-directory nil t nil
+                               (lambda (name) (string-suffix-p ".org" name)))))
+           (if
+               (file-exists-p selected-file)
+               selected-file
+             (progn
+               (message "Selected file does not exist. Using default template.")
+               nil))))
+        (?c
+         (when
+             (y-or-n-p
+              (format "Create new template file at %s? " template-path))
+           (let
+               ((dir (file-name-directory template-path)))
+             ;; Ensure directory exists
+             (unless
+                 (file-exists-p dir)
+               (make-directory dir t))
+             ;; Create template with basic content
+             (with-temp-file template-path
+               (insert "* Quick Start\n\n")
+               (insert "** Custom Template\n")
+               (insert "This is your custom template.\n")
+               (insert "Edit this content to match your needs.\n\n")
+               (insert "** Usage Notes\n")
+               (insert "- Use M-x claudemacs-repl-send-region to send selected text\n")
+               (insert "- Use M-x claudemacs-repl-send-rest-of-buffer to send from cursor to end\n"))
+             (message "Created new template file: %s" template-path)
+             template-path)))
+        (?q
+         (user-error "Operation cancelled by user"))))))
+
 (defun claudemacs-repl--load-template ()
   "Load template content based on claudemacs-repl-template-file setting.
 Returns template content as string, or nil if no template found."
   (let
       ((template-path
         (cond
-         ;; If custom template file is specified, use it
+         ;; If custom template file is specified, check if it exists
          (claudemacs-repl-template-file
-          (expand-file-name claudemacs-repl-template-file))
+          (let ((custom-path (expand-file-name claudemacs-repl-template-file)))
+            (if (file-exists-p custom-path)
+                custom-path
+              ;; Handle missing custom template interactively
+              (or (claudemacs-repl--handle-missing-template custom-path)
+                  ;; Fall back to default if user chooses default
+                  (expand-file-name claudemacs-repl-default-template-filename
+                                    (claudemacs-repl--get-package-directory))))))
          ;; Otherwise, look for default template in package directory
          (t (expand-file-name claudemacs-repl-default-template-filename
                               (claudemacs-repl--get-package-directory))))))
@@ -312,21 +376,25 @@ If DIRECTORY is nil, use current `default-directory'."
                  name     ; Ensure name is not nil
                  ;; Check for directory-specific claudemacs buffer
                  (or
-                  (and (string-match-p "^\\*claudemacs:" name)
-                       (string-prefix-p (concat "*claudemacs:" target-dir) name))
+                  (and
+                   (string-match-p "^\\*claudemacs:" name)
+                   (string-prefix-p (concat "*claudemacs:" target-dir) name))
                   ;; Fallback to generic buffers only if they match directory
                   (and
-                   (or (string= name "*claude*")
-                       (string= name "*claudemacs*"))
+                   (or
+                    (string= name "*claude*")
+                    (string= name "*claudemacs*"))
                    (when default-dir
-                     (string= (file-truename default-dir)
-                              (file-truename target-dir))))
+                     (string=
+                      (file-truename default-dir)
+                      (file-truename target-dir))))
                   ;; Check for eat-mode buffers with claude in name
                   (and eat-mode
                        (string-match-p "claude" name)
                        (when default-dir
-                         (string= (file-truename default-dir)
-                                  (file-truename target-dir))))))
+                         (string=
+                          (file-truename default-dir)
+                          (file-truename target-dir))))))
           (setq matching-buffer buf)
           (cl-return))))
     matching-buffer))
@@ -485,10 +553,16 @@ Returns the created file path."
         (claudemacs-repl--get-project-file-path target-directory))
        (template-source
         (cond
-         ;; If custom template is specified and exists, use it
-         ((and claudemacs-repl-template-file
-               (file-exists-p claudemacs-repl-template-file))
-          claudemacs-repl-template-file)
+         ;; If custom template is specified, check if it exists
+         (claudemacs-repl-template-file
+          (let ((custom-path (expand-file-name claudemacs-repl-template-file)))
+            (if (file-exists-p custom-path)
+                custom-path
+              ;; Handle missing custom template interactively
+              (or (claudemacs-repl--handle-missing-template custom-path)
+                  ;; Fall back to default if user chooses default
+                  (expand-file-name claudemacs-repl-default-template-filename
+                                    (claudemacs-repl--get-package-directory))))))
          ;; Otherwise, use default.org
          (t (expand-file-name claudemacs-repl-default-template-filename
                               (claudemacs-repl--get-package-directory))))))
