@@ -1,3 +1,10 @@
+## [0.2.2](https://github.com/phasetr/claudemacs-repl/compare/v0.2.1...v0.2.2) (2025-08-04)
+
+
+### Bug Fixes
+
+* resolve default.org path resolution for straight package installs ([#4](https://github.com/phasetr/claudemacs-repl/issues/4)) ([19d2fc7](https://github.com/phasetr/claudemacs-repl/commit/19d2fc76998592e026f409b950b4f5ac5ab1a115))
+
 ## [0.2.1](https://github.com/phasetr/claudemacs-repl/compare/v0.2.0...v0.2.1) (2025-08-04)
 
 
