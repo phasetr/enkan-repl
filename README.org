@@ -75,18 +75,25 @@ I decided to build my own on top of [[https://github.com/cpoile/claudemacs][clau
 - *Planned*: Esc key sending command under development
 
 *** Project Management
+These features rely on the underlying claudemacs functionality,
+and their constraints depend on that implementation.
+
 - *Persistent Input Files*: Org-mode files with filename-encoded directory mapping
+  (based on claudemacs buffer name mode detection specification as of Aug 2025)
 - *Template System*: Customizable templates with default.org included
 - *Directory-based Targeting*: Automatically match files to appropriate claudemacs sessions
 - *Multi-project Support*: Handle multiple Claude sessions in different directories simultaneously
 
 *** Session Management
 - =claudemacs-repl-start-claudemacs= - Launch Claude session in appropriate directory
+  (only wraps =claudemacs-transient-menu=)
 - =claudemacs-repl-setup-window-layout= - Set up convenient window arrangement
+  (for the author: the left side is the input file,
+  and the right side is the claudemacs buffer)
 - =claudemacs-repl-status= - Comprehensive diagnostic information
 
 *** Utility Functions
-- =claudemacs-repl-output-template= - Export template for customization
+- =claudemacs-repl-output-template= - Export input file template for customization
 - =claudemacs-repl-toggle-debug-mode= - Debug mode for troubleshooting
 
 ** Design Philosophy
@@ -142,10 +149,33 @@ compatibility with other environments has not been verified.
 #+end_src
 
 ** Quick Start
-1. *Open project file*: =M-x claudemacs-repl-open-project-input-file=
-2. *Start Claude session*: =M-x claudemacs-repl-start-claudemacs=
-3. *Write your thoughts* in the org-mode file
-4. *Send specific parts* using =M-x claudemacs-repl-send-region= or =M-x claudemacs-repl-send-rest-of-buffer=
+
+*** For New Projects (Recommended)
+
+1. *Create a dedicated project directory*:
+   #+begin_src bash
+   mkdir my-claude-project
+   cd my-claude-project
+   #+end_src
+
+2. *Initialize Git repository*:
+   #+begin_src bash
+   git init
+   #+end_src
+   /This ensures Claude sessions are isolated and changes are tracked safely./
+
+3. *Open project file*: =M-x claudemacs-repl-open-project-input-file=
+4. *Start Claude session*: =M-x claudemacs-repl-start-claudemacs=
+5. *Write your thoughts* in the org-mode file
+6. *Send specific parts* using =M-x claudemacs-repl-send-region= or =M-x claudemacs-repl-send-rest-of-buffer=
+
+*** For Existing Projects
+
+*Important*: claudemacs automatically detects Git repositories or something and may start sessions in parent directories: see [[https://github.com/cpoile/claudemacs?tab=readme-ov-file#workspace-and-project-aware-sessions][the usage section for claudemacs]].
+
+To ensure predictable behavior:
+- Work within properly initialized Git repositories (=git init=)
+- Or use dedicated project directories as shown above
 
 The generated project file includes template functions and usage instructions.
 
@@ -155,7 +185,7 @@ The generated project file includes template functions and usage instructions.
 - =claudemacs-repl-open-project-input-file= - Create/open persistent input file for current directory
 
 *** Text Sending
-- =claudemacs-repl-send-region= - Send selected text (most commonly used)
+- =claudemacs-repl-send-region= - Send selected text (most commonly used, the author think)
 - =claudemacs-repl-send-rest-of-buffer= - Send from cursor to end (second most used)
 - =claudemacs-repl-send-buffer= - Send entire buffer
 - =claudemacs-repl-send-line= - Send current line only
@@ -166,7 +196,7 @@ The generated project file includes template functions and usage instructions.
 
 *** Utilities
 - =claudemacs-repl-start-claudemacs= - Start Claude session in appropriate directory
-- =claudemacs-repl-setup-window-layout= - Arrange windows for optimal workflow
+- =claudemacs-repl-setup-window-layout= - Arrange windows for (the author's) optimal workflow
 - =claudemacs-repl-status= - Display connection status and diagnostics
 
 ** Configuration
@@ -203,7 +233,7 @@ For debug information, enable debug mode with =M-x claudemacs-repl-toggle-debug-
 make check
 #+end_src
 
-This runs the complete test suite (95 tests) including linting,
+This runs the all test suite including linting,
 byte compilation,
 and documentation checks.
 
@@ -211,6 +241,7 @@ and documentation checks.
 This project uses automated releases via [[https://semantic-release.gitbook.io/][semantic-release]]. New versions are automatically published to GitHub Releases and a [[file:CHANGELOG.md][CHANGELOG.md]] is generated based on Conventional Commits. You can find detailed release notes in the CHANGELOG.
 
 *Note*: The `semantic-release` toolchain is used for development/release automation only. The Elisp package itself has no Node.js runtime dependencies and can be installed normally via MELPA.
+
 ** Contributing
 We welcome various issues and pull requests.
 However, please understand that due to leukemia recurrence in June 2024 and ongoing treatment,
@@ -218,7 +249,8 @@ response times may be affected.
 
 Ironically,
 it was precisely this situation that motivated the development of this package - to continue enjoying programming even under these circumstances.
-The desire to maintain productive development workflows during challenging times drove the creation of claudemacs-repl.
+The desire to maintain productive development workflows during challenging times
+drove the creation of claudemacs-repl.
 
 While I have extensively used OSS over the years,
 I never imagined I would find myself on the OSS development side under these circumstances.

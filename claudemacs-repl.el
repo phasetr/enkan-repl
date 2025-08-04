@@ -599,7 +599,7 @@ If not exists, create from template then open."
               (ignore org-mode-hook)  ; Suppress unused variable warning
               (org-mode)))))
       (switch-to-buffer buffer)
-      (goto-char (point-max))
+      (goto-char (point-min))
       (message "Project input file ready: %s" (file-name-nondirectory file-path)))))
 
 ;;;###autoload
@@ -633,12 +633,16 @@ Checks for existing sessions to prevent double startup."
       (unwind-protect
           (progn
             (cd target-dir)
-            (if
-                (fboundp 'claudemacs-transient-menu)
+            ;; Ensure claudemacs is fully loaded before using its functions
+            (if (require 'claudemacs nil t)
                 (progn
-                  (claudemacs-transient-menu)
-                  (message "Started claudemacs in: %s" target-dir))
-              (error "Claudemacs-transient-menu not available.  Is claudemacs package loaded?")))
+                  ;; Double-check after explicit require
+                  (if (fboundp 'claudemacs-transient-menu)
+                      (progn
+                        (claudemacs-transient-menu)
+                        (message "Started claudemacs in: %s" target-dir))
+                    (error "Claudemacs-transient-menu not available after loading claudemacs package")))
+              (error "Claudemacs package not found or failed to load.  Please install and configure claudemacs first")))
         ;; Restore original directory if startup failed
         (unless (claudemacs-repl--can-send-text target-dir)
           (cd original-default-directory)))))))

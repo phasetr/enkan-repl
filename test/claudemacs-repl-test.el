@@ -1495,7 +1495,11 @@
                        (setq call-count (1+ call-count))
                        (> call-count 1))))  ; Return t after first call (simulating successful startup)
                   ((symbol-function 'claudemacs-transient-menu)
-                   (lambda () (message "Mock claudemacs-transient-menu called"))))
+                   (lambda () (message "Mock claudemacs-transient-menu called")))
+                  ((symbol-function 'require)
+                   (lambda (feature &optional filename noerror) t))  ; Mock successful require
+                  ((symbol-function 'fboundp)
+                   (lambda (func) t)))  ; Mock function availability
           (cd original-dir)
           (claudemacs-repl-start-claudemacs)
           (should (string= (expand-file-name default-directory) test-dir)))
@@ -1564,14 +1568,14 @@
                    (lambda (dir) nil))
                   ((symbol-function 'claudemacs-repl--can-send-text)
                    (lambda (dir) nil))
-                  ((symbol-function 'fboundp)
-                   (lambda (func) nil)))  ; Simulate claudemacs-transient-menu not available
+                  ((symbol-function 'require)
+                   (lambda (feature &optional filename noerror) nil)))  ; Simulate claudemacs package not available
           (condition-case err
               (claudemacs-repl-start-claudemacs)
             (error
              (setq error-caught (error-message-string err))))
           (should error-caught)
-          (should (string-match-p "not available" error-caught))
+          (should (string-match-p "not found or failed to load" error-caught))
           ;; Should restore original directory on error
           (should (string= (expand-file-name default-directory) original-dir)))
       ;; Cleanup
