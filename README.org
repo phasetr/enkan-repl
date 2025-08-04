@@ -1,53 +1,123 @@
 * claudemacs-repl
-Enhanced client utilities for claudemacs - extending AI pair programming capabilities in Emacs.
 
-[[<https://github.com/phasetr/claudemacs-repl/workflows/CI/badge.svg]]>
-<[[https://img.shields.io/badge/License-MIT-yellow.svg]]>
+[[https://github.com/phasetr/claudemacs-repl/workflows/CI/badge.svg]]
+[[https://img.shields.io/badge/License-MIT-yellow.svg]]
 
-** Design Philosophy
-This package provides minimal documentation and maximum customization freedom for advanced Emacs users who:
-- Have a strong will to use Claude Code outside of officially supported VSCode
-- Prefer to configure their own efficient workflows
-- Define their own transient menus and keybinding preferences
-- Or are familiar with =send-region= patterns (like F# REPL =C-c C-r=)
+This package builds upon the excellent work of:
+- [[https://github.com/akib/emacs-eat][eat]] - Terminal emulator inside Emacs
+- [[https://github.com/cpoile/claudemacs][claudemacs]] - Claude AI integration for Emacs
 
-Welcome to the freedom of Emacs world - we provide the tools, you create the experience.
+We extend our deepest gratitude to the authors and contributors of these foundational packages.
 
-*** Author's Personal Approach
-"I cannot remember keybindings unless I use them daily, and transient menus are even more hopeless. From the early prototype stage of this package, I have not set any keybindings and only remember =send-region= and =send-rest-of-buffer=, executing them via =M-x= with fuzzy search. When using Claude Code, I'm focused and only use these functions, so they always appear at the top of the completion list and can be executed immediately."
+#+TOC: headlines 2 local
 
-This personal workflow is the foundation for our function-name-first design philosophy. Common keybindings like =C-c C-r= for send-region are widely used, but we leave all efficiency optimizations to your expertise.
+** Table of Contents
+- [[#vision-reviving-repl-culture-for-the-ai-era][Vision: Reviving REPL Culture for the AI Era]]
+- [[#motivation][Motivation]]
+- [[#features][Features]]
+- [[#design-philosophy][Design Philosophy]]
+- [[#installation][Installation]]
+- [[#quick-start][Quick Start]]
+- [[#core-functions][Core Functions]]
+- [[#configuration][Configuration]]
+- [[#troubleshooting][Troubleshooting]]
+- [[#development][Development]]
+- [[#contributing][Contributing]]
+- [[#license][License]]
 
-*** Core Design Principles
+** Vision: Reviving REPL Culture for the AI Era
+This package differs technically from traditional REPLs (Read-Eval-Print Loop).
+While conventional REPLs execute code and return results,
+=claudemacs-repl= sends text to Claude AI and receives generated responses.
 
-**** File-based vs Buffer-based
-- Claude Code's limitation: difficult to preserve personal comments and context
-- Avoid building complex history features - use files for persistence instead
-- Files allow complete preservation of past comments and thought processes
-- Add content chronologically at the bottom, use =send-region= or =send-rest-of-buffer= to send specific parts
-- When inspiration strikes after Claude Code execution, write it down in the file - no more forgotten ideas
+However, we view this difference not as a constraint,
+but as a new possibility.
+Our dream is to revive the interactive development culture that LISP, Elisp,
+and Emacs have nurtured for decades,
+in a form befitting the AI era.
 
-**** Workflow Flexibility
-- Always use =send-region=? Write new comments below the current content
-- Always use =send-rest-of-buffer=? Write notes slightly above the cursor position
-- File persistence means your workflow adapts to your thinking patterns
+Send your thoughts with =send-region=,
+receive Claude's response,
+and deepen your thinking further.
+This cycle is the development experience that the new era's REPL envisions.
+Here lies a completely new programming horizon woven by Emacs and AI.
 
-**** Filename-Buffer Mapping
-- File-local variables and parsing file contents are tedious
-- Use filename encoding for simple, unambiguous (2025-8-temporal) claudemacs buffer correspondence
-- Ugly but functional: filename directly encodes the target directory
+** Motivation
+The development motivation stems from the current usability issues with Claude Code and Gemini CLI,
+particularly the difficulty of text input and the non-persistent nature of personal input history.
+While file-based input is somewhat possible,
+it's extremely cumbersome to use.
 
-**** Org-mode Choice
-- This is Emacs - use org-mode, not markdown
-- Leverage Emacs's native structured document capabilities
+In terminals,
+input and copy-paste operations are difficult,
+making revisions troublesome.
+Furthermore, when something comes to mind during AI work,
+you need to leave the terminal to take notes,
+creating an extremely unpleasant development experience.
+
+I constantly wished for the ability to easily take notes in text files
+and send only the necessary parts as commands to AI,
+keeping inspired thoughts noted for immediate use after AI work is complete.
+For text work, I naturally turned to Emacs.
+After trying several packages that didn't quite fit,
+I decided to build my own on top of claudemacs.
 
 ** Features
-- 🚀 *Enhanced Text Sending*: Send regions, buffers, or cursor-to-end text to claudemacs
-- 📝 *Persistent Input Files*: Org-mode enabled files with multi-language template support (Being Japanese, I want Japanese templates to be easily usable)
-- 🔍 *Directory-Based Targeting*: Automatically match files to appropriate claudemacs buffers (depends on claudemacs buffer naming convention)
-- 📁 *Template Customization*: External template files for maximum flexibility
+
+*** Text Sending Capabilities
+- =claudemacs-repl-send-region= - Send selected text to Claude
+- =claudemacs-repl-send-buffer= - Send entire buffer content
+- =claudemacs-repl-send-rest-of-buffer= - Send from cursor position to end
+- =claudemacs-repl-send-line= - Send current line
+- =claudemacs-repl-send-enter= - Send enter key for prompts
+- =claudemacs-repl-send-1/2/3= - Send numbered choices for AI prompts
+- *File Path Support*: Send file paths for Claude to read directly (e.g., =~/project/config.json=)
+- *Planned*: Esc key sending command under development
+
+*** Project Management
+- *Persistent Input Files*: Org-mode files with filename-encoded directory mapping
+- *Template System*: Customizable templates with default.org included
+- *Directory-based Targeting*: Automatically match files to appropriate claudemacs sessions
+- *Multi-project Support*: Handle multiple Claude sessions in different directories simultaneously
+
+*** Session Management
+- =claudemacs-repl-start-claudemacs= - Launch Claude session in appropriate directory
+- =claudemacs-repl-setup-window-layout= - Set up convenient window arrangement
+- =claudemacs-repl-status= - Comprehensive diagnostic information
+
+*** Utility Functions
+- =claudemacs-repl-output-template= - Export template for customization
+- =claudemacs-repl-toggle-debug-mode= - Debug mode for troubleshooting
+
+** Design Philosophy
+
+*** Org-mode Only Choice
+This package exclusively uses Org-mode for input files,
+leveraging Emacs's native compatibility and structured document capabilities.
+Rather than supporting multiple formats like Markdown,
+we focus on what works best within the Emacs ecosystem.
+
+*** No Default Keybindings
+We intentionally provide no default keybindings for several reasons:
+- Org-mode users often have heavily customized configurations
+- Serious Emacs users (especially those who don't "cheat" with VSCode)
+  have unpredictable customization patterns
+- Avoiding conflicts with existing user workflows
+
+*** M-x Driven Workflow
+The author's personal approach assumes complete focus during AI development sessions.
+All functions are accessed via =M-x= with fuzzy matching,
+which works efficiently when you're concentrated on AI interaction.
+During Claude development work,
+the frequently used functions (=send-region=, =send-rest-of-buffer=)
+naturally appear at the top of completion lists.
 
 ** Installation
+
+*** Prerequisites
+- Emacs 28.1 or later
+- [[https://github.com/cpoile/claudemacs][claudemacs]] package installed and configured
+- [[https://github.com/anthropics/claude-code][Claude Code CLI]] properly set up
 
 *** Using straight.el (Recommended)
 #+begin_src elisp
@@ -67,50 +137,61 @@ This personal workflow is the foundation for our function-name-first design phil
 (require 'claudemacs-repl)
 #+end_src
 
-*** Prerequisites
-- Emacs 28.1 or later
-- [[https://github.com/cpoile/claudemacs][claudemacs]] installed and configured
-- [[https://github.com/anthropics/claude-code][Claude Code CLI]] setup
+** Quick Start
 
-** Usage
+1. *Start Claude session*: =M-x claudemacs-repl-start-claudemacs=
+2. *Open project file*: =M-x claudemacs-repl-open-project-input-file=
+3. *Write your thoughts* in the org-mode file
+4. *Send specific parts* using =M-x claudemacs-repl-send-region= or =M-x claudemacs-repl-send-rest-of-buffer=
 
-*** Quick Start
-1. Start claudemacs in your project directory
-2. Run =M-x claudemacs-repl-open-project-input-file=
-3. Use the template functions shown in the generated file
+The generated project file includes template functions and usage instructions.
 
-*** Essential Functions
-- =claudemacs-repl-open-project-input-file= - Open or create project input file
-- =claudemacs-repl-send-region= - Send selected text to claudemacs
-- =claudemacs-repl-send-rest-of-buffer= - Send rest of buffer from cursor position
+** Core Functions
+
+*** File Management
+- =claudemacs-repl-open-project-input-file= - Create/open persistent input file for current directory
+
+*** Text Sending
+- =claudemacs-repl-send-region= - Send selected text (most commonly used)
+- =claudemacs-repl-send-rest-of-buffer= - Send from cursor to end (second most used)
 - =claudemacs-repl-send-buffer= - Send entire buffer
-- =claudemacs-repl-status= - Show connection status and diagnostics
+- =claudemacs-repl-send-line= - Send current line only
+
+*** Session Control
+- =claudemacs-repl-send-enter= - Send enter key
+- =claudemacs-repl-send-1/2/3= - Send numbered choices for AI prompts
+
+*** Utilities
+- =claudemacs-repl-start-claudemacs= - Start Claude session in appropriate directory
+- =claudemacs-repl-setup-window-layout= - Arrange windows for optimal workflow
+- =claudemacs-repl-status= - Display connection status and diagnostics
 
 ** Configuration
-*** Template Configuration
+
+*** Template Customization
 #+begin_src elisp
-;; Use default template (uses templates/default.org from package)
+;; Use default template
 (setq claudemacs-repl-template-file nil)
 
 ;; Use custom template file
 (setq claudemacs-repl-template-file "~/my-claude-template.org")
 
-;; Use template from another package or system location
-(setq claudemacs-repl-template-file "/usr/local/share/emacs/claude-templates/my-template.org")
-
 ;; Use project-specific template
 (setq claudemacs-repl-template-file (expand-file-name "claude-template.org" user-emacs-directory))
 #+end_src
 
-*** Template Customization
-Use =M-x claudemacs-repl-output-template= to output the default template to a new buffer for customization.
+To create a custom template,
+use =M-x claudemacs-repl-output-template= to export the default template to a buffer for editing.
 
 ** Troubleshooting
-If you see "❌ Cannot send - no matching claudemacs buffer found for this directory":
+If you encounter "❌ Cannot send - no matching claudemacs buffer found for this directory":
 
 1. Ensure claudemacs is running: =M-x claudemacs-transient-menu=
-2. Check if Claude Code CLI is properly configured
-3. Use =M-x claudemacs-repl-status= for diagnostic information
+2. Verify Claude Code CLI is properly configured
+3. Run =M-x claudemacs-repl-status= for detailed diagnostic information
+4. Check that you're in the correct directory or using the appropriate project file
+
+For debug information, enable debug mode with =M-x claudemacs-repl-toggle-debug-mode=.
 
 ** Development
 
@@ -119,14 +200,23 @@ If you see "❌ Cannot send - no matching claudemacs buffer found for this direc
 make check
 #+end_src
 
-** Contributing
-This package prioritizes maintainability over feature requests. For template translations or custom workflows, prefer using the =custom= template mechanism rather than contributing to the core package.
+This runs the complete test suite (95 tests) including linting,
+byte compilation,
+and documentation checks.
 
-Note: Due to leukemia recurrence in June 2024, the maintainer is concerned about potential health deterioration and may have limited capacity for reviewing contributions.
+** Contributing
+We welcome various issues and pull requests.
+However, please understand that due to leukemia recurrence in June 2024 and ongoing treatment,
+response times may be affected.
+
+Ironically,
+it was precisely this situation that motivated the development of this package - to continue enjoying programming even under these circumstances.
+The desire to maintain productive development workflows during challenging times drove the creation of claudemacs-repl.
 
 ** License
 This project is licensed under the MIT License - see the [[file:LICENSE][LICENSE]] file for details.
 
 ** Support
+
 - 🐛 [[https://github.com/phasetr/claudemacs-repl/issues][Issue Tracker]]
 - 💬 [[https://github.com/phasetr/claudemacs-repl/discussions][Discussions]]
