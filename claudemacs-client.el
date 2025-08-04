@@ -45,7 +45,7 @@
 ;;   (require 'claudemacs-client)
 ;;
 ;; Usage:
-;; M-x claudemacs-client-open-project-input
+;; M-x claudemacs-client-open-project-input-file
 ;;
 ;; Acknowledgments:
 ;; This project is built on top of claudemacs.  We thank the original
@@ -490,7 +490,7 @@ Returns the created file path."
     file-path))
 
 ;;;###autoload
-(defun claudemacs-client-open-project-input (&optional directory)
+(defun claudemacs-client-open-project-input-file (&optional directory)
   "Open or create project input file for DIRECTORY.
 If DIRECTORY is nil, use current `default-directory'.
 If project input file exists, open it directly.
@@ -732,7 +732,7 @@ This is the author's preference - customize as needed."
                  "^\\*claudemacs:\\(.*\\)\\*$" "\\1"
                  (buffer-name buf))))
             (princ (format "   - %s\n" session-path))))))
-      (princ "\nFor more help: M-x claudemacs-client-open-project-input\n"))))
+      (princ "\nFor more help: M-x claudemacs-client-open-project-input-file\n"))))
 
 ;;;###autoload
 (defun claudemacs-client-toggle-debug-mode ()

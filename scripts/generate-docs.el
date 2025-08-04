@@ -147,7 +147,7 @@ Write the formatted template to OUTPUT-FILE."
     (insert "- *Send entire buffer*: ~M-x claudemacs-client-send-buffer~ (or ~C-c b~)\n\n")
     
     (insert "** Project Management\n")
-    (insert "- *Open project input file*: ~M-x claudemacs-client-open-project-input~\n")
+    (insert "- *Open project input file*: ~M-x claudemacs-client-open-project-input-file~\n")
     (insert "- *Output template for customization*: ~M-x claudemacs-client-output-template~\n\n")
     
     (insert "** Troubleshooting\n")

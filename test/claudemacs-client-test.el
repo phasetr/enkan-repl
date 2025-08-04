@@ -951,7 +951,7 @@
       (when (file-exists-p temp-dir)
         (delete-directory temp-dir t)))))
 
-;;; Integration Tests for claudemacs-client-open-project-input Command
+;;; Integration Tests for claudemacs-client-open-project-input-file Command
 
 (ert-deftest test-open-project-input-file-exists ()
   "Test that open-project-input opens existing file directly without creating new one."
@@ -986,7 +986,7 @@
                       ((symbol-function 'fboundp)
                        (lambda (sym) nil)))
               (let ((default-directory temp-dir))
-                (claudemacs-client-open-project-input))
+                (claudemacs-client-open-project-input-file))
               ;; Should open the existing file
               (should (string= opened-file temp-file))
               ;; File content should remain unchanged
@@ -1029,7 +1029,7 @@
                       ((symbol-function 'fboundp)
                        (lambda (sym) nil)))
               (let ((default-directory temp-dir))
-                (claudemacs-client-open-project-input))
+                (claudemacs-client-open-project-input-file))
               ;; Should open the newly created file
               (should (string= opened-file temp-file))
               ;; File should now exist and contain template content

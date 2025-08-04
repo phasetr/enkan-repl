@@ -27,7 +27,7 @@ Create a convenient window layout for Claude Code interaction:
 - *Send entire buffer*: ~M-x claudemacs-client-send-buffer~ (or ~C-c b~)
 
 ** Project Management
-- *Open project input file*: ~M-x claudemacs-client-open-project-input~
+- *Open project input file*: ~M-x claudemacs-client-open-project-input-file~
 - *Output template for customization*: ~M-x claudemacs-client-output-template~
 
 ** Troubleshooting

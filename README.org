@@ -76,11 +76,11 @@ This personal workflow is the foundation for our function-name-first design phil
 
 *** Quick Start
 1. Start claudemacs in your project directory
-2. Run =M-x claudemacs-client-open-project-input=
+2. Run =M-x claudemacs-client-open-project-input-file=
 3. Use the template functions shown in the generated file
 
 *** Essential Functions
-- =claudemacs-client-open-project-input= - Open or create project input file
+- =claudemacs-client-open-project-input-file= - Open or create project input file
 - =claudemacs-client-send-region= - Send selected text to claudemacs
 - =claudemacs-client-send-rest-of-buffer= - Send rest of buffer from cursor position
 - =claudemacs-client-send-buffer= - Send entire buffer
