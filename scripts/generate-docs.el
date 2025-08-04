@@ -17,7 +17,7 @@
 
 (require 'cl-lib)
 
-(defun claudemacs-client--extract-function-info (file-path)
+(defun claudemacs-repl--extract-function-info (file-path)
   "Extract public function information from an Emacs Lisp file.
 Returns a list of plists, each containing :name, :args, :docstring,
 :interactive, and :autoload status."
@@ -83,7 +83,7 @@ Returns a list of plists, each containing :name, :args, :docstring,
           (setq current-line (1+ current-line))))
       (nreverse functions-info))))
 
-(defun claudemacs-client--format-function-info (info)
+(defun claudemacs-repl--format-function-info (info)
   "Format a single function info plist into org-mode format."
   (let* ((name (plist-get info :name))
          (args (plist-get info :args))
@@ -101,88 +101,88 @@ Returns a list of plists, each containing :name, :args, :docstring,
       (push (format "   - *Description*: %s" docstring) output-lines))
     (string-join (nreverse output-lines) "\n")))
 
-(defun claudemacs-client--generate-public-api-docs (file-path output-file)
+(defun claudemacs-repl--generate-public-api-docs (file-path output-file)
   "Generate org-mode documentation for public functions/commands from FILE-PATH.
 Write the formatted output to OUTPUT-FILE."
-  (let* ((functions (claudemacs-client--extract-function-info file-path))
+  (let* ((functions (claudemacs-repl--extract-function-info file-path))
          (public-functions (cl-remove-if-not
                             (lambda (f) (or (plist-get f :interactive)
                                             (plist-get f :autoload)))
                             functions))
-         (formatted-output (mapcar 'claudemacs-client--format-function-info public-functions)))
+         (formatted-output (mapcar 'claudemacs-repl--format-function-info public-functions)))
     (with-temp-file output-file
       (insert "#+TITLE: Public API\n\n")
       (insert "* Public API\n\n")
-      (insert "This document lists all public functions and commands available in claudemacs-client.\n\n")
+      (insert "This document lists all public functions and commands available in claudemacs-repl.\n\n")
       (insert (string-join formatted-output "\n\n")))))
 
-(defun claudemacs-client--generate-default-template (output-file)
-  "Generate default template file for claudemacs-client projects.
+(defun claudemacs-repl--generate-default-template (output-file)
+  "Generate default template file for claudemacs-repl projects.
 Write the formatted template to OUTPUT-FILE."
   (with-temp-file output-file
     (insert "#+TITLE: Claude Input File\n")
-    (insert "#+AUTHOR: claudemacs-client\n")
+    (insert "#+AUTHOR: claudemacs-repl\n")
     (insert "#+DATE: %<%Y-%m-%d>\n\n")
-    
+
     (insert "* Quick Start\n\n")
-    
+
     (insert "** 1. Start Claude Code Session\n")
     (insert "Execute this to start claudemacs and set up the environment:\n\n")
     (insert "#+BEGIN_SRC emacs-lisp\n")
-    (insert "(claudemacs-client-start-claudemacs)\n")
+    (insert "(claudemacs-repl-start-claudemacs)\n")
     (insert "#+END_SRC\n\n")
-    
+
     (insert "** 2. Setup Window Layout (Optional)\n")
     (insert "Create a convenient window layout for Claude Code interaction:\n\n")
     (insert "#+BEGIN_SRC emacs-lisp\n")
-    (insert "(claudemacs-client-setup-window-layout)\n")
+    (insert "(claudemacs-repl-setup-window-layout)\n")
     (insert "#+END_SRC\n\n")
-    
+
     (insert "* Essential Commands\n\n")
-    
+
     (insert "** Sending Content to Claude Code\n")
-    (insert "- *Send current region*: ~M-x claudemacs-client-send-region~ (or ~C-c r~)\n")
-    (insert "- *Send current line*: ~M-x claudemacs-client-send-line~ (or ~C-c l~)\n")
-    (insert "- *Send rest of buffer*: ~M-x claudemacs-client-send-rest-of-buffer~ (or ~C-c t~)\n")
-    (insert "- *Send entire buffer*: ~M-x claudemacs-client-send-buffer~ (or ~C-c b~)\n\n")
-    
+    (insert "- *Send current region*: ~M-x claudemacs-repl-send-region~ (or ~C-c r~)\n")
+    (insert "- *Send current line*: ~M-x claudemacs-repl-send-line~ (or ~C-c l~)\n")
+    (insert "- *Send rest of buffer*: ~M-x claudemacs-repl-send-rest-of-buffer~ (or ~C-c t~)\n")
+    (insert "- *Send entire buffer*: ~M-x claudemacs-repl-send-buffer~ (or ~C-c b~)\n\n")
+
     (insert "** Project Management\n")
-    (insert "- *Open project input file*: ~M-x claudemacs-client-open-project-input-file~\n")
-    (insert "- *Output template for customization*: ~M-x claudemacs-client-output-template~\n\n")
-    
+    (insert "- *Open project input file*: ~M-x claudemacs-repl-open-project-input-file~\n")
+    (insert "- *Output template for customization*: ~M-x claudemacs-repl-output-template~\n\n")
+
     (insert "** Troubleshooting\n")
     (insert "If you encounter connection issues, run diagnostics:\n\n")
     (insert "#+BEGIN_SRC emacs-lisp\n")
-    (insert "(claudemacs-client-status)\n")
+    (insert "(claudemacs-repl-status)\n")
     (insert "#+END_SRC\n\n")
-    
+
     (insert "* Working Notes\n\n")
     (insert "You can write extensive notes here to organize your thoughts.\n")
     (insert "This section is for your personal use - only send specific parts to Claude Code as needed.\n\n")
-    
+
     (insert "** Project Context\n")
     (insert "- Description of your current project\n")
     (insert "- Key objectives and requirements\n")
     (insert "- Important constraints or considerations\n\n")
-    
+
     (insert "** Development Notes\n")
     (insert "- Code snippets for testing\n")
     (insert "- Architecture decisions\n")
     (insert "- TODO items and reminders\n\n")
-    
+
     (insert "** Communication with Claude Code\n")
     (insert "Use the sending commands above to share specific sections with Claude Code.\n")
     (insert "You don't need to send everything - be selective about what context is relevant.\n")))
 
 ;; For batch execution
 (defun extract-public-api ()
-  "Extract public API from claudemacs-client.el to public-api.org."
-  (claudemacs-client--generate-public-api-docs "claudemacs-client.el" "public-api.org")
+  "Extract public API from claudemacs-repl.el to public-api.org."
+  (claudemacs-repl--generate-public-api-docs "claudemacs-repl.el" "public-api.org")
   (message "Public API documentation generated in public-api.org"))
 
 (defun generate-default-template ()
-  "Generate default template file for claudemacs-client projects."
-  (claudemacs-client--generate-default-template "default.org")
+  "Generate default template file for claudemacs-repl projects."
+  (claudemacs-repl--generate-default-template "default.org")
   (message "Default template generated in default.org"))
 
 (defun generate-all-docs ()

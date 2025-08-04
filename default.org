@@ -1,5 +1,5 @@
 #+TITLE: Claude Input File
-#+AUTHOR: claudemacs-client
+#+AUTHOR: claudemacs-repl
 #+DATE: %<%Y-%m-%d>
 
 * Quick Start
@@ -8,33 +8,33 @@
 Execute this to start claudemacs and set up the environment:
 
 #+BEGIN_SRC emacs-lisp
-(claudemacs-client-start-claudemacs)
+(claudemacs-repl-start-claudemacs)
 #+END_SRC
 
 ** 2. Setup Window Layout (Optional)
 Create a convenient window layout for Claude Code interaction:
 
 #+BEGIN_SRC emacs-lisp
-(claudemacs-client-setup-window-layout)
+(claudemacs-repl-setup-window-layout)
 #+END_SRC
 
 * Essential Commands
 
 ** Sending Content to Claude Code
-- *Send current region*: ~M-x claudemacs-client-send-region~ (or ~C-c r~)
-- *Send current line*: ~M-x claudemacs-client-send-line~ (or ~C-c l~)
-- *Send rest of buffer*: ~M-x claudemacs-client-send-rest-of-buffer~ (or ~C-c t~)
-- *Send entire buffer*: ~M-x claudemacs-client-send-buffer~ (or ~C-c b~)
+- *Send current region*: ~M-x claudemacs-repl-send-region~ (or ~C-c r~)
+- *Send current line*: ~M-x claudemacs-repl-send-line~ (or ~C-c l~)
+- *Send rest of buffer*: ~M-x claudemacs-repl-send-rest-of-buffer~ (or ~C-c t~)
+- *Send entire buffer*: ~M-x claudemacs-repl-send-buffer~ (or ~C-c b~)
 
 ** Project Management
-- *Open project input file*: ~M-x claudemacs-client-open-project-input-file~
-- *Output template for customization*: ~M-x claudemacs-client-output-template~
+- *Open project input file*: ~M-x claudemacs-repl-open-project-input-file~
+- *Output template for customization*: ~M-x claudemacs-repl-output-template~
 
 ** Troubleshooting
 If you encounter connection issues, run diagnostics:
 
 #+BEGIN_SRC emacs-lisp
-(claudemacs-client-status)
+(claudemacs-repl-status)
 #+END_SRC
 
 * Working Notes

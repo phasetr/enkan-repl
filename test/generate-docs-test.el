@@ -74,7 +74,7 @@ It spans multiple lines for testing.\"
   "Test basic function information extraction."
   (let* ((temp-file (extract-public-functions-test--create-temp-file 
                      extract-public-functions-test-data))
-         (functions (claudemacs-client--extract-function-info temp-file)))
+         (functions (claudemacs-repl--extract-function-info temp-file)))
     (unwind-protect
         (progn
           ;; Should extract 5 public functions (autoload or interactive)
@@ -106,7 +106,7 @@ It spans multiple lines for testing.\"
   "Test extraction of autoload-only functions."
   (let* ((temp-file (extract-public-functions-test--create-temp-file 
                      extract-public-functions-test-data))
-         (functions (claudemacs-client--extract-function-info temp-file)))
+         (functions (claudemacs-repl--extract-function-info temp-file)))
     (unwind-protect
         (let ((autoload-func (cl-find "test-autoload-no-interactive" functions 
                                       :key (lambda (f) (plist-get f :name)) 
@@ -123,7 +123,7 @@ It spans multiple lines for testing.\"
   "Test that private functions are filtered out."
   (let* ((temp-file (extract-public-functions-test--create-temp-file 
                      extract-public-functions-test-data))
-         (functions (claudemacs-client--extract-function-info temp-file)))
+         (functions (claudemacs-repl--extract-function-info temp-file)))
     (unwind-protect
         (progn
           ;; Private function should not be extracted
@@ -139,7 +139,7 @@ It spans multiple lines for testing.\"
   "Test handling of functions without docstrings."
   (let* ((temp-file (extract-public-functions-test--create-temp-file 
                      extract-public-functions-test-data))
-         (functions (claudemacs-client--extract-function-info temp-file)))
+         (functions (claudemacs-repl--extract-function-info temp-file)))
     (unwind-protect
         (let ((no-doc-func (cl-find "test-no-docstring" functions 
                                     :key (lambda (f) (plist-get f :name)) 
@@ -160,7 +160,7 @@ It spans multiple lines for testing.\"
                           :docstring "Test function description."
                           :interactive t
                           :autoload t))
-         (formatted (claudemacs-client--format-function-info func-info)))
+         (formatted (claudemacs-repl--format-function-info func-info)))
     (should (string-match-p "\\*\\* ~test-function~" formatted))
     (should (string-match-p "\\*Type\\*: Interactive Command" formatted))
     (should (string-match-p "\\*Autoload\\*: Yes" formatted))
@@ -174,7 +174,7 @@ It spans multiple lines for testing.\"
                           :docstring ""
                           :interactive nil
                           :autoload t))
-         (formatted (claudemacs-client--format-function-info func-info)))
+         (formatted (claudemacs-repl--format-function-info func-info)))
     (should (string-match-p "\\*\\* ~minimal-function~" formatted))
     (should (string-match-p "\\*Autoload\\*: Yes" formatted))
     (should-not (string-match-p "\\*Type\\*" formatted))
@@ -189,7 +189,7 @@ It spans multiple lines for testing.\"
          (temp-output (make-temp-file "api-docs-" nil ".org")))
     (unwind-protect
         (progn
-          (claudemacs-client--generate-public-api-docs temp-input temp-output)
+          (claudemacs-repl--generate-public-api-docs temp-input temp-output)
           
           ;; Check that output file was created and has content
           (should (file-exists-p temp-output))
@@ -212,7 +212,7 @@ It spans multiple lines for testing.\"
 (ert-deftest test-extract-function-info-empty-file ()
   "Test extraction from an empty file."
   (let* ((temp-file (extract-public-functions-test--create-temp-file ""))
-         (functions (claudemacs-client--extract-function-info temp-file)))
+         (functions (claudemacs-repl--extract-function-info temp-file)))
     (unwind-protect
         (should (= (length functions) 0))
       
@@ -223,7 +223,7 @@ It spans multiple lines for testing.\"
   "Test extraction from malformed Emacs Lisp."
   (let* ((malformed-content ";;;###autoload\n(defun broken-function\n  \"Missing closing paren\"")
          (temp-file (extract-public-functions-test--create-temp-file malformed-content))
-         (functions (claudemacs-client--extract-function-info temp-file)))
+         (functions (claudemacs-repl--extract-function-info temp-file)))
     (unwind-protect
         ;; Should not crash and return empty list for malformed content
         (should (listp functions))
@@ -238,7 +238,7 @@ It spans multiple lines for testing.\"
   (let ((temp-output (make-temp-file "default-template-" nil ".org")))
     (unwind-protect
         (progn
-          (claudemacs-client--generate-default-template temp-output)
+          (claudemacs-repl--generate-default-template temp-output)
           
           ;; Check that output file was created and has content
           (should (file-exists-p temp-output))
@@ -247,16 +247,16 @@ It spans multiple lines for testing.\"
                            (buffer-string))))
             ;; Check basic structure
             (should (string-match-p "#\\+TITLE: Claude Input File" content))
-            (should (string-match-p "#\\+AUTHOR: claudemacs-client" content))
+            (should (string-match-p "#\\+AUTHOR: claudemacs-repl" content))
             (should (string-match-p "\\* Quick Start" content))
             (should (string-match-p "\\* Essential Commands" content))
             (should (string-match-p "\\* Working Notes" content))
             
             ;; Check function references
-            (should (string-match-p "claudemacs-client-start-claudemacs" content))
-            (should (string-match-p "claudemacs-client-setup-window-layout" content))
-            (should (string-match-p "claudemacs-client-send-region" content))
-            (should (string-match-p "claudemacs-client-status" content))))
+            (should (string-match-p "claudemacs-repl-start-claudemacs" content))
+            (should (string-match-p "claudemacs-repl-setup-window-layout" content))
+            (should (string-match-p "claudemacs-repl-send-region" content))
+            (should (string-match-p "claudemacs-repl-status" content))))
       
       ;; Cleanup
       (when (file-exists-p temp-output)
@@ -267,7 +267,7 @@ It spans multiple lines for testing.\"
   (let ((temp-output (make-temp-file "default-template-" nil ".org")))
     (unwind-protect
         (progn
-          (claudemacs-client--generate-default-template temp-output)
+          (claudemacs-repl--generate-default-template temp-output)
           
           (let ((content (with-temp-buffer
                            (insert-file-contents temp-output)
@@ -278,7 +278,7 @@ It spans multiple lines for testing.\"
             
             ;; Check emphasis markup
             (should (string-match-p "\\*Send current region\\*:" content))
-            (should (string-match-p "~M-x claudemacs-client-send-region~" content))
+            (should (string-match-p "~M-x claudemacs-repl-send-region~" content))
             
             ;; Check hierarchical structure
             (should (string-match-p "^\\*\\* 1\\. Start Claude Code Session" content))
@@ -298,8 +298,8 @@ It spans multiple lines for testing.\"
     (unwind-protect
         (progn
           ;; Test individual generation functions directly
-          (claudemacs-client--generate-public-api-docs temp-input temp-api)
-          (claudemacs-client--generate-default-template temp-template)
+          (claudemacs-repl--generate-public-api-docs temp-input temp-api)
+          (claudemacs-repl--generate-default-template temp-template)
           
           ;; Check both files were created
           (should (file-exists-p temp-api))
@@ -317,7 +317,7 @@ It spans multiple lines for testing.\"
                                     (insert-file-contents temp-template)
                                     (buffer-string))))
             (should (string-match-p "#\\+TITLE: Claude Input File" template-content))
-            (should (string-match-p "claudemacs-client-start-claudemacs" template-content))))
+            (should (string-match-p "claudemacs-repl-start-claudemacs" template-content))))
       
       ;; Cleanup
       (delete-file temp-input)

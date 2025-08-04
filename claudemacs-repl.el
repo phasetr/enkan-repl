@@ -1,4 +1,4 @@
-;;; claudemacs-client.el --- Enhanced client utilities for claudemacs -*- lexical-binding: t -*-
+;;; claudemacs-repl.el --- Enhanced repl utilities for claudemacs -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2025 [phasetr]
 
@@ -6,7 +6,7 @@
 ;; Version: 0.0.0
 ;; Package-Requires: ((emacs "28.1") (claudemacs "0.1.0"))
 ;; Keywords: claudemacs ai tools convenience
-;; URL: https://github.com/phasetr/claudemacs-client
+;; URL: https://github.com/phasetr/claudemacs-repl
 ;; License: MIT
 
 ;; This file is not part of GNU Emacs.
@@ -31,7 +31,7 @@
 
 ;;; Commentary:
 
-;; claudemacs-client provides enhanced utilities for working with claudemacs.
+;; claudemacs-repl provides enhanced utilities for working with claudemacs.
 ;;
 ;; Features:
 ;; - Send text from files, buffers, and regions to claudemacs
@@ -42,10 +42,10 @@
 ;;
 ;; Installation:
 ;; Add to your init.el:
-;;   (require 'claudemacs-client)
+;;   (require 'claudemacs-repl)
 ;;
 ;; Usage:
-;; M-x claudemacs-client-open-project-input-file
+;; M-x claudemacs-repl-open-project-input-file
 ;;
 ;; Acknowledgments:
 ;; This project is built on top of claudemacs.  We thank the original
@@ -66,49 +66,49 @@
 
 ;;;; Custom Variables
 
-(defgroup claudemacs-client nil
-  "Enhanced client utilities for claudemacs."
+(defgroup claudemacs-repl nil
+  "Enhanced REPL utilities for claudemacs."
   :group 'tools
-  :prefix "claudemacs-client-")
+  :prefix "claudemacs-repl-")
 
 ;;;; Constants
 
-(defconst claudemacs-client-path-separator "--"
+(defconst claudemacs-repl-path-separator "--"
   "String to replace path separators (/) in filenames.
-This is a fixed part of the claudemacs-client filename encoding scheme
+This is a fixed part of the claudemacs-repl filename encoding scheme
 and should not be changed to maintain compatibility and security.")
 
-(defconst claudemacs-client-default-template-filename "default.org"
-  "Default template filename for claudemacs-client input files.
+(defconst claudemacs-repl-default-template-filename "default.org"
+  "Default template filename for claudemacs-repl input files.
 This file should be located in the package directory and contains
 the standard template structure for new project input files.")
 
-(defconst claudemacs-client-file-prefix "cec"
-  "Prefix for claudemacs-client encoded filenames.
+(defconst claudemacs-repl-file-prefix "cer"
+  "Prefix for claudemacs-repl encoded filenames.
 This is a fixed part of the filename encoding scheme and should not be changed
 to maintain compatibility with existing project files.")
 
 ;;;; Internal Variables
 
-(defvar claudemacs-client-debug-mode nil
+(defvar claudemacs-repl-debug-mode nil
   "When non-nil, enable debug messages for send operations.")
 
-(defvar claudemacs-client--package-directory
+(defvar claudemacs-repl--package-directory
   (cond
    ;; Try load-file-name first (when loading with load command)
    (load-file-name (file-name-directory load-file-name))
    ;; Try buffer-file-name (when evaluating in buffer)
    (buffer-file-name (file-name-directory buffer-file-name))
-   ;; Try to find claudemacs-client.el in load-path
-   ((locate-library "claudemacs-client")
-    (file-name-directory (locate-library "claudemacs-client")))
+   ;; Try to find claudemacs-repl.el in load-path
+   ((locate-library "claudemacs-repl")
+    (file-name-directory (locate-library "claudemacs-repl")))
    ;; Search for default.org in load-path directories
    (t
     (or
      (cl-some
       (lambda (dir)
         (let ((expanded-dir (expand-file-name dir))
-              (default-org-path (expand-file-name claudemacs-client-default-template-filename (expand-file-name dir))))
+              (default-org-path (expand-file-name claudemacs-repl-default-template-filename (expand-file-name dir))))
           (when (file-exists-p default-org-path)
             expanded-dir)))
       load-path)
@@ -116,8 +116,8 @@ to maintain compatibility with existing project files.")
      default-directory)))
   "Package directory determined at load time.")
 
-(defcustom claudemacs-client-template-file nil
-  "Template file path for claudemacs-client input files.
+(defcustom claudemacs-repl-template-file nil
+  "Template file path for claudemacs-repl input files.
 When nil, uses the default template (default.org).
 When set to a file path, uses that file as the template."
   :type
@@ -125,56 +125,56 @@ When set to a file path, uses that file as the template."
     (const :tag "Use default template" nil)
     (file :tag "Custom template file"))
   :group
-  'claudemacs-client)
+  'claudemacs-repl)
 
 ;;;; Core Functions
 
 ;;;; File Naming and Path Management
 
-(defun claudemacs-client--encode-full-path (path)
+(defun claudemacs-repl--encode-full-path (path)
   "Encode PATH by replacing forward slashes with the configured separator.
-Example: \\='/Users/phasetr/project1/\\=' -> \\='cec--Users--phasetr--project1\\='"
-  (claudemacs-client--encode-full-path-pure
+Example: \\='/Users/phasetr/project1/\\=' -> \\='cer--Users--phasetr--project1\\='"
+  (claudemacs-repl--encode-full-path-pure
    path
-   claudemacs-client-file-prefix
-   claudemacs-client-path-separator))
+   claudemacs-repl-file-prefix
+   claudemacs-repl-path-separator))
 
-(defun claudemacs-client--decode-full-path (encoded-name)
+(defun claudemacs-repl--decode-full-path (encoded-name)
   "Decode ENCODED-NAME back to original path.
-Example: \\='cec--Users--phasetr--project1\\=' -> \\='/Users/phasetr/project1/\\='"
-  (claudemacs-client--decode-full-path-pure
+Example: \\='cer--Users--phasetr--project1\\=' -> \\='/Users/phasetr/project1/\\='"
+  (claudemacs-repl--decode-full-path-pure
    encoded-name
-   claudemacs-client-file-prefix
-   claudemacs-client-path-separator))
+   claudemacs-repl-file-prefix
+   claudemacs-repl-path-separator))
 
-(defun claudemacs-client--get-project-file-path (&optional directory)
+(defun claudemacs-repl--get-project-file-path (&optional directory)
   "Get the full path for the project file based on DIRECTORY.
 If DIRECTORY is nil, use the current `default-directory'."
   (let*
       ((target-dir (or directory default-directory))
-       (encoded-name (claudemacs-client--encode-full-path target-dir))
+       (encoded-name (claudemacs-repl--encode-full-path target-dir))
        (filename (concat encoded-name ".org")))
     (expand-file-name filename target-dir)))
 
 ;;;; Template Loading Functions
 
-(defun claudemacs-client--get-package-directory ()
+(defun claudemacs-repl--get-package-directory ()
   "Get package directory for template files.
 Returns directory path where default templates are located."
-  claudemacs-client--package-directory)
+  claudemacs-repl--package-directory)
 
-(defun claudemacs-client--load-template ()
-  "Load template content based on claudemacs-client-template-file setting.
+(defun claudemacs-repl--load-template ()
+  "Load template content based on claudemacs-repl-template-file setting.
 Returns template content as string, or nil if no template found."
   (let
       ((template-path
         (cond
          ;; If custom template file is specified, use it
-         (claudemacs-client-template-file
-          (expand-file-name claudemacs-client-template-file))
+         (claudemacs-repl-template-file
+          (expand-file-name claudemacs-repl-template-file))
          ;; Otherwise, look for default template in package directory
-         (t (expand-file-name claudemacs-client-default-template-filename
-                              (claudemacs-client--get-package-directory))))))
+         (t (expand-file-name claudemacs-repl-default-template-filename
+                              (claudemacs-repl--get-package-directory))))))
     (when (and template-path (file-exists-p template-path))
       (with-temp-buffer
         (insert-file-contents template-path)
@@ -182,12 +182,12 @@ Returns template content as string, or nil if no template found."
 
 ;;;; Pure Functions for Directory/Buffer Detection
 
-(defun claudemacs-client--encode-full-path-pure (path prefix separator)
+(defun claudemacs-repl--encode-full-path-pure (path prefix separator)
   "Pure function: Encode PATH with PREFIX and SEPARATOR.
 PATH: Directory path to encode.
-PREFIX: Prefix string to add (e.g., \\='cec\\=').
+PREFIX: Prefix string to add (e.g., \\='cer\\=').
 SEPARATOR: String to replace '/' with (e.g., '--').
-Example: \='/Users/project\=' + \='cec\=' + \='--\=' -> \='cec--Users--project\='"
+Example: \='/Users/project\=' + \='cer\=' + \='--\=' -> \='cer--Users--project\='"
   (let*
       ((expanded-path (expand-file-name path))
        (cleaned-path
@@ -197,12 +197,12 @@ Example: \='/Users/project\=' + \='cec\=' + \='--\=' -> \='cec--Users--project\=
           expanded-path)))
     (concat prefix (replace-regexp-in-string "/" separator cleaned-path))))
 
-(defun claudemacs-client--decode-full-path-pure (encoded-name prefix separator)
+(defun claudemacs-repl--decode-full-path-pure (encoded-name prefix separator)
   "Pure function: Decode ENCODED-NAME with PREFIX and SEPARATOR.
 ENCODED-NAME: Encoded filename to decode.
-PREFIX: Expected prefix string (e.g., \\='cec\\=').
+PREFIX: Expected prefix string (e.g., \\='cer\\=').
 SEPARATOR: String to replace with '/' (e.g., '--').
-Example: \='cec--Users--project\=' + \='cec\=' + \='--\=' -> \='/Users/project/\='"
+Example: \='cer--Users--project\=' + \='cer\=' + \='--\=' -> \='/Users/project/\='"
   (when (string-prefix-p prefix encoded-name)
     (let
         ((path-part (substring encoded-name (length prefix))))  ; Remove prefix
@@ -210,20 +210,20 @@ Example: \='cec--Users--project\=' + \='cec\=' + \='--\=' -> \='/Users/project/\
 
 ;;;; Debug Functions
 
-(defun claudemacs-client--debug-message (format-string &rest args)
+(defun claudemacs-repl--debug-message (format-string &rest args)
   "Print debug message if debug mode is enabled.
 FORMAT-STRING is the format string.  ARGS are the arguments."
-  (when claudemacs-client-debug-mode
-    (apply #'message (concat "[CLAUDEMACS-DEBUG] " format-string) args)))
+  (when claudemacs-repl-debug-mode
+    (apply #'message (concat "[CLAUDEMACS-REPL-DEBUG] " format-string) args)))
 
-(defun claudemacs-client--sanitize-content (content)
+(defun claudemacs-repl--sanitize-content (content)
   "Sanitize CONTENT to ensure it can be safely sent to claudemacs.
 This function handles edge cases with special characters and ensures
 proper formatting for terminal input.  Also addresses Claude Code
 interpretation issues."
   (when content
     (let ((sanitized content))
-      (claudemacs-client--debug-message "Input content: %S" content)
+      (claudemacs-repl--debug-message "Input content: %S" content)
       ;; Remove any remaining control characters that might interfere with terminal input
       (setq sanitized
             (replace-regexp-in-string
@@ -241,16 +241,16 @@ interpretation issues."
             (replace-regexp-in-string
              "[\r\x0B\x0C\x0E-\x1F]+\\'" ""
              sanitized))
-      (claudemacs-client--debug-message
+      (claudemacs-repl--debug-message
        "After control char cleanup: %S"
        sanitized)
-      (claudemacs-client--debug-message
+      (claudemacs-repl--debug-message
        "File path pattern match: %s"
        (if
            (string-match-p "~/[^[:space:]]*\\.[a-zA-Z0-9]+\\'" sanitized)
            "YES"
          "NO"))
-      (claudemacs-client--debug-message
+      (claudemacs-repl--debug-message
        "Punctuation pattern match: %s"
        (if (string-match-p "[.!?。！？]\\'" sanitized) "YES" "NO"))
       ;; Address Claude Code interpretation issue: if content ends with a file path
@@ -260,29 +260,29 @@ interpretation issues."
           (and
            (string-match-p "~/[^[:space:]]*\\.[a-zA-Z0-9]+\\'" sanitized)
            (not (string-match-p "[.!?。！？]\\'" sanitized)))
-        (claudemacs-client--debug-message "Adding end marker to prevent file path interpretation")
-        (setq sanitized (concat sanitized "\n(This text is added by claudemacs-client as a workaround for Claude Code's special interpretation of file paths)")))
-      (claudemacs-client--debug-message "Final sanitized content: %S" sanitized)
+        (claudemacs-repl--debug-message "Adding end marker to prevent file path interpretation")
+        (setq sanitized (concat sanitized "\n(This text is added by claudemacs-repl as a workaround for Claude Code's special interpretation of file paths)")))
+      (claudemacs-repl--debug-message "Final sanitized content: %S" sanitized)
       ;; Final trim to ensure clean content
       (string-trim sanitized))))
 
 ;;;; Target Directory Detection Functions
 
-(defun claudemacs-client--get-target-directory-for-buffer ()
+(defun claudemacs-repl--get-target-directory-for-buffer ()
   "Get the target directory for current buffer.
 For persistent files, extract directory from filename.
 For other buffers, use current `default-directory'."
   (if
       (and
        buffer-file-name
-       (string-match-p "cec-.+\\.org$" (file-name-nondirectory buffer-file-name)))
+       (string-match-p "cer-.+\\.org$" (file-name-nondirectory buffer-file-name)))
       ;; This is a persistent file, extract directory from filename
-      (claudemacs-client--decode-full-path
+      (claudemacs-repl--decode-full-path
        (file-name-base (file-name-nondirectory buffer-file-name)))
     ;; Use current directory
     default-directory))
 
-(defun claudemacs-client--get-buffer-for-directory (&optional directory)
+(defun claudemacs-repl--get-buffer-for-directory (&optional directory)
   "Get the claudemacs buffer for DIRECTORY if it exists and is live.
 If DIRECTORY is nil, use current `default-directory'."
   (let ((target-dir (or directory default-directory))
@@ -321,7 +321,7 @@ If DIRECTORY is nil, use current `default-directory'."
           (cl-return))))
     matching-buffer))
 
-(defun claudemacs-client--buffer-matches-directory (buffer target-dir)
+(defun claudemacs-repl--buffer-matches-directory (buffer target-dir)
   "Check if BUFFER's working directory matches TARGET-DIR."
   (with-current-buffer buffer
     (when (boundp 'default-directory)
@@ -331,11 +331,11 @@ If DIRECTORY is nil, use current `default-directory'."
 
 ;;;; Send Functions - Internal Helpers
 
-(defun claudemacs-client--can-send-text (&optional directory)
+(defun claudemacs-repl--can-send-text (&optional directory)
   "Check if text can actually be sent to claudemacs (strict check).
 If DIRECTORY is provided, check for claudemacs in that directory.
 Otherwise, use current `default-directory'."
-  (let ((claude-buffer (claudemacs-client--get-buffer-for-directory directory)))
+  (let ((claude-buffer (claudemacs-repl--get-buffer-for-directory directory)))
     (when claude-buffer
       (with-current-buffer claude-buffer
         (and
@@ -343,14 +343,14 @@ Otherwise, use current `default-directory'."
          eat--process
          (process-live-p eat--process))))))
 
-(defun claudemacs-client--send-text (text &optional directory)
+(defun claudemacs-repl--send-text (text &optional directory)
   "Send TEXT to claudemacs buffer.
 If DIRECTORY is provided, send to claudemacs in that directory.
 Otherwise, use current `default-directory'."
   (let
       ((claude-buffer
-        (claudemacs-client--get-buffer-for-directory directory)))
-    (claudemacs-client--debug-message
+        (claudemacs-repl--get-buffer-for-directory directory)))
+    (claudemacs-repl--debug-message
      "send-text called with text length: %d, buffer: %s"
      (length text) (if claude-buffer (buffer-name claude-buffer) "nil"))
     (when
@@ -359,31 +359,31 @@ Otherwise, use current `default-directory'."
                (and (boundp 'eat--process)
                     eat--process
                     (process-live-p eat--process))))
-      (claudemacs-client--debug-message
+      (claudemacs-repl--debug-message
        "Sending text to claude buffer: %S"
        (substring text 0 (min 50 (length text))))
       (with-current-buffer claude-buffer
         (eat--send-string eat--process text)
         (eat--send-string eat--process "\r")
-        (claudemacs-client--debug-message "Text sent successfully")
+        (claudemacs-repl--debug-message "Text sent successfully")
         t))))
 
-(defun claudemacs-client--send-numbered-choice (number)
+(defun claudemacs-repl--send-numbered-choice (number)
   "Send NUMBER as string to claudemacs buffer for numbered choice prompt.
 NUMBER should be a string (e.g., \\='1\\=', \\='2\\=', \\='3\\=') or empty string for enter."
   (let
-      ((target-dir (claudemacs-client--get-target-directory-for-buffer)))
+      ((target-dir (claudemacs-repl--get-target-directory-for-buffer)))
     (if
-        (claudemacs-client--can-send-text target-dir)
+        (claudemacs-repl--can-send-text target-dir)
         (progn
-          (claudemacs-client--send-text number target-dir)
+          (claudemacs-repl--send-text number target-dir)
           (if
               (string-empty-p number)
               (message "Sent enter to Claude")
             (message "Sent '%s' to Claude" number)))
       (message "❌ Cannot send - no matching claudemacs buffer found for this directory"))))
 
-(defun claudemacs-client--send-buffer-content (start end content-description &optional skip-empty-check)
+(defun claudemacs-repl--send-buffer-content (start end content-description &optional skip-empty-check)
   "Send buffer content from START to END with CONTENT-DESCRIPTION.
 START and END define the region to send.
 CONTENT-DESCRIPTION is used in success message.
@@ -392,22 +392,22 @@ If SKIP-EMPTY-CHECK is non-nil, send content even if empty."
       ((raw-content
         (buffer-substring-no-properties start end))
        (content
-        (claudemacs-client--sanitize-content (string-trim raw-content)))
+        (claudemacs-repl--sanitize-content (string-trim raw-content)))
        (target-dir
-        (claudemacs-client--get-target-directory-for-buffer)))
-    (claudemacs-client--debug-message
+        (claudemacs-repl--get-target-directory-for-buffer)))
+    (claudemacs-repl--debug-message
      "Raw content length: %d, trimmed: %d"
      (length raw-content)
      (length content))
-    (claudemacs-client--debug-message
+    (claudemacs-repl--debug-message
      "Content empty?: %s, target-dir: %s"
      (string-empty-p content)
      target-dir)
     (if
         (or skip-empty-check (and content (not (string-empty-p content))))
         (progn
-          (claudemacs-client--debug-message "Attempting to send content")
-          (if (claudemacs-client--send-text content target-dir)
+          (claudemacs-repl--debug-message "Attempting to send content")
+          (if (claudemacs-repl--send-text content target-dir)
               (message "%s sent to Claude (%d characters)"
                        content-description (length content))
             (message "❌ Cannot send - no matching claudemacs buffer found for this directory")))
@@ -416,72 +416,72 @@ If SKIP-EMPTY-CHECK is non-nil, send content even if empty."
 ;;;; Public API - Send Functions
 
 ;;;###autoload
-(defun claudemacs-client-send-region (start end)
+(defun claudemacs-repl-send-region (start end)
   "Send the text in region from START to END to claudemacs."
   (interactive "r")
   (when (use-region-p)
-    (claudemacs-client--send-buffer-content start end "Region")))
+    (claudemacs-repl--send-buffer-content start end "Region")))
 
 ;;;###autoload
-(defun claudemacs-client-send-buffer ()
+(defun claudemacs-repl-send-buffer ()
   "Send the entire current buffer to claudemacs."
   (interactive)
-  (claudemacs-client--send-buffer-content
+  (claudemacs-repl--send-buffer-content
    (point-min) (point-max)
    (format "File %s" (buffer-name)) t))
 
 ;;;###autoload
-(defun claudemacs-client-send-rest-of-buffer ()
+(defun claudemacs-repl-send-rest-of-buffer ()
   "Send rest of buffer from cursor position to end to claudemacs."
   (interactive)
-  (claudemacs-client--send-buffer-content (point) (point-max) "Rest of buffer"))
+  (claudemacs-repl--send-buffer-content (point) (point-max) "Rest of buffer"))
 
 ;;;###autoload
-(defun claudemacs-client-send-line ()
+(defun claudemacs-repl-send-line ()
   "Send the current line to claudemacs."
   (interactive)
-  (claudemacs-client--send-buffer-content
+  (claudemacs-repl--send-buffer-content
    (line-beginning-position) (line-end-position) "Line"))
 
 ;;;###autoload
-(defun claudemacs-client-send-enter ()
+(defun claudemacs-repl-send-enter ()
   "Send enter key to claudemacs buffer."
   (interactive)
-  (claudemacs-client--send-numbered-choice ""))
+  (claudemacs-repl--send-numbered-choice ""))
 
 ;;;###autoload
-(defun claudemacs-client-send-1 ()
+(defun claudemacs-repl-send-1 ()
   "Send \\='1\\=' to claudemacs buffer for numbered choice prompt."
   (interactive)
-  (claudemacs-client--send-numbered-choice "1"))
+  (claudemacs-repl--send-numbered-choice "1"))
 
 ;;;###autoload
-(defun claudemacs-client-send-2 ()
+(defun claudemacs-repl-send-2 ()
   "Send \\='2\\=' to claudemacs buffer for numbered choice prompt."
   (interactive)
-  (claudemacs-client--send-numbered-choice "2"))
+  (claudemacs-repl--send-numbered-choice "2"))
 
 ;;;###autoload
-(defun claudemacs-client-send-3 ()
+(defun claudemacs-repl-send-3 ()
   "Send \\='3\\=' to claudemacs buffer for numbered choice prompt."
   (interactive)
-  (claudemacs-client--send-numbered-choice "3"))
+  (claudemacs-repl--send-numbered-choice "3"))
 
-(defun claudemacs-client--create-project-input-file (target-directory)
+(defun claudemacs-repl--create-project-input-file (target-directory)
   "Create project input file for TARGET-DIRECTORY from template.
 Returns the created file path."
   (let*
       ((file-path
-        (claudemacs-client--get-project-file-path target-directory))
+        (claudemacs-repl--get-project-file-path target-directory))
        (template-source
         (cond
          ;; If custom template is specified and exists, use it
-         ((and claudemacs-client-template-file
-               (file-exists-p claudemacs-client-template-file))
-          claudemacs-client-template-file)
+         ((and claudemacs-repl-template-file
+               (file-exists-p claudemacs-repl-template-file))
+          claudemacs-repl-template-file)
          ;; Otherwise, use default.org
-         (t (expand-file-name claudemacs-client-default-template-filename
-                              (claudemacs-client--get-package-directory))))))
+         (t (expand-file-name claudemacs-repl-default-template-filename
+                              (claudemacs-repl--get-package-directory))))))
     ;; Ensure target directory exists
     (unless (file-exists-p (file-name-directory file-path))
       (make-directory (file-name-directory file-path) t))
@@ -490,7 +490,7 @@ Returns the created file path."
     file-path))
 
 ;;;###autoload
-(defun claudemacs-client-open-project-input-file (&optional directory)
+(defun claudemacs-repl-open-project-input-file (&optional directory)
   "Open or create project input file for DIRECTORY.
 If DIRECTORY is nil, use current `default-directory'.
 If project input file exists, open it directly.
@@ -500,11 +500,11 @@ If not exists, create from template then open."
       ((target-dir
         (or directory default-directory))
        (file-path
-        (claudemacs-client--get-project-file-path target-dir)))
+        (claudemacs-repl--get-project-file-path target-dir)))
     ;; Create file if it doesn't exist
     (unless
         (file-exists-p file-path)
-      (claudemacs-client--create-project-input-file target-dir))
+      (claudemacs-repl--create-project-input-file target-dir))
     ;; Open the file
     (let ((buffer (find-file file-path)))
       (with-current-buffer buffer
@@ -519,18 +519,18 @@ If not exists, create from template then open."
       (message "Project input file ready: %s" (file-name-nondirectory file-path)))))
 
 ;;;###autoload
-(defun claudemacs-client-start-claudemacs ()
+(defun claudemacs-repl-start-claudemacs ()
   "Start claudemacs and change to appropriate directory.
 Determines directory from current buffer filename if it's a persistent file.
 Checks for existing sessions to prevent double startup."
   (interactive)
   (let*
       ((target-dir
-        (claudemacs-client--get-target-directory-for-buffer))
+        (claudemacs-repl--get-target-directory-for-buffer))
        (existing-buffer
-        (claudemacs-client--get-buffer-for-directory target-dir))
+        (claudemacs-repl--get-buffer-for-directory target-dir))
        (can-send
-        (claudemacs-client--can-send-text target-dir))
+        (claudemacs-repl--can-send-text target-dir))
        (original-default-directory default-directory))
     ;; Check for existing session
     (cond
@@ -543,7 +543,7 @@ Checks for existing sessions to prevent double startup."
       (when
           (y-or-n-p (format "Dead claudemacs session found in %s.  Restart? " target-dir))
         (kill-buffer existing-buffer)
-        (claudemacs-client-start-claudemacs)))
+        (claudemacs-repl-start-claudemacs)))
      ;; No existing session - start new one
      (t
       (unwind-protect
@@ -556,37 +556,37 @@ Checks for existing sessions to prevent double startup."
                   (message "Started claudemacs in: %s" target-dir))
               (error "Claudemacs-transient-menu not available.  Is claudemacs package loaded?")))
         ;; Restore original directory if startup failed
-        (unless (claudemacs-client--can-send-text target-dir)
+        (unless (claudemacs-repl--can-send-text target-dir)
           (cd original-default-directory)))))))
 
 ;;;###autoload
-(defun claudemacs-client-setup-window-layout ()
+(defun claudemacs-repl-setup-window-layout ()
   "Set up window layout with org file on left and claudemacs on right.
 This is the author's preference - customize as needed."
   (interactive)
   (let
-      ((target-dir (claudemacs-client--get-target-directory-for-buffer)))
+      ((target-dir (claudemacs-repl--get-target-directory-for-buffer)))
     (delete-other-windows)
     (split-window-right)
     (other-window 1)
-    (let ((claudemacs-buf (claudemacs-client--get-buffer-for-directory target-dir)))
+    (let ((claudemacs-buf (claudemacs-repl--get-buffer-for-directory target-dir)))
       (if claudemacs-buf
           (switch-to-buffer claudemacs-buf)
-        (message "claudemacs buffer not found. Run (claudemacs-client-start-claudemacs) first.")))
+        (message "claudemacs buffer not found. Run (claudemacs-repl-start-claudemacs) first.")))
     (other-window -1)
     (message "Window layout setup complete")))
 
 ;;;###autoload
-(defun claudemacs-client-output-template ()
+(defun claudemacs-repl-output-template ()
   "Output current template content to a new buffer for customization."
   (interactive)
   (let*
       ((template-content
-        (claudemacs-client--load-template))
+        (claudemacs-repl--load-template))
        (template-file
-        (or claudemacs-client-template-file "default"))
+        (or claudemacs-repl-template-file "default"))
        (buffer-name
-        (format "*claudemacs-template-%s*"
+        (format "*claudemacs-repl-template-%s*"
                 (file-name-base template-file))))
     (if template-content
         (progn
@@ -608,13 +608,13 @@ This is the author's preference - customize as needed."
 ;; They can be safely removed in production environments if needed.
 
 ;;;###autoload
-(defun claudemacs-client-status ()
+(defun claudemacs-repl-status ()
   "Show detailed diagnostic information for troubleshooting connection issues."
   (interactive)
   (let*
-      ((target-dir (claudemacs-client--get-target-directory-for-buffer))
-       (claude-buffer (claudemacs-client--get-buffer-for-directory target-dir))
-       (can-send (claudemacs-client--can-send-text target-dir))
+      ((target-dir (claudemacs-repl--get-target-directory-for-buffer))
+       (claude-buffer (claudemacs-repl--get-buffer-for-directory target-dir))
+       (can-send (claudemacs-repl--can-send-text target-dir))
        (expected-session (concat "*claudemacs:" target-dir "*"))
        (all-buffers (buffer-list))
        (claudemacs-sessions
@@ -634,8 +634,8 @@ This is the author's preference - customize as needed."
                       (string-match-p "claude" name)))))
          all-buffers)))
     (with-output-to-temp-buffer
-        "*claudemacs-client-diagnostic*"
-      (princ "═══ claudemacs-client Diagnostic Report ═══\n\n")
+        "*claudemacs-repl-diagnostic*"
+      (princ "═══ claudemacs-repl Diagnostic Report ═══\n\n")
       ;; Basic information
       (princ (format "Target directory: %s\n" target-dir))
       (princ (format "Current buffer: %s\n\n" (buffer-name)))
@@ -665,11 +665,11 @@ This is the author's preference - customize as needed."
       (if
           (and
            (buffer-file-name)
-           (string-match-p "cec-.+\\.org$" (file-name-nondirectory (buffer-file-name))))
+           (string-match-p "cer-.+\\.org$" (file-name-nondirectory (buffer-file-name))))
           (let*
               ((encoded-name (file-name-base (file-name-nondirectory (buffer-file-name))))
-               (decoded-path (claudemacs-client--decode-full-path encoded-name))
-               (re-encoded (claudemacs-client--encode-full-path decoded-path)))
+               (decoded-path (claudemacs-repl--decode-full-path encoded-name))
+               (re-encoded (claudemacs-repl--encode-full-path decoded-path)))
             (princ "[✅] Path encoding: OK\n")
             (princ (format "  File: %s\n" (file-name-nondirectory (buffer-file-name))))
             (princ (format "  → Decoded to: %s\n" decoded-path))
@@ -720,10 +720,10 @@ This is the author's preference - customize as needed."
        (can-send
         (princ "✓ Connection is working. You can send text to Claude.\n"))
        ((not claudemacs-sessions)
-        (princ "1. Start claudemacs in target directory: (claudemacs-client-start-claudemacs)\n")
-        (princ "2. Or run: M-x claudemacs-client-start-claudemacs\n"))
+        (princ "1. Start claudemacs in target directory: (claudemacs-repl-start-claudemacs)\n")
+        (princ "2. Or run: M-x claudemacs-repl-start-claudemacs\n"))
        (t
-        (princ "1. Start claudemacs for target directory: (claudemacs-client-start-claudemacs)\n")
+        (princ "1. Start claudemacs for target directory: (claudemacs-repl-start-claudemacs)\n")
         (princ "2. Or switch to existing session directory:\n")
         (dolist (buf claudemacs-sessions)
           (let
@@ -732,33 +732,33 @@ This is the author's preference - customize as needed."
                  "^\\*claudemacs:\\(.*\\)\\*$" "\\1"
                  (buffer-name buf))))
             (princ (format "   - %s\n" session-path))))))
-      (princ "\nFor more help: M-x claudemacs-client-open-project-input-file\n"))))
+      (princ "\nFor more help: M-x claudemacs-repl-open-project-input-file\n"))))
 
 ;;;###autoload
-(defun claudemacs-client-toggle-debug-mode ()
-  "Toggle debug mode for claudemacs-client operations."
+(defun claudemacs-repl-toggle-debug-mode ()
+  "Toggle debug mode for claudemacs-repl operations."
   (interactive)
   (setq
-   claudemacs-client-debug-mode
-   (not claudemacs-client-debug-mode))
+   claudemacs-repl-debug-mode
+   (not claudemacs-repl-debug-mode))
   (message
-   "claudemacs-client debug mode: %s"
-   (if claudemacs-client-debug-mode "ENABLED" "DISABLED")))
+   "claudemacs-repl debug mode: %s"
+   (if claudemacs-repl-debug-mode "ENABLED" "DISABLED")))
 
 ;;;###autoload
-(defun claudemacs-client-enable-debug-mode ()
-  "Enable debug mode for claudemacs-client operations."
+(defun claudemacs-repl-enable-debug-mode ()
+  "Enable debug mode for claudemacs-repl operations."
   (interactive)
-  (setq claudemacs-client-debug-mode t)
-  (message "claudemacs-client debug mode: ENABLED"))
+  (setq claudemacs-repl-debug-mode t)
+  (message "claudemacs-repl debug mode: ENABLED"))
 
 ;;;###autoload
-(defun claudemacs-client-disable-debug-mode ()
-  "Disable debug mode for claudemacs-client operations."
+(defun claudemacs-repl-disable-debug-mode ()
+  "Disable debug mode for claudemacs-repl operations."
   (interactive)
-  (setq claudemacs-client-debug-mode nil)
-  (message "claudemacs-client debug mode: DISABLED"))
+  (setq claudemacs-repl-debug-mode nil)
+  (message "claudemacs-repl debug mode: DISABLED"))
 
-(provide 'claudemacs-client)
+(provide 'claudemacs-repl)
 
-;;; claudemacs-client.el ends here
+;;; claudemacs-repl.el ends here
