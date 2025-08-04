@@ -61,6 +61,8 @@
 
 ;; Declare external functions to avoid byte-compiler warnings
 (declare-function eat--send-string "eat" (process string))
+(declare-function claudemacs-client--encode-full-path-pure "claudemacs-client-test")
+(declare-function claudemacs-client--decode-full-path-pure "claudemacs-client-test")
 (defvar eat--process)
 (defvar eat-mode)
 
@@ -82,6 +84,16 @@ and should not be changed to maintain compatibility and security.")
   "Default template filename for claudemacs-client input files.
 This file should be located in the package directory and contains
 the standard template structure for new project input files.")
+
+(defconst claudemacs-client-file-prefix "cec"
+  "Prefix for claudemacs-client encoded filenames.
+This is a fixed part of the filename encoding scheme and should not be changed
+to maintain compatibility with existing project files.")
+
+;;;; Internal Variables
+
+(defvar claudemacs-client-debug-mode nil
+  "When non-nil, enable debug messages for send operations.")
 
 (defvar claudemacs-client--package-directory
   (cond
@@ -124,22 +136,18 @@ When set to a file path, uses that file as the template."
 (defun claudemacs-client--encode-full-path (path)
   "Encode PATH by replacing forward slashes with the configured separator.
 Example: \\='/Users/phasetr/project1/\\=' -> \\='cec--Users--phasetr--project1\\='"
-  (let*
-      ((expanded-path (expand-file-name path))
-       (cleaned-path
-        (if
-            (string-suffix-p "/" expanded-path)
-            (substring expanded-path 0 -1)
-          expanded-path)))
-    (concat "cec" (replace-regexp-in-string "/" claudemacs-client-path-separator cleaned-path))))
+  (claudemacs-client--encode-full-path-pure
+   path
+   claudemacs-client-file-prefix
+   claudemacs-client-path-separator))
 
 (defun claudemacs-client--decode-full-path (encoded-name)
   "Decode ENCODED-NAME back to original path.
 Example: \\='cec--Users--phasetr--project1\\=' -> \\='/Users/phasetr/project1/\\='"
-  (when (string-prefix-p "cec" encoded-name)
-    (let
-        ((path-part (substring encoded-name 3)))  ; Remove "cec" prefix
-      (concat (replace-regexp-in-string claudemacs-client-path-separator "/" path-part) "/"))))
+  (claudemacs-client--decode-full-path-pure
+   encoded-name
+   claudemacs-client-file-prefix
+   claudemacs-client-path-separator))
 
 (defun claudemacs-client--get-project-file-path (&optional directory)
   "Get the full path for the project file based on DIRECTORY.
@@ -174,37 +182,10 @@ Returns template content as string, or nil if no template found."
         (insert-file-contents template-path)
         (buffer-string)))))
 
-;;;; File Template and Content Management
-
-(defun claudemacs-client--initialize-project-file (file-path)
-  "Initialize a new project file at FILE-PATH with template content."
-  (let*
-      ((directory (file-name-directory file-path))
-       (project-path-raw (claudemacs-client--decode-full-path
-                          (file-name-base (file-name-nondirectory file-path))))
-       (project-path (expand-file-name project-path-raw))
-       (template-content (claudemacs-client--load-template)))
-    (unless (file-exists-p directory)
-      (make-directory directory t))
-    (with-temp-file file-path
-      (if template-content
-          (insert template-content)
-        ;; Fallback to default.org content if template loading fails
-        (condition-case nil
-            (insert-file-contents
-             (expand-file-name
-              claudemacs-client-default-template-filename
-              (claudemacs-client--get-package-directory)))
-          (error
-           ;; Final fallback if default.org cannot be read
-           (insert (format "* Claude Input File\nProject: %s\n\n** Thoughts/Notes\n" project-path))))))
-    file-path))
-
 ;;;; Pure Functions for Directory/Buffer Detection
 ;; Pure functions have been moved to test file to avoid namespace pollution
 
-(defvar claudemacs-client-debug-mode nil
-  "When non-nil, enable debug messages for send operations.")
+;;;; Debug Functions
 
 (defun claudemacs-client--debug-message (format-string &rest args)
   "Print debug message if debug mode is enabled.

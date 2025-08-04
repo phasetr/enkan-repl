@@ -1661,6 +1661,137 @@ Does not modify global state."
       (claudemacs-client--debug-message "Text sent successfully")
       t)))
 
+(defun claudemacs-client--initialize-project-file (file-path)
+  "Initialize a new project file at FILE-PATH with template content."
+  (let*
+      ((directory (file-name-directory file-path))
+       (project-path-raw (claudemacs-client--decode-full-path
+                          (file-name-base (file-name-nondirectory file-path))))
+       (project-path (expand-file-name project-path-raw))
+       (template-content (claudemacs-client--load-template)))
+    (unless (file-exists-p directory)
+      (make-directory directory t))
+    (with-temp-file file-path
+      (if template-content
+          (insert template-content)
+        ;; Fallback to default.org content if template loading fails
+        (condition-case nil
+            (insert-file-contents
+             (expand-file-name
+              claudemacs-client-default-template-filename
+              (claudemacs-client--get-package-directory)))
+          (error
+           ;; Final fallback if default.org cannot be read
+           (insert (format "* Claude Input File\nProject: %s\n\n** Thoughts/Notes\n" project-path))))))
+    file-path))
+
+(defun claudemacs-client--encode-full-path-pure (path prefix separator)
+  "Pure function: Encode PATH with PREFIX and SEPARATOR.
+PATH: Directory path to encode.
+PREFIX: Prefix string to add (e.g., 'cec').
+SEPARATOR: String to replace '/' with (e.g., '--').
+Example: \\='/Users/project\\=' + \\='cec\\=' + \\='--\\=' -> \\='cec--Users--project\\='"
+  (let*
+      ((expanded-path (expand-file-name path))
+       (cleaned-path
+        (if
+            (string-suffix-p "/" expanded-path)
+            (substring expanded-path 0 -1)
+          expanded-path)))
+    (concat prefix (replace-regexp-in-string "/" separator cleaned-path))))
+
+(defun claudemacs-client--decode-full-path-pure (encoded-name prefix separator)
+  "Pure function: Decode ENCODED-NAME with PREFIX and SEPARATOR.
+ENCODED-NAME: Encoded filename to decode.
+PREFIX: Expected prefix string (e.g., 'cec').
+SEPARATOR: String to replace with '/' (e.g., '--').
+Example: \\='cec--Users--project\\=' + \\='cec\\=' + \\='--\\=' -> \\='/Users/project/\\='"
+  (when (string-prefix-p prefix encoded-name)
+    (let
+        ((path-part (substring encoded-name (length prefix))))  ; Remove prefix
+      (concat (replace-regexp-in-string (regexp-quote separator) "/" path-part) "/"))))
+
+;;; Tests for encode/decode pure functions
+
+(ert-deftest test-encode-full-path-pure-basic ()
+  "Test basic path encoding with custom prefix and separator."
+  (should (string= (claudemacs-client--encode-full-path-pure 
+                    "/Users/test" 
+                    "cec" 
+                    "--")
+                   "cec--Users--test"))
+  (should (string= (claudemacs-client--encode-full-path-pure 
+                    "/Users/test/" 
+                    "cec" 
+                    "--")
+                   "cec--Users--test"))
+  (should (string= (claudemacs-client--encode-full-path-pure 
+                    "relative/path" 
+                    "prefix" 
+                    "_")
+                   (concat "prefix" (replace-regexp-in-string "/" "_" (expand-file-name "relative/path"))))))
+
+(ert-deftest test-encode-full-path-pure-custom-separators ()
+  "Test path encoding with different separators and prefixes."
+  (should (string= (claudemacs-client--encode-full-path-pure 
+                    "/Users/test" 
+                    "xyz" 
+                    "___")
+                   "xyz___Users___test"))
+  (should (string= (claudemacs-client--encode-full-path-pure 
+                    "/a/b/c" 
+                    "" 
+                    "-")
+                   "-a-b-c")))
+
+(ert-deftest test-decode-full-path-pure-basic ()
+  "Test basic path decoding with custom prefix and separator."
+  (should (string= (claudemacs-client--decode-full-path-pure 
+                    "cec--Users--test" 
+                    "cec" 
+                    "--")
+                   "/Users/test/"))
+  (should (string= (claudemacs-client--decode-full-path-pure 
+                    "prefix_Users_test" 
+                    "prefix" 
+                    "_")
+                   "/Users/test/")))
+
+(ert-deftest test-decode-full-path-pure-invalid-prefix ()
+  "Test decoding with invalid prefix returns nil."
+  (should-not (claudemacs-client--decode-full-path-pure 
+               "invalid--Users--test" 
+               "cec" 
+               "--"))
+  (should-not (claudemacs-client--decode-full-path-pure 
+               "partial" 
+               "prefix" 
+               "--")))
+
+(ert-deftest test-encode-decode-roundtrip-pure ()
+  "Test that encoding and decoding are symmetric with pure functions."
+  (let ((test-paths '("/Users/test" "/project/subdir" "/a/b/c/d"))
+        (prefix "test")
+        (separator "___"))
+    (dolist (path test-paths)
+      (let* ((encoded (claudemacs-client--encode-full-path-pure path prefix separator))
+             (decoded (claudemacs-client--decode-full-path-pure encoded prefix separator)))
+        (should (string= (concat path "/") decoded))))))
+
+(ert-deftest test-encode-decode-edge-cases-pure ()
+  "Test edge cases for pure encode/decode functions."
+  ;; Empty prefix
+  (should (string= (claudemacs-client--encode-full-path-pure "/test" "" "--")
+                   "--test"))
+  (should (string= (claudemacs-client--decode-full-path-pure "--test" "" "--")
+                   "/test/"))
+  
+  ;; Single character separator
+  (should (string= (claudemacs-client--encode-full-path-pure "/a/b" "x" ".")
+                   "x.a.b"))
+  (should (string= (claudemacs-client--decode-full-path-pure "x.a.b" "x" ".")
+                   "/a/b/")))
+
 ;;; Test Runner
 
 (defun claudemacs-client-run-all-tests ()
