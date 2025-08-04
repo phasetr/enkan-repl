@@ -25,6 +25,7 @@ Create a convenient window layout for Claude Code interaction:
 - *send-1*: ~M-x claudemacs-repl-send-1~
 - *send-2*: ~M-x claudemacs-repl-send-2~
 - *send-3*: ~M-x claudemacs-repl-send-3~
+- *send-escape*: ~M-x claudemacs-repl-send-escape~
 
 ** Project Management
 - *open-project-input-file*: ~M-x claudemacs-repl-open-project-input-file~
