@@ -736,30 +736,6 @@
 
 ;;; Tests for Template Loading Functions
 
-(ert-deftest test-get-template-path-with-existing-file ()
-  "Test getting template path for existing template file."
-  (let ((default-directory claudemacs-client-test-package-dir))
-    ;; Test with default template (should exist)
-    (let ((template-path (claudemacs-client--get-template-path "default")))
-      (should template-path)
-      (should (file-exists-p template-path))
-      (should (string-match-p "default\\.org$" template-path)))))
-
-(ert-deftest test-get-template-path-with-nonexistent-file ()
-  "Test getting template path for nonexistent template file."
-  (let ((default-directory claudemacs-client-test-package-dir))
-    ;; Test with nonexistent language
-    (should-not (claudemacs-client--get-template-path "nonexistent"))))
-
-(ert-deftest test-get-template-path-directory-fallback ()
-  "Test template path detection with directory fallback."
-  (let ((load-file-name nil)
-        (buffer-file-name nil)
-        (default-directory claudemacs-client-test-package-dir))
-    ;; Should fallback to default-directory
-    (let ((template-path (claudemacs-client--get-template-path "default")))
-      (should template-path)
-      (should (file-exists-p template-path)))))
 
 (ert-deftest test-load-template-default ()
   "Test loading default template."
@@ -1590,6 +1566,100 @@
           (should (string= (expand-file-name default-directory) original-dir)))
       ;; Cleanup
       (cd original-dir))))
+
+;;; Test-Only Pure Functions
+;; These functions are only used by tests and moved here to avoid
+;; polluting the main package namespace
+
+(defun claudemacs-client--load-template-pure (custom-template-file package-dir default-template-name)
+  "Pure function: Load template content from specified paths.
+CUSTOM-TEMPLATE-FILE: Custom template file path (can be nil).
+PACKAGE-DIR: Package directory for default template.
+DEFAULT-TEMPLATE-NAME: Default template filename.
+Returns template content as string, or nil if no template found."
+  (let ((template-path
+         (cond
+          ;; If custom template file is specified, use it
+          (custom-template-file
+           (expand-file-name custom-template-file))
+          ;; Otherwise, look for default template in package directory
+          (t (expand-file-name default-template-name package-dir)))))
+    (when (and template-path (file-exists-p template-path))
+      (with-temp-buffer
+        (insert-file-contents template-path)
+        (buffer-string)))))
+
+(defun claudemacs-client--extract-directory-pure (buffer-file-name-arg default-directory-arg)
+  "Pure function: Extract target directory from BUFFER-FILE-NAME-ARG.
+Uses DEFAULT-DIRECTORY-ARG if BUFFER-FILE-NAME-ARG doesn't match pattern.
+If BUFFER-FILE-NAME-ARG matches persistent file pattern, decode directory."
+  (if (and buffer-file-name-arg
+           (string-match-p "cec-.+\\.org$" (file-name-nondirectory buffer-file-name-arg)))
+      ;; This is a persistent file, extract directory from filename
+      (claudemacs-client--decode-full-path
+       (file-name-base (file-name-nondirectory buffer-file-name-arg)))
+    ;; Use current directory
+    default-directory-arg))
+
+(defun claudemacs-client--buffer-matches-directory-pure (buffer-default-directory target-dir)
+  "Pure function: Check if BUFFER-DEFAULT-DIRECTORY matches TARGET-DIR.
+Returns t if directories match, nil otherwise."
+  (when buffer-default-directory
+    (string=
+     (file-truename buffer-default-directory)
+     (file-truename target-dir))))
+
+(defun claudemacs-client--find-matching-buffer-pure (buffer-list target-directory)
+  "Pure function: Find claudemacs buffer matching TARGET-DIRECTORY.
+BUFFER-LIST should contain buffer objects.
+Returns matching buffer or nil."
+  (cl-find-if
+   (lambda (buf-info)
+     (let
+         ((name (plist-get buf-info :name))
+          (default-dir (plist-get buf-info :default-directory))
+          (eat-mode (plist-get buf-info :eat-mode))
+          (buffer (plist-get buf-info :buffer)))
+       (and
+        (buffer-live-p buffer)
+        name       ; Ensure name is not nil
+        ;; Check for directory-specific claudemacs buffer
+        (or (and (string-match-p "^\\*claudemacs:" name)
+                 (string-prefix-p (concat "*claudemacs:" target-directory) name))
+            ;; Fallback to generic buffers only if they match directory
+            (and (or (string= name "*claude*")
+                     (string= name "*claudemacs*"))
+                 (claudemacs-client--buffer-matches-directory-pure default-dir target-directory))
+            ;; Check for eat-mode buffers with claude in name
+            (and eat-mode
+                 (string-match-p "claude" name)
+                 (claudemacs-client--buffer-matches-directory-pure default-dir target-directory))))))
+   buffer-list))
+
+(defun claudemacs-client--can-send-text-pure (claude-buffer)
+  "Pure function: Check if CLAUDE-BUFFER can receive text.
+Returns t if buffer has live eat process, nil otherwise."
+  (when claude-buffer
+    (with-current-buffer claude-buffer
+      (and
+       (boundp 'eat--process)
+       eat--process
+       (process-live-p eat--process)))))
+
+(defun claudemacs-client--send-text-pure (text claude-buffer)
+  "Pure function: Send TEXT to CLAUDE-BUFFER.
+Returns t if successful, nil if buffer cannot receive text.
+Does not modify global state."
+  (claudemacs-client--debug-message "send-text-pure called with text length: %d, buffer: %s"
+                                    (length text) (if claude-buffer (buffer-name claude-buffer) "nil"))
+  (when
+      (and claude-buffer (claudemacs-client--can-send-text-pure claude-buffer))
+    (claudemacs-client--debug-message "Sending text to claude buffer: %S" (substring text 0 (min 50 (length text))))
+    (with-current-buffer claude-buffer
+      (eat--send-string eat--process text)
+      (eat--send-string eat--process "\r")
+      (claudemacs-client--debug-message "Text sent successfully")
+      t)))
 
 ;;; Test Runner
 
