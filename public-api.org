@@ -1,0 +1,82 @@
+#+TITLE: Public API
+
+* Public API
+
+This document lists all public functions and commands available in claudemacs-repl.
+
+** ~claudemacs-repl-send-region~ (start end)
+   - *Type*: Interactive Command
+   - *Autoload*: Yes
+   - *Description*: Send the text in region from START to END to claudemacs.
+
+** ~claudemacs-repl-send-buffer~ ()
+   - *Type*: Interactive Command
+   - *Autoload*: Yes
+   - *Description*: Send the entire current buffer to claudemacs.
+
+** ~claudemacs-repl-send-rest-of-buffer~ ()
+   - *Type*: Interactive Command
+   - *Autoload*: Yes
+   - *Description*: Send rest of buffer from cursor position to end to claudemacs.
+
+** ~claudemacs-repl-send-line~ ()
+   - *Type*: Interactive Command
+   - *Autoload*: Yes
+   - *Description*: Send the current line to claudemacs.
+
+** ~claudemacs-repl-send-enter~ ()
+   - *Type*: Interactive Command
+   - *Autoload*: Yes
+   - *Description*: Send enter key to claudemacs buffer.
+
+** ~claudemacs-repl-send-1~ ()
+   - *Type*: Interactive Command
+   - *Autoload*: Yes
+   - *Description*: Send \\='1\\=' to claudemacs buffer for numbered choice prompt.
+
+** ~claudemacs-repl-send-2~ ()
+   - *Type*: Interactive Command
+   - *Autoload*: Yes
+   - *Description*: Send \\='2\\=' to claudemacs buffer for numbered choice prompt.
+
+** ~claudemacs-repl-send-3~ ()
+   - *Type*: Interactive Command
+   - *Autoload*: Yes
+   - *Description*: Send \\='3\\=' to claudemacs buffer for numbered choice prompt.
+
+** ~claudemacs-repl-open-project-input-file~ (&optional directory)
+   - *Type*: Interactive Command
+   - *Autoload*: Yes
+
+** ~claudemacs-repl-start-claudemacs~ ()
+   - *Type*: Interactive Command
+   - *Autoload*: Yes
+
+** ~claudemacs-repl-setup-window-layout~ ()
+   - *Type*: Interactive Command
+   - *Autoload*: Yes
+
+** ~claudemacs-repl-output-template~ ()
+   - *Type*: Interactive Command
+   - *Autoload*: Yes
+   - *Description*: Output current template content to a new buffer for customization.
+
+** ~claudemacs-repl-status~ ()
+   - *Type*: Interactive Command
+   - *Autoload*: Yes
+   - *Description*: Show detailed diagnostic information for troubleshooting connection issues.
+
+** ~claudemacs-repl-toggle-debug-mode~ ()
+   - *Type*: Interactive Command
+   - *Autoload*: Yes
+   - *Description*: Toggle debug mode for claudemacs-repl operations.
+
+** ~claudemacs-repl-enable-debug-mode~ ()
+   - *Type*: Interactive Command
+   - *Autoload*: Yes
+   - *Description*: Enable debug mode for claudemacs-repl operations.
+
+** ~claudemacs-repl-disable-debug-mode~ ()
+   - *Type*: Interactive Command
+   - *Autoload*: Yes
+   - *Description*: Disable debug mode for claudemacs-repl operations.

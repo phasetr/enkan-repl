@@ -1,0 +1,56 @@
+* Quick Start
+
+** 1. Start Claude Code Session
+Execute this to start claudemacs and set up the environment:
+
+#+BEGIN_SRC emacs-lisp
+(claudemacs-repl-start-claudemacs)
+#+END_SRC
+
+** 2. Setup Window Layout (Optional)
+Create a convenient window layout for Claude Code interaction:
+
+#+BEGIN_SRC emacs-lisp
+(claudemacs-repl-setup-window-layout)
+#+END_SRC
+
+* Essential Commands
+
+** Sending Content to Claude Code
+- *send-region*: ~M-x claudemacs-repl-send-region~
+- *send-buffer*: ~M-x claudemacs-repl-send-buffer~
+- *send-rest-of-buffer*: ~M-x claudemacs-repl-send-rest-of-buffer~
+- *send-line*: ~M-x claudemacs-repl-send-line~
+- *send-enter*: ~M-x claudemacs-repl-send-enter~
+- *send-1*: ~M-x claudemacs-repl-send-1~
+- *send-2*: ~M-x claudemacs-repl-send-2~
+- *send-3*: ~M-x claudemacs-repl-send-3~
+
+** Project Management
+- *open-project-input-file*: ~M-x claudemacs-repl-open-project-input-file~
+- *start-claudemacs*: ~M-x claudemacs-repl-start-claudemacs~
+- *setup-window-layout*: ~M-x claudemacs-repl-setup-window-layout~
+- *output-template*: ~M-x claudemacs-repl-output-template~
+
+** Troubleshooting & Utilities
+- *status*: ~M-x claudemacs-repl-status~
+- *toggle-debug-mode*: ~M-x claudemacs-repl-toggle-debug-mode~
+
+* Working Notes
+
+You can write extensive notes here to organize your thoughts.
+This section is for your personal use - only send specific parts to Claude Code as needed.
+
+** Project Context
+- Description of your current project
+- Key objectives and requirements
+- Important constraints or considerations
+
+** Development Notes
+- Code snippets for testing
+- Architecture decisions
+- TODO items and reminders
+
+** Communication with Claude Code
+Use the sending commands above to share specific sections with Claude Code.
+You don't need to send everything - be selective about what context is relevant.
