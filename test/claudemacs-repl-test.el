@@ -1878,6 +1878,21 @@ Does not modify global state."
       (when (file-exists-p temp-dir)
         (delete-directory temp-dir t)))))
 
+(ert-deftest test-find-template-directory-straight-el-path-conversion ()
+  "Test that straight.el build path is correctly converted to repos path."
+  ;; Test the path conversion logic directly
+  (let ((build-path "/Users/test/.emacs.d/straight/build/claudemacs-repl/"))
+    (when (string-match-p "/straight/build/" build-path)
+      (let ((repos-path (replace-regexp-in-string "/straight/build/" "/straight/repos/" build-path)))
+        (should (string= repos-path "/Users/test/.emacs.d/straight/repos/claudemacs-repl/"))))))
+
+(ert-deftest test-find-template-directory-path-matching ()
+  "Test that straight.el build path is detected correctly."
+  (let ((build-path "/Users/test/.emacs.d/straight/build/claudemacs-repl/")
+        (normal-path "/Users/test/.emacs.d/elpa/claudemacs-repl/"))
+    (should (string-match-p "/straight/build/" build-path))
+    (should-not (string-match-p "/straight/build/" normal-path))))
+
 ;;; Test Runner
 
 (defun claudemacs-repl-run-all-tests ()

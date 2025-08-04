@@ -91,27 +91,46 @@ to maintain compatibility with existing project files.")
 (defvar claudemacs-repl-debug-mode nil
   "When non-nil, enable debug messages for send operations.")
 
-(defvar claudemacs-repl--package-directory
-  (cond
+(defun claudemacs-repl--find-template-directory ()
+  "Find directory containing default template file.
+Returns the directory path where default.org is located."
+  (or
    ;; Try load-file-name first (when loading with load command)
-   (load-file-name (file-name-directory load-file-name))
+   (and load-file-name 
+        (let ((dir (file-name-directory load-file-name)))
+          (when (file-exists-p (expand-file-name claudemacs-repl-default-template-filename dir))
+            dir)))
    ;; Try buffer-file-name (when evaluating in buffer)
-   (buffer-file-name (file-name-directory buffer-file-name))
-   ;; Try to find claudemacs-repl.el in load-path
-   ((locate-library "claudemacs-repl")
-    (file-name-directory (locate-library "claudemacs-repl")))
+   (and buffer-file-name 
+        (let ((dir (file-name-directory buffer-file-name)))
+          (when (file-exists-p (expand-file-name claudemacs-repl-default-template-filename dir))
+            dir)))
+   ;; Try locate-library result directory
+   (and (locate-library "claudemacs-repl")
+        (let ((dir (file-name-directory (locate-library "claudemacs-repl"))))
+          (when (file-exists-p (expand-file-name claudemacs-repl-default-template-filename dir))
+            dir)))
+   ;; For straight.el: try repos directory if build directory doesn't have template
+   (and (locate-library "claudemacs-repl")
+        (let* ((build-dir (file-name-directory (locate-library "claudemacs-repl")))
+               (straight-build-p (string-match-p "/straight/build/" build-dir))
+               (repos-dir (and straight-build-p
+                               (replace-regexp-in-string "/straight/build/" "/straight/repos/" build-dir))))
+          (when (and repos-dir (file-exists-p (expand-file-name claudemacs-repl-default-template-filename repos-dir)))
+            repos-dir)))
    ;; Search for default.org in load-path directories
-   (t
-    (or
-     (cl-some
-      (lambda (dir)
-        (let ((expanded-dir (expand-file-name dir))
-              (default-org-path (expand-file-name claudemacs-repl-default-template-filename (expand-file-name dir))))
-          (when (file-exists-p default-org-path)
-            expanded-dir)))
-      load-path)
-     ;; Final fallback to current directory
-     default-directory)))
+   (cl-some
+    (lambda (dir)
+      (let ((expanded-dir (expand-file-name dir))
+            (default-org-path (expand-file-name claudemacs-repl-default-template-filename (expand-file-name dir))))
+        (when (file-exists-p default-org-path)
+          expanded-dir)))
+    load-path)
+   ;; Final fallback to current directory
+   default-directory))
+
+(defvar claudemacs-repl--package-directory
+  (claudemacs-repl--find-template-directory)
   "Package directory determined at load time.")
 
 (defcustom claudemacs-repl-template-file nil
@@ -159,7 +178,9 @@ If DIRECTORY is nil, use the current `default-directory'."
 (defun claudemacs-repl--get-package-directory ()
   "Get package directory for template files.
 Returns directory path where default templates are located."
-  claudemacs-repl--package-directory)
+  (or (claudemacs-repl--find-template-directory)
+      claudemacs-repl--package-directory
+      default-directory))
 
 (defvar claudemacs-repl--testing-mode nil
   "When non-nil, disable interactive prompts for testing.")
