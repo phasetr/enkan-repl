@@ -44,6 +44,11 @@ This document lists all public functions and commands available in claudemacs-re
    - *Autoload*: Yes
    - *Description*: Send \\='3\\=' to claudemacs buffer for numbered choice prompt.
 
+** ~claudemacs-repl-send-escape~ ()
+   - *Type*: Interactive Command
+   - *Autoload*: Yes
+   - *Description*: Send ESC key to claudemacs buffer.
+
 ** ~claudemacs-repl-open-project-input-file~ (&optional directory)
    - *Type*: Interactive Command
    - *Autoload*: Yes

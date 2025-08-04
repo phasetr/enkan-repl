@@ -209,10 +209,144 @@ Write the formatted template to OUTPUT-FILE."
   (claudemacs-repl--generate-default-template "default.org")
   (message "Default template generated in default.org"))
 
+(defun claudemacs-repl--generate-readme (output-file)
+  "Generate README.org file with dynamically updated function lists.
+Write the formatted README to OUTPUT-FILE."
+  (let* ((script-dir (file-name-directory (or load-file-name buffer-file-name default-directory)))
+         (project-root (if (string-match-p "scripts/?$" script-dir)
+                          (file-name-directory (directory-file-name script-dir))
+                        default-directory))
+         (package-file (expand-file-name "claudemacs-repl.el" project-root))
+         (functions (claudemacs-repl--extract-function-info package-file))
+         (interactive-functions (cl-remove-if-not
+                                (lambda (f) (plist-get f :interactive))
+                                functions))
+         (send-functions (cl-remove-if-not
+                         (lambda (f) (string-match-p "send-" (plist-get f :name)))
+                         interactive-functions)))
+    (with-temp-file output-file
+      ;; Static header content
+      (insert "#+TITLE: claudemacs-repl\n")
+      (insert "#+AUTHOR: [phasetr]\n")
+      (insert "#+EMAIL: phasetr@gmail.com\n")
+      (insert "#+OPTIONS: toc:2 num:nil\n\n")
+      
+      (insert "[[https://melpa.org/#/claudemacs-repl][file:https://melpa.org/packages/claudemacs-repl-badge.svg]]\n")
+      (insert "[[https://stable.melpa.org/#/claudemacs-repl][file:https://stable.melpa.org/packages/claudemacs-repl-badge.svg]]\n")
+      (insert "[[https://github.com/phasetr/claudemacs-repl/actions/workflows/ci.yml][file:https://github.com/phasetr/claudemacs-repl/actions/workflows/ci.yml/badge.svg]]\n\n")
+      
+      (insert "Enhanced REPL utilities for seamless Claude Code interaction through Emacs.\n\n")
+      
+      (insert "** Table of Contents\n")
+      (insert ":PROPERTIES:\n")
+      (insert ":TOC:      :include all :depth 2\n")
+      (insert ":END:\n")
+      (insert ":CONTENTS:\n")
+      (insert "- [[#installation][Installation]]\n")
+      (insert "- [[#usage][Usage]]\n")
+      (insert "- [[#features][Features]]\n")
+      (insert "- [[#background][Background]]\n")
+      (insert "- [[#contributing][Contributing]]\n")
+      (insert "- [[#license][License]]\n")
+      (insert ":END:\n\n")
+      
+      (insert "** Installation\n\n")
+      (insert "*** From MELPA\n\n")
+      (insert "=claudemacs-repl= is available on [[https://melpa.org/][MELPA]].\n\n")
+      (insert "#+BEGIN_SRC emacs-lisp\n")
+      (insert "(use-package claudemacs-repl\n")
+      (insert "  :ensure t\n")
+      (insert "  :after claudemacs)\n")
+      (insert "#+END_SRC\n\n")
+      
+      (insert "*** Manual Installation\n\n")
+      (insert "#+BEGIN_SRC bash\n")
+      (insert "git clone https://github.com/phasetr/claudemacs-repl.git\n")
+      (insert "#+END_SRC\n\n")
+      (insert "Add to your Emacs configuration:\n\n")
+      (insert "#+BEGIN_SRC emacs-lisp\n")
+      (insert "(add-to-list 'load-path \"/path/to/claudemacs-repl\")\n")
+      (insert "(require 'claudemacs-repl)\n")
+      (insert "#+END_SRC\n\n")
+      
+      (insert "** Usage\n\n")
+      (insert "*** Quick Start\n\n")
+      (insert "1. Start a Claude Code session: ~M-x claudemacs-repl-start-claudemacs~\n")
+      (insert "2. Open project input file: ~M-x claudemacs-repl-open-project-input-file~\n")
+      (insert "3. Write your thoughts and send them with ~M-x claudemacs-repl-send-region~\n\n")
+      
+      (insert "*** Workflow\n\n")
+      (insert "=claudemacs-repl= creates persistent org-mode files for each project directory.\n")
+      (insert "These files serve as your thinking space - write extensively, then send\n")
+      (insert "only relevant parts to Claude Code using the send commands.\n\n")
+      
+      (insert "** Background\n\n")
+      (insert "I frequently collaborate with Claude Code and found myself\n")
+      (insert "keeping inspired thoughts noted for immediate use after AI work is complete.\n")
+      (insert "For text work, I naturally turned to Emacs.\n")
+      (insert "After trying several packages that didn't quite fit,\n")
+      (insert "I decided to build my own on top of [[https://github.com/cpoile/claudemacs][claudemacs]].\n\n")
+      
+      (insert "** Features\n\n")
+      
+      ;; Dynamically generate Text Sending Capabilities
+      (insert "*** Text Sending Capabilities\n")
+      (dolist (func send-functions)
+        (let* ((name (plist-get func :name))
+               (docstring (plist-get func :docstring))
+               (display-name (replace-regexp-in-string "claudemacs-repl-" "" name))
+               (description (cond
+                            ((string-match-p "region" name) "Send selected text to Claude")
+                            ((string-match-p "buffer" name) "Send entire buffer content")
+                            ((string-match-p "rest-of-buffer" name) "Send from cursor position to end")
+                            ((string-match-p "line" name) "Send current line")
+                            ((string-match-p "enter" name) "Send enter key for prompts")
+                            ((string-match-p "send-[123]" name) "Send numbered choices for AI prompts")
+                            ((string-match-p "escape" name) "Send ESC key to interrupt operations")
+                            (t (or docstring "Send command")))))
+          (insert (format "- =%s= - %s\n" name description))))
+      (insert "- *File Path Support*: Send file paths for Claude to read directly (e.g., =~/project/config.json=)\n\n")
+      
+      ;; Static project management content
+      (insert "*** Project Management\n")
+      (insert "These features rely on the underlying claudemacs functionality,\n")
+      (insert "and their constraints depend on that implementation.\n\n")
+      (insert "- *Persistent Input Files*: Org-mode files with filename-encoded directory mapping\n")
+      (insert "  (based on claudemacs buffer name mode detection specification as of Aug 2025)\n")
+      (insert "- *Template System*: Customizable templates with default.org included\n")
+      (insert "- *Directory-based Targeting*: Automatically match files to appropriate claudemacs sessions\n")
+      (insert "- *Multi-project Support*: Handle multiple Claude sessions in different directories simultaneously\n\n")
+      
+      (insert "*** Session Management\n")
+      (insert "- =claudemacs-repl-start-claudemacs= - Launch Claude session in appropriate directory\n")
+      (insert "  (only wraps =claudemacs-transient-menu=)\n\n")
+      
+      (insert "*** Session Control\n")
+      (insert "- =claudemacs-repl-send-enter= - Send enter key\n")
+      (insert "- =claudemacs-repl-send-1/2/3= - Send numbered choices for AI prompts\n\n")
+      
+      (insert "*** Utilities\n")
+      (insert "- =claudemacs-repl-start-claudemacs= - Start Claude session in appropriate directory\n")
+      (insert "- =claudemacs-repl-setup-window-layout= - Arrange windows for (the author's) optimal workflow\n")
+      (insert "- =claudemacs-repl-status= - Diagnostic information for troubleshooting\n")
+      (insert "- =claudemacs-repl-toggle-debug-mode= - Enable/disable debug messages\n\n")
+      
+      (insert "** Contributing\n\n")
+      (insert "See [[file:CONTRIBUTING.md][CONTRIBUTING.md]] for development setup and guidelines.\n\n")
+      
+      (insert "** License\n\n")
+      (insert "MIT License. See [[file:LICENSE][LICENSE]] file for details.\n"))))
+
+(defun generate-readme ()
+  "Generate README.org with dynamically updated function lists."
+  (claudemacs-repl--generate-readme "README.org")
+  (message "README.org generated successfully"))
+
 (defun generate-all-docs ()
-  "Generate all documentation files (API and template)."
+  "Generate all documentation files (API, template, and README)."
   (extract-public-api)
   (generate-default-template)
+  (generate-readme)
   (message "All documentation generated successfully"))
 
 ;;; generate-docs.el ends here
