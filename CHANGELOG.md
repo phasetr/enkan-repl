@@ -1,3 +1,15 @@
+# [0.2.0](https://github.com/phasetr/claudemacs-repl/compare/v0.1.0...v0.2.0) (2025-08-04)
+
+
+### Bug Fixes
+
+* replace string-join with mapconcat for Emacs 28.2 compatibility ([4fc79e6](https://github.com/phasetr/claudemacs-repl/commit/4fc79e62102240b72acbf6124282c4cdd970d6b0))
+
+
+### Features
+
+* add ESC key sending functionality ([#2](https://github.com/phasetr/claudemacs-repl/issues/2)) ([1929cba](https://github.com/phasetr/claudemacs-repl/commit/1929cba5f3dc3e361a1bbf302e3d536205c5908b))
+
 # 1.0.0 (2025-08-04)
 
 
