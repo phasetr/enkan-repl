@@ -1,6 +1,6 @@
 {
   "name": "claudemacs-repl",
-  "version": "0.0.0-development",
+  "version": "0.0.0",
   "description": "Enhanced repl utilities for claudemacs - AI-era interactive development",
   "main": "claudemacs-repl.el",
   "scripts": {
