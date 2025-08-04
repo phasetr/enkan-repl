@@ -51,6 +51,36 @@ This document lists all public functions and commands available in claudemacs-cl
    - *Autoload*: Yes
    - *Description*: Toggle debug mode for claudemacs-client operations.
 
+** ~claudemacs-client-send-yes~ ()
+   - *Type*: Interactive Command
+   - *Autoload*: Yes
+   - *Description*: Send 'y' to claudemacs buffer to automatically respond to yes/no prompts.
+
+** ~claudemacs-client-send-no~ ()
+   - *Type*: Interactive Command
+   - *Autoload*: Yes
+   - *Description*: Send 'n' to claudemacs buffer to automatically respond to yes/no prompts.
+
+** ~claudemacs-client-send-enter~ ()
+   - *Type*: Interactive Command
+   - *Autoload*: Yes
+   - *Description*: Send enter key to claudemacs buffer.
+
+** ~claudemacs-client-send-1~ ()
+   - *Type*: Interactive Command
+   - *Autoload*: Yes
+   - *Description*: Send '1' to claudemacs buffer for numbered choice prompts.
+
+** ~claudemacs-client-send-2~ ()
+   - *Type*: Interactive Command
+   - *Autoload*: Yes
+   - *Description*: Send '2' to claudemacs buffer for numbered choice prompts.
+
+** ~claudemacs-client-send-3~ ()
+   - *Type*: Interactive Command
+   - *Autoload*: Yes
+   - *Description*: Send '3' to claudemacs buffer for numbered choice prompts.
+
 ** ~claudemacs-client-enable-debug-mode~ ()
    - *Type*: Interactive Command
    - *Autoload*: Yes

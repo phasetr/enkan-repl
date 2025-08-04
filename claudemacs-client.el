@@ -748,6 +748,72 @@ This is the author's preference - customize as needed."
            (if claudemacs-client-debug-mode "ENABLED" "DISABLED")))
 
 ;;;###autoload
+(defun claudemacs-client-send-yes ()
+  "Send 'y' to claudemacs buffer to automatically respond to yes/no prompts."
+  (interactive)
+  (let ((target-dir (claudemacs-client--get-target-directory-for-buffer)))
+    (if (claudemacs-client--can-send-text target-dir)
+        (progn
+          (claudemacs-client--send-text "y" target-dir)
+          (message "Sent 'y' to Claude"))
+      (message "❌ Cannot send - no matching claudemacs buffer found for this directory"))))
+
+;;;###autoload
+(defun claudemacs-client-send-no ()
+  "Send 'n' to claudemacs buffer to automatically respond to yes/no prompts."
+  (interactive)
+  (let ((target-dir (claudemacs-client--get-target-directory-for-buffer)))
+    (if (claudemacs-client--can-send-text target-dir)
+        (progn
+          (claudemacs-client--send-text "n" target-dir)
+          (message "Sent 'n' to Claude"))
+      (message "❌ Cannot send - no matching claudemacs buffer found for this directory"))))
+
+;;;###autoload
+(defun claudemacs-client-send-enter ()
+  "Send enter key to claudemacs buffer."
+  (interactive)
+  (let ((target-dir (claudemacs-client--get-target-directory-for-buffer)))
+    (if (claudemacs-client--can-send-text target-dir)
+        (progn
+          (claudemacs-client--send-text "" target-dir)
+          (message "Sent enter to Claude"))
+      (message "❌ Cannot send - no matching claudemacs buffer found for this directory"))))
+
+;;;###autoload
+(defun claudemacs-client-send-1 ()
+  "Send '1' to claudemacs buffer for numbered choice prompts."
+  (interactive)
+  (let ((target-dir (claudemacs-client--get-target-directory-for-buffer)))
+    (if (claudemacs-client--can-send-text target-dir)
+        (progn
+          (claudemacs-client--send-text "1" target-dir)
+          (message "Sent '1' to Claude"))
+      (message "❌ Cannot send - no matching claudemacs buffer found for this directory"))))
+
+;;;###autoload
+(defun claudemacs-client-send-2 ()
+  "Send '2' to claudemacs buffer for numbered choice prompts."
+  (interactive)
+  (let ((target-dir (claudemacs-client--get-target-directory-for-buffer)))
+    (if (claudemacs-client--can-send-text target-dir)
+        (progn
+          (claudemacs-client--send-text "2" target-dir)
+          (message "Sent '2' to Claude"))
+      (message "❌ Cannot send - no matching claudemacs buffer found for this directory"))))
+
+;;;###autoload
+(defun claudemacs-client-send-3 ()
+  "Send '3' to claudemacs buffer for numbered choice prompts."
+  (interactive)
+  (let ((target-dir (claudemacs-client--get-target-directory-for-buffer)))
+    (if (claudemacs-client--can-send-text target-dir)
+        (progn
+          (claudemacs-client--send-text "3" target-dir)
+          (message "Sent '3' to Claude"))
+      (message "❌ Cannot send - no matching claudemacs buffer found for this directory"))))
+
+;;;###autoload
 (defun claudemacs-client-enable-debug-mode ()
   "Enable debug mode for claudemacs-client operations."
   (interactive)
