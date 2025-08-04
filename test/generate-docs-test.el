@@ -246,8 +246,6 @@ It spans multiple lines for testing.\"
                            (insert-file-contents temp-output)
                            (buffer-string))))
             ;; Check basic structure
-            (should (string-match-p "#\\+TITLE: Claude Input File" content))
-            (should (string-match-p "#\\+AUTHOR: claudemacs-repl" content))
             (should (string-match-p "\\* Quick Start" content))
             (should (string-match-p "\\* Essential Commands" content))
             (should (string-match-p "\\* Working Notes" content))
@@ -316,7 +314,7 @@ It spans multiple lines for testing.\"
           (let ((template-content (with-temp-buffer
                                     (insert-file-contents temp-template)
                                     (buffer-string))))
-            (should (string-match-p "#\\+TITLE: Claude Input File" template-content))
+            (should (string-match-p "\\* Quick Start" template-content))
             (should (string-match-p "claudemacs-repl-start-claudemacs" template-content))))
       
       ;; Cleanup

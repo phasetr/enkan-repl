@@ -120,10 +120,6 @@ Write the formatted output to OUTPUT-FILE."
   "Generate default template file for claudemacs-repl projects.
 Write the formatted template to OUTPUT-FILE."
   (with-temp-file output-file
-    (insert "#+TITLE: Claude Input File\n")
-    (insert "#+AUTHOR: claudemacs-repl\n")
-    (insert "#+DATE: %<%Y-%m-%d>\n\n")
-
     (insert "* Quick Start\n\n")
 
     (insert "** 1. Start Claude Code Session\n")

@@ -1,7 +1,3 @@
-#+TITLE: Claude Input File
-#+AUTHOR: claudemacs-repl
-#+DATE: %<%Y-%m-%d>
-
 * Quick Start
 
 ** 1. Start Claude Code Session
