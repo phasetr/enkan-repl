@@ -2,7 +2,17 @@ module.exports = {
 	branches: ["main"],
 	plugins: [
 		// Analyze commits to determine version bump
-		"@semantic-release/commit-analyzer",
+		[
+			"@semantic-release/commit-analyzer",
+			{
+				releaseRules: [
+					{ type: "feat", release: "minor" },
+					{ type: "fix", release: "patch" },
+					{ type: "perf", release: "patch" },
+					{ breaking: true, release: "minor" }, // Breaking changes in 0.x should be minor
+				],
+			},
+		],
 		// Generate release notes from commits
 		"@semantic-release/release-notes-generator",
 		// Generate and update CHANGELOG.md
