@@ -119,56 +119,84 @@ Write the formatted output to OUTPUT-FILE."
 (defun claudemacs-repl--generate-default-template (output-file)
   "Generate default template file for claudemacs-repl projects.
 Write the formatted template to OUTPUT-FILE."
-  (with-temp-file output-file
-    (insert "* Quick Start\n\n")
+  (let* ((script-dir (file-name-directory (or load-file-name buffer-file-name default-directory)))
+         (project-root (if (string-match-p "scripts/?$" script-dir)
+                          (file-name-directory (directory-file-name script-dir))
+                        default-directory))
+         (package-file (expand-file-name "claudemacs-repl.el" project-root))
+         (functions (claudemacs-repl--extract-function-info package-file))
+         (interactive-functions (cl-remove-if-not
+                                (lambda (f) (plist-get f :interactive))
+                                functions)))
+    (with-temp-file output-file
+      (insert "* Quick Start\n\n")
 
-    (insert "** 1. Start Claude Code Session\n")
-    (insert "Execute this to start claudemacs and set up the environment:\n\n")
-    (insert "#+BEGIN_SRC emacs-lisp\n")
-    (insert "(claudemacs-repl-start-claudemacs)\n")
-    (insert "#+END_SRC\n\n")
+      (insert "** 1. Start Claude Code Session\n")
+      (insert "Execute this to start claudemacs and set up the environment:\n\n")
+      (insert "#+BEGIN_SRC emacs-lisp\n")
+      (insert "(claudemacs-repl-start-claudemacs)\n")
+      (insert "#+END_SRC\n\n")
 
-    (insert "** 2. Setup Window Layout (Optional)\n")
-    (insert "Create a convenient window layout for Claude Code interaction:\n\n")
-    (insert "#+BEGIN_SRC emacs-lisp\n")
-    (insert "(claudemacs-repl-setup-window-layout)\n")
-    (insert "#+END_SRC\n\n")
+      (insert "** 2. Setup Window Layout (Optional)\n")
+      (insert "Create a convenient window layout for Claude Code interaction:\n\n")
+      (insert "#+BEGIN_SRC emacs-lisp\n")
+      (insert "(claudemacs-repl-setup-window-layout)\n")
+      (insert "#+END_SRC\n\n")
 
-    (insert "* Essential Commands\n\n")
+      (insert "* Essential Commands\n\n")
 
-    (insert "** Sending Content to Claude Code\n")
-    (insert "- *Send current region*: ~M-x claudemacs-repl-send-region~ (or ~C-c r~)\n")
-    (insert "- *Send current line*: ~M-x claudemacs-repl-send-line~ (or ~C-c l~)\n")
-    (insert "- *Send rest of buffer*: ~M-x claudemacs-repl-send-rest-of-buffer~ (or ~C-c t~)\n")
-    (insert "- *Send entire buffer*: ~M-x claudemacs-repl-send-buffer~ (or ~C-c b~)\n\n")
+      ;; Generate commands dynamically from extracted function info
+      (let ((send-functions (cl-remove-if-not
+                            (lambda (f) (string-match-p "send-" (plist-get f :name)))
+                            interactive-functions))
+            (project-functions (cl-remove-if-not
+                               (lambda (f) (string-match-p "\\(open\\|output\\|start\\|setup\\)" (plist-get f :name)))
+                               interactive-functions))
+            (utility-functions (cl-remove-if-not
+                               (lambda (f) (string-match-p "\\(status\\|toggle\\)" (plist-get f :name)))
+                               interactive-functions)))
 
-    (insert "** Project Management\n")
-    (insert "- *Open project input file*: ~M-x claudemacs-repl-open-project-input-file~\n")
-    (insert "- *Output template for customization*: ~M-x claudemacs-repl-output-template~\n\n")
+        (when send-functions
+          (insert "** Sending Content to Claude Code\n")
+          (dolist (func send-functions)
+            (insert (format "- *%s*: ~M-x %s~\n"
+                           (replace-regexp-in-string "claudemacs-repl-" "" (plist-get func :name))
+                           (plist-get func :name))))
+          (insert "\n"))
 
-    (insert "** Troubleshooting\n")
-    (insert "If you encounter connection issues, run diagnostics:\n\n")
-    (insert "#+BEGIN_SRC emacs-lisp\n")
-    (insert "(claudemacs-repl-status)\n")
-    (insert "#+END_SRC\n\n")
+        (when project-functions
+          (insert "** Project Management\n")
+          (dolist (func project-functions)
+            (insert (format "- *%s*: ~M-x %s~\n"
+                           (replace-regexp-in-string "claudemacs-repl-" "" (plist-get func :name))
+                           (plist-get func :name))))
+          (insert "\n"))
 
-    (insert "* Working Notes\n\n")
-    (insert "You can write extensive notes here to organize your thoughts.\n")
-    (insert "This section is for your personal use - only send specific parts to Claude Code as needed.\n\n")
+        (when utility-functions
+          (insert "** Troubleshooting & Utilities\n")
+          (dolist (func utility-functions)
+            (insert (format "- *%s*: ~M-x %s~\n"
+                           (replace-regexp-in-string "claudemacs-repl-" "" (plist-get func :name))
+                           (plist-get func :name))))
+          (insert "\n")))
 
-    (insert "** Project Context\n")
-    (insert "- Description of your current project\n")
-    (insert "- Key objectives and requirements\n")
-    (insert "- Important constraints or considerations\n\n")
+      (insert "* Working Notes\n\n")
+      (insert "You can write extensive notes here to organize your thoughts.\n")
+      (insert "This section is for your personal use - only send specific parts to Claude Code as needed.\n\n")
 
-    (insert "** Development Notes\n")
-    (insert "- Code snippets for testing\n")
-    (insert "- Architecture decisions\n")
-    (insert "- TODO items and reminders\n\n")
+      (insert "** Project Context\n")
+      (insert "- Description of your current project\n")
+      (insert "- Key objectives and requirements\n")
+      (insert "- Important constraints or considerations\n\n")
 
-    (insert "** Communication with Claude Code\n")
-    (insert "Use the sending commands above to share specific sections with Claude Code.\n")
-    (insert "You don't need to send everything - be selective about what context is relevant.\n")))
+      (insert "** Development Notes\n")
+      (insert "- Code snippets for testing\n")
+      (insert "- Architecture decisions\n")
+      (insert "- TODO items and reminders\n\n")
+
+      (insert "** Communication with Claude Code\n")
+      (insert "Use the sending commands above to share specific sections with Claude Code.\n")
+      (insert "You don't need to send everything - be selective about what context is relevant.\n"))))
 
 ;; For batch execution
 (defun extract-public-api ()

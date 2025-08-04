@@ -17,21 +17,24 @@ Create a convenient window layout for Claude Code interaction:
 * Essential Commands
 
 ** Sending Content to Claude Code
-- *Send current region*: ~M-x claudemacs-repl-send-region~ (or ~C-c r~)
-- *Send current line*: ~M-x claudemacs-repl-send-line~ (or ~C-c l~)
-- *Send rest of buffer*: ~M-x claudemacs-repl-send-rest-of-buffer~ (or ~C-c t~)
-- *Send entire buffer*: ~M-x claudemacs-repl-send-buffer~ (or ~C-c b~)
+- *send-region*: ~M-x claudemacs-repl-send-region~
+- *send-buffer*: ~M-x claudemacs-repl-send-buffer~
+- *send-rest-of-buffer*: ~M-x claudemacs-repl-send-rest-of-buffer~
+- *send-line*: ~M-x claudemacs-repl-send-line~
+- *send-enter*: ~M-x claudemacs-repl-send-enter~
+- *send-1*: ~M-x claudemacs-repl-send-1~
+- *send-2*: ~M-x claudemacs-repl-send-2~
+- *send-3*: ~M-x claudemacs-repl-send-3~
 
 ** Project Management
-- *Open project input file*: ~M-x claudemacs-repl-open-project-input-file~
-- *Output template for customization*: ~M-x claudemacs-repl-output-template~
+- *open-project-input-file*: ~M-x claudemacs-repl-open-project-input-file~
+- *start-claudemacs*: ~M-x claudemacs-repl-start-claudemacs~
+- *setup-window-layout*: ~M-x claudemacs-repl-setup-window-layout~
+- *output-template*: ~M-x claudemacs-repl-output-template~
 
-** Troubleshooting
-If you encounter connection issues, run diagnostics:
-
-#+BEGIN_SRC emacs-lisp
-(claudemacs-repl-status)
-#+END_SRC
+** Troubleshooting & Utilities
+- *status*: ~M-x claudemacs-repl-status~
+- *toggle-debug-mode*: ~M-x claudemacs-repl-toggle-debug-mode~
 
 * Working Notes
 

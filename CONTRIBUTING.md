@@ -5,8 +5,10 @@ Thank you for your interest in contributing to claudemacs-repl!
 ## Development Setup
 
 1. Clone the repository
-2. Install Node.js dependencies: `npm install`
+2. Install Emacs dependencies: `make install-deps`
 3. Run tests: `make check`
+
+> **Note**: Node.js is only required for release automation (handled by GitHub Actions). Local development uses Emacs/ELisp tools only.
 
 ## Commit Message Format
 
@@ -14,7 +16,7 @@ This project uses [Conventional Commits](https://www.conventionalcommits.org/) f
 
 ### Format
 
-```
+```text
 <type>[optional scope]: <description>
 
 [optional body]
@@ -48,7 +50,7 @@ chore: update dependencies
 
 For breaking changes, add `BREAKING CHANGE:` in the footer:
 
-```
+```text
 feat: change API structure
 
 BREAKING CHANGE: the API structure has changed significantly
@@ -56,17 +58,48 @@ BREAKING CHANGE: the API structure has changed significantly
 
 ## Release Process
 
-Releases are automated using semantic-release:
+### Current Release System
 
-1. **Patch** (0.0.1): `fix:` commits
-2. **Minor** (0.1.0): `feat:` commits  
-3. **Major** (1.0.0): `BREAKING CHANGE:` commits
+The project uses **semantic-release** with GitHub Actions for fully automated releases.
 
-When you push to `main` branch with conventional commits:
-- Version is automatically bumped
-- CHANGELOG.md is updated
-- Git tag is created
-- GitHub release is published
+### Release Steps
+
+#### Automatic (Recommended)
+1. Push conventional commits to `main` branch
+2. GitHub Actions triggers automatically
+3. Version bumped, CHANGELOG updated, Git tag created, GitHub Release published
+
+#### Manual Override (For Maintainers Only)
+1. Install Node.js dependencies: `npm install`
+2. Run `npm run semantic-release` locally
+3. Requires `GITHUB_TOKEN` environment variable
+
+*Note*: This is only needed for repository maintainers. End users installing via MELPA do not need Node.js.
+
+### Version Bumping Rules
+
+| Commit Type | Version Bump | Example |
+|-------------|--------------|---------|
+| `fix:` | Patch (0.0.1) | Bug fixes |
+| `feat:` | Minor (0.1.0) | New features |
+| `BREAKING CHANGE:` | Major (1.0.0) | Breaking changes |
+
+### Files Updated During Release
+
+- `claudemacs-repl.el` - Version field
+- `CHANGELOG.md` - Auto-generated from commits
+- `default.org` - Regenerated with new version
+- Git tag created
+- GitHub Release published
+
+### Required Format
+
+Use Conventional Commits:
+```
+feat: add new feature
+fix: resolve bug
+docs: update documentation
+```
 
 ## Testing
 
@@ -77,6 +110,7 @@ make check
 ```
 
 This includes:
+
 - Unit tests (ERT)
 - Linting (biome)
 - Byte compilation

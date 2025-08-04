@@ -60,7 +60,7 @@ and send only the necessary parts as commands to AI,
 keeping inspired thoughts noted for immediate use after AI work is complete.
 For text work, I naturally turned to Emacs.
 After trying several packages that didn't quite fit,
-I decided to build my own on top of claudemacs.
+I decided to build my own on top of [[https://github.com/cpoile/claudemacs][claudemacs]].
 
 ** Features
 
@@ -101,10 +101,10 @@ we focus on what works best within the Emacs ecosystem.
 We intentionally provide no default keybindings for several reasons:
 - Org-mode users often have heavily customized configurations
 - Serious Emacs users (especially those who don't "cheat" with VSCode)
-  have unpredictable customization patterns
+  may have unpredictable customization patterns
 - Avoiding conflicts with existing user workflows
 
-*** M-x Driven Workflow
+*** `M-x` Driven Workflow
 The author's personal approach assumes complete focus during AI development sessions.
 All functions are accessed via =M-x= with fuzzy matching,
 which works efficiently when you're concentrated on AI interaction.
@@ -142,9 +142,8 @@ compatibility with other environments has not been verified.
 #+end_src
 
 ** Quick Start
-
-1. *Start Claude session*: =M-x claudemacs-repl-start-claudemacs=
-2. *Open project file*: =M-x claudemacs-repl-open-project-input-file=
+1. *Open project file*: =M-x claudemacs-repl-open-project-input-file=
+2. *Start Claude session*: =M-x claudemacs-repl-start-claudemacs=
 3. *Write your thoughts* in the org-mode file
 4. *Send specific parts* using =M-x claudemacs-repl-send-region= or =M-x claudemacs-repl-send-rest-of-buffer=
 
@@ -208,6 +207,10 @@ This runs the complete test suite (95 tests) including linting,
 byte compilation,
 and documentation checks.
 
+** Releases
+This project uses automated releases via [[https://semantic-release.gitbook.io/][semantic-release]]. New versions are automatically published to GitHub Releases and a [[file:CHANGELOG.md][CHANGELOG.md]] is generated based on Conventional Commits. You can find detailed release notes in the CHANGELOG.
+
+*Note*: The `semantic-release` toolchain is used for development/release automation only. The Elisp package itself has no Node.js runtime dependencies and can be installed normally via MELPA.
 ** Contributing
 We welcome various issues and pull requests.
 However, please understand that due to leukemia recurrence in June 2024 and ongoing treatment,
@@ -218,9 +221,16 @@ it was precisely this situation that motivated the development of this package -
 The desire to maintain productive development workflows during challenging times drove the creation of claudemacs-repl.
 
 While I have extensively used OSS over the years,
-I never imagined I would find myself on the development side under these circumstances.
-Since I have never received pull requests before,
+I never imagined I would find myself on the OSS development side under these circumstances.
+I have received almost no pull requests for repositories published on GitHub,
 please bear with me as responses may take longer than usual while I learn the process.
+
+*Note*: I wanted to automate version updates like semver as much as possible,
+so I had Claude Code (consulting with Gemini) automate it,
+and it recommended using Node.js mechanisms,
+which I have adopted.
+I'm not sure if this is the right approach,
+but I'll run with it for now.
 
 ** License
 This project is licensed under the MIT License - see the [[file:LICENSE][LICENSE]] file for details.
