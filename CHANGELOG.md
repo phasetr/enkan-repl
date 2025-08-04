@@ -14,6 +14,24 @@
 ### Features
 
 * comprehensive release automation and development improvements ([#1](https://github.com/phasetr/claudemacs-repl/issues/1)) ([fd3c050](https://github.com/phasetr/claudemacs-repl/commit/fd3c050633b978a07ca239443e31b1decabebd7d))
+* configure semantic-release for 0.x versioning ([37d692a](https://github.com/phasetr/claudemacs-repl/commit/37d692ae5b676f6c35f8aaee69581a52317e61b6))
+
+# 1.0.0 (2025-08-04)
+
+
+### Bug Fixes
+
+* add check-ci target for CI environments without package-lint ([2cce0ad](https://github.com/phasetr/claudemacs-repl/commit/2cce0ad16e46cd19c0174b8f994a7d134f94f6e4))
+* add GitHub Actions permissions for semantic-release ([5d944f4](https://github.com/phasetr/claudemacs-repl/commit/5d944f4628e763c384855928a1943fc058fdcdc7))
+* remove npm cache configuration to resolve CI failure ([8936b6a](https://github.com/phasetr/claudemacs-repl/commit/8936b6a8e4357ee3922d7772dfdc5b299e0e5d4f))
+* remove package-lint from CI check target ([3359626](https://github.com/phasetr/claudemacs-repl/commit/33596264c8ff0e4861c89a4aaa23faaf9ee181bb))
+* replace string-empty-p with length check for Emacs 28.2 compatibility ([ebe3efd](https://github.com/phasetr/claudemacs-repl/commit/ebe3efdd93a07874bd19460ea89d036b2f855b5e))
+* resolve quality check warnings and add automation ([cafe67d](https://github.com/phasetr/claudemacs-repl/commit/cafe67d4f9bd96010a6168646350b7c458d06e24))
+
+
+### Features
+
+* comprehensive release automation and development improvements ([#1](https://github.com/phasetr/claudemacs-repl/issues/1)) ([fd3c050](https://github.com/phasetr/claudemacs-repl/commit/fd3c050633b978a07ca239443e31b1decabebd7d))
 
 # Changelog
 
