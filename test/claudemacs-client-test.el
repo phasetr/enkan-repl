@@ -630,23 +630,23 @@
         (progn
           ;; Start with debug mode disabled
           (setq claudemacs-client-debug-mode nil)
-          
+
           ;; Test toggle from disabled to enabled
           (claudemacs-client-toggle-debug-mode)
           (should claudemacs-client-debug-mode)
-          
+
           ;; Test toggle from enabled to disabled
           (claudemacs-client-toggle-debug-mode)
           (should-not claudemacs-client-debug-mode)
-          
+
           ;; Test explicit enable
           (claudemacs-client-enable-debug-mode)
           (should claudemacs-client-debug-mode)
-          
+
           ;; Test explicit disable
           (claudemacs-client-disable-debug-mode)
           (should-not claudemacs-client-debug-mode))
-      
+
       ;; Restore original state
       (setq claudemacs-client-debug-mode original-debug-mode))))
 
@@ -660,18 +660,18 @@
           (cl-letf (((symbol-function 'message)
                      (lambda (format-string &rest args)
                        (push (apply #'format format-string args) captured-messages))))
-            
+
             ;; Test with debug mode disabled
             (setq claudemacs-client-debug-mode nil)
             (claudemacs-client--debug-message "Test debug message 1")
             (should (= (length captured-messages) 0))
-            
+
             ;; Test with debug mode enabled
             (setq claudemacs-client-debug-mode t)
             (claudemacs-client--debug-message "Test debug message 2")
             (should (= (length captured-messages) 1))
             (should (string-match-p "\\[CLAUDEMACS-DEBUG\\] Test debug message 2" (car captured-messages)))))
-      
+
       ;; Restore original state
       (setq claudemacs-client-debug-mode original-debug-mode))))
 
@@ -681,13 +681,13 @@
   "Test basic content sanitization functionality."
   ;; Test normal content passes through unchanged
   (should (string= (claudemacs-client--sanitize-content "Hello World") "Hello World"))
-  
+
   ;; Test content with newlines and tabs is preserved
   (should (string= (claudemacs-client--sanitize-content "Line 1\nLine 2\tTabbed") "Line 1\nLine 2\tTabbed"))
-  
+
   ;; Test nil input
   (should-not (claudemacs-client--sanitize-content nil))
-  
+
   ;; Test empty string
   (should (string= (claudemacs-client--sanitize-content "") "")))
 
@@ -695,10 +695,10 @@
   "Test that problematic control characters are removed."
   ;; Test carriage return removal
   (should (string= (claudemacs-client--sanitize-content "Test\rContent") "TestContent"))
-  
+
   ;; Test mixed control characters at end
   (should (string= (claudemacs-client--sanitize-content "Test Content\r\x0B\x0C") "Test Content"))
-  
+
   ;; Test that normal whitespace trimming still works
   (should (string= (claudemacs-client--sanitize-content "  Test Content  ") "Test Content")))
 
@@ -719,14 +719,14 @@
       (should sanitized)
       (should (string-match-p "This text is added by claudemacs-client" sanitized))
       (should-not (string-empty-p sanitized))))
-  
+
   ;; Test content ending with punctuation after file path (should not get marker)
   (let ((test-string "Check this file: ~/Downloads/send-sample.png."))
     (let ((sanitized (claudemacs-client--sanitize-content test-string)))
       (should sanitized)
       (should (string= sanitized test-string)) ; Should be unchanged
       (should-not (string-match-p "This text is added by claudemacs-client" sanitized))))
-  
+
   ;; Test content not ending with file path (should not get marker)
   (let ((test-string "This is just normal text without file paths"))
     (let ((sanitized (claudemacs-client--sanitize-content test-string)))
@@ -793,33 +793,35 @@
 
 (ert-deftest test-initialize-project-file-default ()
   "Test project file initialization with default template."
-  (let ((default-directory claudemacs-client-test-package-dir)
-        (claudemacs-client-template-file nil)
-        (temp-file (concat claudemacs-client-test-package-dir "cec--tmp--test--project.org")))
+  (let* ((temp-dir (make-temp-file "test-project-default" t))
+         (default-directory claudemacs-client-test-package-dir)
+         (claudemacs-client-template-file nil)
+         (temp-file nil))
     (unwind-protect
         (progn
-          (claudemacs-client--initialize-project-file temp-file)
+          (setq temp-file (claudemacs-client--create-project-input-file temp-dir))
           (should (file-exists-p temp-file))
           (with-temp-buffer
             (insert-file-contents temp-file)
             (let ((content (buffer-string)))
               (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" content))
               (should (string-match-p "(claudemacs-client-start-claudemacs)" content)))))
-      (when (file-exists-p temp-file)
-        (delete-file temp-file)))))
+      (when (file-exists-p temp-dir)
+        (delete-directory temp-dir t)))))
 
 (ert-deftest test-initialize-project-file-custom ()
   "Test project file initialization with custom template."
-  (let ((temp-template (make-temp-file "test-template" nil ".org"))
-        (temp-project (concat claudemacs-client-test-package-dir "cec--tmp--test--custom.org"))
-        (test-content "* Custom Template\n"))
+  (let* ((temp-template (make-temp-file "test-template" nil ".org"))
+         (temp-dir (make-temp-file "test-project-custom" t))
+         (temp-project nil)
+         (test-content "* Custom Template\n"))
     (unwind-protect
         (progn
           (with-temp-file temp-template
             (insert test-content))
           (let ((default-directory claudemacs-client-test-package-dir)
                 (claudemacs-client-template-file temp-template))
-            (claudemacs-client--initialize-project-file temp-project)
+            (setq temp-project (claudemacs-client--create-project-input-file temp-dir))
             (should (file-exists-p temp-project))
             (with-temp-buffer
               (insert-file-contents temp-project)
@@ -827,18 +829,19 @@
                 (should (string-match-p "\\* Custom Template" content))))))
       (when (file-exists-p temp-template)
         (delete-file temp-template))
-      (when (file-exists-p temp-project)
-        (delete-file temp-project)))))
+      (when (file-exists-p temp-dir)
+        (delete-directory temp-dir t)))))
 
 (ert-deftest test-initialize-project-file-fallback ()
   "Test project file initialization with fallback when template loading fails."
-  (let ((default-directory claudemacs-client-test-package-dir)
-        (claudemacs-client-template-file "/nonexistent/path.org")
-        (temp-file (concat claudemacs-client-test-package-dir "cec--tmp--test--fallback.org")))
+  (let* ((temp-dir (make-temp-file "test-project-fallback" t))
+         (default-directory claudemacs-client-test-package-dir)
+         (claudemacs-client-template-file "/nonexistent/path.org")
+         (temp-file nil))
     (unwind-protect
         (progn
           ;; Should use default.org content as fallback
-          (claudemacs-client--initialize-project-file temp-file)
+          (setq temp-file (claudemacs-client--create-project-input-file temp-dir))
           (should (file-exists-p temp-file))
           (with-temp-buffer
             (insert-file-contents temp-file)
@@ -847,17 +850,18 @@
               (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" content))
               (should (string-match-p "(claudemacs-client-start-claudemacs)" content))
               (should (string-match-p "Start Claude Code Session\\|claudemacs-client-start-claudemacs" content)))))
-      (when (file-exists-p temp-file)
-        (delete-file temp-file)))))
+      (when (file-exists-p temp-dir)
+        (delete-directory temp-dir t)))))
 
 (ert-deftest test-initialize-project-file-nil-template-uses-default-org ()
   "Test that when claudemacs-client-template-file is nil, default.org content is used."
-  (let ((default-directory claudemacs-client-test-package-dir)
-        (claudemacs-client-template-file nil)  ; Explicitly set to nil
-        (temp-file (concat claudemacs-client-test-package-dir "cec--tmp--test--nil-template.org")))
+  (let* ((temp-dir (make-temp-file "test-project-nil" t))
+         (default-directory claudemacs-client-test-package-dir)
+         (claudemacs-client-template-file nil)  ; Explicitly set to nil
+         (temp-file nil))
     (unwind-protect
         (progn
-          (claudemacs-client--initialize-project-file temp-file)
+          (setq temp-file (claudemacs-client--create-project-input-file temp-dir))
           (should (file-exists-p temp-file))
           (with-temp-buffer
             (insert-file-contents temp-file)
@@ -869,8 +873,8 @@
               (should (string-match-p "Essential Commands\\|Send current region" content))
               ;; Should NOT contain the hardcoded fallback format
               (should-not (string-match-p "Project: .*\n\n\\*\\* Thoughts/Notes" content)))))
-      (when (file-exists-p temp-file)
-        (delete-file temp-file)))))
+      (when (file-exists-p temp-dir)
+        (delete-directory temp-dir t)))))
 
 ;;; Tests for claudemacs-client--create-project-input-file Function
 
@@ -1366,9 +1370,10 @@
 
 (ert-deftest test-template-system-integration ()
   "Integration test for the complete template system."
-  (let ((default-directory claudemacs-client-test-package-dir)
-        (claudemacs-client-template-file nil)
-        (temp-file (concat claudemacs-client-test-package-dir "cec--tmp--test--integration.org")))
+  (let* ((temp-dir (make-temp-file "test-integration" t))
+         (default-directory claudemacs-client-test-package-dir)
+         (claudemacs-client-template-file nil)
+         (temp-file nil))
     (unwind-protect
         (progn
           ;; Test that template loading works with current language setting
@@ -1377,7 +1382,7 @@
             (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" template-content)))
 
           ;; Test that project file initialization uses the loaded template
-          (claudemacs-client--initialize-project-file temp-file)
+          (setq temp-file (claudemacs-client--create-project-input-file temp-dir))
           (should (file-exists-p temp-file))
           (with-temp-buffer
             (insert-file-contents temp-file)
@@ -1386,14 +1391,15 @@
 
           ;; Test switching to custom template and regenerating
           (let ((temp-custom-template (make-temp-file "test-custom-template" nil ".org"))
-                (temp-file2 (concat claudemacs-client-test-package-dir "cec--tmp--test--integration2.org"))
+                (temp-dir2 (make-temp-file "test-integration2" t))
+                (temp-file2 nil)
                 (custom-content "* Custom Integration Template\nProject: %s\n"))
             (unwind-protect
                 (progn
                   (with-temp-file temp-custom-template
                     (insert custom-content))
                   (let ((claudemacs-client-template-file temp-custom-template))
-                    (claudemacs-client--initialize-project-file temp-file2)
+                    (setq temp-file2 (claudemacs-client--create-project-input-file temp-dir2))
                     (should (file-exists-p temp-file2))
                     (with-temp-buffer
                       (insert-file-contents temp-file2)
@@ -1401,10 +1407,10 @@
                         (should (string-match-p "\\* Custom Integration Template" content))))))
               (when (file-exists-p temp-custom-template)
                 (delete-file temp-custom-template))
-              (when (file-exists-p temp-file2)
-                (delete-file temp-file2)))))
-      (when (file-exists-p temp-file)
-        (delete-file temp-file)))))
+              (when (file-exists-p temp-dir2)
+                (delete-directory temp-dir2 t)))))
+      (when (file-exists-p temp-dir)
+        (delete-directory temp-dir t)))))
 
 ;;; Tests for claudemacs-client-start-claudemacs Function
 
@@ -1621,111 +1627,63 @@ Does not modify global state."
       (claudemacs-client--debug-message "Text sent successfully")
       t)))
 
-(defun claudemacs-client--initialize-project-file (file-path)
-  "Initialize a new project file at FILE-PATH with template content."
-  (let*
-      ((directory (file-name-directory file-path))
-       (project-path-raw (claudemacs-client--decode-full-path
-                          (file-name-base (file-name-nondirectory file-path))))
-       (project-path (expand-file-name project-path-raw))
-       (template-content (claudemacs-client--load-template)))
-    (unless (file-exists-p directory)
-      (make-directory directory t))
-    (with-temp-file file-path
-      (if template-content
-          (insert template-content)
-        ;; Fallback to default.org content if template loading fails
-        (condition-case nil
-            (insert-file-contents
-             (expand-file-name
-              claudemacs-client-default-template-filename
-              (claudemacs-client--get-package-directory)))
-          (error
-           ;; Final fallback if default.org cannot be read
-           (insert (format "* Claude Input File\nProject: %s\n\n** Thoughts/Notes\n" project-path))))))
-    file-path))
 
-(defun claudemacs-client--encode-full-path-pure (path prefix separator)
-  "Pure function: Encode PATH with PREFIX and SEPARATOR.
-PATH: Directory path to encode.
-PREFIX: Prefix string to add (e.g., 'cec').
-SEPARATOR: String to replace '/' with (e.g., '--').
-Example: \\='/Users/project\\=' + \\='cec\\=' + \\='--\\=' -> \\='cec--Users--project\\='"
-  (let*
-      ((expanded-path (expand-file-name path))
-       (cleaned-path
-        (if
-            (string-suffix-p "/" expanded-path)
-            (substring expanded-path 0 -1)
-          expanded-path)))
-    (concat prefix (replace-regexp-in-string "/" separator cleaned-path))))
-
-(defun claudemacs-client--decode-full-path-pure (encoded-name prefix separator)
-  "Pure function: Decode ENCODED-NAME with PREFIX and SEPARATOR.
-ENCODED-NAME: Encoded filename to decode.
-PREFIX: Expected prefix string (e.g., 'cec').
-SEPARATOR: String to replace with '/' (e.g., '--').
-Example: \\='cec--Users--project\\=' + \\='cec\\=' + \\='--\\=' -> \\='/Users/project/\\='"
-  (when (string-prefix-p prefix encoded-name)
-    (let
-        ((path-part (substring encoded-name (length prefix))))  ; Remove prefix
-      (concat (replace-regexp-in-string (regexp-quote separator) "/" path-part) "/"))))
 
 ;;; Tests for encode/decode pure functions
 
 (ert-deftest test-encode-full-path-pure-basic ()
   "Test basic path encoding with custom prefix and separator."
-  (should (string= (claudemacs-client--encode-full-path-pure 
-                    "/Users/test" 
-                    "cec" 
+  (should (string= (claudemacs-client--encode-full-path-pure
+                    "/Users/test"
+                    "cec"
                     "--")
                    "cec--Users--test"))
-  (should (string= (claudemacs-client--encode-full-path-pure 
-                    "/Users/test/" 
-                    "cec" 
+  (should (string= (claudemacs-client--encode-full-path-pure
+                    "/Users/test/"
+                    "cec"
                     "--")
                    "cec--Users--test"))
-  (should (string= (claudemacs-client--encode-full-path-pure 
-                    "relative/path" 
-                    "prefix" 
+  (should (string= (claudemacs-client--encode-full-path-pure
+                    "relative/path"
+                    "prefix"
                     "_")
                    (concat "prefix" (replace-regexp-in-string "/" "_" (expand-file-name "relative/path"))))))
 
 (ert-deftest test-encode-full-path-pure-custom-separators ()
   "Test path encoding with different separators and prefixes."
-  (should (string= (claudemacs-client--encode-full-path-pure 
-                    "/Users/test" 
-                    "xyz" 
+  (should (string= (claudemacs-client--encode-full-path-pure
+                    "/Users/test"
+                    "xyz"
                     "___")
                    "xyz___Users___test"))
-  (should (string= (claudemacs-client--encode-full-path-pure 
-                    "/a/b/c" 
-                    "" 
+  (should (string= (claudemacs-client--encode-full-path-pure
+                    "/a/b/c"
+                    ""
                     "-")
                    "-a-b-c")))
 
 (ert-deftest test-decode-full-path-pure-basic ()
   "Test basic path decoding with custom prefix and separator."
-  (should (string= (claudemacs-client--decode-full-path-pure 
-                    "cec--Users--test" 
-                    "cec" 
+  (should (string= (claudemacs-client--decode-full-path-pure
+                    "cec--Users--test"
+                    "cec"
                     "--")
                    "/Users/test/"))
-  (should (string= (claudemacs-client--decode-full-path-pure 
-                    "prefix_Users_test" 
-                    "prefix" 
+  (should (string= (claudemacs-client--decode-full-path-pure
+                    "prefix_Users_test"
+                    "prefix"
                     "_")
                    "/Users/test/")))
 
 (ert-deftest test-decode-full-path-pure-invalid-prefix ()
   "Test decoding with invalid prefix returns nil."
-  (should-not (claudemacs-client--decode-full-path-pure 
-               "invalid--Users--test" 
-               "cec" 
+  (should-not (claudemacs-client--decode-full-path-pure
+               "invalid--Users--test"
+               "cec"
                "--"))
-  (should-not (claudemacs-client--decode-full-path-pure 
-               "partial" 
-               "prefix" 
+  (should-not (claudemacs-client--decode-full-path-pure
+               "partial"
+               "prefix"
                "--")))
 
 (ert-deftest test-encode-decode-roundtrip-pure ()
@@ -1745,7 +1703,7 @@ Example: \\='cec--Users--project\\=' + \\='cec\\=' + \\='--\\=' -> \\='/Users/pr
                    "--test"))
   (should (string= (claudemacs-client--decode-full-path-pure "--test" "" "--")
                    "/test/"))
-  
+
   ;; Single character separator
   (should (string= (claudemacs-client--encode-full-path-pure "/a/b" "x" ".")
                    "x.a.b"))
