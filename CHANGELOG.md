@@ -1,3 +1,10 @@
+## [0.2.1](https://github.com/phasetr/claudemacs-repl/compare/v0.2.0...v0.2.1) (2025-08-04)
+
+
+### Bug Fixes
+
+* trigger release for cl-return error fix ([571c064](https://github.com/phasetr/claudemacs-repl/commit/571c06432ce9d418c6b7eef24c7538ad33da3b6b))
+
 # [0.2.0](https://github.com/phasetr/claudemacs-repl/compare/v0.1.0...v0.2.0) (2025-08-04)
 
 
