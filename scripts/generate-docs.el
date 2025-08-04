@@ -99,7 +99,7 @@ Returns a list of plists, each containing :name, :args, :docstring,
       (push "   - *Autoload*: Yes" output-lines))
     (when (not (= (length docstring) 0))
       (push (format "   - *Description*: %s" docstring) output-lines))
-    (string-join (nreverse output-lines) "\n")))
+    (mapconcat 'identity (nreverse output-lines) "\n")))
 
 (defun claudemacs-repl--generate-public-api-docs (file-path output-file)
   "Generate org-mode documentation for public functions/commands from FILE-PATH.
@@ -114,7 +114,7 @@ Write the formatted output to OUTPUT-FILE."
       (insert "#+TITLE: Public API\n\n")
       (insert "* Public API\n\n")
       (insert "This document lists all public functions and commands available in claudemacs-repl.\n\n")
-      (insert (string-join formatted-output "\n\n")))))
+      (insert (mapconcat 'identity formatted-output "\n\n")))))
 
 (defun claudemacs-repl--generate-default-template (output-file)
   "Generate default template file for claudemacs-repl projects.
