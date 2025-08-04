@@ -217,6 +217,11 @@ Ironically,
 it was precisely this situation that motivated the development of this package - to continue enjoying programming even under these circumstances.
 The desire to maintain productive development workflows during challenging times drove the creation of claudemacs-repl.
 
+While I have extensively used OSS over the years,
+I never imagined I would find myself on the development side under these circumstances.
+Since I have never received pull requests before,
+please bear with me as responses may take longer than usual while I learn the process.
+
 ** License
 This project is licensed under the MIT License - see the [[file:LICENSE][LICENSE]] file for details.
 
