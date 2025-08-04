@@ -31,25 +31,23 @@
 
 ;;; Commentary:
 
-;; claudemacs-repl provides enhanced utilities for working with claudemacs.
+;; claudemacs-repl revives interactive development culture for the AI era.
+;; Send thoughts with `send-region`, receive Claude's response, and deepen
+;; your thinking further - a new REPL experience woven by Emacs and AI.
 ;;
-;; Features:
-;; - Send text from files, buffers, and regions to claudemacs
-;; - Dedicated input file with org-mode support
-;; - File-based project management with persistent storage
-;; - Multi-project support (planned)
-;; - Enhanced key bindings for efficient workflow
+;; Core Features:
+;; - Text sending capabilities (region, buffer, line, etc.)
+;; - Persistent org-mode input files with template system
+;; - Directory-based Claude session targeting
+;; - M-x driven workflow with no default keybindings
+;; - File path support for Claude direct reading
 ;;
-;; Installation:
-;; Add to your init.el:
-;;   (require 'claudemacs-repl)
+;; Quick Start:
+;;   M-x claudemacs-repl-start-claudemacs
+;;   M-x claudemacs-repl-open-project-input-file
 ;;
-;; Usage:
-;; M-x claudemacs-repl-open-project-input-file
-;;
-;; Acknowledgments:
-;; This project is built on top of claudemacs.  We thank the original
-;; authors for their excellent work.
+;; This package builds upon claudemacs and eat.  We extend our deepest
+;; gratitude to their authors and contributors.
 
 ;;; Code:
 
@@ -220,11 +218,29 @@ FORMAT-STRING is the format string.  ARGS are the arguments."
   "Sanitize CONTENT to ensure it can be safely sent to claudemacs.
 This function handles edge cases with special characters and ensures
 proper formatting for terminal input.  Also addresses Claude Code
-interpretation issues."
+interpretation issues and Mac region selection problems."
   (when content
     (let ((sanitized content))
       (claudemacs-repl--debug-message "Input content: %S" content)
-      ;; Remove any remaining control characters that might interfere with terminal input
+      (claudemacs-repl--debug-message "Input content length: %d" (length content))
+      
+      ;; Step 1: Remove all carriage return characters (\r) immediately
+      ;; This is the most likely cause of "extra newlines" on Mac
+      (setq sanitized (replace-regexp-in-string "\r" "" sanitized))
+      (claudemacs-repl--debug-message "After \\r removal: %S" sanitized)
+      
+      ;; Step 2: Normalize all newline variations to single LF
+      ;; Handles \r\n, \n\r, and other combinations that might remain
+      (setq sanitized (replace-regexp-in-string "\\(\r\n\\|\n\r\\)" "\n" sanitized))
+      (claudemacs-repl--debug-message "After newline normalization: %S" sanitized)
+      
+      ;; Step 3: Collapse consecutive newlines to single newlines
+      ;; This prevents sending empty lines that might confuse Claude Code
+      (setq sanitized (replace-regexp-in-string "\n\n+" "\n" sanitized))
+      (claudemacs-repl--debug-message "After consecutive newline collapse: %S" sanitized)
+      
+      ;; Step 4: Remove other problematic control characters
+      ;; Keep only \n (newline) and \t (tab) among control characters
       (setq sanitized
             (replace-regexp-in-string
              "[[:cntrl:]]"
@@ -235,36 +251,36 @@ interpretation issues."
                 ;; Remove other control characters
                 (t "")))
              sanitized))
-      ;; Ensure content doesn't end with problematic characters
-      ;; This addresses potential issues with Mac's region selection
-      (setq sanitized
-            (replace-regexp-in-string
-             "[\r\x0B\x0C\x0E-\x1F]+\\'" ""
-             sanitized))
-      (claudemacs-repl--debug-message
-       "After control char cleanup: %S"
-       sanitized)
+      (claudemacs-repl--debug-message "After control char cleanup: %S" sanitized)
+      
+      ;; Step 5: Remove Unicode line separators that might cause issues
+      ;; U+0085 (NEL), U+2028 (LINE SEPARATOR), U+2029 (PARAGRAPH SEPARATOR)
+      (setq sanitized (replace-regexp-in-string "[\u0085\u2028\u2029]" "" sanitized))
+      (claudemacs-repl--debug-message "After Unicode separator removal: %S" sanitized)
+      
+      ;; Step 6: Final cleanup of any remaining problematic characters at end
+      (setq sanitized (replace-regexp-in-string "[\x0B\x0C\x0E-\x1F]+\\'" "" sanitized))
+      (claudemacs-repl--debug-message "After final cleanup: %S" sanitized)
+      
+      ;; Step 7: File path interpretation workaround (existing logic)
       (claudemacs-repl--debug-message
        "File path pattern match: %s"
-       (if
-           (string-match-p "~/[^[:space:]]*\\.[a-zA-Z0-9]+\\'" sanitized)
-           "YES"
-         "NO"))
+       (if (string-match-p "~/[^[:space:]]*\\.[a-zA-Z0-9]+\\'" sanitized) "YES" "NO"))
       (claudemacs-repl--debug-message
        "Punctuation pattern match: %s"
        (if (string-match-p "[.!?。！？]\\'" sanitized) "YES" "NO"))
-      ;; Address Claude Code interpretation issue: if content ends with a file path
-      ;; without punctuation, Claude Code may interpret it as a file reference instead
-      ;; of text content. Add an explanatory marker to ensure it's treated as text.
-      (when
-          (and
-           (string-match-p "~/[^[:space:]]*\\.[a-zA-Z0-9]+\\'" sanitized)
-           (not (string-match-p "[.!?。！？]\\'" sanitized)))
+      
+      (when (and (string-match-p "~/[^[:space:]]*\\.[a-zA-Z0-9]+\\'" sanitized)
+                 (not (string-match-p "[.!?。！？]\\'" sanitized)))
         (claudemacs-repl--debug-message "Adding end marker to prevent file path interpretation")
         (setq sanitized (concat sanitized "\n(This text is added by claudemacs-repl as a workaround for Claude Code's special interpretation of file paths)")))
+      
+      ;; Step 8: Final trim and validation
+      (setq sanitized (string-trim sanitized))
       (claudemacs-repl--debug-message "Final sanitized content: %S" sanitized)
-      ;; Final trim to ensure clean content
-      (string-trim sanitized))))
+      (claudemacs-repl--debug-message "Final content length: %d" (length sanitized))
+      
+      sanitized)))
 
 ;;;; Target Directory Detection Functions
 

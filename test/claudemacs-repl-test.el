@@ -1756,6 +1756,23 @@ Does not modify global state."
   (should (string= (claudemacs-repl--decode-full-path-pure "x.a.b" "x" ".")
                    "/a/b/")))
 
+(ert-deftest test-sanitize-content-newline-normalization ()
+  "Test comprehensive newline normalization and Mac-specific issues."
+  ;; Test \r\n normalization to \n
+  (should (string= (claudemacs-repl--sanitize-content "Line1\r\nLine2") "Line1\nLine2"))
+  ;; Test \n\r normalization to \n
+  (should (string= (claudemacs-repl--sanitize-content "Line1\n\rLine2") "Line1\nLine2"))
+  ;; Test mixed \r removal
+  (should (string= (claudemacs-repl--sanitize-content "Line1\rLine2\r\nLine3") "Line1Line2\nLine3"))
+  ;; Test consecutive newlines collapse
+  (should (string= (claudemacs-repl--sanitize-content "Line1\n\n\nLine2") "Line1\nLine2"))
+  ;; Test combination of \r and consecutive newlines
+  (should (string= (claudemacs-repl--sanitize-content "Line1\r\n\n\rLine2") "Line1\nLine2"))
+  ;; Test Unicode line separators removal
+  (should (string= (claudemacs-repl--sanitize-content "Line1\u0085Line2\u2028Line3\u2029Line4") "Line1Line2Line3Line4"))
+  ;; Test real-world Mac selection scenario
+  (should (string= (claudemacs-repl--sanitize-content "send-region test\r\n\nwith extra newlines\r") "send-region test\nwith extra newlines")))
+
 ;;; Test Runner
 
 (defun claudemacs-repl-run-all-tests ()
