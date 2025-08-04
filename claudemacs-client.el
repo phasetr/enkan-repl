@@ -158,7 +158,6 @@ If DIRECTORY is nil, use the current `default-directory'."
 
 ;;;; Template Loading Functions
 
-
 (defun claudemacs-client--get-package-directory ()
   "Get package directory for template files.
 Returns directory path where default templates are located."
@@ -167,14 +166,15 @@ Returns directory path where default templates are located."
 (defun claudemacs-client--load-template ()
   "Load template content based on claudemacs-client-template-file setting.
 Returns template content as string, or nil if no template found."
-  (let ((template-path
-         (cond
-          ;; If custom template file is specified, use it
-          (claudemacs-client-template-file
-           (expand-file-name claudemacs-client-template-file))
-          ;; Otherwise, look for default template in package directory
-          (t (expand-file-name claudemacs-client-default-template-filename
-                               (claudemacs-client--get-package-directory))))))
+  (let
+      ((template-path
+        (cond
+         ;; If custom template file is specified, use it
+         (claudemacs-client-template-file
+          (expand-file-name claudemacs-client-template-file))
+         ;; Otherwise, look for default template in package directory
+         (t (expand-file-name claudemacs-client-default-template-filename
+                              (claudemacs-client--get-package-directory))))))
     (when (and template-path (file-exists-p template-path))
       (with-temp-buffer
         (insert-file-contents template-path)
@@ -226,22 +226,30 @@ interpretation issues."
       (claudemacs-client--debug-message "Input content: %S" content)
       ;; Remove any remaining control characters that might interfere with terminal input
       (setq sanitized
-            (replace-regexp-in-string "[[:cntrl:]]"
-                                      (lambda (match)
-                                        (cond
-                                         ;; Keep normal newlines and tabs
-                                         ((or (string= match "\n") (string= match "\t")) match)
-                                         ;; Remove other control characters
-                                         (t "")))
-                                      sanitized))
+            (replace-regexp-in-string
+             "[[:cntrl:]]"
+             (lambda (match)
+               (cond
+                ;; Keep normal newlines and tabs
+                ((or (string= match "\n") (string= match "\t")) match)
+                ;; Remove other control characters
+                (t "")))
+             sanitized))
       ;; Ensure content doesn't end with problematic characters
       ;; This addresses potential issues with Mac's region selection
-      (setq sanitized (replace-regexp-in-string "[\r\x0B\x0C\x0E-\x1F]+\\'" "" sanitized))
+      (setq sanitized
+            (replace-regexp-in-string
+             "[\r\x0B\x0C\x0E-\x1F]+\\'" ""
+             sanitized))
       (claudemacs-client--debug-message
-       "After control char cleanup: %S" sanitized)
+       "After control char cleanup: %S"
+       sanitized)
       (claudemacs-client--debug-message
        "File path pattern match: %s"
-       (if (string-match-p "~/[^[:space:]]*\\.[a-zA-Z0-9]+\\'" sanitized) "YES" "NO"))
+       (if
+           (string-match-p "~/[^[:space:]]*\\.[a-zA-Z0-9]+\\'" sanitized)
+           "YES"
+         "NO"))
       (claudemacs-client--debug-message
        "Punctuation pattern match: %s"
        (if (string-match-p "[.!?。！？]\\'" sanitized) "YES" "NO"))
@@ -321,6 +329,8 @@ If DIRECTORY is nil, use current `default-directory'."
        (file-truename default-directory)
        (file-truename target-dir)))))
 
+;;;; Send Functions - Internal Helpers
+
 (defun claudemacs-client--can-send-text (&optional directory)
   "Check if text can actually be sent to claudemacs (strict check).
 If DIRECTORY is provided, check for claudemacs in that directory.
@@ -358,16 +368,17 @@ Otherwise, use current `default-directory'."
         (claudemacs-client--debug-message "Text sent successfully")
         t))))
 
-;;;; Send Functions - Internal Helpers
-
 (defun claudemacs-client--send-numbered-choice (number)
   "Send NUMBER as string to claudemacs buffer for numbered choice prompt.
 NUMBER should be a string (e.g., \\='1\\=', \\='2\\=', \\='3\\=') or empty string for enter."
-  (let ((target-dir (claudemacs-client--get-target-directory-for-buffer)))
-    (if (claudemacs-client--can-send-text target-dir)
+  (let
+      ((target-dir (claudemacs-client--get-target-directory-for-buffer)))
+    (if
+        (claudemacs-client--can-send-text target-dir)
         (progn
           (claudemacs-client--send-text number target-dir)
-          (if (string-empty-p number)
+          (if
+              (string-empty-p number)
               (message "Sent enter to Claude")
             (message "Sent '%s' to Claude" number)))
       (message "❌ Cannot send - no matching claudemacs buffer found for this directory"))))
@@ -377,14 +388,23 @@ NUMBER should be a string (e.g., \\='1\\=', \\='2\\=', \\='3\\=') or empty strin
 START and END define the region to send.
 CONTENT-DESCRIPTION is used in success message.
 If SKIP-EMPTY-CHECK is non-nil, send content even if empty."
-  (let* ((raw-content (buffer-substring-no-properties start end))
-         (content (claudemacs-client--sanitize-content (string-trim raw-content)))
-         (target-dir (claudemacs-client--get-target-directory-for-buffer)))
-    (claudemacs-client--debug-message "Raw content length: %d, trimmed: %d"
-                                      (length raw-content) (length content))
-    (claudemacs-client--debug-message "Content empty?: %s, target-dir: %s"
-                                      (string-empty-p content) target-dir)
-    (if (or skip-empty-check (and content (not (string-empty-p content))))
+  (let*
+      ((raw-content
+        (buffer-substring-no-properties start end))
+       (content
+        (claudemacs-client--sanitize-content (string-trim raw-content)))
+       (target-dir
+        (claudemacs-client--get-target-directory-for-buffer)))
+    (claudemacs-client--debug-message
+     "Raw content length: %d, trimmed: %d"
+     (length raw-content)
+     (length content))
+    (claudemacs-client--debug-message
+     "Content empty?: %s, target-dir: %s"
+     (string-empty-p content)
+     target-dir)
+    (if
+        (or skip-empty-check (and content (not (string-empty-p content))))
         (progn
           (claudemacs-client--debug-message "Attempting to send content")
           (if (claudemacs-client--send-text content target-dir)
@@ -406,8 +426,8 @@ If SKIP-EMPTY-CHECK is non-nil, send content even if empty."
 (defun claudemacs-client-send-buffer ()
   "Send the entire current buffer to claudemacs."
   (interactive)
-  (claudemacs-client--send-buffer-content 
-   (point-min) (point-max) 
+  (claudemacs-client--send-buffer-content
+   (point-min) (point-max)
    (format "File %s" (buffer-name)) t))
 
 ;;;###autoload
@@ -420,7 +440,7 @@ If SKIP-EMPTY-CHECK is non-nil, send content even if empty."
 (defun claudemacs-client-send-line ()
   "Send the current line to claudemacs."
   (interactive)
-  (claudemacs-client--send-buffer-content 
+  (claudemacs-client--send-buffer-content
    (line-beginning-position) (line-end-position) "Line"))
 
 ;;;###autoload
@@ -724,7 +744,6 @@ This is the author's preference - customize as needed."
   (message
    "claudemacs-client debug mode: %s"
    (if claudemacs-client-debug-mode "ENABLED" "DISABLED")))
-
 
 ;;;###autoload
 (defun claudemacs-client-enable-debug-mode ()
