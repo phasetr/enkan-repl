@@ -118,7 +118,7 @@ FUNCTIONS should be a list of function info plists from
     (dolist (func functions)
       (let* ((name (plist-get func :name))
              (docstring (plist-get func :docstring))
-             (description (if (and docstring (not (string-empty-p docstring)))
+             (description (if (and docstring (not (zerop (length docstring))))
                               docstring
                             "Send command")))
         (setq result (concat result (format "- ~M-x %s~ - %s\n" name description)))))
