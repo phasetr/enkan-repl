@@ -1,3 +1,11 @@
+## [0.2.3](https://github.com/phasetr/claudemacs-repl/compare/v0.2.2...v0.2.3) (2025-08-05)
+
+
+### Bug Fixes
+
+* replace string-empty-p with zerop for Emacs 28.2 compatibility ([18f5d26](https://github.com/phasetr/claudemacs-repl/commit/18f5d26d3258c897cd7411d63bf93e5062a07a11))
+* trigger release for previous documentation restoration work ([38fec41](https://github.com/phasetr/claudemacs-repl/commit/38fec417f05b831906b9785bbd168488e292e75b))
+
 ## [0.2.2](https://github.com/phasetr/claudemacs-repl/compare/v0.2.1...v0.2.2) (2025-08-04)
 
 
