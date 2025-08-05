@@ -35,7 +35,7 @@ module.exports = {
 				changelogFile: "CHANGELOG.md",
 			},
 		],
-		// Update version in claudemacs-repl.el and regenerate default.org
+		// Update version in claudemacs-repl.el and regenerate documentation
 		[
 			"@semantic-release/exec",
 			{
@@ -55,9 +55,7 @@ module.exports = {
 					"CHANGELOG.md",
 					"package.json",
 					"claudemacs-repl.el",
-					"default.org",
 					"README.org",
-					"public-api.org",
 				],
 				message:
 					"chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}",
