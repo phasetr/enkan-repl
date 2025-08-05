@@ -924,54 +924,28 @@ This is the author's preference - customize as needed."
   (setq claudemacs-repl-debug-mode nil)
   (message "claudemacs-repl debug mode: DISABLED"))
 
-;;; Minor Mode and Cheatsheet Feature
-
-(defvar claudemacs-repl-mode-map (make-sparse-keymap)
-  "Keymap for `claudemacs-repl-mode'.")
-
-;;;###autoload
-(define-minor-mode claudemacs-repl-mode
-  "Minor mode with highest priority keybindings for claudemacs-repl in org-mode."
-  :init-value nil
-  :lighter " ClaudeREPL"
-  :keymap claudemacs-repl-mode-map
-  :group 'claudemacs-repl
-  (when (and claudemacs-repl-mode (not (derived-mode-p 'org-mode)))
-    (claudemacs-repl-mode -1)))
-
-(add-to-list 'emulation-mode-map-alists 
-             `((claudemacs-repl-mode . ,claudemacs-repl-mode-map)))
-
-(defun claudemacs-repl--setup-minor-mode ()
-  "Set up claudemacs-repl-mode for org-mode buffers."
-  (claudemacs-repl-mode 1))
-
-;;;###autoload
-(add-hook 'org-mode-hook 'claudemacs-repl--setup-minor-mode)
-
-;; No default keybindings - users can set their own:
-;; (define-key claudemacs-repl-mode-map (kbd "C-c C-h") 'claudemacs-repl-cheatsheet)
+;;; Interactive Cheatsheet Feature
 
 ;;;###autoload
 (defun claudemacs-repl-cheatsheet ()
   "Display interactive cheatsheet for claudemacs-repl commands."
   (interactive)
   (let* ((current-file (expand-file-name "claudemacs-repl.el"
-                         (file-name-directory (or load-file-name buffer-file-name default-directory))))
-          (functions-info (claudemacs-repl-utils--extract-function-info current-file))
-          (interactive-functions (cl-remove-if-not
-                                   (lambda (f) (plist-get f :interactive))
-                                   functions-info))
-          (candidates (mapcar (lambda (func)
-                                (cons (plist-get func :name)
-                                  (or (plist-get func :docstring) "No description")))
-                        interactive-functions)))
+                                         (file-name-directory (or load-file-name buffer-file-name default-directory))))
+         (functions-info (claudemacs-repl-utils--extract-function-info current-file))
+         (interactive-functions (cl-remove-if-not
+                                 (lambda (f) (plist-get f :interactive))
+                                 functions-info))
+         (candidates (mapcar (lambda (func)
+                               (cons (plist-get func :name)
+                                     (or (plist-get func :docstring) "No description")))
+                             interactive-functions)))
     (let ((completion-extra-properties
-            `(:annotation-function
-               (lambda (candidate)
-                 (let ((description (alist-get candidate ',candidates nil nil #'string=)))
-                   (when description
-                     (format " — %s" description)))))))
+           `(:annotation-function
+             (lambda (candidate)
+               (let ((description (alist-get candidate ',candidates nil nil #'string=)))
+                 (when description
+                   (format " — %s" description)))))))
       (let ((selected-command (completing-read "claudemacs-repl commands: " candidates)))
         (when selected-command
           (call-interactively (intern selected-command)))))))
