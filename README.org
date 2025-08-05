@@ -62,40 +62,6 @@ For text work, I naturally turned to Emacs.
 After trying several packages that didn't quite fit,
 I decided to build my own on top of [[https://github.com/cpoile/claudemacs][claudemacs]].
 
-** Features
-
-*** Text Sending Capabilities
-- =claudemacs-repl-send-region= - Send selected text to Claude
-- =claudemacs-repl-send-buffer= - Send entire buffer content
-- =claudemacs-repl-send-rest-of-buffer= - Send from cursor position to end
-- =claudemacs-repl-send-line= - Send current line
-- =claudemacs-repl-send-enter= - Send enter key for prompts
-- =claudemacs-repl-send-1/2/3= - Send numbered choices for AI prompts
-- *File Path Support*: Send file paths for Claude to read directly (e.g., =~/project/config.json=)
-- *Planned*: Esc key sending command under development
-
-*** Project Management
-These features rely on the underlying claudemacs functionality,
-and their constraints depend on that implementation.
-
-- *Persistent Input Files*: Org-mode files with filename-encoded directory mapping
-  (based on claudemacs buffer name mode detection specification as of Aug 2025)
-- *Template System*: Customizable templates with default.org included
-- *Directory-based Targeting*: Automatically match files to appropriate claudemacs sessions
-- *Multi-project Support*: Handle multiple Claude sessions in different directories simultaneously
-
-*** Session Management
-- =claudemacs-repl-start-claudemacs= - Launch Claude session in appropriate directory
-  (only wraps =claudemacs-transient-menu=)
-- =claudemacs-repl-setup-window-layout= - Set up convenient window arrangement
-  (for the author: the left side is the input file,
-  and the right side is the claudemacs buffer)
-- =claudemacs-repl-status= - Comprehensive diagnostic information
-
-*** Utility Functions
-- =claudemacs-repl-output-template= - Export input file template for customization
-- =claudemacs-repl-toggle-debug-mode= - Debug mode for troubleshooting
-
 ** Design Philosophy
 
 *** Org-mode Only Choice
@@ -108,7 +74,7 @@ we focus on what works best within the Emacs ecosystem.
 We intentionally provide no default keybindings for several reasons:
 - Org-mode users often have heavily customized configurations
 - Serious Emacs users (especially those who don't "cheat" with VSCode)
-  may have unpredictable customization patterns
+  may have their own customization patterns
 - Avoiding conflicts with existing user workflows
 
 *** `M-x` Driven Workflow
@@ -118,6 +84,28 @@ which works efficiently when you're concentrated on AI interaction.
 During Claude development work,
 the frequently used functions (=send-region=, =send-rest-of-buffer=)
 naturally appear at the top of completion lists.
+
+** Functions/Commands
+
+We open the following functions/commands.
+
+- =claudemacs-repl-send-region= - Send the text in region from START to END to claudemacs.
+- =claudemacs-repl-send-buffer= - Send the entire current buffer to claudemacs.
+- =claudemacs-repl-send-rest-of-buffer= - Send rest of buffer from cursor position to end to claudemacs.
+- =claudemacs-repl-send-line= - Send the current line to claudemacs.
+- =claudemacs-repl-send-enter= - Send enter key to claudemacs buffer.
+- =claudemacs-repl-send-1= - Send \\='1\\=' to claudemacs buffer for numbered choice prompt.
+- =claudemacs-repl-send-2= - Send \\='2\\=' to claudemacs buffer for numbered choice prompt.
+- =claudemacs-repl-send-3= - Send \\='3\\=' to claudemacs buffer for numbered choice prompt.
+- =claudemacs-repl-send-escape= - Send ESC key to claudemacs buffer.
+- =claudemacs-repl-open-project-input-file= - Open or create project input file for DIRECTORY. If DIRECTORY is nil, use current `default-directory'. If project input file exists, open it directly. If not exists, create from template then open.
+- =claudemacs-repl-start-claudemacs= - Start claudemacs and change to appropriate directory. Determines directory from current buffer filename if it's a persistent file. Checks for existing sessions to prevent double startup.
+- =claudemacs-repl-setup-window-layout= - Set up window layout with org file on left and claudemacs on right. This is the author's preference - customize as needed.
+- =claudemacs-repl-output-template= - Output current template content to a new buffer for customization.
+- =claudemacs-repl-status= - Show detailed diagnostic information for troubleshooting connection issues.
+- =claudemacs-repl-toggle-debug-mode= - Toggle debug mode for claudemacs-repl operations.
+- =claudemacs-repl-enable-debug-mode= - Enable debug mode for claudemacs-repl operations.
+- =claudemacs-repl-disable-debug-mode= - Disable debug mode for claudemacs-repl operations.
 
 ** Installation
 
