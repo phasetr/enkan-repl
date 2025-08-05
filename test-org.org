@@ -1,0 +1,21 @@
+#+TITLE: Test Org Mode for claudemacs-repl-mode
+
+This is a test org-mode file to verify that the claudemacs-repl-mode
+minor mode is automatically activated.
+
+* Test Section
+
+Some content here.
+
+** Subsection
+
+More content.
+
+Press C-c C-h to test the cheatsheet functionality.
+
+* Instructions
+
+1. Open this file in Emacs
+2. Check if " ClaudeREPL" appears in the mode line
+3. Try pressing C-c C-h to open the cheatsheet
+4. Test that keybindings have highest priority
