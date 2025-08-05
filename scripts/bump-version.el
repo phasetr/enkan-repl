@@ -19,10 +19,8 @@
   (let* ((script-dir (file-name-directory (or load-file-name buffer-file-name)))
          (project-root (file-name-directory (directory-file-name script-dir)))
          (package-file (expand-file-name "claudemacs-repl.el" project-root)))
-    
     (unless (file-exists-p package-file)
       (error "Package file not found: %s" package-file))
-    
     (let* ((file-content (with-temp-buffer
                            (insert-file-contents package-file)
                            (buffer-string)))
@@ -31,7 +29,6 @@
                              "^;; Version: \\([0-9]+\\.[0-9]+\\.[0-9]+\\(?:-[a-zA-Z0-9\\.-]+\\)?\\)"
                              (format ";; Version: %s" new-version)
                              file-content nil t)))
-      
       (unless (string= file-content updated-content)
         (with-temp-file package-file
           (insert updated-content))
@@ -47,11 +44,11 @@
     (let ((version-arg nil))
       (while (and args (not version-arg))
         (let ((arg (car args)))
-          (when (and (stringp arg) 
+          (when (and (stringp arg)
                      (string-match-p "^[0-9]+\\.[0-9]+\\.[0-9]+" arg))
             (setq version-arg arg)))
         (setq args (cdr args)))
-      
+
       (if version-arg
           (progn
             (claudemacs-repl-update-version version-arg)
