@@ -1,69 +1,62 @@
-#+TITLE: claudemacs-repl
-#+AUTHOR: [phasetr]
-#+EMAIL: phasetr@gmail.com
-#+OPTIONS: toc:2 num:nil
+* claudemacs-repl
 
-[[https://melpa.org/#/claudemacs-repl][file:https://melpa.org/packages/claudemacs-repl-badge.svg]]
-[[https://stable.melpa.org/#/claudemacs-repl][file:https://stable.melpa.org/packages/claudemacs-repl-badge.svg]]
-[[https://github.com/phasetr/claudemacs-repl/actions/workflows/ci.yml][file:https://github.com/phasetr/claudemacs-repl/actions/workflows/ci.yml/badge.svg]]
+[[https://github.com/phasetr/claudemacs-repl/workflows/CI/badge.svg]]
+[[https://img.shields.io/badge/License-MIT-yellow.svg]]
 
-Enhanced REPL utilities for seamless Claude Code interaction through Emacs.
+This package builds upon the excellent work of:
+- [[https://github.com/akib/emacs-eat][eat]] - Terminal emulator inside Emacs
+- [[https://github.com/cpoile/claudemacs][claudemacs]] - Claude AI integration for Emacs
+
+We extend our deepest gratitude to the authors and contributors of these foundational packages.
+
+#+TOC: headlines 2 local
 
 ** Table of Contents
-:PROPERTIES:
-:TOC:      :include all :depth 2
-:END:
-:CONTENTS:
-- [[#installation][Installation]]
-- [[#usage][Usage]]
+- [[#vision-reviving-repl-culture-for-the-ai-era][Vision: Reviving REPL Culture for the AI Era]]
+- [[#motivation][Motivation]]
 - [[#features][Features]]
-- [[#background][Background]]
+- [[#design-philosophy][Design Philosophy]]
+- [[#installation][Installation]]
+- [[#quick-start][Quick Start]]
+- [[#core-functions][Core Functions]]
+- [[#configuration][Configuration]]
+- [[#troubleshooting][Troubleshooting]]
+- [[#development][Development]]
 - [[#contributing][Contributing]]
 - [[#license][License]]
-:END:
 
-** Installation
+** Vision: Reviving REPL Culture for the AI Era
+This package differs technically from traditional REPLs (Read-Eval-Print Loop).
+While conventional REPLs execute code and return results,
+=claudemacs-repl= sends text to Claude AI and receives generated responses.
 
-*** From MELPA
+However, we view this difference not as a constraint,
+but as a new possibility.
+Our dream is to revive the interactive development culture that LISP, Elisp,
+and Emacs have nurtured for decades,
+in a form befitting the AI era.
 
-=claudemacs-repl= is available on [[https://melpa.org/][MELPA]].
+Send your thoughts with =send-region=,
+receive Claude's response,
+and deepen your thinking further.
+This cycle is the development experience that the new era's REPL envisions.
+Here lies a completely new programming horizon woven by Emacs and AI.
 
-#+BEGIN_SRC emacs-lisp
-(use-package claudemacs-repl
-  :ensure t
-  :after claudemacs)
-#+END_SRC
+** Motivation
+The development motivation stems from the current usability issues with Claude Code and Gemini CLI,
+particularly the difficulty of text input and the non-persistent nature of personal input history.
+While file-based input is somewhat possible,
+it's extremely cumbersome to use.
 
-*** Manual Installation
+In terminals,
+input and copy-paste operations are difficult,
+making revisions troublesome.
+Furthermore, when something comes to mind during AI work,
+you need to leave the terminal to take notes,
+creating an extremely unpleasant development experience.
 
-#+BEGIN_SRC bash
-git clone https://github.com/phasetr/claudemacs-repl.git
-#+END_SRC
-
-Add to your Emacs configuration:
-
-#+BEGIN_SRC emacs-lisp
-(add-to-list 'load-path "/path/to/claudemacs-repl")
-(require 'claudemacs-repl)
-#+END_SRC
-
-** Usage
-
-*** Quick Start
-
-1. Start a Claude Code session: ~M-x claudemacs-repl-start-claudemacs~
-2. Open project input file: ~M-x claudemacs-repl-open-project-input-file~
-3. Write your thoughts and send them with ~M-x claudemacs-repl-send-region~
-
-*** Workflow
-
-=claudemacs-repl= creates persistent org-mode files for each project directory.
-These files serve as your thinking space - write extensively, then send
-only relevant parts to Claude Code using the send commands.
-
-** Background
-
-I frequently collaborate with Claude Code and found myself
+I constantly wished for the ability to easily take notes in text files
+and send only the necessary parts as commands to AI,
 keeping inspired thoughts noted for immediate use after AI work is complete.
 For text work, I naturally turned to Emacs.
 After trying several packages that didn't quite fit,
@@ -74,14 +67,12 @@ I decided to build my own on top of [[https://github.com/cpoile/claudemacs][clau
 *** Text Sending Capabilities
 - =claudemacs-repl-send-region= - Send selected text to Claude
 - =claudemacs-repl-send-buffer= - Send entire buffer content
-- =claudemacs-repl-send-rest-of-buffer= - Send entire buffer content
+- =claudemacs-repl-send-rest-of-buffer= - Send from cursor position to end
 - =claudemacs-repl-send-line= - Send current line
 - =claudemacs-repl-send-enter= - Send enter key for prompts
-- =claudemacs-repl-send-1= - Send numbered choices for AI prompts
-- =claudemacs-repl-send-2= - Send numbered choices for AI prompts
-- =claudemacs-repl-send-3= - Send numbered choices for AI prompts
-- =claudemacs-repl-send-escape= - Send ESC key to interrupt operations
+- =claudemacs-repl-send-1/2/3= - Send numbered choices for AI prompts
 - *File Path Support*: Send file paths for Claude to read directly (e.g., =~/project/config.json=)
+- *Planned*: Esc key sending command under development
 
 *** Project Management
 These features rely on the underlying claudemacs functionality,
@@ -96,6 +87,108 @@ and their constraints depend on that implementation.
 *** Session Management
 - =claudemacs-repl-start-claudemacs= - Launch Claude session in appropriate directory
   (only wraps =claudemacs-transient-menu=)
+- =claudemacs-repl-setup-window-layout= - Set up convenient window arrangement
+  (for the author: the left side is the input file,
+  and the right side is the claudemacs buffer)
+- =claudemacs-repl-status= - Comprehensive diagnostic information
+
+*** Utility Functions
+- =claudemacs-repl-output-template= - Export input file template for customization
+- =claudemacs-repl-toggle-debug-mode= - Debug mode for troubleshooting
+
+** Design Philosophy
+
+*** Org-mode Only Choice
+This package exclusively uses Org-mode for input files,
+leveraging Emacs's native compatibility and structured document capabilities.
+Rather than supporting multiple formats like Markdown,
+we focus on what works best within the Emacs ecosystem.
+
+*** No Default Keybindings
+We intentionally provide no default keybindings for several reasons:
+- Org-mode users often have heavily customized configurations
+- Serious Emacs users (especially those who don't "cheat" with VSCode)
+  may have unpredictable customization patterns
+- Avoiding conflicts with existing user workflows
+
+*** `M-x` Driven Workflow
+The author's personal approach assumes complete focus during AI development sessions.
+All functions are accessed via =M-x= with fuzzy matching,
+which works efficiently when you're concentrated on AI interaction.
+During Claude development work,
+the frequently used functions (=send-region=, =send-rest-of-buffer=)
+naturally appear at the top of completion lists.
+
+** Installation
+
+*** Prerequisites
+- Emacs 28.1 or later
+- [[https://github.com/cpoile/claudemacs][claudemacs]] package installed and configured
+- [[https://github.com/anthropics/claude-code][Claude Code CLI]] properly set up
+
+*Note*: This package has been developed and tested exclusively on macOS with GNU Emacs 30.1.
+While it should work on other platforms and Emacs versions (28.1+),
+compatibility with other environments has not been verified.
+
+*** Using straight.el (Recommended)
+#+begin_src elisp
+(straight-use-package
+  '(claudemacs-repl :host github :repo "phasetr/claudemacs-repl"))
+#+end_src
+
+*** Manual Installation
+1. Download =claudemacs-repl.el=
+2. Add to your Emacs configuration:
+
+#+begin_src elisp
+;; Add to load path
+(add-to-list 'load-path "/path/to/claudemacs-repl")
+
+;; Load the package
+(require 'claudemacs-repl)
+#+end_src
+
+** Quick Start
+
+*** For New Projects (Recommended)
+
+1. *Create a dedicated project directory*:
+   #+begin_src bash
+   mkdir my-claude-project
+   cd my-claude-project
+   #+end_src
+
+2. *Initialize Git repository*:
+   #+begin_src bash
+   git init
+   #+end_src
+   /This ensures Claude sessions are isolated and changes are tracked safely./
+
+3. *Open project file*: =M-x claudemacs-repl-open-project-input-file=
+4. *Start Claude session*: =M-x claudemacs-repl-start-claudemacs=
+5. *Write your thoughts* in the org-mode file
+6. *Send specific parts* using =M-x claudemacs-repl-send-region= or =M-x claudemacs-repl-send-rest-of-buffer=
+
+*** For Existing Projects
+
+*Important*: claudemacs automatically detects Git repositories or something and may start sessions in parent directories: see [[https://github.com/cpoile/claudemacs?tab=readme-ov-file#workspace-and-project-aware-sessions][the usage section for claudemacs]].
+
+To ensure predictable behavior:
+- Work within properly initialized Git repositories (=git init=)
+- Or use dedicated project directories as shown above
+
+The generated project file includes template functions and usage instructions.
+
+** Core Functions
+
+*** File Management
+- =claudemacs-repl-open-project-input-file= - Create/open persistent input file for current directory
+
+*** Text Sending
+- =claudemacs-repl-send-region= - Send selected text (most commonly used, the author think)
+- =claudemacs-repl-send-rest-of-buffer= - Send from cursor to end (second most used)
+- =claudemacs-repl-send-buffer= - Send entire buffer
+- =claudemacs-repl-send-line= - Send current line only
 
 *** Session Control
 - =claudemacs-repl-send-enter= - Send enter key
@@ -104,13 +197,77 @@ and their constraints depend on that implementation.
 *** Utilities
 - =claudemacs-repl-start-claudemacs= - Start Claude session in appropriate directory
 - =claudemacs-repl-setup-window-layout= - Arrange windows for (the author's) optimal workflow
-- =claudemacs-repl-status= - Diagnostic information for troubleshooting
-- =claudemacs-repl-toggle-debug-mode= - Enable/disable debug messages
+- =claudemacs-repl-status= - Display connection status and diagnostics
+
+** Configuration
+
+*** Template Customization
+#+begin_src elisp
+;; Use default template
+(setq claudemacs-repl-template-file nil)
+
+;; Use custom template file
+(setq claudemacs-repl-template-file "~/my-claude-template.org")
+
+;; Use project-specific template
+(setq claudemacs-repl-template-file (expand-file-name "claude-template.org" user-emacs-directory))
+#+end_src
+
+To create a custom template,
+use =M-x claudemacs-repl-output-template= to export the default template to a buffer for editing.
+
+** Troubleshooting
+If you encounter "❌ Cannot send - no matching claudemacs buffer found for this directory":
+
+1. Ensure claudemacs is running: =M-x claudemacs-transient-menu=
+2. Verify Claude Code CLI is properly configured
+3. Run =M-x claudemacs-repl-status= for detailed diagnostic information
+4. Check that you're in the correct directory or using the appropriate project file
+
+For debug information, enable debug mode with =M-x claudemacs-repl-toggle-debug-mode=.
+
+** Development
+
+*** Running Tests
+#+begin_src bash
+make check
+#+end_src
+
+This runs the all test suite including linting,
+byte compilation,
+and documentation checks.
+
+** Releases
+This project uses automated releases via [[https://semantic-release.gitbook.io/][semantic-release]]. New versions are automatically published to GitHub Releases and a [[file:CHANGELOG.md][CHANGELOG.md]] is generated based on Conventional Commits. You can find detailed release notes in the CHANGELOG.
+
+*Note*: The `semantic-release` toolchain is used for development/release automation only. The Elisp package itself has no Node.js runtime dependencies and can be installed normally via MELPA.
 
 ** Contributing
+We welcome various issues and pull requests.
+However, please understand that due to leukemia recurrence in June 2024 and ongoing treatment,
+response times may be affected.
 
-See [[file:CONTRIBUTING.md][CONTRIBUTING.md]] for development setup and guidelines.
+Ironically,
+it was precisely this situation that motivated the development of this package - to continue enjoying programming even under these circumstances.
+The desire to maintain productive development workflows during challenging times
+drove the creation of claudemacs-repl.
+
+While I have extensively used OSS over the years,
+I never imagined I would find myself on the OSS development side under these circumstances.
+I have received almost no pull requests for repositories published on GitHub,
+please bear with me as responses may take longer than usual while I learn the process.
+
+*Note*: I wanted to automate version updates like semver as much as possible,
+so I had Claude Code (consulting with Gemini) automate it,
+and it recommended using Node.js mechanisms,
+which I have adopted.
+I'm not sure if this is the right approach,
+but I'll run with it for now.
 
 ** License
+This project is licensed under the MIT License - see the [[file:LICENSE][LICENSE]] file for details.
 
-MIT License. See [[file:LICENSE][LICENSE]] file for details.
+** Support
+
+- 🐛 [[https://github.com/phasetr/claudemacs-repl/issues][Issue Tracker]]
+- 💬 [[https://github.com/phasetr/claudemacs-repl/discussions][Discussions]]
