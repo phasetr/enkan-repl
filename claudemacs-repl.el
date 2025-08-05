@@ -53,6 +53,10 @@
 
 (require 'cl-lib)
 
+;; Load utility functions (require for template generation)
+(when (locate-library "claudemacs-repl-utils")
+  (require 'claudemacs-repl-utils))
+
 ;; Compatibility check
 (when (locate-library "claudemacs")
   (require 'claudemacs))
@@ -96,12 +100,12 @@ to maintain compatibility with existing project files.")
 Returns the directory path where default.org is located."
   (or
    ;; Try load-file-name first (when loading with load command)
-   (and load-file-name 
+   (and load-file-name
         (let ((dir (file-name-directory load-file-name)))
           (when (file-exists-p (expand-file-name claudemacs-repl-default-template-filename dir))
             dir)))
    ;; Try buffer-file-name (when evaluating in buffer)
-   (and buffer-file-name 
+   (and buffer-file-name
         (let ((dir (file-name-directory buffer-file-name)))
           (when (file-exists-p (expand-file-name claudemacs-repl-default-template-filename dir))
             dir)))
@@ -225,15 +229,40 @@ Returns the template path to use, or nil to use default template."
              (unless
                  (file-exists-p dir)
                (make-directory dir t))
-             ;; Create template with basic content
+             ;; Create template with dynamically generated command list
              (with-temp-file template-path
                (insert "* Quick Start\n\n")
                (insert "** Custom Template\n")
                (insert "This is your custom template.\n")
                (insert "Edit this content to match your needs.\n\n")
-               (insert "** Usage Notes\n")
-               (insert "- Use M-x claudemacs-repl-send-region to send selected text\n")
-               (insert "- Use M-x claudemacs-repl-send-rest-of-buffer to send from cursor to end\n"))
+               (insert "** Available Commands\n\n")
+               ;; Insert dynamically generated function list if available
+               (if (and (fboundp 'claudemacs-repl-utils--get-all-public-functions)
+                        (or load-file-name buffer-file-name))
+                   (insert (claudemacs-repl-utils--get-all-public-functions 
+                            (or load-file-name buffer-file-name)))
+                 ;; Fallback to static list if utils not available
+                 (progn
+                   (insert "- ~M-x claudemacs-repl-send-region~ - Send selected text to Claude\n")
+                   (insert "- ~M-x claudemacs-repl-send-buffer~ - Send entire buffer content\n")
+                   (insert "- ~M-x claudemacs-repl-send-rest-of-buffer~ - Send from cursor position to end\n")
+                   (insert "- ~M-x claudemacs-repl-send-line~ - Send current line\n")
+                   (insert "- ~M-x claudemacs-repl-send-enter~ - Send enter key for prompts\n")
+                   (insert "- ~M-x claudemacs-repl-send-1~ - Send '1' for numbered choice prompts\n")
+                   (insert "- ~M-x claudemacs-repl-send-2~ - Send '2' for numbered choice prompts\n")
+                   (insert "- ~M-x claudemacs-repl-send-3~ - Send '3' for numbered choice prompts\n")
+                   (insert "- ~M-x claudemacs-repl-send-escape~ - Send ESC key to interrupt operations\n")
+                   (insert "- ~M-x claudemacs-repl-open-project-input-file~ - Open or create project input file\n")
+                   (insert "- ~M-x claudemacs-repl-start-claudemacs~ - Start claudemacs session\n")
+                   (insert "- ~M-x claudemacs-repl-setup-window-layout~ - Set up convenient window layout\n")
+                   (insert "- ~M-x claudemacs-repl-output-template~ - Export template for customization\n")
+                   (insert "- ~M-x claudemacs-repl-status~ - Show diagnostic information\n")
+                   (insert "- ~M-x claudemacs-repl-toggle-debug-mode~ - Toggle debug mode\n")
+                   (insert "- ~M-x claudemacs-repl-enable-debug-mode~ - Enable debug mode\n")
+                   (insert "- ~M-x claudemacs-repl-disable-debug-mode~ - Disable debug mode\n")))
+               (insert "\n** Working Notes\n")
+               (insert "Write your thoughts and notes here.\n")
+               (insert "Send specific parts to Claude Code using the commands above.\n"))
              (message "Created new template file: %s" template-path)
              template-path)))
         (?q
@@ -387,9 +416,9 @@ If DIRECTORY is nil, use current `default-directory'."
         (let
             ((name (buffer-name buf))
              (default-dir
-               (with-current-buffer buf
-                 (when (boundp 'default-directory)
-                   default-directory)))
+              (with-current-buffer buf
+                (when (boundp 'default-directory)
+                  default-directory)))
              (eat-mode
               (with-current-buffer buf
                 (and (boundp 'eat-mode) eat-mode))))
