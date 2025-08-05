@@ -44,6 +44,8 @@ module.exports = {
 					"emacs --batch --load scripts/bump-version.el -- ${nextRelease.version}",
 					// Regenerate documentation files with updated functions
 					"emacs --batch --load scripts/generate-docs.el --eval '(generate-all-docs)'",
+					// Regenerate precompiled constants for cheatsheet performance
+					"emacs --batch --load scripts/generate-constants.el --eval '(generate-cheatsheet-constants)'",
 				].join(" && "),
 			},
 		],
@@ -56,6 +58,7 @@ module.exports = {
 					"package.json",
 					"claudemacs-repl.el",
 					"README.org",
+					"claudemacs-repl-constants.el",
 				],
 				message:
 					"chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}",

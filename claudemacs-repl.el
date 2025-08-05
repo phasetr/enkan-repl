@@ -999,18 +999,9 @@ Category: Utilities"
 
 Category: Command Palette"
   (interactive)
-  (unless (featurep 'claudemacs-repl-utils)
-    (require 'claudemacs-repl-utils))
-  (let* ((current-file (expand-file-name "claudemacs-repl.el"
-                                         (file-name-directory (or load-file-name buffer-file-name default-directory))))
-         (functions-info (claudemacs-repl-utils--extract-function-info current-file))
-         (interactive-functions (cl-remove-if-not
-                                 (lambda (f) (plist-get f :interactive))
-                                 functions-info))
-         (candidates (mapcar (lambda (func)
-                               (cons (plist-get func :name)
-                                     (or (plist-get func :docstring) "No description")))
-                             interactive-functions)))
+  (unless (featurep 'claudemacs-repl-constants)
+    (require 'claudemacs-repl-constants))
+  (let ((candidates claudemacs-repl-cheatsheet-candidates))
     (let ((completion-extra-properties
            `(:annotation-function
              (lambda (candidate)
