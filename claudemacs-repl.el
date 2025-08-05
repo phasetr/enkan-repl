@@ -53,9 +53,12 @@
 
 (require 'cl-lib)
 
-;; Load utility functions (require for template generation)
+;; Load utility functions (require for template generation and cheatsheet)
 (when (locate-library "claudemacs-repl-utils")
   (require 'claudemacs-repl-utils))
+
+;; Declare external functions to avoid byte-compile warnings
+(declare-function claudemacs-repl-utils--extract-function-info "claudemacs-repl-utils" (file-path))
 
 ;; Compatibility check
 (when (locate-library "claudemacs")
@@ -89,6 +92,15 @@ the standard template structure for new project input files.")
   "Prefix for claudemacs-repl encoded filenames.
 This is a fixed part of the filename encoding scheme and should not be changed
 to maintain compatibility with existing project files.")
+
+(defconst claudemacs-repl-command-categories
+  '("Command Palette"
+    "Text Sender"
+    "Session Controller"
+    "Utilities")
+  "Command category names for claudemacs-repl package.
+Command Palette is positioned first as the primary interface for M-x driven workflow.
+This structure is used for documentation generation and command organization.")
 
 ;;;; Internal Variables
 
@@ -264,7 +276,7 @@ Returns the template path to use, or nil to use default template."
 
 (defun claudemacs-repl--load-template ()
   "Load template content based on claudemacs-repl-template-file setting.
-Returns template content as string, or nil if no template found."
+Returns template content as string, using embedded template as fallback."
   (let
       ((template-path
         (cond
@@ -281,10 +293,49 @@ Returns template content as string, or nil if no template found."
          ;; Otherwise, look for default template in package directory
          (t (expand-file-name claudemacs-repl-default-template-filename
                               (claudemacs-repl--get-package-directory))))))
-    (when (and template-path (file-exists-p template-path))
-      (with-temp-buffer
-        (insert-file-contents template-path)
-        (buffer-string)))))
+    (if (and template-path (file-exists-p template-path))
+        (with-temp-buffer
+          (insert-file-contents template-path)
+          (buffer-string))
+      ;; Fall back to embedded template
+      (claudemacs-repl--get-embedded-template))))
+
+(defun claudemacs-repl--get-embedded-template ()
+  "Return embedded default template content as string."
+  (concat "#+TITLE: Claude Input File\n\n"
+          "This is the default project template for claudemacs-repl.\n\n"
+          "* Quick Start\n\n"
+          "Describe your main objective here.\n\n"
+          "* Context\n\n"
+          "Provide relevant background information, constraints, or requirements.\n\n"
+          "* Approach\n\n"
+          "Outline your planned approach or methodology.\n\n"
+          "* Functions/Commands\n\n"
+          "We open the following functions/commands.\n\n"
+          "- ~M-x claudemacs-repl-send-region~ - Send the text in region from START to END to claudemacs.\n"
+          "- ~M-x claudemacs-repl-send-buffer~ - Send the entire current buffer to claudemacs.\n"
+          "- ~M-x claudemacs-repl-send-rest-of-buffer~ - Send rest of buffer from cursor position to end to claudemacs.\n"
+          "- ~M-x claudemacs-repl-send-line~ - Send the current line to claudemacs.\n"
+          "- ~M-x claudemacs-repl-send-enter~ - Send enter key to claudemacs buffer.\n"
+          "- ~M-x claudemacs-repl-send-1~ - Send \\='1\\=' to claudemacs buffer for numbered choice prompts.\n"
+          "- ~M-x claudemacs-repl-send-2~ - Send \\='2\\=' to claudemacs buffer for numbered choice prompts.\n"
+          "- ~M-x claudemacs-repl-send-3~ - Send \\='3\\=' to claudemacs buffer for numbered choice prompts.\n"
+          "- ~M-x claudemacs-repl-send-escape~ - Send ESC key to claudemacs buffer.\n"
+          "- ~M-x claudemacs-repl-open-project-input-file~ - Open or create project input file for DIRECTORY. If DIRECTORY is not provided, use the current buffer's directory. When called interactively, prompts for directory if current buffer has no file.\n"
+          "- ~M-x claudemacs-repl-start-claudemacs~ - Start claudemacs and change to appropriate directory. Determines the directory from either a project input file in the current buffer or the buffer's directory.\n"
+          "- ~M-x claudemacs-repl-setup-window-layout~ - Set up window layout with org file on left and claudemacs on right.\n"
+          "- ~M-x claudemacs-repl-output-template~ - Output current template content to a new buffer for customization.\n"
+          "- ~M-x claudemacs-repl-status~ - Show detailed diagnostic information for troubleshooting connection and environment issues.\n"
+          "- ~M-x claudemacs-repl-toggle-debug-mode~ - Toggle debug mode for claudemacs-repl operations.\n"
+          "- ~M-x claudemacs-repl-enable-debug-mode~ - Enable debug mode for claudemacs-repl operations.\n"
+          "- ~M-x claudemacs-repl-disable-debug-mode~ - Disable debug mode for claudemacs-repl operations.\n"
+          "- ~M-x claudemacs-repl-cheatsheet~ - Display interactive cheatsheet for claudemacs-repl commands.\n\n"
+          "* Notes\n\n"
+          "Add your thoughts, observations, or important points here.\n\n"
+          "* Next Steps\n\n"
+          "- [ ] Item 1\n"
+          "- [ ] Item 2\n"
+          "- [ ] Item 3\n"))
 
 ;;;; Pure Functions for Directory/Buffer Detection
 
@@ -560,14 +611,18 @@ If SKIP-EMPTY-CHECK is non-nil, send content even if empty."
 
 ;;;###autoload
 (defun claudemacs-repl-send-region (start end)
-  "Send the text in region from START to END to claudemacs."
+  "Send the text in region from START to END to claudemacs.
+
+Category: Text Sender"
   (interactive "r")
   (when (use-region-p)
     (claudemacs-repl--send-buffer-content start end "Region")))
 
 ;;;###autoload
 (defun claudemacs-repl-send-buffer ()
-  "Send the entire current buffer to claudemacs."
+  "Send the entire current buffer to claudemacs.
+
+Category: Text Sender"
   (interactive)
   (claudemacs-repl--send-buffer-content
    (point-min) (point-max)
@@ -575,44 +630,58 @@ If SKIP-EMPTY-CHECK is non-nil, send content even if empty."
 
 ;;;###autoload
 (defun claudemacs-repl-send-rest-of-buffer ()
-  "Send rest of buffer from cursor position to end to claudemacs."
+  "Send rest of buffer from cursor position to end to claudemacs.
+
+Category: Text Sender"
   (interactive)
   (claudemacs-repl--send-buffer-content (point) (point-max) "Rest of buffer"))
 
 ;;;###autoload
 (defun claudemacs-repl-send-line ()
-  "Send the current line to claudemacs."
+  "Send the current line to claudemacs.
+
+Category: Text Sender"
   (interactive)
   (claudemacs-repl--send-buffer-content
    (line-beginning-position) (line-end-position) "Line"))
 
 ;;;###autoload
 (defun claudemacs-repl-send-enter ()
-  "Send enter key to claudemacs buffer."
+  "Send enter key to claudemacs buffer.
+
+Category: Text Sender"
   (interactive)
   (claudemacs-repl--send-numbered-choice ""))
 
 ;;;###autoload
 (defun claudemacs-repl-send-1 ()
-  "Send \\='1\\=' to claudemacs buffer for numbered choice prompt."
+  "Send \\='1\\=' to claudemacs buffer for numbered choice prompt.
+
+Category: Text Sender"
   (interactive)
   (claudemacs-repl--send-numbered-choice "1"))
 
 ;;;###autoload
 (defun claudemacs-repl-send-2 ()
-  "Send \\='2\\=' to claudemacs buffer for numbered choice prompt."
+  "Send \\='2\\=' to claudemacs buffer for numbered choice prompt.
+
+Category: Text Sender"
   (interactive)
   (claudemacs-repl--send-numbered-choice "2"))
 
 ;;;###autoload
 (defun claudemacs-repl-send-3 ()
-  "Send \\='3\\=' to claudemacs buffer for numbered choice prompt."
+  "Send \\='3\\=' to claudemacs buffer for numbered choice prompt.
+
+Category: Text Sender"
   (interactive)
   (claudemacs-repl--send-numbered-choice "3"))
 
 ;;;###autoload
 (defun claudemacs-repl-send-escape ()
-  "Send ESC key to claudemacs buffer."
+  "Send ESC key to claudemacs buffer.
+
+Category: Text Sender"
   (interactive)
   (claudemacs-repl--send-escape-directly))
 
@@ -622,26 +691,14 @@ Returns the created file path."
   (let*
       ((file-path
         (claudemacs-repl--get-project-file-path target-directory))
-       (template-source
-        (cond
-         ;; If custom template is specified, check if it exists
-         (claudemacs-repl-template-file
-          (let ((custom-path (expand-file-name claudemacs-repl-template-file)))
-            (if (file-exists-p custom-path)
-                custom-path
-              ;; Handle missing custom template interactively
-              (or (claudemacs-repl--handle-missing-template custom-path)
-                  ;; Fall back to default if user chooses default
-                  (expand-file-name claudemacs-repl-default-template-filename
-                                    (claudemacs-repl--get-package-directory))))))
-         ;; Otherwise, use default.org
-         (t (expand-file-name claudemacs-repl-default-template-filename
-                              (claudemacs-repl--get-package-directory))))))
+       (template-content
+        (claudemacs-repl--load-template)))
     ;; Ensure target directory exists
     (unless (file-exists-p (file-name-directory file-path))
       (make-directory (file-name-directory file-path) t))
-    ;; Copy template file to target location
-    (copy-file template-source file-path)
+    ;; Write template content to target location
+    (with-temp-file file-path
+      (insert template-content))
     file-path))
 
 ;;;###autoload
@@ -649,7 +706,9 @@ Returns the created file path."
   "Open or create project input file for DIRECTORY.
 If DIRECTORY is nil, use current `default-directory'.
 If project input file exists, open it directly.
-If not exists, create from template then open."
+If not exists, create from template then open.
+
+Category: Utilities"
   (interactive)
   (let*
       ((target-dir
@@ -677,7 +736,9 @@ If not exists, create from template then open."
 (defun claudemacs-repl-start-claudemacs ()
   "Start claudemacs and change to appropriate directory.
 Determines directory from current buffer filename if it's a persistent file.
-Checks for existing sessions to prevent double startup."
+Checks for existing sessions to prevent double startup.
+
+Category: Session Controller"
   (interactive)
   (let*
       ((target-dir
@@ -721,7 +782,9 @@ Checks for existing sessions to prevent double startup."
 ;;;###autoload
 (defun claudemacs-repl-setup-window-layout ()
   "Set up window layout with org file on left and claudemacs on right.
-This is the author's preference - customize as needed."
+This is the author's preference - customize as needed.
+
+Category: Session Controller"
   (interactive)
   (let
       ((target-dir (claudemacs-repl--get-target-directory-for-buffer)))
@@ -737,7 +800,9 @@ This is the author's preference - customize as needed."
 
 ;;;###autoload
 (defun claudemacs-repl-output-template ()
-  "Output current template content to a new buffer for customization."
+  "Output current template content to a new buffer for customization.
+
+Category: Utilities"
   (interactive)
   (let*
       ((template-content
@@ -768,7 +833,9 @@ This is the author's preference - customize as needed."
 
 ;;;###autoload
 (defun claudemacs-repl-status ()
-  "Show detailed diagnostic information for troubleshooting connection issues."
+  "Show detailed diagnostic information for troubleshooting connection issues.
+
+Category: Utilities"
   (interactive)
   (let*
       ((target-dir (claudemacs-repl--get-target-directory-for-buffer))
@@ -895,7 +962,9 @@ This is the author's preference - customize as needed."
 
 ;;;###autoload
 (defun claudemacs-repl-toggle-debug-mode ()
-  "Toggle debug mode for claudemacs-repl operations."
+  "Toggle debug mode for claudemacs-repl operations.
+
+Category: Utilities"
   (interactive)
   (setq
    claudemacs-repl-debug-mode
@@ -906,14 +975,18 @@ This is the author's preference - customize as needed."
 
 ;;;###autoload
 (defun claudemacs-repl-enable-debug-mode ()
-  "Enable debug mode for claudemacs-repl operations."
+  "Enable debug mode for claudemacs-repl operations.
+
+Category: Utilities"
   (interactive)
   (setq claudemacs-repl-debug-mode t)
   (message "claudemacs-repl debug mode: ENABLED"))
 
 ;;;###autoload
 (defun claudemacs-repl-disable-debug-mode ()
-  "Disable debug mode for claudemacs-repl operations."
+  "Disable debug mode for claudemacs-repl operations.
+
+Category: Utilities"
   (interactive)
   (setq claudemacs-repl-debug-mode nil)
   (message "claudemacs-repl debug mode: DISABLED"))
@@ -922,8 +995,12 @@ This is the author's preference - customize as needed."
 
 ;;;###autoload
 (defun claudemacs-repl-cheatsheet ()
-  "Display interactive cheatsheet for claudemacs-repl commands."
+  "Display interactive cheatsheet for claudemacs-repl commands.
+
+Category: Command Palette"
   (interactive)
+  (unless (featurep 'claudemacs-repl-utils)
+    (require 'claudemacs-repl-utils))
   (let* ((current-file (expand-file-name "claudemacs-repl.el"
                                          (file-name-directory (or load-file-name buffer-file-name default-directory))))
          (functions-info (claudemacs-repl-utils--extract-function-info current-file))

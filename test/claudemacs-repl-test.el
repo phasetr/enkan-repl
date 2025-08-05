@@ -851,13 +851,13 @@
          (temp-file nil))
     (unwind-protect
         (progn
-          ;; Should use default.org content as fallback
+          ;; Should use embedded template content as fallback
           (setq temp-file (claudemacs-repl--create-project-input-file temp-dir))
           (should (file-exists-p temp-file))
           (with-temp-buffer
             (insert-file-contents temp-file)
             (let ((content (buffer-string)))
-              ;; Should contain default.org content, not hardcoded fallback
+              ;; Should contain embedded template content, not hardcoded fallback
               (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" content))
               (should (string-match-p "~M-x claudemacs-repl-start-claudemacs~" content))
               (should (string-match-p "Start claudemacs session\\|claudemacs-repl-start-claudemacs" content)))))
@@ -865,7 +865,7 @@
         (delete-directory temp-dir t)))))
 
 (ert-deftest test-initialize-project-file-nil-template-uses-default-org ()
-  "Test that when claudemacs-repl-template-file is nil, default.org content is used."
+  "Test that when claudemacs-repl-template-file is nil, embedded template content is used."
   (let* ((temp-dir (make-temp-file "test-project-nil" t))
          (default-directory claudemacs-repl-test-package-dir)
          (claudemacs-repl-template-file nil)  ; Explicitly set to nil
@@ -877,7 +877,7 @@
           (with-temp-buffer
             (insert-file-contents temp-file)
             (let ((content (buffer-string)))
-              ;; Should contain default.org content, not hardcoded fallback
+              ;; Should contain embedded template content, not hardcoded fallback
               (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" content))
               (should (string-match-p "~M-x claudemacs-repl-start-claudemacs~" content))
               (should (string-match-p "Start claudemacs session\\|claudemacs-repl-start-claudemacs" content))
@@ -890,22 +890,19 @@
 ;;; Tests for claudemacs-repl--create-project-input-file Function
 
 (ert-deftest test-create-project-input-file-with-nil-template ()
-  "Test that create-project-input-file uses default.org when template-file is nil."
+  "Test that create-project-input-file uses embedded template when template-file is nil."
   (let ((claudemacs-repl-template-file nil)
         (temp-dir (make-temp-file "test-project" t))
-        (temp-file nil)
-        (original-default-org (expand-file-name "default.org" claudemacs-repl-test-package-dir)))
+        (temp-file nil))
     (unwind-protect
         (progn
-          ;; Copy default.org to temp directory for get-package-directory to find
-          (copy-file original-default-org (expand-file-name "default.org" temp-dir))
           (let ((default-directory temp-dir))
             (setq temp-file (claudemacs-repl--create-project-input-file temp-dir)))
           (should (file-exists-p temp-file))
           (with-temp-buffer
             (insert-file-contents temp-file)
             (let ((content (buffer-string)))
-              ;; Should contain default.org content
+              ;; Should contain embedded template content
               (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" content))
               (should (string-match-p "~M-x claudemacs-repl-start-claudemacs~" content))
               (should (string-match-p "Start claudemacs session\\|claudemacs-repl-start-claudemacs" content)))))
@@ -940,23 +937,20 @@
         (delete-directory temp-dir t)))))
 
 (ert-deftest test-create-project-input-file-with-nonexistent-custom-template ()
-  "Test that create-project-input-file falls back to default.org when custom template doesn't exist."
+  "Test that create-project-input-file falls back to embedded template when custom template doesn't exist."
   (let ((claudemacs-repl-template-file "/nonexistent/custom-template.org")
         (claudemacs-repl--testing-mode t)  ; Enable testing mode
         (temp-dir (make-temp-file "test-project" t))
-        (temp-file nil)
-        (original-default-org (expand-file-name "default.org" claudemacs-repl-test-package-dir)))
+        (temp-file nil))
     (unwind-protect
         (progn
-          ;; Copy default.org to temp directory for get-package-directory to find
-          (copy-file original-default-org (expand-file-name "default.org" temp-dir))
           (let ((default-directory temp-dir))
             (setq temp-file (claudemacs-repl--create-project-input-file temp-dir)))
           (should (file-exists-p temp-file))
           (with-temp-buffer
             (insert-file-contents temp-file)
             (let ((content (buffer-string)))
-              ;; Should fallback to default.org content
+              ;; Should fallback to embedded template content
               (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" content))
               (should (string-match-p "~M-x claudemacs-repl-start-claudemacs~" content))
               (should (string-match-p "Start claudemacs session\\|claudemacs-repl-start-claudemacs" content)))))
@@ -1011,12 +1005,9 @@
 (ert-deftest test-open-project-input-file-not-exists ()
   "Test that open-project-input creates and opens new file when it doesn't exist."
   (let ((temp-dir (make-temp-file "test-project" t))
-        (original-default-org (expand-file-name "default.org" claudemacs-repl-test-package-dir))
         (temp-file nil))
     (unwind-protect
         (progn
-          ;; Copy default.org to temp directory for get-package-directory to find
-          (copy-file original-default-org (expand-file-name "default.org" temp-dir))
           (setq temp-file (claudemacs-repl--get-project-file-path temp-dir))
           ;; Ensure file doesn't exist initially
           (should-not (file-exists-p temp-file))
