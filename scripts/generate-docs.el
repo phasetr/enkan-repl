@@ -48,12 +48,37 @@ Returns a list of plists, each containing :name, :args, :docstring,
               (condition-case nil
                   (setq args (read args-str))
                 (error (setq args nil)))
-              ;; Look for docstring in next lines
-              (let ((next-line-idx (1+ current-line)))
-                (when (< next-line-idx (length lines))
+              ;; Look for docstring in next lines (support multi-line)
+              (let ((next-line-idx (1+ current-line))
+                    (in-docstring nil)
+                    (docstring-lines '()))
+                (while (and (< next-line-idx (length lines))
+                            (< next-line-idx (+ current-line 10))) ; reasonable limit
                   (let ((next-line (nth next-line-idx lines)))
-                    (when (string-match "^\\s-*\"\\(.*\\)\"" next-line)
-                      (setq docstring (match-string 1 next-line))))))
+                    (cond
+                     ;; Start of docstring
+                     ((and (not in-docstring) 
+                           (string-match "^\\s-*\"\\(.*\\)\"\\s-*$" next-line))
+                      ;; Single line docstring
+                      (setq docstring (match-string 1 next-line))
+                      (setq next-line-idx (length lines))) ; break
+                     ((and (not in-docstring)
+                           (string-match "^\\s-*\"\\(.*\\)" next-line))
+                      ;; Start of multi-line docstring
+                      (setq in-docstring t)
+                      (push (match-string 1 next-line) docstring-lines))
+                     ;; End of multi-line docstring
+                     ((and in-docstring
+                           (string-match "\\(.*\\)\"\\s-*$" next-line))
+                      (push (match-string 1 next-line) docstring-lines)
+                      (setq docstring (mapconcat 'identity (nreverse docstring-lines) " "))
+                      (setq next-line-idx (length lines))) ; break
+                     ;; Middle of multi-line docstring
+                     (in-docstring
+                      (push (string-trim next-line) docstring-lines))
+                     ;; Not a docstring line, break
+                     (t (setq next-line-idx (length lines)))))
+                  (setq next-line-idx (1+ next-line-idx))))
               ;; Look for (interactive) in the function body
               ;; Only search until we find another defun or end of reasonable function scope
               (let ((body-idx (1+ current-line))
@@ -83,38 +108,6 @@ Returns a list of plists, each containing :name, :args, :docstring,
           (setq current-line (1+ current-line))))
       (nreverse functions-info))))
 
-(defun claudemacs-repl--format-function-info (info)
-  "Format a single function info plist into org-mode format."
-  (let* ((name (plist-get info :name))
-         (args (plist-get info :args))
-         (docstring (plist-get info :docstring))
-         (interactive-p (plist-get info :interactive))
-         (autoload-p (plist-get info :autoload))
-         (output-lines '()))
-
-    (push (format "** ~%s~ %s" name (if args (format "%S" args) "()")) output-lines)
-    (when interactive-p
-      (push "   - *Type*: Interactive Command" output-lines))
-    (when autoload-p
-      (push "   - *Autoload*: Yes" output-lines))
-    (when (not (= (length docstring) 0))
-      (push (format "   - *Description*: %s" docstring) output-lines))
-    (mapconcat 'identity (nreverse output-lines) "\n")))
-
-(defun claudemacs-repl--generate-public-api-docs (file-path output-file)
-  "Generate org-mode documentation for public functions/commands from FILE-PATH.
-Write the formatted output to OUTPUT-FILE."
-  (let* ((functions (claudemacs-repl--extract-function-info file-path))
-         (public-functions (cl-remove-if-not
-                            (lambda (f) (or (plist-get f :interactive)
-                                            (plist-get f :autoload)))
-                            functions))
-         (formatted-output (mapcar 'claudemacs-repl--format-function-info public-functions)))
-    (with-temp-file output-file
-      (insert "#+TITLE: Public API\n\n")
-      (insert "* Public API\n\n")
-      (insert "This document lists all public functions and commands available in claudemacs-repl.\n\n")
-      (insert (mapconcat 'identity formatted-output "\n\n")))))
 
 (defun claudemacs-repl--generate-default-template (output-file)
   "Generate default template file for claudemacs-repl projects.
@@ -199,10 +192,6 @@ Write the formatted template to OUTPUT-FILE."
       (insert "You don't need to send everything - be selective about what context is relevant.\n"))))
 
 ;; For batch execution
-(defun extract-public-api ()
-  "Extract public API from claudemacs-repl.el to public-api.org."
-  (claudemacs-repl--generate-public-api-docs "claudemacs-repl.el" "public-api.org")
-  (message "Public API documentation generated in public-api.org"))
 
 (defun generate-default-template ()
   "Generate default template file for claudemacs-repl projects."
@@ -211,7 +200,7 @@ Write the formatted template to OUTPUT-FILE."
 
 (defun claudemacs-repl--generate-readme (output-file)
   "Generate README.org file with dynamically updated function lists.
-Write the formatted README to OUTPUT-FILE."
+Only updates the Text Sending Capabilities section, preserving other content."
   (let* ((script-dir (file-name-directory (or load-file-name buffer-file-name default-directory)))
          (project-root (if (string-match-p "scripts/?$" script-dir)
                           (file-name-directory (directory-file-name script-dir))
@@ -221,121 +210,42 @@ Write the formatted README to OUTPUT-FILE."
          (interactive-functions (cl-remove-if-not
                                 (lambda (f) (plist-get f :interactive))
                                 functions))
-         (send-functions (cl-remove-if-not
-                         (lambda (f) (string-match-p "send-" (plist-get f :name)))
-                         interactive-functions)))
-    (with-temp-file output-file
-      ;; Static header content
-      (insert "#+TITLE: claudemacs-repl\n")
-      (insert "#+AUTHOR: [phasetr]\n")
-      (insert "#+EMAIL: phasetr@gmail.com\n")
-      (insert "#+OPTIONS: toc:2 num:nil\n\n")
+         (send-functions interactive-functions))
+    
+    ;; Read existing README.org content
+    (let ((readme-content (if (file-exists-p output-file)
+                              (with-temp-buffer
+                                (insert-file-contents output-file)
+                                (buffer-string))
+                            ""))
+          (new-section ""))
       
-      (insert "[[https://melpa.org/#/claudemacs-repl][file:https://melpa.org/packages/claudemacs-repl-badge.svg]]\n")
-      (insert "[[https://stable.melpa.org/#/claudemacs-repl][file:https://stable.melpa.org/packages/claudemacs-repl-badge.svg]]\n")
-      (insert "[[https://github.com/phasetr/claudemacs-repl/actions/workflows/ci.yml][file:https://github.com/phasetr/claudemacs-repl/actions/workflows/ci.yml/badge.svg]]\n\n")
-      
-      (insert "Enhanced REPL utilities for seamless Claude Code interaction through Emacs.\n\n")
-      
-      (insert "** Table of Contents\n")
-      (insert ":PROPERTIES:\n")
-      (insert ":TOC:      :include all :depth 2\n")
-      (insert ":END:\n")
-      (insert ":CONTENTS:\n")
-      (insert "- [[#installation][Installation]]\n")
-      (insert "- [[#usage][Usage]]\n")
-      (insert "- [[#features][Features]]\n")
-      (insert "- [[#background][Background]]\n")
-      (insert "- [[#contributing][Contributing]]\n")
-      (insert "- [[#license][License]]\n")
-      (insert ":END:\n\n")
-      
-      (insert "** Installation\n\n")
-      (insert "*** From MELPA\n\n")
-      (insert "=claudemacs-repl= is available on [[https://melpa.org/][MELPA]].\n\n")
-      (insert "#+BEGIN_SRC emacs-lisp\n")
-      (insert "(use-package claudemacs-repl\n")
-      (insert "  :ensure t\n")
-      (insert "  :after claudemacs)\n")
-      (insert "#+END_SRC\n\n")
-      
-      (insert "*** Manual Installation\n\n")
-      (insert "#+BEGIN_SRC bash\n")
-      (insert "git clone https://github.com/phasetr/claudemacs-repl.git\n")
-      (insert "#+END_SRC\n\n")
-      (insert "Add to your Emacs configuration:\n\n")
-      (insert "#+BEGIN_SRC emacs-lisp\n")
-      (insert "(add-to-list 'load-path \"/path/to/claudemacs-repl\")\n")
-      (insert "(require 'claudemacs-repl)\n")
-      (insert "#+END_SRC\n\n")
-      
-      (insert "** Usage\n\n")
-      (insert "*** Quick Start\n\n")
-      (insert "1. Start a Claude Code session: ~M-x claudemacs-repl-start-claudemacs~\n")
-      (insert "2. Open project input file: ~M-x claudemacs-repl-open-project-input-file~\n")
-      (insert "3. Write your thoughts and send them with ~M-x claudemacs-repl-send-region~\n\n")
-      
-      (insert "*** Workflow\n\n")
-      (insert "=claudemacs-repl= creates persistent org-mode files for each project directory.\n")
-      (insert "These files serve as your thinking space - write extensively, then send\n")
-      (insert "only relevant parts to Claude Code using the send commands.\n\n")
-      
-      (insert "** Background\n\n")
-      (insert "I frequently collaborate with Claude Code and found myself\n")
-      (insert "keeping inspired thoughts noted for immediate use after AI work is complete.\n")
-      (insert "For text work, I naturally turned to Emacs.\n")
-      (insert "After trying several packages that didn't quite fit,\n")
-      (insert "I decided to build my own on top of [[https://github.com/cpoile/claudemacs][claudemacs]].\n\n")
-      
-      (insert "** Features\n\n")
-      
-      ;; Dynamically generate Text Sending Capabilities
-      (insert "*** Text Sending Capabilities\n")
+      ;; Generate new Functions/Commands section
+      (setq new-section "** Functions/Commands\n\n")
+      (setq new-section (concat new-section "We open the following functions/commands.\n\n"))
       (dolist (func send-functions)
         (let* ((name (plist-get func :name))
                (docstring (plist-get func :docstring))
-               (display-name (replace-regexp-in-string "claudemacs-repl-" "" name))
-               (description (cond
-                            ((string-match-p "region" name) "Send selected text to Claude")
-                            ((string-match-p "buffer" name) "Send entire buffer content")
-                            ((string-match-p "rest-of-buffer" name) "Send from cursor position to end")
-                            ((string-match-p "line" name) "Send current line")
-                            ((string-match-p "enter" name) "Send enter key for prompts")
-                            ((string-match-p "send-[123]" name) "Send numbered choices for AI prompts")
-                            ((string-match-p "escape" name) "Send ESC key to interrupt operations")
-                            (t (or docstring "Send command")))))
-          (insert (format "- =%s= - %s\n" name description))))
-      (insert "- *File Path Support*: Send file paths for Claude to read directly (e.g., =~/project/config.json=)\n\n")
+               (description (or docstring "Send command")))
+          (setq new-section (concat new-section (format "- =%s= - %s\n" name description)))))
+      (setq new-section (concat new-section "\n"))
       
-      ;; Static project management content
-      (insert "*** Project Management\n")
-      (insert "These features rely on the underlying claudemacs functionality,\n")
-      (insert "and their constraints depend on that implementation.\n\n")
-      (insert "- *Persistent Input Files*: Org-mode files with filename-encoded directory mapping\n")
-      (insert "  (based on claudemacs buffer name mode detection specification as of Aug 2025)\n")
-      (insert "- *Template System*: Customizable templates with default.org included\n")
-      (insert "- *Directory-based Targeting*: Automatically match files to appropriate claudemacs sessions\n")
-      (insert "- *Multi-project Support*: Handle multiple Claude sessions in different directories simultaneously\n\n")
-      
-      (insert "*** Session Management\n")
-      (insert "- =claudemacs-repl-start-claudemacs= - Launch Claude session in appropriate directory\n")
-      (insert "  (only wraps =claudemacs-transient-menu=)\n\n")
-      
-      (insert "*** Session Control\n")
-      (insert "- =claudemacs-repl-send-enter= - Send enter key\n")
-      (insert "- =claudemacs-repl-send-1/2/3= - Send numbered choices for AI prompts\n\n")
-      
-      (insert "*** Utilities\n")
-      (insert "- =claudemacs-repl-start-claudemacs= - Start Claude session in appropriate directory\n")
-      (insert "- =claudemacs-repl-setup-window-layout= - Arrange windows for (the author's) optimal workflow\n")
-      (insert "- =claudemacs-repl-status= - Diagnostic information for troubleshooting\n")
-      (insert "- =claudemacs-repl-toggle-debug-mode= - Enable/disable debug messages\n\n")
-      
-      (insert "** Contributing\n\n")
-      (insert "See [[file:CONTRIBUTING.md][CONTRIBUTING.md]] for development setup and guidelines.\n\n")
-      
-      (insert "** License\n\n")
-      (insert "MIT License. See [[file:LICENSE][LICENSE]] file for details.\n"))))
+      ;; Find start and end positions
+      (let ((start-pos (string-match "\\*\\* Functions/Commands" readme-content))
+            (end-pos (string-match "\\*\\* Installation" readme-content)))
+        (if (and start-pos end-pos)
+            ;; Replace the section
+            (let ((before (substring readme-content 0 start-pos))
+                  (after (substring readme-content end-pos)))
+              (with-temp-file output-file
+                (insert before)
+                (insert new-section)
+                (insert after)))
+          ;; If markers not found, create the file with original logic for fallback
+          (with-temp-file output-file
+            (insert readme-content)
+            (insert "\n\n")
+            (insert new-section)))))))
 
 (defun generate-readme ()
   "Generate README.org with dynamically updated function lists."
@@ -343,8 +253,7 @@ Write the formatted README to OUTPUT-FILE."
   (message "README.org generated successfully"))
 
 (defun generate-all-docs ()
-  "Generate all documentation files (API, template, and README)."
-  (extract-public-api)
+  "Generate all documentation files (template and README)."
   (generate-default-template)
   (generate-readme)
   (message "All documentation generated successfully"))
