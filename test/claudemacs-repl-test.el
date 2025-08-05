@@ -815,7 +815,7 @@
             (insert-file-contents temp-file)
             (let ((content (buffer-string)))
               (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" content))
-              (should (string-match-p "(claudemacs-repl-start-claudemacs)" content)))))
+              (should (string-match-p "~M-x claudemacs-repl-start-claudemacs~" content)))))
       (when (file-exists-p temp-dir)
         (delete-directory temp-dir t)))))
 
@@ -859,8 +859,8 @@
             (let ((content (buffer-string)))
               ;; Should contain default.org content, not hardcoded fallback
               (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" content))
-              (should (string-match-p "(claudemacs-repl-start-claudemacs)" content))
-              (should (string-match-p "Start Claude Code Session\\|claudemacs-repl-start-claudemacs" content)))))
+              (should (string-match-p "~M-x claudemacs-repl-start-claudemacs~" content))
+              (should (string-match-p "Start claudemacs session\\|claudemacs-repl-start-claudemacs" content)))))
       (when (file-exists-p temp-dir)
         (delete-directory temp-dir t)))))
 
@@ -879,9 +879,9 @@
             (let ((content (buffer-string)))
               ;; Should contain default.org content, not hardcoded fallback
               (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" content))
-              (should (string-match-p "(claudemacs-repl-start-claudemacs)" content))
-              (should (string-match-p "Start Claude Code Session\\|claudemacs-repl-start-claudemacs" content))
-              (should (string-match-p "Essential Commands\\|Send current region" content))
+              (should (string-match-p "~M-x claudemacs-repl-start-claudemacs~" content))
+              (should (string-match-p "Start claudemacs session\\|claudemacs-repl-start-claudemacs" content))
+              (should (string-match-p "Available Commands\\|Send the text in region" content))
               ;; Should NOT contain the hardcoded fallback format
               (should-not (string-match-p "Project: .*\n\n\\*\\* Thoughts/Notes" content)))))
       (when (file-exists-p temp-dir)
@@ -907,8 +907,8 @@
             (let ((content (buffer-string)))
               ;; Should contain default.org content
               (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" content))
-              (should (string-match-p "(claudemacs-repl-start-claudemacs)" content))
-              (should (string-match-p "Start Claude Code Session\\|claudemacs-repl-start-claudemacs" content)))))
+              (should (string-match-p "~M-x claudemacs-repl-start-claudemacs~" content))
+              (should (string-match-p "Start claudemacs session\\|claudemacs-repl-start-claudemacs" content)))))
       (when (file-exists-p temp-dir)
         (delete-directory temp-dir t)))))
 
@@ -933,7 +933,7 @@
               (should (string-match-p "\\* Custom Template Content" content))
               (should (string-match-p "My Custom Section" content))
               ;; Should NOT contain default.org content
-              (should-not (string-match-p "(claudemacs-repl-start-claudemacs)" content)))))
+              (should-not (string-match-p "~M-x claudemacs-repl-start-claudemacs~" content)))))
       (when (file-exists-p temp-template)
         (delete-file temp-template))
       (when (file-exists-p temp-dir)
@@ -958,8 +958,8 @@
             (let ((content (buffer-string)))
               ;; Should fallback to default.org content
               (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" content))
-              (should (string-match-p "(claudemacs-repl-start-claudemacs)" content))
-              (should (string-match-p "Start Claude Code Session\\|claudemacs-repl-start-claudemacs" content)))))
+              (should (string-match-p "~M-x claudemacs-repl-start-claudemacs~" content))
+              (should (string-match-p "Start claudemacs session\\|claudemacs-repl-start-claudemacs" content)))))
       (when (file-exists-p temp-dir)
         (delete-directory temp-dir t)))))
 
@@ -1050,7 +1050,7 @@
                 (insert-file-contents temp-file)
                 (let ((content (buffer-string)))
                   (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" content))
-                  (should (string-match-p "(claudemacs-repl-start-claudemacs)" content)))))))
+                  (should (string-match-p "~M-x claudemacs-repl-start-claudemacs~" content)))))))
       (when (file-exists-p temp-dir)
         (delete-directory temp-dir t)))))
 
