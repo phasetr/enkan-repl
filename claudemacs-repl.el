@@ -511,9 +511,9 @@ If DIRECTORY is nil, use current `default-directory'."
         (let
             ((name (buffer-name buf))
              (default-dir
-               (with-current-buffer buf
-                 (when (boundp 'default-directory)
-                   default-directory)))
+              (with-current-buffer buf
+                (when (boundp 'default-directory)
+                  default-directory)))
              (eat-mode
               (with-current-buffer buf
                 (and (boundp 'eat-mode) eat-mode))))
@@ -782,6 +782,51 @@ Category: Utilities"
       (goto-char (point-min))
       (message "Project input file ready: %s" (file-name-nondirectory file-path)))))
 
+(defun claudemacs-repl--get-session-info ()
+  "Get session information for current buffer.
+Returns (target-dir existing-buffer can-send) as a list."
+  (let ((target-dir (claudemacs-repl--get-target-directory-for-buffer)))
+    (let ((existing-buffer (claudemacs-repl--get-buffer-for-directory target-dir)))
+      (let ((can-send (claudemacs-repl--can-send-text target-dir)))
+        (list target-dir existing-buffer can-send)))))
+
+(defun claudemacs-repl--execute-claudemacs-command (command-symbol success-message)
+  "Execute a claudemacs command with proper setup and error handling.
+This function temporarily changes the working directory to the target directory,
+executes the command, and restores the original directory afterward.
+
+COMMAND-SYMBOL is the command to execute (e.g., \\='claudemacs-transient-menu).
+SUCCESS-MESSAGE is the message format string for successful execution."
+  (let ((target-dir (car (claudemacs-repl--get-session-info)))
+        (original-default-directory default-directory))
+    (unwind-protect
+        (progn
+          (cd target-dir)
+          ;; Ensure claudemacs is loaded and command is available
+          (unless (require 'claudemacs nil t)
+            (error "Claudemacs package not found or failed to load.  Please install and configure claudemacs first"))
+          (unless (fboundp command-symbol)
+            (error "%s not available after loading claudemacs package" command-symbol))
+          ;; Execute the command
+          (funcall command-symbol)
+          (message success-message target-dir))
+      ;; Always restore original directory
+      (cd original-default-directory))))
+
+(defun claudemacs-repl--handle-dead-session (existing-buffer target-dir prompt-format restart-func)
+  "Handle dead session with user confirmation.
+EXISTING-BUFFER is the dead buffer to handle.
+TARGET-DIR is the target directory.
+PROMPT-FORMAT is the format string for `y-or-n-p' prompt.
+RESTART-FUNC is a zero-argument function to call for restart.
+  When nil, only cleanup is performed (buffer is killed).
+  When provided, the function is called after cleanup for restart."
+  (when (y-or-n-p (format prompt-format target-dir))
+    (kill-buffer existing-buffer)
+    (if restart-func
+        (funcall restart-func)
+      (message "Removed dead claudemacs session buffer in: %s" target-dir))))
+
 ;;;###autoload
 (defun claudemacs-repl-start-claudemacs ()
   "Start claudemacs and change to appropriate directory.
@@ -790,44 +835,58 @@ Checks for existing sessions to prevent double startup.
 
 Category: Session Controller"
   (interactive)
-  (let*
-      ((target-dir
-        (claudemacs-repl--get-target-directory-for-buffer))
-       (existing-buffer
-        (claudemacs-repl--get-buffer-for-directory target-dir))
-       (can-send
-        (claudemacs-repl--can-send-text target-dir))
-       (original-default-directory default-directory))
-    ;; Check for existing session
+  (let* ((session-info (claudemacs-repl--get-session-info))
+         (target-dir (nth 0 session-info))
+         (existing-buffer (nth 1 session-info))
+         (can-send (nth 2 session-info)))
     (cond
+     ;; Active session already exists
      (can-send
-      (message
-       "Claudemacs session already running in: %s (buffer: %s)"
-       target-dir (buffer-name existing-buffer)))
+      (message "Claudemacs session already running in: %s (buffer: %s)"
+               target-dir (buffer-name existing-buffer)))
      ;; Dead session exists - offer to restart
      (existing-buffer
-      (when
-          (y-or-n-p (format "Dead claudemacs session found in %s.  Restart? " target-dir))
-        (kill-buffer existing-buffer)
-        (claudemacs-repl-start-claudemacs)))
+      (claudemacs-repl--handle-dead-session
+       existing-buffer target-dir
+       "Dead claudemacs session found in %s. Restart? "
+       #'claudemacs-repl-start-claudemacs))
      ;; No existing session - start new one
      (t
-      (unwind-protect
-          (progn
-            (cd target-dir)
-            ;; Ensure claudemacs is fully loaded before using its functions
-            (if (require 'claudemacs nil t)
-                (progn
-                  ;; Double-check after explicit require
-                  (if (fboundp 'claudemacs-transient-menu)
-                      (progn
-                        (claudemacs-transient-menu)
-                        (message "Started claudemacs in: %s" target-dir))
-                    (error "Claudemacs-transient-menu not available after loading claudemacs package")))
-              (error "Claudemacs package not found or failed to load.  Please install and configure claudemacs first")))
-        ;; Restore original directory if startup failed
-        (unless (claudemacs-repl--can-send-text target-dir)
-          (cd original-default-directory)))))))
+      (claudemacs-repl--execute-claudemacs-command
+       'claudemacs-transient-menu
+       "Started claudemacs in: %s")
+      ;; Verify startup succeeded
+      (unless (claudemacs-repl--can-send-text target-dir)
+        (error "Failed to start claudemacs session in: %s" target-dir))))))
+
+;;;###autoload
+(defun claudemacs-repl-finish-claudemacs ()
+  "Terminate claudemacs session and close its buffer.
+Determines directory from current buffer filename if it's a persistent file.
+Calls claudemacs-kill for proper session termination.
+
+Category: Session Controller"
+  (interactive)
+  (let* ((session-info (claudemacs-repl--get-session-info))
+         (target-dir (nth 0 session-info))
+         (existing-buffer (nth 1 session-info))
+         (can-send (nth 2 session-info)))
+    (cond
+     ;; No session found
+     ((not existing-buffer)
+      (message "No claudemacs session found for directory: %s" target-dir))
+     ;; Active session - terminate using claudemacs-kill
+     (can-send
+      (when (y-or-n-p (format "Terminate active claudemacs session in %s? " target-dir))
+        (claudemacs-repl--execute-claudemacs-command
+         'claudemacs-kill
+         "Terminated claudemacs in: %s")))
+     ;; Dead session exists - offer to clean up
+     (existing-buffer
+      (claudemacs-repl--handle-dead-session
+       existing-buffer target-dir
+       "Clean up dead claudemacs session in %s? "
+       nil)))))
 
 ;;;###autoload
 (defun claudemacs-repl-setup-window-layout ()
