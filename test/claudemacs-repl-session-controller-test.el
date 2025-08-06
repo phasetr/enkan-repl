@@ -9,9 +9,14 @@
 (require 'ert)
 (require 'cl-lib)
 
-;; Load the main file
-(let ((main-file (expand-file-name "../claudemacs-repl.el" (file-name-directory (or load-file-name buffer-file-name)))))
-  (load main-file))
+;; Load the main file - try multiple approaches for robustness
+(unless (featurep 'claudemacs-repl)
+  (or (ignore-errors (require 'claudemacs-repl))
+      (let ((main-file (expand-file-name "../claudemacs-repl.el" 
+                                         (file-name-directory (or load-file-name buffer-file-name)))))
+        (when (file-exists-p main-file)
+          (load main-file)))
+      (error "Could not load claudemacs-repl.el")))
 
 ;;;; Helper Function Tests
 

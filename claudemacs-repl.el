@@ -792,6 +792,9 @@ Returns (target-dir existing-buffer can-send) as a list."
 
 (defun claudemacs-repl--execute-claudemacs-command (command-symbol success-message)
   "Execute a claudemacs command with proper setup and error handling.
+This function temporarily changes the working directory to the target directory,
+executes the command, and restores the original directory afterward.
+
 COMMAND-SYMBOL is the command to execute (e.g., \\='claudemacs-transient-menu).
 SUCCESS-MESSAGE is the message format string for successful execution."
   (let ((target-dir (car (claudemacs-repl--get-session-info)))
@@ -815,7 +818,9 @@ SUCCESS-MESSAGE is the message format string for successful execution."
 EXISTING-BUFFER is the dead buffer to handle.
 TARGET-DIR is the target directory.
 PROMPT-FORMAT is the format string for `y-or-n-p' prompt.
-RESTART-FUNC is the function to call for restart (can be nil for cleanup only)."
+RESTART-FUNC is a zero-argument function to call for restart.
+  When nil, only cleanup is performed (buffer is killed).
+  When provided, the function is called after cleanup for restart."
   (when (y-or-n-p (format prompt-format target-dir))
     (kill-buffer existing-buffer)
     (if restart-func
