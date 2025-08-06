@@ -22,6 +22,7 @@
     ("claudemacs-repl-send-escape" . "Send ESC key to claudemacs buffer.  Category: Text Sender")
     ("claudemacs-repl-open-project-input-file" . "Open or create project input file for DIRECTORY. If DIRECTORY is nil, use current `default-directory'. If project input file exists, open it directly. If not exists, create from template then open.  Category: Utilities")
     ("claudemacs-repl-start-claudemacs" . "Start claudemacs and change to appropriate directory. Determines directory from current buffer filename if it's a persistent file. Checks for existing sessions to prevent double startup.  Category: Session Controller")
+    ("claudemacs-repl-finish-claudemacs" . "Terminate claudemacs session and close its buffer. Determines directory from current buffer filename if it's a persistent file. Calls claudemacs-kill for proper session termination.  Category: Session Controller")
     ("claudemacs-repl-setup-window-layout" . "Set up window layout with org file on left and claudemacs on right. This is the author's preference - customize as needed.  Category: Session Controller")
     ("claudemacs-repl-output-template" . "Output current template content to a new buffer for customization.  Category: Utilities")
     ("claudemacs-repl-status" . "Show detailed diagnostic information for troubleshooting connection issues.  Category: Utilities")
@@ -33,7 +34,7 @@
 Each element is a cons cell (FUNCTION-NAME . DESCRIPTION).")
 
 (defconst claudemacs-repl-cheatsheet-function-count
-  18
+  19
   "Number of functions in cheatsheet.")
 
 (provide 'claudemacs-repl-constants)
