@@ -9,23 +9,9 @@ This package builds upon the excellent work of:
 
 We extend our deepest gratitude to the authors and contributors of these foundational packages.
 
-#+TOC: headlines 2 local
+#+OPTIONS: toc:2
 
-** Table of Contents
-- [[#vision-reviving-repl-culture-for-the-ai-era][Vision: Reviving REPL Culture for the AI Era]]
-- [[#motivation][Motivation]]
-- [[#features][Features]]
-- [[#design-philosophy][Design Philosophy]]
-- [[#installation][Installation]]
-- [[#quick-start][Quick Start]]
-- [[#core-functions][Core Functions]]
-- [[#configuration][Configuration]]
-- [[#troubleshooting][Troubleshooting]]
-- [[#development][Development]]
-- [[#contributing][Contributing]]
-- [[#license][License]]
-
-** Vision: Reviving REPL Culture for the AI Era
+** Vision - Reviving REPL Culture for the AI Era
 This package differs technically from traditional REPLs (Read-Eval-Print Loop).
 While conventional REPLs execute code and return results,
 =claudemacs-repl= sends text to Claude AI and receives generated responses.
@@ -42,6 +28,18 @@ and deepen your thinking further.
 This cycle is the development experience that the new era's REPL envisions.
 Here lies a completely new programming horizon woven by Emacs and AI.
 
+** Future Direction and Breaking Changes Notice
+
+This package is currently built on Claude Code due to the overwhelmingly superior experience it provides within my current usage scope.
+However, if superior services emerge that surpass Claude Code through future technological and service developments, I intend to migrate to those alternatives.
+Ideally, I would like to enable switching between or combining multiple services.
+(In fact, I judge Claude Code's search capabilities to be insufficient,
+which is why I frequently instruct to "consult Gemini with =gemini -p= for research.")
+Parts that are tightly coupled to Claude Code represent critical weaknesses.
+Therefore, please be aware that breaking changes, including package name changes, may be introduced.
+
+This package also serves as my personal research tool for exploring challenges on the path to achieving that goal.
+
 ** Motivation
 The development motivation stems from the current usability issues with Claude Code and Gemini CLI,
 particularly the difficulty of text input and the non-persistent nature of personal input history.
@@ -55,12 +53,24 @@ Furthermore, when something comes to mind during AI work,
 you need to leave the terminal to take notes,
 creating an extremely unpleasant development experience.
 
+Additionally, when security constraints are enforced to prevent dangerous command execution,
+you're frequently prompted for permission approvals.
+Constantly switching to the terminal for these confirmations becomes highly tedious.
+Even when stopping runaway processes, you must navigate to the terminal and press Esc.
+
 I constantly wished for the ability to easily take notes in text files
 and send only the necessary parts as commands to AI,
 keeping inspired thoughts noted for immediate use after AI work is complete.
 For text work, I naturally turned to Emacs.
 After trying several packages that didn't quite fit,
 I decided to build my own on top of [[https://github.com/cpoile/claudemacs][claudemacs]].
+
+This package enables you to send numbered choices directly from your input file
+using functions like =M-x claudemacs-repl-send-1/2/3=.
+To stop runaway processes, use =M-x claudemacs-repl-send-escape= from your input file -
+no terminal navigation required.
+(Note: We provide no default keybindings, so you may prefer mapping these to keys like =C-g=
+or configure them according to your preferences.)
 
 ** Design Philosophy
 
@@ -72,40 +82,46 @@ we focus on what works best within the Emacs ecosystem.
 
 *** No Default Keybindings
 We intentionally provide no default keybindings for several reasons:
-- Org-mode users often have heavily customized configurations
+- Org-mode itself already has a vast number of features and keybindings
 - Serious Emacs users (especially those who don't "cheat" with VSCode)
   may have their own customization patterns
 - Avoiding conflicts with existing user workflows
 
-*** `M-x` Driven Workflow
-The author's personal approach assumes complete focus during AI development sessions.
-All functions are accessed via =M-x= with fuzzy matching,
-which works efficiently when you're concentrated on AI interaction.
+Even if your Emacs configuration is heavily customized with no available keybindings,
+the interactive cheatsheet (=M-x claudemacs-repl-cheatsheet=) provides quick access
+to all functions with fuzzy search and filtering capabilities.
+
+*** =M-x= Driven Workflow with Interactive Cheatsheet
+As the author's personal approach, we introduce a "partial keybinding abandonment + cheatsheet strategy."
+Since there's little potential harm, we assigned direct org-mode keys for numbers and Esc as buffer-local variables.
+We also bound the central sending command =send-region= to a key, also as a buffer-local variable.
+For everything else, we abandoned keybinding configurations since they're rarely used.
+
+Instead, we added a cheatsheet feature to quickly access only the commands you need.
+You can filter by keywords directly related to the operation you want to perform.
+For infrequently used operations, this overhead is perfectly acceptable.
+At least for me.
+
+You could assign a keybinding to the cheatsheet itself, but I can't remember them.
+My memory/configuration approach doesn't align well with this - 
+I get confused thinking "is it 'c' for cheatsheet? or 's' for sheet? 
+wait, did I use 'open' somewhere, so 'o'?" even though 'open' isn't even in the actual command name.
+
+Furthermore, once you decide on settings, you want to reuse them to some extent.
+To make this easy, we made it possible to specify your own default configuration file.
+We also added =claudemacs-repl-output-template= to output your custom configuration file
+to a temporary buffer, making it as easy as possible to reconfigure multiple files.
+
+The interactive cheatsheet (=M-x claudemacs-repl-cheatsheet=) makes this workflow
+even more practical by providing:
+- *Command Palette*: Quick access to all functions with descriptions
+- *Fuzzy Search*: Type partial names to find functions instantly
+- *Categorized Organization*: Functions grouped by purpose (Text Sender, Session Controller, Utilities)
+- *No Memorization Required*: Browse available functions without remembering exact names
+
 During Claude development work,
-the frequently used functions (=send-region=, =send-rest-of-buffer=)
-naturally appear at the top of completion lists.
-
-** Functions/Commands
-
-We open the following functions/commands.
-
-- ~M-x claudemacs-repl-send-region~ - Send the text in region from START to END to claudemacs.
-- ~M-x claudemacs-repl-send-buffer~ - Send the entire current buffer to claudemacs.
-- ~M-x claudemacs-repl-send-rest-of-buffer~ - Send rest of buffer from cursor position to end to claudemacs.
-- ~M-x claudemacs-repl-send-line~ - Send the current line to claudemacs.
-- ~M-x claudemacs-repl-send-enter~ - Send enter key to claudemacs buffer.
-- ~M-x claudemacs-repl-send-1~ - Send \\='1\\=' to claudemacs buffer for numbered choice prompt.
-- ~M-x claudemacs-repl-send-2~ - Send \\='2\\=' to claudemacs buffer for numbered choice prompt.
-- ~M-x claudemacs-repl-send-3~ - Send \\='3\\=' to claudemacs buffer for numbered choice prompt.
-- ~M-x claudemacs-repl-send-escape~ - Send ESC key to claudemacs buffer.
-- ~M-x claudemacs-repl-open-project-input-file~ - Open or create project input file for DIRECTORY. If DIRECTORY is nil, use current `default-directory'. If project input file exists, open it directly. If not exists, create from template then open.
-- ~M-x claudemacs-repl-start-claudemacs~ - Start claudemacs and change to appropriate directory. Determines directory from current buffer filename if it's a persistent file. Checks for existing sessions to prevent double startup.
-- ~M-x claudemacs-repl-setup-window-layout~ - Set up window layout with org file on left and claudemacs on right. This is the author's preference - customize as needed.
-- ~M-x claudemacs-repl-output-template~ - Output current template content to a new buffer for customization.
-- ~M-x claudemacs-repl-status~ - Show detailed diagnostic information for troubleshooting connection issues.
-- ~M-x claudemacs-repl-toggle-debug-mode~ - Toggle debug mode for claudemacs-repl operations.
-- ~M-x claudemacs-repl-enable-debug-mode~ - Enable debug mode for claudemacs-repl operations.
-- ~M-x claudemacs-repl-disable-debug-mode~ - Disable debug mode for claudemacs-repl operations.
+frequently used functions naturally appear at the top of completion lists,
+and the cheatsheet ensures you never miss useful functionality.
 
 ** Installation
 
@@ -155,11 +171,12 @@ compatibility with other environments has not been verified.
 3. *Open project file*: =M-x claudemacs-repl-open-project-input-file=
 4. *Start Claude session*: =M-x claudemacs-repl-start-claudemacs=
 5. *Write your thoughts* in the org-mode file
-6. *Send specific parts* using =M-x claudemacs-repl-send-region= or =M-x claudemacs-repl-send-rest-of-buffer=
+6. *Access functions easily*: Use =M-x claudemacs-repl-cheatsheet= to browse and select functions
+7. *Send specific parts* using =M-x claudemacs-repl-send-region= or =M-x claudemacs-repl-send-rest-of-buffer=
 
 *** For Existing Projects
 
-*Important*: claudemacs automatically detects Git repositories or something and may start sessions in parent directories: see [[https://github.com/cpoile/claudemacs?tab=readme-ov-file#workspace-and-project-aware-sessions][the usage section for claudemacs]].
+*Important*: claude (or claudemacs) automatically detects Git repositories or something and may start sessions in parent directories: see [[https://github.com/cpoile/claudemacs?tab=readme-ov-file#workspace-and-project-aware-sessions][the usage section for claudemacs]].
 
 To ensure predictable behavior:
 - Work within properly initialized Git repositories (=git init=)
@@ -169,12 +186,19 @@ The generated project file includes template functions and usage instructions.
 
 ** Core Functions
 
+*** Command Palette
+- =claudemacs-repl-cheatsheet= - *Interactive command browser with fuzzy search*
+  - Browse all available functions with descriptions
+  - Filter functions by typing partial names
+  - Functions organized by category for easy discovery
+  - No need to memorize function names
+
 *** File Management
 - =claudemacs-repl-open-project-input-file= - Create/open persistent input file for current directory
 
 *** Text Sending
-- =claudemacs-repl-send-region= - Send selected text (most commonly used, the author think)
-- =claudemacs-repl-send-rest-of-buffer= - Send from cursor to end (second most used)
+- =claudemacs-repl-send-region= - Send selected text (the author most commonly used)
+- =claudemacs-repl-send-rest-of-buffer= - Send from cursor to end
 - =claudemacs-repl-send-buffer= - Send entire buffer
 - =claudemacs-repl-send-line= - Send current line only
 
@@ -246,7 +270,7 @@ I have received almost no pull requests for repositories published on GitHub,
 please bear with me as responses may take longer than usual while I learn the process.
 
 *Note*: I wanted to automate version updates like semver as much as possible,
-so I had Claude Code (consulting with Gemini) automate it,
+so I had Claude Code (and Gemini) automate it,
 and it recommended using Node.js mechanisms,
 which I have adopted.
 I'm not sure if this is the right approach,

@@ -35,7 +35,7 @@ module.exports = {
 				changelogFile: "CHANGELOG.md",
 			},
 		],
-		// Update version in claudemacs-repl.el and regenerate default.org
+		// Update version in claudemacs-repl.el and regenerate documentation
 		[
 			"@semantic-release/exec",
 			{
@@ -44,6 +44,8 @@ module.exports = {
 					"emacs --batch --load scripts/bump-version.el -- ${nextRelease.version}",
 					// Regenerate documentation files with updated functions
 					"emacs --batch --load scripts/generate-docs.el --eval '(generate-all-docs)'",
+					// Regenerate precompiled constants for cheatsheet performance
+					"emacs --batch --load scripts/generate-constants.el --eval '(generate-cheatsheet-constants)'",
 				].join(" && "),
 			},
 		],
@@ -55,9 +57,8 @@ module.exports = {
 					"CHANGELOG.md",
 					"package.json",
 					"claudemacs-repl.el",
-					"default.org",
 					"README.org",
-					"public-api.org",
+					"claudemacs-repl-constants.el",
 				],
 				message:
 					"chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}",
