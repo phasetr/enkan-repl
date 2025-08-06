@@ -1375,7 +1375,7 @@
         (claudemacs-repl--send-buffer-content (point-min) (point-max) "Test")
         (should (string= sent-text "Test content\n  with whitespace"))
         (should (string-match-p "Test sent to Claude" message-text))
-        
+
         ;; Test skip-empty-check
         (erase-buffer)
         (insert "   ")
@@ -1471,9 +1471,11 @@
 ;;; Tests for claudemacs-repl-start-claudemacs Function
 
 (ert-deftest test-start-claudemacs-directory-change ()
-  "Test that claudemacs-repl-start-claudemacs changes default-directory correctly."
+  "Test that claudemacs-repl-start-claudemacs properly handles directory changes."
   (let ((original-dir (expand-file-name default-directory))
-        (test-dir (expand-file-name "/tmp/")))
+        (test-dir (expand-file-name "/tmp/"))
+        (command-executed nil)
+        (directory-changed-to nil))
     (unwind-protect
         (cl-letf (((symbol-function 'claudemacs-repl--get-target-directory-for-buffer)
                    (lambda () test-dir))
@@ -1486,14 +1488,25 @@
                        (setq call-count (1+ call-count))
                        (> call-count 1))))  ; Return t after first call (simulating successful startup)
                   ((symbol-function 'claudemacs-transient-menu)
-                   (lambda () (message "Mock claudemacs-transient-menu called")))
+                   (lambda ()
+                     (setq command-executed t)
+                     (message "Mock claudemacs-transient-menu called")))
                   ((symbol-function 'require)
                    (lambda (feature &optional filename noerror) t))  ; Mock successful require
                   ((symbol-function 'fboundp)
-                   (lambda (func) t)))  ; Mock function availability
+                   (lambda (func) t))  ; Mock function availability
+                  ((symbol-function 'cd)
+                   (lambda (dir)
+                     ;; Record the cd call to test-dir (not to original-dir)
+                     (when (string= dir test-dir)
+                       (setq directory-changed-to dir)))))  ; Record directory change to test-dir only
           (cd original-dir)
           (claudemacs-repl-start-claudemacs)
-          (should (string= (expand-file-name default-directory) test-dir)))
+          ;; Directory should be restored to original after execution
+          (should (string= (expand-file-name default-directory) original-dir))
+          ;; But the command should have been executed with the correct target directory
+          (should command-executed)
+          (should (string= directory-changed-to test-dir)))
       ;; Cleanup
       (cd original-dir))))
 
@@ -1803,7 +1816,7 @@ Does not modify global state."
     ;; Mock read-char-choice to return 'd' (default)
     (cl-letf (((symbol-function 'read-char-choice)
                (lambda (prompt choices) ?d))
-              ((symbol-function 'message) 
+              ((symbol-function 'message)
                (lambda (&rest args) nil)))
       (let ((result (claudemacs-repl--handle-missing-template template-path)))
         (should (null result))))))
@@ -1831,7 +1844,7 @@ Does not modify global state."
                      (lambda (prompt choices) ?c))
                     ((symbol-function 'y-or-n-p)
                      (lambda (prompt) t))
-                    ((symbol-function 'message) 
+                    ((symbol-function 'message)
                      (lambda (&rest args) nil)))
             (let ((result (claudemacs-repl--handle-missing-template template-path)))
               (should (string= result template-path))
@@ -1956,8 +1969,8 @@ Does not modify global state."
 (ert-deftest test-get-categorized-functions-error-handling ()
   "Test error handling when constants are unavailable."
   ;; Mock constants being unavailable by causing require to fail
-  (cl-letf (((symbol-function 'require) 
-             (lambda (feature &rest _) 
+  (cl-letf (((symbol-function 'require)
+             (lambda (feature &rest _)
                (if (eq feature 'claudemacs-repl-constants)
                    (error "Mock constants unavailable")
                  (funcall #'require feature)))))
