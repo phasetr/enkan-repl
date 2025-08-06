@@ -25,51 +25,59 @@
 
 ;; For batch execution
 
+(defun claudemacs-repl--generate-core-functions-section ()
+  "Generate Core Functions section matching manual update structure."
+  (concat "** Core Functions\n\n"
+          "*** Command Palette\n"
+          "- =claudemacs-repl-cheatsheet= - *Interactive command browser with fuzzy search*\n"
+          "  - Browse all available functions with descriptions\n"
+          "  - Filter functions by typing partial names\n"
+          "  - Functions organized by category for easy discovery\n"
+          "  - No need to memorize function names\n\n"
+          "*** File Management\n"
+          "- =claudemacs-repl-open-project-input-file= - Create/open persistent input file for current directory\n\n"
+          "*** Text Sending\n"
+          "- =claudemacs-repl-send-region= - Send selected text (the author most commonly used)\n"
+          "- =claudemacs-repl-send-rest-of-buffer= - Send from cursor to end\n"
+          "- =claudemacs-repl-send-buffer= - Send entire buffer\n"
+          "- =claudemacs-repl-send-line= - Send current line only\n\n"
+          "*** Session Control\n"
+          "- =claudemacs-repl-send-enter= - Send enter key\n"
+          "- =claudemacs-repl-send-1/2/3= - Send numbered choices for AI prompts\n\n"
+          "*** Utilities\n"
+          "- =claudemacs-repl-start-claudemacs= - Start Claude session in appropriate directory\n"
+          "- =claudemacs-repl-setup-window-layout= - Arrange windows for (the author's) optimal workflow\n"
+          "- =claudemacs-repl-status= - Display connection status and diagnostics\n\n"))
+
 (defun claudemacs-repl--generate-readme (output-file)
-  "Generate README.org file with dynamically updated function lists.
-Only updates the Text Sending Capabilities section, preserving other content."
-  (let* ((script-dir (file-name-directory (or load-file-name buffer-file-name default-directory)))
-         (project-root (if (string-match-p "scripts/?$" script-dir)
-                          (file-name-directory (directory-file-name script-dir))
-                        default-directory))
-         (package-file (expand-file-name "claudemacs-repl.el" project-root))
-         (function-list (claudemacs-repl-utils--get-all-public-functions package-file)))
-    ;; Read existing README.org content
-    (let ((readme-content (if (file-exists-p output-file)
-                              (with-temp-buffer
-                                (insert-file-contents output-file)
-                                (buffer-string))
-                            ""))
-          (new-section ""))
-      ;; Generate new Functions/Commands section
-      (setq new-section "** Functions/Commands\n\n")
-      (setq new-section (concat new-section "We open the following functions/commands.\n\n"))
-      (setq new-section (concat new-section function-list))
-      (setq new-section (concat new-section "\n"))
-      ;; Find start and end positions
-      (let ((start-pos (string-match "\\*\\* Functions/Commands" readme-content))
-            (end-pos (string-match "\\*\\* Installation" readme-content)))
-        (if (and start-pos end-pos)
-            ;; Replace the section
-            (let ((before (substring readme-content 0 start-pos))
-                  (after (substring readme-content end-pos)))
-              (with-temp-file output-file
-                (insert before)
-                (insert new-section)
-                (insert after)))
-          ;; If markers not found, create the file with original logic for fallback
-          (with-temp-file output-file
-            (insert readme-content)
-            (insert "\n\n")
-            (insert new-section)))))))
+  "Generate README.org file with Core Functions section matching manual updates."
+  (let* ((readme-content (if (file-exists-p output-file)
+                             (with-temp-buffer
+                               (insert-file-contents output-file)
+                               (buffer-string))
+                           ""))
+         (new-section (claudemacs-repl--generate-core-functions-section)))
+    ;; Find start and end positions for Core Functions section
+    (let ((start-pos (string-match "\\*\\* Core Functions" readme-content))
+          (end-pos (string-match "\\*\\* Configuration" readme-content)))
+      (if (and start-pos end-pos)
+          ;; Replace the Core Functions section
+          (let ((before (substring readme-content 0 start-pos))
+                (after (substring readme-content end-pos)))
+            (with-temp-file output-file
+              (insert before)
+              (insert new-section)
+              (insert after)))
+        ;; If markers not found, keep file unchanged
+        (message "Core Functions section markers not found - file unchanged")))))
 
 (defun generate-readme ()
-  "Generate README.org with dynamically updated function lists."
+  "Generate README.org with updated Core Functions section."
   (claudemacs-repl--generate-readme "README.org")
   (message "README.org generated successfully"))
 
 (defun generate-all-docs ()
-  "Generate all documentation files (README only)."
+  "Generate all documentation files."
   (generate-readme)
   (message "All documentation generated successfully"))
 

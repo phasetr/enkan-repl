@@ -133,6 +133,74 @@ Returns a string containing org-mode formatted function list."
                                 functions)))
     (claudemacs-repl-utils--generate-function-list-flat interactive-functions)))
 
+(defun claudemacs-repl-utils--extract-category-from-docstring (docstring)
+  "Extract category information from DOCSTRING.
+Returns category string or nil if not found."
+  (when (and docstring (stringp docstring))
+    (if (string-match "Category: \\(.*\\)$" docstring)
+        (match-string 1 docstring)
+      nil)))
+
+(defun claudemacs-repl-utils--get-categorized-functions (file-path)
+  "Get functions organized by category from FILE-PATH.
+Returns an alist where each element is (CATEGORY . FUNCTIONS-LIST).
+FUNCTIONS-LIST contains plists with :name, :docstring, :category."
+  (let ((functions-info (claudemacs-repl-utils--extract-function-info file-path))
+        (categorized-functions '())
+        (categories '("Command Palette" "Text Sender" "Session Controller" "Utilities")))
+    
+    ;; Extract categories from docstrings and group functions
+    (dolist (func functions-info)
+      (when (plist-get func :interactive)
+        (let* ((docstring (plist-get func :docstring))
+               (category (claudemacs-repl-utils--extract-category-from-docstring docstring))
+               (clean-docstring (if category
+                                   (replace-regexp-in-string "  Category: .*$" "" docstring)
+                                 docstring))
+               (func-info `(:name ,(plist-get func :name)
+                           :docstring ,clean-docstring
+                           :category ,(or category "Uncategorized"))))
+          ;; Add to appropriate category list
+          (let ((category-entry (assoc (or category "Uncategorized") categorized-functions)))
+            (if category-entry
+                (setcdr category-entry (append (cdr category-entry) (list func-info)))
+              (push (cons (or category "Uncategorized") (list func-info)) categorized-functions))))))
+    
+    ;; Sort by predefined category order
+    (let ((sorted-result '()))
+      (dolist (category categories)
+        (let ((category-functions (cdr (assoc category categorized-functions))))
+          (when category-functions
+            (push (cons category category-functions) sorted-result))))
+      ;; Add any uncategorized functions at the end
+      (let ((uncategorized (cdr (assoc "Uncategorized" categorized-functions))))
+        (when uncategorized
+          (push (cons "Uncategorized" uncategorized) sorted-result)))
+      (nreverse sorted-result))))
+
+(defun claudemacs-repl-utils--generate-org-section (category functions header-level)
+  "Generate org-mode section for CATEGORY with FUNCTIONS at HEADER-LEVEL.
+HEADER-LEVEL should be a number (1 for *, 2 for **, etc.)."
+  (let ((header-prefix (make-string header-level ?*))
+        (result ""))
+    (setq result (concat result (format "%s %s\n\n" header-prefix category)))
+    (dolist (func functions)
+      (let ((name (plist-get func :name))
+            (docstring (plist-get func :docstring)))
+        (setq result (concat result (format "- ~M-x %s~ - %s\n" name (or docstring "No description"))))))
+    (concat result "\n")))
+
+(defun claudemacs-repl-utils--generate-categorized-documentation (file-path header-level)
+  "Generate categorized documentation from FILE-PATH with HEADER-LEVEL.
+Returns org-mode formatted string with functions organized by category."
+  (let ((categorized-functions (claudemacs-repl-utils--get-categorized-functions file-path))
+        (result ""))
+    (dolist (category-entry categorized-functions)
+      (let ((category (car category-entry))
+            (functions (cdr category-entry)))
+        (setq result (concat result (claudemacs-repl-utils--generate-org-section category functions header-level)))))
+    result))
+
 (provide 'claudemacs-repl-utils)
 
 ;;; claudemacs-repl-utils.el ends here

@@ -851,13 +851,13 @@
          (temp-file nil))
     (unwind-protect
         (progn
-          ;; Should use default.org content as fallback
+          ;; Should use embedded template content as fallback
           (setq temp-file (claudemacs-repl--create-project-input-file temp-dir))
           (should (file-exists-p temp-file))
           (with-temp-buffer
             (insert-file-contents temp-file)
             (let ((content (buffer-string)))
-              ;; Should contain default.org content, not hardcoded fallback
+              ;; Should contain embedded template content, not hardcoded fallback
               (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" content))
               (should (string-match-p "~M-x claudemacs-repl-start-claudemacs~" content))
               (should (string-match-p "Start claudemacs session\\|claudemacs-repl-start-claudemacs" content)))))
@@ -865,7 +865,7 @@
         (delete-directory temp-dir t)))))
 
 (ert-deftest test-initialize-project-file-nil-template-uses-default-org ()
-  "Test that when claudemacs-repl-template-file is nil, default.org content is used."
+  "Test that when claudemacs-repl-template-file is nil, embedded template content is used."
   (let* ((temp-dir (make-temp-file "test-project-nil" t))
          (default-directory claudemacs-repl-test-package-dir)
          (claudemacs-repl-template-file nil)  ; Explicitly set to nil
@@ -877,7 +877,7 @@
           (with-temp-buffer
             (insert-file-contents temp-file)
             (let ((content (buffer-string)))
-              ;; Should contain default.org content, not hardcoded fallback
+              ;; Should contain embedded template content, not hardcoded fallback
               (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" content))
               (should (string-match-p "~M-x claudemacs-repl-start-claudemacs~" content))
               (should (string-match-p "Start claudemacs session\\|claudemacs-repl-start-claudemacs" content))
@@ -890,22 +890,19 @@
 ;;; Tests for claudemacs-repl--create-project-input-file Function
 
 (ert-deftest test-create-project-input-file-with-nil-template ()
-  "Test that create-project-input-file uses default.org when template-file is nil."
+  "Test that create-project-input-file uses embedded template when template-file is nil."
   (let ((claudemacs-repl-template-file nil)
         (temp-dir (make-temp-file "test-project" t))
-        (temp-file nil)
-        (original-default-org (expand-file-name "default.org" claudemacs-repl-test-package-dir)))
+        (temp-file nil))
     (unwind-protect
         (progn
-          ;; Copy default.org to temp directory for get-package-directory to find
-          (copy-file original-default-org (expand-file-name "default.org" temp-dir))
           (let ((default-directory temp-dir))
             (setq temp-file (claudemacs-repl--create-project-input-file temp-dir)))
           (should (file-exists-p temp-file))
           (with-temp-buffer
             (insert-file-contents temp-file)
             (let ((content (buffer-string)))
-              ;; Should contain default.org content
+              ;; Should contain embedded template content
               (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" content))
               (should (string-match-p "~M-x claudemacs-repl-start-claudemacs~" content))
               (should (string-match-p "Start claudemacs session\\|claudemacs-repl-start-claudemacs" content)))))
@@ -940,23 +937,20 @@
         (delete-directory temp-dir t)))))
 
 (ert-deftest test-create-project-input-file-with-nonexistent-custom-template ()
-  "Test that create-project-input-file falls back to default.org when custom template doesn't exist."
+  "Test that create-project-input-file falls back to embedded template when custom template doesn't exist."
   (let ((claudemacs-repl-template-file "/nonexistent/custom-template.org")
         (claudemacs-repl--testing-mode t)  ; Enable testing mode
         (temp-dir (make-temp-file "test-project" t))
-        (temp-file nil)
-        (original-default-org (expand-file-name "default.org" claudemacs-repl-test-package-dir)))
+        (temp-file nil))
     (unwind-protect
         (progn
-          ;; Copy default.org to temp directory for get-package-directory to find
-          (copy-file original-default-org (expand-file-name "default.org" temp-dir))
           (let ((default-directory temp-dir))
             (setq temp-file (claudemacs-repl--create-project-input-file temp-dir)))
           (should (file-exists-p temp-file))
           (with-temp-buffer
             (insert-file-contents temp-file)
             (let ((content (buffer-string)))
-              ;; Should fallback to default.org content
+              ;; Should fallback to embedded template content
               (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" content))
               (should (string-match-p "~M-x claudemacs-repl-start-claudemacs~" content))
               (should (string-match-p "Start claudemacs session\\|claudemacs-repl-start-claudemacs" content)))))
@@ -1011,12 +1005,9 @@
 (ert-deftest test-open-project-input-file-not-exists ()
   "Test that open-project-input creates and opens new file when it doesn't exist."
   (let ((temp-dir (make-temp-file "test-project" t))
-        (original-default-org (expand-file-name "default.org" claudemacs-repl-test-package-dir))
         (temp-file nil))
     (unwind-protect
         (progn
-          ;; Copy default.org to temp directory for get-package-directory to find
-          (copy-file original-default-org (expand-file-name "default.org" temp-dir))
           (setq temp-file (claudemacs-repl--get-project-file-path temp-dir))
           ;; Ensure file doesn't exist initially
           (should-not (file-exists-p temp-file))
@@ -1892,6 +1883,148 @@ Does not modify global state."
         (normal-path "/Users/test/.emacs.d/elpa/claudemacs-repl/"))
     (should (string-match-p "/straight/build/" build-path))
     (should-not (string-match-p "/straight/build/" normal-path))))
+
+;;; Tests for Categorized Template Functions
+
+(ert-deftest test-get-categorized-functions-with-constants ()
+  "Test that get-categorized-functions works when constants are available."
+  (let ((result (claudemacs-repl--get-categorized-functions)))
+    (should (stringp result))
+    (should (string-match-p "Command Palette" result))
+    (should (string-match-p "Text Sender" result))
+    (should (string-match-p "Session Controller" result))
+    (should (string-match-p "Utilities" result))
+    (should (string-match-p "claudemacs-repl-cheatsheet" result))
+    (should (string-match-p "claudemacs-repl-send-region" result))))
+
+(ert-deftest test-get-static-functions-fallback ()
+  "Test that get-static-functions provides proper fallback."
+  (let ((result (claudemacs-repl--get-static-functions)))
+    (should (stringp result))
+    (should (string-match-p "Command Palette" result))
+    (should (string-match-p "Text Sender" result))
+    (should (string-match-p "Session Controller" result))
+    (should (string-match-p "Utilities" result))
+    (should (string-match-p "claudemacs-repl-cheatsheet" result))
+    (should (string-match-p "claudemacs-repl-send-region" result))))
+
+(ert-deftest test-embedded-template-uses-categorized-functions ()
+  "Test that embedded template includes categorized function list."
+  (let ((template (claudemacs-repl--get-embedded-template)))
+    (should (stringp template))
+    (should (string-match-p "Functions/Commands" template))
+    (should (string-match-p "Command Palette" template))
+    (should (string-match-p "Text Sender" template))
+    (should (string-match-p "Session Controller" template))
+    (should (string-match-p "Utilities" template))))
+
+;;; Extended Tests for Categorized Template Functions
+
+(ert-deftest test-get-categorized-functions-structure ()
+  "Test the structure and format of categorized functions output."
+  (let ((result (claudemacs-repl--get-categorized-functions)))
+    ;; Should be non-empty string
+    (should (stringp result))
+    (should (> (length result) 0))
+    ;; Should have proper org-mode headers
+    (should (string-match-p "\\*\\* Command Palette" result))
+    (should (string-match-p "\\*\\* Text Sender" result))
+    (should (string-match-p "\\*\\* Session Controller" result))
+    (should (string-match-p "\\*\\* Utilities" result))
+    ;; Should have proper org-mode function entries
+    (should (string-match-p "- ~M-x claudemacs-repl-" result))
+    ;; Category information should be stripped from descriptions
+    (should-not (string-match-p "Category:" result))))
+
+(ert-deftest test-get-categorized-functions-category-order ()
+  "Test that categories appear in the correct order."
+  (let ((result (claudemacs-repl--get-categorized-functions)))
+    (let ((command-pos (string-match "\\*\\* Command Palette" result))
+          (text-pos (string-match "\\*\\* Text Sender" result))
+          (session-pos (string-match "\\*\\* Session Controller" result))
+          (util-pos (string-match "\\*\\* Utilities" result)))
+      ;; All categories should be found
+      (should command-pos)
+      (should text-pos)
+      (should session-pos)
+      (should util-pos)
+      ;; Should appear in correct order
+      (should (< command-pos text-pos))
+      (should (< text-pos session-pos))
+      (should (< session-pos util-pos)))))
+
+(ert-deftest test-get-categorized-functions-error-handling ()
+  "Test error handling when constants are unavailable."
+  ;; Mock constants being unavailable by causing require to fail
+  (cl-letf (((symbol-function 'require) 
+             (lambda (feature &rest _) 
+               (if (eq feature 'claudemacs-repl-constants)
+                   (error "Mock constants unavailable")
+                 (funcall #'require feature)))))
+    (let ((result (claudemacs-repl--get-categorized-functions)))
+      ;; Should fall back to static functions
+      (should (stringp result))
+      (should (string-match-p "Command Palette" result))
+      (should (string-match-p "claudemacs-repl-cheatsheet" result)))))
+
+(ert-deftest test-get-static-functions-structure ()
+  "Test structure and completeness of static functions fallback."
+  (let ((result (claudemacs-repl--get-static-functions)))
+    ;; Should be non-empty string
+    (should (stringp result))
+    (should (> (length result) 0))
+    ;; Should have all essential functions
+    (should (string-match-p "claudemacs-repl-send-region" result))
+    (should (string-match-p "claudemacs-repl-send-buffer" result))
+    (should (string-match-p "claudemacs-repl-start-claudemacs" result))
+    (should (string-match-p "claudemacs-repl-cheatsheet" result))
+    ;; Should have proper org-mode format
+    (should (string-match-p "\\*\\*" result))
+    (should (string-match-p "- ~M-x" result))
+    ;; Should end with double newline for proper formatting
+    (should (string-suffix-p "\n\n" result))))
+
+(ert-deftest test-get-static-functions-consistency ()
+  "Test consistency between static and categorized functions."
+  (let ((static-result (claudemacs-repl--get-static-functions))
+        (categorized-result (claudemacs-repl--get-categorized-functions)))
+    ;; Both should have same categories
+    (should (string-match-p "Command Palette" static-result))
+    (should (string-match-p "Command Palette" categorized-result))
+    (should (string-match-p "Text Sender" static-result))
+    (should (string-match-p "Text Sender" categorized-result))
+    ;; Both should have key functions
+    (should (string-match-p "claudemacs-repl-cheatsheet" static-result))
+    (should (string-match-p "claudemacs-repl-cheatsheet" categorized-result))))
+
+(ert-deftest test-embedded-template-integration ()
+  "Test integration between embedded template and categorized functions."
+  (let ((template (claudemacs-repl--get-embedded-template)))
+    ;; Should contain template structure
+    (should (string-match-p (regexp-quote "#+TITLE: Claude Input File") template))
+    (should (string-match-p "\\* Quick Start" template))
+    (should (string-match-p "\\* Context" template))
+    (should (string-match-p "\\* Functions/Commands" template))
+    (should (string-match-p "\\* Notes" template))
+    ;; Should contain categorized functions within the template
+    (should (string-match-p "\\*\\* Command Palette" template))
+    (should (string-match-p "claudemacs-repl-cheatsheet" template))
+    ;; Should be properly formatted org-mode
+    (should (string-match-p "- ~M-x claudemacs-repl-" template))))
+
+(ert-deftest test-embedded-template-completeness ()
+  "Test that embedded template contains all expected sections."
+  (let ((template (claudemacs-repl--get-embedded-template)))
+    ;; Required template sections
+    (should (string-match-p "\\* Quick Start" template))
+    (should (string-match-p "\\* Context" template))
+    (should (string-match-p "\\* Approach" template))
+    (should (string-match-p "\\* Functions/Commands" template))
+    (should (string-match-p "\\* Notes" template))
+    (should (string-match-p "\\* Next Steps" template))
+    ;; Should be valid org-mode
+    (should (string-prefix-p "#+TITLE:" template))
+    (should (string-suffix-p "\n" template))))
 
 ;;; Test Runner
 
