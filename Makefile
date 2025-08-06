@@ -54,5 +54,9 @@ extract-api: ## Extract public API documentation as org file
 generate-template: ## Generate default template file
 	$(BATCH) -l scripts/generate-docs.el --eval "(generate-default-template)"
 
-docs: ## Generate all documentation files (API and template)
+generate-constants: ## Generate precompiled constants for cheatsheet performance
+	$(BATCH) -l scripts/generate-constants.el --eval "(generate-cheatsheet-constants)"
+
+docs: ## Generate all documentation files (API, template, and constants)
 	$(BATCH) -l scripts/generate-docs.el --eval "(generate-all-docs)"
+	$(BATCH) -l scripts/generate-constants.el --eval "(generate-cheatsheet-constants)"
