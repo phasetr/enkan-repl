@@ -1,3 +1,10 @@
+# [0.4.0](https://github.com/phasetr/claudemacs-repl/compare/v0.3.0...v0.4.0) (2025-08-06)
+
+
+### Features
+
+* implement claudemacs-repl-finish-claudemacs command ([cc8c103](https://github.com/phasetr/claudemacs-repl/commit/cc8c10377f3a7e9f13db3fbdb7029e762984b825))
+
 # [0.3.0](https://github.com/phasetr/claudemacs-repl/compare/v0.2.3...v0.3.0) (2025-08-06)
 
 

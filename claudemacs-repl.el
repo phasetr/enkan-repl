@@ -3,7 +3,7 @@
 ;; Copyright (C) 2025 [phasetr]
 
 ;; Author: [phasetr] <phasetr@gmail.com>
-;; Version: 0.3.0
+;; Version: 0.4.0
 ;; Package-Requires: ((emacs "28.1") (claudemacs "0.1.0"))
 ;; Keywords: claudemacs ai tools convenience
 ;; URL: https://github.com/phasetr/claudemacs-repl
@@ -511,9 +511,9 @@ If DIRECTORY is nil, use current `default-directory'."
         (let
             ((name (buffer-name buf))
              (default-dir
-              (with-current-buffer buf
-                (when (boundp 'default-directory)
-                  default-directory)))
+               (with-current-buffer buf
+                 (when (boundp 'default-directory)
+                   default-directory)))
              (eat-mode
               (with-current-buffer buf
                 (and (boundp 'eat-mode) eat-mode))))
