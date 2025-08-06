@@ -34,12 +34,23 @@
 
 (ert-deftest test-claudemacs-repl--execute-claudemacs-command-error-handling ()
   "Test error handling in execute-claudemacs-command."
-  ;; Test with non-existent command
-  (should-error 
-   (claudemacs-repl--execute-claudemacs-command 
-    'non-existent-function
-    "Should not reach this message")
-   :type 'error))
+  ;; Mock require to succeed but fboundp to fail for specific function
+  (cl-letf (((symbol-function 'require) (lambda (&rest _) t))
+            ((symbol-function 'fboundp) (lambda (sym) (not (eq sym 'non-existent-function))))
+            ((symbol-function 'cd) (lambda (&rest _) nil)))
+    (let ((error-thrown nil)
+          (error-message nil))
+      (condition-case err
+          (claudemacs-repl--execute-claudemacs-command 
+           'non-existent-function
+           "Should not reach this message")
+        (error 
+         (setq error-thrown t)
+         (setq error-message (error-message-string err))))
+      ;; Verify error was thrown with specific message about the function
+      (should error-thrown)
+      (should (string-match-p "non-existent-function not available after loading claudemacs package" 
+                              error-message)))))
 
 (ert-deftest test-claudemacs-repl--handle-dead-session-no-restart ()
   "Test handle-dead-session without restart function."
