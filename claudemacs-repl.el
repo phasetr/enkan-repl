@@ -3,7 +3,7 @@
 ;; Copyright (C) 2025 [phasetr]
 
 ;; Author: [phasetr] <phasetr@gmail.com>
-;; Version: 0.2.3
+;; Version: 0.3.0
 ;; Package-Requires: ((emacs "28.1") (claudemacs "0.1.0"))
 ;; Keywords: claudemacs ai tools convenience
 ;; URL: https://github.com/phasetr/claudemacs-repl
