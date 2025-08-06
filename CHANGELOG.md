@@ -1,3 +1,15 @@
+# [0.3.0](https://github.com/phasetr/claudemacs-repl/compare/v0.2.3...v0.3.0) (2025-08-06)
+
+
+### Features
+
+* add interactive cheatsheet command for function discovery ([#7](https://github.com/phasetr/claudemacs-repl/issues/7)) ([2c3b140](https://github.com/phasetr/claudemacs-repl/commit/2c3b1405346eb82450230812da5dbf6b8b68d208))
+
+
+### BREAKING CHANGES
+
+* None (backward compatible)
+
 ## [0.2.3](https://github.com/phasetr/claudemacs-repl/compare/v0.2.2...v0.2.3) (2025-08-05)
 
 
