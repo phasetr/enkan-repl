@@ -32,10 +32,6 @@
   "Precompiled list of cheatsheet candidates.
 Each element is a cons cell (FUNCTION-NAME . DESCRIPTION).")
 
-(defconst claudemacs-repl-cheatsheet-generation-time
-  "2025-08-06 07:28:39 JST"
-  "Time when constants were generated.")
-
 (defconst claudemacs-repl-cheatsheet-function-count
   18
   "Number of functions in cheatsheet.")

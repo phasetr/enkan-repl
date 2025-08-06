@@ -27,15 +27,13 @@
   "Test that constants file exists and loads correctly."
   (should (featurep 'claudemacs-repl-constants))
   (should (boundp 'claudemacs-repl-cheatsheet-candidates))
-  (should (boundp 'claudemacs-repl-cheatsheet-generation-time))
   (should (boundp 'claudemacs-repl-cheatsheet-function-count)))
 
 (ert-deftest test-constants-structure ()
   "Test that constants have correct structure."
   (should (listp claudemacs-repl-cheatsheet-candidates))
   (should (> (length claudemacs-repl-cheatsheet-candidates) 10))
-  (should (numberp claudemacs-repl-cheatsheet-function-count))
-  (should (stringp claudemacs-repl-cheatsheet-generation-time)))
+  (should (numberp claudemacs-repl-cheatsheet-function-count)))
 
 (ert-deftest test-constants-content ()
   "Test that constants contain expected functions."

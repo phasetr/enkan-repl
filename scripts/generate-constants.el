@@ -57,10 +57,6 @@
       (insert "Each element is a cons cell (FUNCTION-NAME . DESCRIPTION).\")\n\n")
       
       ;; Generate metadata
-      (insert (format "(defconst claudemacs-repl-cheatsheet-generation-time\n"))
-      (insert (format "  \"%s\"\n" (format-time-string "%Y-%m-%d %H:%M:%S %Z")))
-      (insert "  \"Time when constants were generated.\")\n\n")
-      
       (insert (format "(defconst claudemacs-repl-cheatsheet-function-count\n"))
       (insert (format "  %d\n" (length candidates)))
       (insert "  \"Number of functions in cheatsheet.\")\n\n")
@@ -70,7 +66,6 @@
     
     (message "Generated constants file: %s" output-file)
     (message "Function count: %d" (length candidates))
-    (message "Generation time: %s" (format-time-string "%Y-%m-%d %H:%M:%S %Z"))
     output-file))
 
 ;; When running as script
