@@ -324,6 +324,121 @@ It spans multiple lines for testing.\"
       (when (file-exists-p temp-template)
         (delete-file temp-template)))))
 
+;;; Tests for New Core Functions Section Generation
+
+(ert-deftest test-generate-core-functions-section-structure ()
+  "Test that generate-core-functions-section produces correct structure."
+  (let ((result (claudemacs-repl--generate-core-functions-section)))
+    ;; Should be non-empty string
+    (should (stringp result))
+    (should (> (length result) 0))
+    ;; Should start with Core Functions header
+    (should (string-prefix-p "** Core Functions\n\n" result))
+    ;; Should contain all expected categories
+    (should (string-match-p "\\*\\*\\* Command Palette" result))
+    (should (string-match-p "\\*\\*\\* File Management" result))
+    (should (string-match-p "\\*\\*\\* Text Sending" result))
+    (should (string-match-p "\\*\\*\\* Session Control" result))
+    (should (string-match-p "\\*\\*\\* Utilities" result))))
+
+(ert-deftest test-generate-core-functions-section-content ()
+  "Test that generate-core-functions-section contains expected functions."
+  (let ((result (claudemacs-repl--generate-core-functions-section)))
+    ;; Should contain key functions
+    (should (string-match-p "claudemacs-repl-cheatsheet" result))
+    (should (string-match-p "claudemacs-repl-send-region" result))
+    (should (string-match-p "claudemacs-repl-start-claudemacs" result))
+    (should (string-match-p "claudemacs-repl-open-project-input-file" result))
+    ;; Should have proper org-mode formatting
+    (should (string-match-p "- =" result))
+    (should (string-match-p "\\*Interactive command browser" result))))
+
+(ert-deftest test-generate-core-functions-section-formatting ()
+  "Test proper org-mode formatting in core functions section."
+  (let ((result (claudemacs-repl--generate-core-functions-section)))
+    ;; Should have proper section headers
+    (should (string-match-p "^\\*\\* Core Functions$" result))
+    (should (string-match-p "^\\*\\*\\* Command Palette$" result))
+    ;; Should have proper function entries
+    (should (string-match-p "^- =claudemacs-repl-" result))
+    ;; Should have indented sub-bullets for command palette
+    (should (string-match-p "^  - Browse all available" result))
+    ;; Should end with proper spacing
+    (should (string-suffix-p "\n\n" result))))
+
+(ert-deftest test-generate-readme-with-temp-file ()
+  "Test README generation with temporary file."
+  (let ((temp-file (make-temp-file "test-readme-" nil ".org")))
+    (unwind-protect
+        (progn
+          ;; Create test README with Core Functions section
+          (with-temp-file temp-file
+            (insert "#+TITLE: Test README\n\n")
+            (insert "** Introduction\n\nSome intro text.\n\n")
+            (insert "** Core Functions\n\nOld content here.\n\n")
+            (insert "** Configuration\n\nConfig content.\n\n"))
+          ;; Generate new README
+          (claudemacs-repl--generate-readme temp-file)
+          ;; Check that Core Functions section was updated
+          (let ((updated-content (with-temp-buffer
+                                   (insert-file-contents temp-file)
+                                   (buffer-string))))
+            (should (string-match-p "\\*\\* Core Functions" updated-content))
+            (should (string-match-p "\\*\\*\\* Command Palette" updated-content))
+            (should (string-match-p "claudemacs-repl-cheatsheet" updated-content))
+            ;; Should preserve other sections
+            (should (string-match-p "\\*\\* Introduction" updated-content))
+            (should (string-match-p "\\*\\* Configuration" updated-content))))
+      (when (file-exists-p temp-file)
+        (delete-file temp-file)))))
+
+(ert-deftest test-generate-readme-section-boundaries ()
+  "Test that README generation respects section boundaries."
+  (let ((temp-file (make-temp-file "test-readme-boundaries-" nil ".org")))
+    (unwind-protect
+        (progn
+          ;; Create test README with specific structure
+          (with-temp-file temp-file
+            (insert "** Before Section\n\nBefore content.\n\n")
+            (insert "** Core Functions\n\nOld functions content.\n\n")
+            (insert "** Configuration\n\nAfter content.\n\n"))
+          ;; Generate new README
+          (claudemacs-repl--generate-readme temp-file)
+          ;; Check boundaries are respected
+          (let ((updated-content (with-temp-buffer
+                                   (insert-file-contents temp-file)
+                                   (buffer-string))))
+            ;; Should preserve content before Core Functions
+            (should (string-match-p "Before content" updated-content))
+            ;; Should preserve content after Core Functions  
+            (should (string-match-p "After content" updated-content))
+            ;; Should have updated Core Functions content
+            (should (string-match-p "\\*\\*\\* Command Palette" updated-content))))
+      (when (file-exists-p temp-file)
+        (delete-file temp-file)))))
+
+(ert-deftest test-generate-readme-missing-markers ()
+  "Test README generation when section markers are missing."
+  (let ((temp-file (make-temp-file "test-readme-missing-" nil ".org")))
+    (unwind-protect
+        (progn
+          ;; Create README without Core Functions section
+          (with-temp-file temp-file
+            (insert "#+TITLE: Test README\n\n")
+            (insert "** Introduction\n\nSome content.\n\n"))
+          ;; Capture message output
+          (let ((messages '()))
+            (cl-letf (((symbol-function 'message)
+                       (lambda (format-str &rest args)
+                         (push (apply #'format format-str args) messages))))
+              (claudemacs-repl--generate-readme temp-file)
+              ;; Should get appropriate message about missing markers
+              (should (cl-some (lambda (msg) 
+                                (string-match-p "markers not found" msg)) 
+                              messages)))))
+      (when (file-exists-p temp-file)
+        (delete-file temp-file)))))
+
 ;;; Test Runner
 
 (defun generate-docs-run-all-tests ()

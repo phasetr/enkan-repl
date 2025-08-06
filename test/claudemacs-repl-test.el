@@ -1918,6 +1918,114 @@ Does not modify global state."
     (should (string-match-p "Session Controller" template))
     (should (string-match-p "Utilities" template))))
 
+;;; Extended Tests for Categorized Template Functions
+
+(ert-deftest test-get-categorized-functions-structure ()
+  "Test the structure and format of categorized functions output."
+  (let ((result (claudemacs-repl--get-categorized-functions)))
+    ;; Should be non-empty string
+    (should (stringp result))
+    (should (> (length result) 0))
+    ;; Should have proper org-mode headers
+    (should (string-match-p "\\*\\* Command Palette" result))
+    (should (string-match-p "\\*\\* Text Sender" result))
+    (should (string-match-p "\\*\\* Session Controller" result))
+    (should (string-match-p "\\*\\* Utilities" result))
+    ;; Should have proper org-mode function entries
+    (should (string-match-p "- ~M-x claudemacs-repl-" result))
+    ;; Category information should be stripped from descriptions
+    (should-not (string-match-p "Category:" result))))
+
+(ert-deftest test-get-categorized-functions-category-order ()
+  "Test that categories appear in the correct order."
+  (let ((result (claudemacs-repl--get-categorized-functions)))
+    (let ((command-pos (string-match "\\*\\* Command Palette" result))
+          (text-pos (string-match "\\*\\* Text Sender" result))
+          (session-pos (string-match "\\*\\* Session Controller" result))
+          (util-pos (string-match "\\*\\* Utilities" result)))
+      ;; All categories should be found
+      (should command-pos)
+      (should text-pos)
+      (should session-pos)
+      (should util-pos)
+      ;; Should appear in correct order
+      (should (< command-pos text-pos))
+      (should (< text-pos session-pos))
+      (should (< session-pos util-pos)))))
+
+(ert-deftest test-get-categorized-functions-error-handling ()
+  "Test error handling when constants are unavailable."
+  ;; Mock constants being unavailable by causing require to fail
+  (cl-letf (((symbol-function 'require) 
+             (lambda (feature &rest _) 
+               (if (eq feature 'claudemacs-repl-constants)
+                   (error "Mock constants unavailable")
+                 (funcall #'require feature)))))
+    (let ((result (claudemacs-repl--get-categorized-functions)))
+      ;; Should fall back to static functions
+      (should (stringp result))
+      (should (string-match-p "Command Palette" result))
+      (should (string-match-p "claudemacs-repl-cheatsheet" result)))))
+
+(ert-deftest test-get-static-functions-structure ()
+  "Test structure and completeness of static functions fallback."
+  (let ((result (claudemacs-repl--get-static-functions)))
+    ;; Should be non-empty string
+    (should (stringp result))
+    (should (> (length result) 0))
+    ;; Should have all essential functions
+    (should (string-match-p "claudemacs-repl-send-region" result))
+    (should (string-match-p "claudemacs-repl-send-buffer" result))
+    (should (string-match-p "claudemacs-repl-start-claudemacs" result))
+    (should (string-match-p "claudemacs-repl-cheatsheet" result))
+    ;; Should have proper org-mode format
+    (should (string-match-p "\\*\\*" result))
+    (should (string-match-p "- ~M-x" result))
+    ;; Should end with double newline for proper formatting
+    (should (string-suffix-p "\n\n" result))))
+
+(ert-deftest test-get-static-functions-consistency ()
+  "Test consistency between static and categorized functions."
+  (let ((static-result (claudemacs-repl--get-static-functions))
+        (categorized-result (claudemacs-repl--get-categorized-functions)))
+    ;; Both should have same categories
+    (should (string-match-p "Command Palette" static-result))
+    (should (string-match-p "Command Palette" categorized-result))
+    (should (string-match-p "Text Sender" static-result))
+    (should (string-match-p "Text Sender" categorized-result))
+    ;; Both should have key functions
+    (should (string-match-p "claudemacs-repl-cheatsheet" static-result))
+    (should (string-match-p "claudemacs-repl-cheatsheet" categorized-result))))
+
+(ert-deftest test-embedded-template-integration ()
+  "Test integration between embedded template and categorized functions."
+  (let ((template (claudemacs-repl--get-embedded-template)))
+    ;; Should contain template structure
+    (should (string-match-p (regexp-quote "#+TITLE: Claude Input File") template))
+    (should (string-match-p "\\* Quick Start" template))
+    (should (string-match-p "\\* Context" template))
+    (should (string-match-p "\\* Functions/Commands" template))
+    (should (string-match-p "\\* Notes" template))
+    ;; Should contain categorized functions within the template
+    (should (string-match-p "\\*\\* Command Palette" template))
+    (should (string-match-p "claudemacs-repl-cheatsheet" template))
+    ;; Should be properly formatted org-mode
+    (should (string-match-p "- ~M-x claudemacs-repl-" template))))
+
+(ert-deftest test-embedded-template-completeness ()
+  "Test that embedded template contains all expected sections."
+  (let ((template (claudemacs-repl--get-embedded-template)))
+    ;; Required template sections
+    (should (string-match-p "\\* Quick Start" template))
+    (should (string-match-p "\\* Context" template))
+    (should (string-match-p "\\* Approach" template))
+    (should (string-match-p "\\* Functions/Commands" template))
+    (should (string-match-p "\\* Notes" template))
+    (should (string-match-p "\\* Next Steps" template))
+    ;; Should be valid org-mode
+    (should (string-prefix-p "#+TITLE:" template))
+    (should (string-suffix-p "\n" template))))
+
 ;;; Test Runner
 
 (defun claudemacs-repl-run-all-tests ()

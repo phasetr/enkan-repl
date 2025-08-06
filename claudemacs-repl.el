@@ -99,13 +99,17 @@ to maintain compatibility with existing project files.")
     "Session Controller"
     "Utilities")
   "Command category names for claudemacs-repl package.
-Command Palette is positioned first as the primary interface for M-x driven workflow.
-This structure is used for documentation generation and command organization.")
+Command Palette is positioned first as the primary interface.
+This structure is used for documentation generation and organization.")
 
 ;;;; Internal Variables
 
 (defvar claudemacs-repl-debug-mode nil
   "When non-nil, enable debug messages for send operations.")
+
+;; Declare external variable from constants file
+(defvar claudemacs-repl-cheatsheet-candidates nil
+  "Precompiled list of cheatsheet candidates from constants file.")
 
 (defun claudemacs-repl--find-template-directory ()
   "Find directory containing default template file.
@@ -302,7 +306,7 @@ Returns template content as string, using embedded template as fallback."
 
 (defun claudemacs-repl--get-categorized-functions ()
   "Get categorized function list from constants file.
-Returns categorized functions as string, or falls back to static list if constants unavailable."
+Returns categorized functions as string, or falls back to static list."
   (condition-case nil
       (progn
         ;; Try to load constants file if not already loaded
@@ -316,8 +320,8 @@ Returns categorized functions as string, or falls back to static list if constan
             (let* ((func-name (car candidate))
                    (description (cdr candidate))
                    (category (if (string-match "Category: \\([^\"]+\\)" description)
-                                (match-string 1 description)
-                              "Other")))
+                                 (match-string 1 description)
+                               "Other")))
               (unless (gethash category categories)
                 (puthash category nil categories))
               (puthash category
