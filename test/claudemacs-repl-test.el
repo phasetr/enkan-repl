@@ -1884,6 +1884,40 @@ Does not modify global state."
     (should (string-match-p "/straight/build/" build-path))
     (should-not (string-match-p "/straight/build/" normal-path))))
 
+;;; Tests for Categorized Template Functions
+
+(ert-deftest test-get-categorized-functions-with-constants ()
+  "Test that get-categorized-functions works when constants are available."
+  (let ((result (claudemacs-repl--get-categorized-functions)))
+    (should (stringp result))
+    (should (string-match-p "Command Palette" result))
+    (should (string-match-p "Text Sender" result))
+    (should (string-match-p "Session Controller" result))
+    (should (string-match-p "Utilities" result))
+    (should (string-match-p "claudemacs-repl-cheatsheet" result))
+    (should (string-match-p "claudemacs-repl-send-region" result))))
+
+(ert-deftest test-get-static-functions-fallback ()
+  "Test that get-static-functions provides proper fallback."
+  (let ((result (claudemacs-repl--get-static-functions)))
+    (should (stringp result))
+    (should (string-match-p "Command Palette" result))
+    (should (string-match-p "Text Sender" result))
+    (should (string-match-p "Session Controller" result))
+    (should (string-match-p "Utilities" result))
+    (should (string-match-p "claudemacs-repl-cheatsheet" result))
+    (should (string-match-p "claudemacs-repl-send-region" result))))
+
+(ert-deftest test-embedded-template-uses-categorized-functions ()
+  "Test that embedded template includes categorized function list."
+  (let ((template (claudemacs-repl--get-embedded-template)))
+    (should (stringp template))
+    (should (string-match-p "Functions/Commands" template))
+    (should (string-match-p "Command Palette" template))
+    (should (string-match-p "Text Sender" template))
+    (should (string-match-p "Session Controller" template))
+    (should (string-match-p "Utilities" template))))
+
 ;;; Test Runner
 
 (defun claudemacs-repl-run-all-tests ()

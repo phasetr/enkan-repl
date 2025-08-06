@@ -33,7 +33,7 @@ Only updates the Text Sending Capabilities section, preserving other content."
                           (file-name-directory (directory-file-name script-dir))
                         default-directory))
          (package-file (expand-file-name "claudemacs-repl.el" project-root))
-         (function-list (claudemacs-repl-utils--get-all-public-functions package-file)))
+         (function-list (claudemacs-repl-utils--generate-categorized-documentation package-file 3)))
     ;; Read existing README.org content
     (let ((readme-content (if (file-exists-p output-file)
                               (with-temp-buffer
@@ -41,14 +41,13 @@ Only updates the Text Sending Capabilities section, preserving other content."
                                 (buffer-string))
                             ""))
           (new-section ""))
-      ;; Generate new Functions/Commands section
-      (setq new-section "** Functions/Commands\n\n")
-      (setq new-section (concat new-section "We open the following functions/commands.\n\n"))
+      ;; Generate new Core Functions section
+      (setq new-section "** Core Functions\n\n")
       (setq new-section (concat new-section function-list))
       (setq new-section (concat new-section "\n"))
       ;; Find start and end positions
-      (let ((start-pos (string-match "\\*\\* Functions/Commands" readme-content))
-            (end-pos (string-match "\\*\\* Installation" readme-content)))
+      (let ((start-pos (string-match "\\*\\* Core Functions" readme-content))
+            (end-pos (string-match "\\*\\* Configuration" readme-content)))
         (if (and start-pos end-pos)
             ;; Replace the section
             (let ((before (substring readme-content 0 start-pos))

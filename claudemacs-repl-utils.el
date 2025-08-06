@@ -155,7 +155,7 @@ FUNCTIONS-LIST contains plists with :name, :docstring, :category."
         (let* ((docstring (plist-get func :docstring))
                (category (claudemacs-repl-utils--extract-category-from-docstring docstring))
                (clean-docstring (if category
-                                   (replace-regexp-in-string "\n\nCategory: .*$" "" docstring)
+                                   (replace-regexp-in-string "  Category: .*$" "" docstring)
                                  docstring))
                (func-info `(:name ,(plist-get func :name)
                            :docstring ,clean-docstring

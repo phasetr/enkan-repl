@@ -300,6 +300,69 @@ Returns template content as string, using embedded template as fallback."
       ;; Fall back to embedded template
       (claudemacs-repl--get-embedded-template))))
 
+(defun claudemacs-repl--get-categorized-functions ()
+  "Get categorized function list from constants file.
+Returns categorized functions as string, or falls back to static list if constants unavailable."
+  (condition-case nil
+      (progn
+        ;; Try to load constants file if not already loaded
+        (unless (featurep 'claudemacs-repl-constants)
+          (require 'claudemacs-repl-constants))
+        ;; Group functions by category
+        (let ((categories (make-hash-table :test 'equal))
+              (category-order '("Command Palette" "Text Sender" "Session Controller" "Utilities")))
+          ;; Group functions by category
+          (dolist (candidate claudemacs-repl-cheatsheet-candidates)
+            (let* ((func-name (car candidate))
+                   (description (cdr candidate))
+                   (category (if (string-match "Category: \\([^\"]+\\)" description)
+                                (match-string 1 description)
+                              "Other")))
+              (unless (gethash category categories)
+                (puthash category nil categories))
+              (puthash category
+                       (cons (cons func-name description) (gethash category categories))
+                       categories)))
+          ;; Generate categorized output
+          (let ((result ""))
+            (dolist (category category-order)
+              (when (gethash category categories)
+                (setq result (concat result "** " category "\n\n"))
+                (dolist (func (reverse (gethash category categories)))
+                  (let* ((func-name (car func))
+                         (description (cdr func))
+                         (clean-desc (replace-regexp-in-string "  Category: [^\"]*" "" description)))
+                    (setq result (concat result "- ~M-x " func-name "~ - " clean-desc "\n"))))
+                (setq result (concat result "\n"))))
+            result)))
+    ;; Fallback to static list if constants file is unavailable
+    (error (claudemacs-repl--get-static-functions))))
+
+(defun claudemacs-repl--get-static-functions ()
+  "Return static function list as fallback when constants unavailable."
+  (concat "** Command Palette\n\n"
+          "- ~M-x claudemacs-repl-cheatsheet~ - Display interactive cheatsheet for claudemacs-repl commands.\n\n"
+          "** Text Sender\n\n"
+          "- ~M-x claudemacs-repl-send-region~ - Send the text in region from START to END to claudemacs.\n"
+          "- ~M-x claudemacs-repl-send-buffer~ - Send the entire current buffer to claudemacs.\n"
+          "- ~M-x claudemacs-repl-send-rest-of-buffer~ - Send rest of buffer from cursor position to end to claudemacs.\n"
+          "- ~M-x claudemacs-repl-send-line~ - Send the current line to claudemacs.\n"
+          "- ~M-x claudemacs-repl-send-enter~ - Send enter key to claudemacs buffer.\n"
+          "- ~M-x claudemacs-repl-send-1~ - Send \\='1\\=' to claudemacs buffer for numbered choice prompts.\n"
+          "- ~M-x claudemacs-repl-send-2~ - Send \\='2\\=' to claudemacs buffer for numbered choice prompts.\n"
+          "- ~M-x claudemacs-repl-send-3~ - Send \\='3\\=' to claudemacs buffer for numbered choice prompts.\n"
+          "- ~M-x claudemacs-repl-send-escape~ - Send ESC key to claudemacs buffer.\n\n"
+          "** Session Controller\n\n"
+          "- ~M-x claudemacs-repl-start-claudemacs~ - Start claudemacs and change to appropriate directory.\n"
+          "- ~M-x claudemacs-repl-setup-window-layout~ - Set up window layout with org file on left and claudemacs on right.\n\n"
+          "** Utilities\n\n"
+          "- ~M-x claudemacs-repl-open-project-input-file~ - Open or create project input file for current directory.\n"
+          "- ~M-x claudemacs-repl-output-template~ - Output current template content to a new buffer for customization.\n"
+          "- ~M-x claudemacs-repl-status~ - Show detailed diagnostic information for troubleshooting connection issues.\n"
+          "- ~M-x claudemacs-repl-toggle-debug-mode~ - Toggle debug mode for claudemacs-repl operations.\n"
+          "- ~M-x claudemacs-repl-enable-debug-mode~ - Enable debug mode for claudemacs-repl operations.\n"
+          "- ~M-x claudemacs-repl-disable-debug-mode~ - Disable debug mode for claudemacs-repl operations.\n\n"))
+
 (defun claudemacs-repl--get-embedded-template ()
   "Return embedded default template content as string."
   (concat "#+TITLE: Claude Input File\n\n"
@@ -312,24 +375,7 @@ Returns template content as string, using embedded template as fallback."
           "Outline your planned approach or methodology.\n\n"
           "* Functions/Commands\n\n"
           "We open the following functions/commands.\n\n"
-          "- ~M-x claudemacs-repl-send-region~ - Send the text in region from START to END to claudemacs.\n"
-          "- ~M-x claudemacs-repl-send-buffer~ - Send the entire current buffer to claudemacs.\n"
-          "- ~M-x claudemacs-repl-send-rest-of-buffer~ - Send rest of buffer from cursor position to end to claudemacs.\n"
-          "- ~M-x claudemacs-repl-send-line~ - Send the current line to claudemacs.\n"
-          "- ~M-x claudemacs-repl-send-enter~ - Send enter key to claudemacs buffer.\n"
-          "- ~M-x claudemacs-repl-send-1~ - Send \\='1\\=' to claudemacs buffer for numbered choice prompts.\n"
-          "- ~M-x claudemacs-repl-send-2~ - Send \\='2\\=' to claudemacs buffer for numbered choice prompts.\n"
-          "- ~M-x claudemacs-repl-send-3~ - Send \\='3\\=' to claudemacs buffer for numbered choice prompts.\n"
-          "- ~M-x claudemacs-repl-send-escape~ - Send ESC key to claudemacs buffer.\n"
-          "- ~M-x claudemacs-repl-open-project-input-file~ - Open or create project input file for DIRECTORY. If DIRECTORY is not provided, use the current buffer's directory. When called interactively, prompts for directory if current buffer has no file.\n"
-          "- ~M-x claudemacs-repl-start-claudemacs~ - Start claudemacs and change to appropriate directory. Determines the directory from either a project input file in the current buffer or the buffer's directory.\n"
-          "- ~M-x claudemacs-repl-setup-window-layout~ - Set up window layout with org file on left and claudemacs on right.\n"
-          "- ~M-x claudemacs-repl-output-template~ - Output current template content to a new buffer for customization.\n"
-          "- ~M-x claudemacs-repl-status~ - Show detailed diagnostic information for troubleshooting connection and environment issues.\n"
-          "- ~M-x claudemacs-repl-toggle-debug-mode~ - Toggle debug mode for claudemacs-repl operations.\n"
-          "- ~M-x claudemacs-repl-enable-debug-mode~ - Enable debug mode for claudemacs-repl operations.\n"
-          "- ~M-x claudemacs-repl-disable-debug-mode~ - Disable debug mode for claudemacs-repl operations.\n"
-          "- ~M-x claudemacs-repl-cheatsheet~ - Display interactive cheatsheet for claudemacs-repl commands.\n\n"
+          (claudemacs-repl--get-categorized-functions)
           "* Notes\n\n"
           "Add your thoughts, observations, or important points here.\n\n"
           "* Next Steps\n\n"
