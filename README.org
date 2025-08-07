@@ -1,6 +1,6 @@
-* claudemacs-repl
+* enkan-repl
 
-[[https://github.com/phasetr/claudemacs-repl/workflows/CI/badge.svg]]
+[[https://github.com/phasetr/enkan-repl/workflows/CI/badge.svg]]
 [[https://img.shields.io/badge/License-MIT-yellow.svg]]
 
 This package builds upon the excellent work of:
@@ -11,34 +11,35 @@ We extend our deepest gratitude to the authors and contributors of these foundat
 
 #+OPTIONS: toc:2
 
-** Vision - Reviving REPL Culture for the AI Era
+** Vision - The Law of Cycles (円環の理) for the AI Era
+
+=enkan-repl= embodies the concept of "円環の理" (enkan no kotowari / Law of Cycles) -
+the eternal cycle of questions and answers, learning and understanding.
+
+The name draws from Japanese anime culture, especially the famous [[https://www.madoka-magica.com/][魔法少女まどか☆マギカ]],
+while carrying profound philosophical meaning:
+- *円環 (enkan)*: The circle or torus, representing the eternal loop of REPL interactions;
+  also fundamental objects in modern mathematics
+- *理 (kotowari)*: The principle, the underlying truth we discover through dialogue
+
 This package differs technically from traditional REPLs (Read-Eval-Print Loop).
 While conventional REPLs execute code and return results,
-=claudemacs-repl= sends text to Claude AI and receives generated responses.
+=enkan-repl= sends text to AI assistants and receives generated responses.
+Yet this represents not a limitation, but a new dimension of interactive development.
 
-However, we view this difference not as a constraint,
-but as a new possibility.
 Our dream is to revive the interactive development culture that LISP, Elisp,
-and Emacs have nurtured for decades,
-in a form befitting the AI era.
+and Emacs have nurtured for decades, in a form befitting the AI era.
+Through the eternal cycle of sending thoughts and receiving AI responses,
+we access what feels like an Akashic Record - the accumulated knowledge of humanity,
+filtered through advanced AI understanding.
 
 Send your thoughts with =send-region=,
-receive Claude's response,
+receive AI's response,
 and deepen your thinking further.
-This cycle is the development experience that the new era's REPL envisions.
+This cycle - this 円環 (enkan) - is the development experience that the new era's REPL envisions.
 Here lies a completely new programming horizon woven by Emacs and AI.
 
-** Future Direction and Breaking Changes Notice
-
-This package is currently built on Claude Code due to the overwhelmingly superior experience it provides within my current usage scope.
-However, if superior services emerge that surpass Claude Code through future technological and service developments, I intend to migrate to those alternatives.
-Ideally, I would like to enable switching between or combining multiple services.
-(In fact, I judge Claude Code's search capabilities to be insufficient,
-which is why I frequently instruct to "consult Gemini with =gemini -p= for research.")
-Parts that are tightly coupled to Claude Code represent critical weaknesses.
-Therefore, please be aware that breaking changes, including package name changes, may be introduced.
-
-This package also serves as my personal research tool for exploring challenges on the path to achieving that goal.
+(See [[#why-enkan][Why "enkan"?]] and [[#future-directions][Future Directions]] for more details about the philosophy and roadmap)
 
 ** Motivation
 The development motivation stems from the current usability issues with Claude Code and Gemini CLI,
@@ -66,8 +67,8 @@ After trying several packages that didn't quite fit,
 I decided to build my own on top of [[https://github.com/cpoile/claudemacs][claudemacs]].
 
 This package enables you to send numbered choices directly from your input file
-using functions like =M-x claudemacs-repl-send-1/2/3=.
-To stop runaway processes, use =M-x claudemacs-repl-send-escape= from your input file -
+using functions like =M-x enkan-repl-send-1/2/3=.
+To stop runaway processes, use =M-x enkan-repl-send-escape= from your input file -
 no terminal navigation required.
 (Note: We provide no default keybindings, so you may prefer mapping these to keys like =C-g=
 or configure them according to your preferences.)
@@ -88,7 +89,7 @@ We intentionally provide no default keybindings for several reasons:
 - Avoiding conflicts with existing user workflows
 
 Even if your Emacs configuration is heavily customized with no available keybindings,
-the interactive cheatsheet (=M-x claudemacs-repl-cheatsheet=) provides quick access
+the interactive cheatsheet (=M-x enkan-repl-cheatsheet=) provides quick access
 to all functions with fuzzy search and filtering capabilities.
 
 *** =M-x= Driven Workflow with Interactive Cheatsheet
@@ -103,16 +104,16 @@ For infrequently used operations, this overhead is perfectly acceptable.
 At least for me.
 
 You could assign a keybinding to the cheatsheet itself, but I can't remember them.
-My memory/configuration approach doesn't align well with this - 
-I get confused thinking "is it 'c' for cheatsheet? or 's' for sheet? 
+My memory/configuration approach doesn't align well with this -
+I get confused thinking "is it 'c' for cheatsheet? or 's' for sheet?
 wait, did I use 'open' somewhere, so 'o'?" even though 'open' isn't even in the actual command name.
 
 Furthermore, once you decide on settings, you want to reuse them to some extent.
 To make this easy, we made it possible to specify your own default configuration file.
-We also added =claudemacs-repl-output-template= to output your custom configuration file
+We also added =enkan-repl-output-template= to output your custom configuration file
 to a temporary buffer, making it as easy as possible to reconfigure multiple files.
 
-The interactive cheatsheet (=M-x claudemacs-repl-cheatsheet=) makes this workflow
+The interactive cheatsheet (=M-x enkan-repl-cheatsheet=) makes this workflow
 even more practical by providing:
 - *Command Palette*: Quick access to all functions with descriptions
 - *Fuzzy Search*: Type partial names to find functions instantly
@@ -137,19 +138,19 @@ compatibility with other environments has not been verified.
 *** Using straight.el (Recommended)
 #+begin_src elisp
 (straight-use-package
-  '(claudemacs-repl :host github :repo "phasetr/claudemacs-repl"))
+  '(enkan-repl :host github :repo "phasetr/enkan-repl"))
 #+end_src
 
 *** Manual Installation
-1. Download =claudemacs-repl.el=
+1. Download =enkan-repl.el=
 2. Add to your Emacs configuration:
 
 #+begin_src elisp
 ;; Add to load path
-(add-to-list 'load-path "/path/to/claudemacs-repl")
+(add-to-list 'load-path "/path/to/enkan-repl")
 
 ;; Load the package
-(require 'claudemacs-repl)
+(require 'enkan-repl)
 #+end_src
 
 ** Quick Start
@@ -168,11 +169,11 @@ compatibility with other environments has not been verified.
    #+end_src
    /This ensures Claude sessions are isolated and changes are tracked safely./
 
-3. *Open project file*: =M-x claudemacs-repl-open-project-input-file=
-4. *Start Claude session*: =M-x claudemacs-repl-start-claudemacs=
+3. *Open project file*: =M-x enkan-repl-open-project-input-file=
+4. *Start Claude session*: =M-x enkan-repl-start-claudemacs=
 5. *Write your thoughts* in the org-mode file
-6. *Access functions easily*: Use =M-x claudemacs-repl-cheatsheet= to browse and select functions
-7. *Send specific parts* using =M-x claudemacs-repl-send-region= or =M-x claudemacs-repl-send-rest-of-buffer=
+6. *Access functions easily*: Use =M-x enkan-repl-cheatsheet= to browse and select functions
+7. *Send specific parts* using =M-x enkan-repl-send-region= or =M-x enkan-repl-send-rest-of-buffer=
 
 *** For Existing Projects
 
@@ -187,56 +188,56 @@ The generated project file includes template functions and usage instructions.
 ** Core Functions
 
 *** Command Palette
-- =claudemacs-repl-cheatsheet= - *Interactive command browser with fuzzy search*
+- =enkan-repl-cheatsheet= - *Interactive command browser with fuzzy search*
   - Browse all available functions with descriptions
   - Filter functions by typing partial names
   - Functions organized by category for easy discovery
   - No need to memorize function names
 
 *** File Management
-- =claudemacs-repl-open-project-input-file= - Create/open persistent input file for current directory
+- =enkan-repl-open-project-input-file= - Create/open persistent input file for current directory
 
 *** Text Sending
-- =claudemacs-repl-send-region= - Send selected text (the author most commonly used)
-- =claudemacs-repl-send-rest-of-buffer= - Send from cursor to end
-- =claudemacs-repl-send-buffer= - Send entire buffer
-- =claudemacs-repl-send-line= - Send current line only
+- =enkan-repl-send-region= - Send selected text (the author most commonly used)
+- =enkan-repl-send-rest-of-buffer= - Send from cursor to end
+- =enkan-repl-send-buffer= - Send entire buffer
+- =enkan-repl-send-line= - Send current line only
 
 *** Session Control
-- =claudemacs-repl-send-enter= - Send enter key
-- =claudemacs-repl-send-1/2/3= - Send numbered choices for AI prompts
+- =enkan-repl-send-enter= - Send enter key
+- =enkan-repl-send-1/2/3= - Send numbered choices for AI prompts
 
 *** Utilities
-- =claudemacs-repl-start-claudemacs= - Start Claude session in appropriate directory
-- =claudemacs-repl-setup-window-layout= - Arrange windows for (the author's) optimal workflow
-- =claudemacs-repl-status= - Display connection status and diagnostics
+- =enkan-repl-start-claudemacs= - Start Claude session in appropriate directory
+- =enkan-repl-setup-window-layout= - Arrange windows for (the author's) optimal workflow
+- =enkan-repl-status= - Display connection status and diagnostics
 
 ** Configuration
 
 *** Template Customization
 #+begin_src elisp
 ;; Use default template
-(setq claudemacs-repl-template-file nil)
+(setq enkan-repl-template-file nil)
 
 ;; Use custom template file
-(setq claudemacs-repl-template-file "~/my-claude-template.org")
+(setq enkan-repl-template-file "~/my-claude-template.org")
 
 ;; Use project-specific template
-(setq claudemacs-repl-template-file (expand-file-name "claude-template.org" user-emacs-directory))
+(setq enkan-repl-template-file (expand-file-name "claude-template.org" user-emacs-directory))
 #+end_src
 
 To create a custom template,
-use =M-x claudemacs-repl-output-template= to export the default template to a buffer for editing.
+use =M-x enkan-repl-output-template= to export the default template to a buffer for editing.
 
 ** Troubleshooting
 If you encounter "❌ Cannot send - no matching claudemacs buffer found for this directory":
 
 1. Ensure claudemacs is running: =M-x claudemacs-transient-menu=
 2. Verify Claude Code CLI is properly configured
-3. Run =M-x claudemacs-repl-status= for detailed diagnostic information
+3. Run =M-x enkan-repl-status= for detailed diagnostic information
 4. Check that you're in the correct directory or using the appropriate project file
 
-For debug information, enable debug mode with =M-x claudemacs-repl-toggle-debug-mode=.
+For debug information, enable debug mode with =M-x enkan-repl-toggle-debug-mode=.
 
 ** Development
 
@@ -262,7 +263,7 @@ response times may be affected.
 Ironically,
 it was precisely this situation that motivated the development of this package - to continue enjoying programming even under these circumstances.
 The desire to maintain productive development workflows during challenging times
-drove the creation of claudemacs-repl.
+drove the creation of enkan-repl.
 
 While I have extensively used OSS over the years,
 I never imagined I would find myself on the OSS development side under these circumstances.
@@ -276,10 +277,49 @@ which I have adopted.
 I'm not sure if this is the right approach,
 but I'll run with it for now.
 
+** Why "enkan"?
+:PROPERTIES:
+:CUSTOM_ID: why-enkan
+:END:
+
+The journey to this name reflects our philosophy:
+- Initially =cer= (ClaudEmacs-Repl), it evolved as we recognized the tool transcends any single AI
+- "enkan" represents the eternal cycle of knowledge exchange through multiple layers:
+  1. *Human → AI (Reasoning)*: We pose questions to thoughtful AI assistants like Claude
+  2. *AI → AI (Search)*: Claude consults specialized search AIs like Gemini for comprehensive information
+  3. *AI → Human Knowledge*: These search engines access humanity's accumulated wisdom
+  4. *Knowledge → Human*: The insights return to us, transformed and synthesized
+- This multi-layered cycle forms the true 円環 (circle) of modern knowledge work
+- It captures the mathematical beauty of circles or tori and the philosophical depth of eternal recurrence
+- Short (5 letters), internationally pronounceable, yet distinctly rooted in Eastern philosophy
+
+** Future Directions
+:PROPERTIES:
+:CUSTOM_ID: future-directions
+:END:
+
+This package is currently built on Claude Code due to the overwhelmingly superior experience it provides within my current usage scope.
+However, if superior services emerge that surpass Claude Code through future technological and service developments, I intend to migrate to those alternatives.
+
+The "enkan" philosophy already embraces multiple AI collaboration:
+We leverage Claude's exceptional reasoning capabilities while compensating for its limited search abilities
+by instructing it to "consult Gemini with =gemini -p= for research."
+This Human-Claude-Gemini-Knowledge chain exemplifies the multi-AI collaboration that defines our approach.
+
+Ideally, I would like to enable seamless switching between or combining multiple services,
+making the entire AI ecosystem work as one harmonious 円環 (circle).
+
+Parts that are tightly coupled to Claude Code represent critical weaknesses.
+Therefore, please be aware that breaking changes, including package name changes, may be introduced.
+Indeed, the recent rename from =claudemacs-repl= to =enkan-repl= is part of this philosophy -
+recognizing that the tool's essence transcends any single AI service.
+
+This package also serves as my personal research tool for exploring challenges on the path to achieving that goal.
+
 ** License
 This project is licensed under the MIT License - see the [[file:LICENSE][LICENSE]] file for details.
 
 ** Support
 
-- 🐛 [[https://github.com/phasetr/claudemacs-repl/issues][Issue Tracker]]
-- 💬 [[https://github.com/phasetr/claudemacs-repl/discussions][Discussions]]
+- 🐛 [[https://github.com/phasetr/enkan-repl/issues][Issue Tracker]]
+- 💬 [[https://github.com/phasetr/enkan-repl/discussions][Discussions]]
