@@ -1,7 +1,7 @@
 {
   "name": "enkan-repl",
   "version": "0.0.0",
-  "description": "Enhanced repl utilities for claudemacs - AI-era interactive development",
+  "description": "Enhanced REPL utilities for AI-era interactive development - The Law of Cycles (円環の理)",
   "main": "enkan-repl.el",
   "scripts": {
     "test": "make check",
