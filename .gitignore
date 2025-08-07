@@ -42,6 +42,9 @@ quelpa/
 *.org~
 *.org.bak
 
+# Project-specific enkan-repl files
+enkan--*.org
+
 # Claude Code
 .claude/
 
