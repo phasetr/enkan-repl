@@ -6,7 +6,7 @@
 ;; Version: 0.4.0
 ;; Package-Requires: ((emacs "28.1") (claudemacs "0.1.0"))
 ;; Keywords: enkan ai tools convenience
-;; URL: https://github.com/phasetr/claudemacs-repl
+;; URL: https://github.com/phasetr/enkan-repl
 ;; License: MIT
 
 ;; This file is not part of GNU Emacs.
