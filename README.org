@@ -11,34 +11,35 @@ We extend our deepest gratitude to the authors and contributors of these foundat
 
 #+OPTIONS: toc:2
 
-** Vision - Reviving REPL Culture for the AI Era
+** Vision - The Law of Cycles (円環の理) for the AI Era
+
+=enkan-repl= embodies the concept of "円環の理" (enkan no kotowari / Law of Cycles) -
+the eternal cycle of questions and answers, learning and understanding.
+
+The name draws from Japanese anime culture, especially the famous [[https://www.madoka-magica.com/][魔法少女まどか☆マギカ]],
+while carrying profound philosophical meaning:
+- *円環 (enkan)*: The circle or torus, representing the eternal loop of REPL interactions;
+  also fundamental objects in modern mathematics
+- *理 (kotowari)*: The principle, the underlying truth we discover through dialogue
+
 This package differs technically from traditional REPLs (Read-Eval-Print Loop).
 While conventional REPLs execute code and return results,
-=enkan-repl= sends text to Claude AI and receives generated responses.
+=enkan-repl= sends text to AI assistants and receives generated responses.
+Yet this represents not a limitation, but a new dimension of interactive development.
 
-However, we view this difference not as a constraint,
-but as a new possibility.
 Our dream is to revive the interactive development culture that LISP, Elisp,
-and Emacs have nurtured for decades,
-in a form befitting the AI era.
+and Emacs have nurtured for decades, in a form befitting the AI era.
+Through the eternal cycle of sending thoughts and receiving AI responses,
+we access what feels like an Akashic Record - the accumulated knowledge of humanity,
+filtered through advanced AI understanding.
 
 Send your thoughts with =send-region=,
-receive Claude's response,
+receive AI's response,
 and deepen your thinking further.
-This cycle is the development experience that the new era's REPL envisions.
+This cycle - this 円環 (enkan) - is the development experience that the new era's REPL envisions.
 Here lies a completely new programming horizon woven by Emacs and AI.
 
-** Future Direction and Breaking Changes Notice
-
-This package is currently built on Claude Code due to the overwhelmingly superior experience it provides within my current usage scope.
-However, if superior services emerge that surpass Claude Code through future technological and service developments, I intend to migrate to those alternatives.
-Ideally, I would like to enable switching between or combining multiple services.
-(In fact, I judge Claude Code's search capabilities to be insufficient,
-which is why I frequently instruct to "consult Gemini with =gemini -p= for research.")
-Parts that are tightly coupled to Claude Code represent critical weaknesses.
-Therefore, please be aware that breaking changes, including package name changes, may be introduced.
-
-This package also serves as my personal research tool for exploring challenges on the path to achieving that goal.
+(See [[#why-enkan][Why "enkan"?]] and [[#future-directions][Future Directions]] for more details about the philosophy and roadmap)
 
 ** Motivation
 The development motivation stems from the current usability issues with Claude Code and Gemini CLI,
@@ -103,8 +104,8 @@ For infrequently used operations, this overhead is perfectly acceptable.
 At least for me.
 
 You could assign a keybinding to the cheatsheet itself, but I can't remember them.
-My memory/configuration approach doesn't align well with this - 
-I get confused thinking "is it 'c' for cheatsheet? or 's' for sheet? 
+My memory/configuration approach doesn't align well with this -
+I get confused thinking "is it 'c' for cheatsheet? or 's' for sheet?
 wait, did I use 'open' somewhere, so 'o'?" even though 'open' isn't even in the actual command name.
 
 Furthermore, once you decide on settings, you want to reuse them to some extent.
@@ -275,6 +276,45 @@ and it recommended using Node.js mechanisms,
 which I have adopted.
 I'm not sure if this is the right approach,
 but I'll run with it for now.
+
+** Why "enkan"?
+:PROPERTIES:
+:CUSTOM_ID: why-enkan
+:END:
+
+The journey to this name reflects our philosophy:
+- Initially =cer= (ClaudEmacs-Repl), it evolved as we recognized the tool transcends any single AI
+- "enkan" represents the eternal cycle of knowledge exchange through multiple layers:
+  1. *Human → AI (Reasoning)*: We pose questions to thoughtful AI assistants like Claude
+  2. *AI → AI (Search)*: Claude consults specialized search AIs like Gemini for comprehensive information
+  3. *AI → Human Knowledge*: These search engines access humanity's accumulated wisdom
+  4. *Knowledge → Human*: The insights return to us, transformed and synthesized
+- This multi-layered cycle forms the true 円環 (circle) of modern knowledge work
+- It captures the mathematical beauty of circles or tori and the philosophical depth of eternal recurrence
+- Short (5 letters), internationally pronounceable, yet distinctly rooted in Eastern philosophy
+
+** Future Directions
+:PROPERTIES:
+:CUSTOM_ID: future-directions
+:END:
+
+This package is currently built on Claude Code due to the overwhelmingly superior experience it provides within my current usage scope.
+However, if superior services emerge that surpass Claude Code through future technological and service developments, I intend to migrate to those alternatives.
+
+The "enkan" philosophy already embraces multiple AI collaboration:
+We leverage Claude's exceptional reasoning capabilities while compensating for its limited search abilities
+by instructing it to "consult Gemini with =gemini -p= for research."
+This Human-Claude-Gemini-Knowledge chain exemplifies the multi-AI collaboration that defines our approach.
+
+Ideally, I would like to enable seamless switching between or combining multiple services,
+making the entire AI ecosystem work as one harmonious 円環 (circle).
+
+Parts that are tightly coupled to Claude Code represent critical weaknesses.
+Therefore, please be aware that breaking changes, including package name changes, may be introduced.
+Indeed, the recent rename from =claudemacs-repl= to =enkan-repl= is part of this philosophy -
+recognizing that the tool's essence transcends any single AI service.
+
+This package also serves as my personal research tool for exploring challenges on the path to achieving that goal.
 
 ** License
 This project is licensed under the MIT License - see the [[file:LICENSE][LICENSE]] file for details.
