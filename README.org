@@ -1,6 +1,6 @@
-* claudemacs-repl
+* enkan-repl
 
-[[https://github.com/phasetr/claudemacs-repl/workflows/CI/badge.svg]]
+[[https://github.com/phasetr/enkan-repl/workflows/CI/badge.svg]]
 [[https://img.shields.io/badge/License-MIT-yellow.svg]]
 
 This package builds upon the excellent work of:
@@ -14,7 +14,7 @@ We extend our deepest gratitude to the authors and contributors of these foundat
 ** Vision - Reviving REPL Culture for the AI Era
 This package differs technically from traditional REPLs (Read-Eval-Print Loop).
 While conventional REPLs execute code and return results,
-=claudemacs-repl= sends text to Claude AI and receives generated responses.
+=enkan-repl= sends text to Claude AI and receives generated responses.
 
 However, we view this difference not as a constraint,
 but as a new possibility.
@@ -66,8 +66,8 @@ After trying several packages that didn't quite fit,
 I decided to build my own on top of [[https://github.com/cpoile/claudemacs][claudemacs]].
 
 This package enables you to send numbered choices directly from your input file
-using functions like =M-x claudemacs-repl-send-1/2/3=.
-To stop runaway processes, use =M-x claudemacs-repl-send-escape= from your input file -
+using functions like =M-x enkan-repl-send-1/2/3=.
+To stop runaway processes, use =M-x enkan-repl-send-escape= from your input file -
 no terminal navigation required.
 (Note: We provide no default keybindings, so you may prefer mapping these to keys like =C-g=
 or configure them according to your preferences.)
@@ -88,7 +88,7 @@ We intentionally provide no default keybindings for several reasons:
 - Avoiding conflicts with existing user workflows
 
 Even if your Emacs configuration is heavily customized with no available keybindings,
-the interactive cheatsheet (=M-x claudemacs-repl-cheatsheet=) provides quick access
+the interactive cheatsheet (=M-x enkan-repl-cheatsheet=) provides quick access
 to all functions with fuzzy search and filtering capabilities.
 
 *** =M-x= Driven Workflow with Interactive Cheatsheet
@@ -109,10 +109,10 @@ wait, did I use 'open' somewhere, so 'o'?" even though 'open' isn't even in the 
 
 Furthermore, once you decide on settings, you want to reuse them to some extent.
 To make this easy, we made it possible to specify your own default configuration file.
-We also added =claudemacs-repl-output-template= to output your custom configuration file
+We also added =enkan-repl-output-template= to output your custom configuration file
 to a temporary buffer, making it as easy as possible to reconfigure multiple files.
 
-The interactive cheatsheet (=M-x claudemacs-repl-cheatsheet=) makes this workflow
+The interactive cheatsheet (=M-x enkan-repl-cheatsheet=) makes this workflow
 even more practical by providing:
 - *Command Palette*: Quick access to all functions with descriptions
 - *Fuzzy Search*: Type partial names to find functions instantly
@@ -137,19 +137,19 @@ compatibility with other environments has not been verified.
 *** Using straight.el (Recommended)
 #+begin_src elisp
 (straight-use-package
-  '(claudemacs-repl :host github :repo "phasetr/claudemacs-repl"))
+  '(enkan-repl :host github :repo "phasetr/enkan-repl"))
 #+end_src
 
 *** Manual Installation
-1. Download =claudemacs-repl.el=
+1. Download =enkan-repl.el=
 2. Add to your Emacs configuration:
 
 #+begin_src elisp
 ;; Add to load path
-(add-to-list 'load-path "/path/to/claudemacs-repl")
+(add-to-list 'load-path "/path/to/enkan-repl")
 
 ;; Load the package
-(require 'claudemacs-repl)
+(require 'enkan-repl)
 #+end_src
 
 ** Quick Start
@@ -168,11 +168,11 @@ compatibility with other environments has not been verified.
    #+end_src
    /This ensures Claude sessions are isolated and changes are tracked safely./
 
-3. *Open project file*: =M-x claudemacs-repl-open-project-input-file=
-4. *Start Claude session*: =M-x claudemacs-repl-start-claudemacs=
+3. *Open project file*: =M-x enkan-repl-open-project-input-file=
+4. *Start Claude session*: =M-x enkan-repl-start-claudemacs=
 5. *Write your thoughts* in the org-mode file
-6. *Access functions easily*: Use =M-x claudemacs-repl-cheatsheet= to browse and select functions
-7. *Send specific parts* using =M-x claudemacs-repl-send-region= or =M-x claudemacs-repl-send-rest-of-buffer=
+6. *Access functions easily*: Use =M-x enkan-repl-cheatsheet= to browse and select functions
+7. *Send specific parts* using =M-x enkan-repl-send-region= or =M-x enkan-repl-send-rest-of-buffer=
 
 *** For Existing Projects
 
@@ -187,56 +187,56 @@ The generated project file includes template functions and usage instructions.
 ** Core Functions
 
 *** Command Palette
-- =claudemacs-repl-cheatsheet= - *Interactive command browser with fuzzy search*
+- =enkan-repl-cheatsheet= - *Interactive command browser with fuzzy search*
   - Browse all available functions with descriptions
   - Filter functions by typing partial names
   - Functions organized by category for easy discovery
   - No need to memorize function names
 
 *** File Management
-- =claudemacs-repl-open-project-input-file= - Create/open persistent input file for current directory
+- =enkan-repl-open-project-input-file= - Create/open persistent input file for current directory
 
 *** Text Sending
-- =claudemacs-repl-send-region= - Send selected text (the author most commonly used)
-- =claudemacs-repl-send-rest-of-buffer= - Send from cursor to end
-- =claudemacs-repl-send-buffer= - Send entire buffer
-- =claudemacs-repl-send-line= - Send current line only
+- =enkan-repl-send-region= - Send selected text (the author most commonly used)
+- =enkan-repl-send-rest-of-buffer= - Send from cursor to end
+- =enkan-repl-send-buffer= - Send entire buffer
+- =enkan-repl-send-line= - Send current line only
 
 *** Session Control
-- =claudemacs-repl-send-enter= - Send enter key
-- =claudemacs-repl-send-1/2/3= - Send numbered choices for AI prompts
+- =enkan-repl-send-enter= - Send enter key
+- =enkan-repl-send-1/2/3= - Send numbered choices for AI prompts
 
 *** Utilities
-- =claudemacs-repl-start-claudemacs= - Start Claude session in appropriate directory
-- =claudemacs-repl-setup-window-layout= - Arrange windows for (the author's) optimal workflow
-- =claudemacs-repl-status= - Display connection status and diagnostics
+- =enkan-repl-start-claudemacs= - Start Claude session in appropriate directory
+- =enkan-repl-setup-window-layout= - Arrange windows for (the author's) optimal workflow
+- =enkan-repl-status= - Display connection status and diagnostics
 
 ** Configuration
 
 *** Template Customization
 #+begin_src elisp
 ;; Use default template
-(setq claudemacs-repl-template-file nil)
+(setq enkan-repl-template-file nil)
 
 ;; Use custom template file
-(setq claudemacs-repl-template-file "~/my-claude-template.org")
+(setq enkan-repl-template-file "~/my-claude-template.org")
 
 ;; Use project-specific template
-(setq claudemacs-repl-template-file (expand-file-name "claude-template.org" user-emacs-directory))
+(setq enkan-repl-template-file (expand-file-name "claude-template.org" user-emacs-directory))
 #+end_src
 
 To create a custom template,
-use =M-x claudemacs-repl-output-template= to export the default template to a buffer for editing.
+use =M-x enkan-repl-output-template= to export the default template to a buffer for editing.
 
 ** Troubleshooting
 If you encounter "❌ Cannot send - no matching claudemacs buffer found for this directory":
 
 1. Ensure claudemacs is running: =M-x claudemacs-transient-menu=
 2. Verify Claude Code CLI is properly configured
-3. Run =M-x claudemacs-repl-status= for detailed diagnostic information
+3. Run =M-x enkan-repl-status= for detailed diagnostic information
 4. Check that you're in the correct directory or using the appropriate project file
 
-For debug information, enable debug mode with =M-x claudemacs-repl-toggle-debug-mode=.
+For debug information, enable debug mode with =M-x enkan-repl-toggle-debug-mode=.
 
 ** Development
 
@@ -262,7 +262,7 @@ response times may be affected.
 Ironically,
 it was precisely this situation that motivated the development of this package - to continue enjoying programming even under these circumstances.
 The desire to maintain productive development workflows during challenging times
-drove the creation of claudemacs-repl.
+drove the creation of enkan-repl.
 
 While I have extensively used OSS over the years,
 I never imagined I would find myself on the OSS development side under these circumstances.
@@ -281,5 +281,5 @@ This project is licensed under the MIT License - see the [[file:LICENSE][LICENSE
 
 ** Support
 
-- 🐛 [[https://github.com/phasetr/claudemacs-repl/issues][Issue Tracker]]
-- 💬 [[https://github.com/phasetr/claudemacs-repl/discussions][Discussions]]
+- 🐛 [[https://github.com/phasetr/enkan-repl/issues][Issue Tracker]]
+- 💬 [[https://github.com/phasetr/enkan-repl/discussions][Discussions]]

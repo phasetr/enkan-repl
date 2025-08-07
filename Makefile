@@ -1,11 +1,11 @@
-# Makefile for claudemacs-repl
+# Makefile for enkan-repl
 EMACS ?= emacs
 BATCH = $(EMACS) --batch -Q
 
 .PHONY: help test test-docs test-all compile checkdoc lint check clean install-deps format docs extract-api generate-template
 
 help: ## Show this help message
-	@echo "claudemacs-repl Quality Check Commands"
+	@echo "enkan-repl Quality Check Commands"
 	@echo "========================================"
 	@echo ""
 	@echo "Available commands:"
@@ -21,7 +21,7 @@ install-deps: ## Install required dependencies (package-lint)
 	$(BATCH) --eval "(progn (require 'package) (add-to-list 'package-archives '(\"melpa\" . \"https://melpa.org/packages/\")) (package-refresh-contents) (package-install 'package-lint))"
 
 test: ## Run ERT tests
-	$(BATCH) --eval "(add-to-list 'load-path \".\")" -l claudemacs-repl.el -l test/claudemacs-repl-test.el -f ert-run-tests-batch-and-exit
+	$(BATCH) --eval "(add-to-list 'load-path \".\")" -l enkan-repl.el -l test/enkan-repl-test.el -f ert-run-tests-batch-and-exit
 
 test-docs: ## Run generate-docs tests
 	$(BATCH) --eval "(add-to-list 'load-path \".\")" -l test/generate-docs-test.el -f ert-run-tests-batch-and-exit
@@ -29,17 +29,17 @@ test-docs: ## Run generate-docs tests
 test-all: test test-docs ## Run all tests (core package and development tools)
 
 compile: ## Byte compile with warnings as errors
-	$(BATCH) --eval "(setq byte-compile-error-on-warn t)" --eval "(byte-compile-file \"claudemacs-repl.el\")"
+	$(BATCH) --eval "(setq byte-compile-error-on-warn t)" --eval "(byte-compile-file \"enkan-repl.el\")"
 
 checkdoc: ## Check documentation format
-	$(BATCH) --eval "(checkdoc-file \"claudemacs-repl.el\")"
+	$(BATCH) --eval "(checkdoc-file \"enkan-repl.el\")"
 
 lint: ## Run package-lint checks
-	$(BATCH) --eval "(progn (package-initialize) (require 'package-lint) (with-temp-buffer (insert-file-contents \"claudemacs-repl.el\") (emacs-lisp-mode) (package-lint-current-buffer)))"
+	$(BATCH) --eval "(progn (package-initialize) (require 'package-lint) (with-temp-buffer (insert-file-contents \"enkan-repl.el\") (emacs-lisp-mode) (package-lint-current-buffer)))"
 
 format: ## Auto-format elisp files using built-in indent-region (spaces only)
-	$(BATCH) --eval "(progn (find-file \"claudemacs-repl.el\") (setq-local indent-tabs-mode nil) (untabify (point-min) (point-max)) (mark-whole-buffer) (indent-region (point-min) (point-max)) (save-buffer))"
-	$(BATCH) --eval "(progn (find-file \"test/claudemacs-repl-test.el\") (setq-local indent-tabs-mode nil) (untabify (point-min) (point-max)) (mark-whole-buffer) (indent-region (point-min) (point-max)) (save-buffer))"
+	$(BATCH) --eval "(progn (find-file \"enkan-repl.el\") (setq-local indent-tabs-mode nil) (untabify (point-min) (point-max)) (mark-whole-buffer) (indent-region (point-min) (point-max)) (save-buffer))"
+	$(BATCH) --eval "(progn (find-file \"test/enkan-repl-test.el\") (setq-local indent-tabs-mode nil) (untabify (point-min) (point-max)) (mark-whole-buffer) (indent-region (point-min) (point-max)) (save-buffer))"
 
 check: test compile checkdoc lint format ## Run all quality checks including formatting
 

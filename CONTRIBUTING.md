@@ -1,6 +1,6 @@
-# Contributing to claudemacs-repl
+# Contributing to enkan-repl
 
-Thank you for your interest in contributing to claudemacs-repl!
+Thank you for your interest in contributing to enkan-repl!
 
 ## Development Setup
 
@@ -86,7 +86,7 @@ The project uses **semantic-release** with GitHub Actions for fully automated re
 
 ### Files Updated During Release
 
-- `claudemacs-repl.el` - Version field
+- `enkan-repl.el` - Version field
 - `CHANGELOG.md` - Auto-generated from commits
 - `default.org` - Regenerated with new version
 - Git tag created

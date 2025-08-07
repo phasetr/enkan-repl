@@ -17,46 +17,46 @@
 
 (require 'cl-lib)
 
-;; Add parent directory to load-path to access claudemacs-repl-utils
+;; Add parent directory to load-path to access enkan-repl-utils
 (let ((parent-dir (file-name-directory (directory-file-name (file-name-directory (or load-file-name buffer-file-name))))))
   (add-to-list 'load-path parent-dir))
 
-(require 'claudemacs-repl-utils)
+(require 'enkan-repl-utils)
 
 ;; For batch execution
 
-(defun claudemacs-repl--generate-core-functions-section ()
+(defun enkan-repl--generate-core-functions-section ()
   "Generate Core Functions section matching manual update structure."
   (concat "** Core Functions\n\n"
           "*** Command Palette\n"
-          "- =claudemacs-repl-cheatsheet= - *Interactive command browser with fuzzy search*\n"
+          "- =enkan-repl-cheatsheet= - *Interactive command browser with fuzzy search*\n"
           "  - Browse all available functions with descriptions\n"
           "  - Filter functions by typing partial names\n"
           "  - Functions organized by category for easy discovery\n"
           "  - No need to memorize function names\n\n"
           "*** File Management\n"
-          "- =claudemacs-repl-open-project-input-file= - Create/open persistent input file for current directory\n\n"
+          "- =enkan-repl-open-project-input-file= - Create/open persistent input file for current directory\n\n"
           "*** Text Sending\n"
-          "- =claudemacs-repl-send-region= - Send selected text (the author most commonly used)\n"
-          "- =claudemacs-repl-send-rest-of-buffer= - Send from cursor to end\n"
-          "- =claudemacs-repl-send-buffer= - Send entire buffer\n"
-          "- =claudemacs-repl-send-line= - Send current line only\n\n"
+          "- =enkan-repl-send-region= - Send selected text (the author most commonly used)\n"
+          "- =enkan-repl-send-rest-of-buffer= - Send from cursor to end\n"
+          "- =enkan-repl-send-buffer= - Send entire buffer\n"
+          "- =enkan-repl-send-line= - Send current line only\n\n"
           "*** Session Control\n"
-          "- =claudemacs-repl-send-enter= - Send enter key\n"
-          "- =claudemacs-repl-send-1/2/3= - Send numbered choices for AI prompts\n\n"
+          "- =enkan-repl-send-enter= - Send enter key\n"
+          "- =enkan-repl-send-1/2/3= - Send numbered choices for AI prompts\n\n"
           "*** Utilities\n"
-          "- =claudemacs-repl-start-claudemacs= - Start Claude session in appropriate directory\n"
-          "- =claudemacs-repl-setup-window-layout= - Arrange windows for (the author's) optimal workflow\n"
-          "- =claudemacs-repl-status= - Display connection status and diagnostics\n\n"))
+          "- =enkan-repl-start-claudemacs= - Start Claude session in appropriate directory\n"
+          "- =enkan-repl-setup-window-layout= - Arrange windows for (the author's) optimal workflow\n"
+          "- =enkan-repl-status= - Display connection status and diagnostics\n\n"))
 
-(defun claudemacs-repl--generate-readme (output-file)
+(defun enkan-repl--generate-readme (output-file)
   "Generate README.org file with Core Functions section matching manual updates."
   (let* ((readme-content (if (file-exists-p output-file)
                              (with-temp-buffer
                                (insert-file-contents output-file)
                                (buffer-string))
                            ""))
-         (new-section (claudemacs-repl--generate-core-functions-section)))
+         (new-section (enkan-repl--generate-core-functions-section)))
     ;; Find start and end positions for Core Functions section
     (let ((start-pos (string-match "\\*\\* Core Functions" readme-content))
           (end-pos (string-match "\\*\\* Configuration" readme-content)))
@@ -73,7 +73,7 @@
 
 (defun generate-readme ()
   "Generate README.org with updated Core Functions section."
-  (claudemacs-repl--generate-readme "README.org")
+  (enkan-repl--generate-readme "README.org")
   (message "README.org generated successfully"))
 
 (defun generate-all-docs ()

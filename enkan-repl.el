@@ -1,12 +1,12 @@
-;;; claudemacs-repl.el --- Enhanced repl utilities for claudemacs -*- lexical-binding: t -*-
+;;; enkan-repl.el --- Enhanced repl utilities for enkan -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2025 [phasetr]
 
 ;; Author: [phasetr] <phasetr@gmail.com>
 ;; Version: 0.4.0
 ;; Package-Requires: ((emacs "28.1") (claudemacs "0.1.0"))
-;; Keywords: claudemacs ai tools convenience
-;; URL: https://github.com/phasetr/claudemacs-repl
+;; Keywords: enkan ai tools convenience
+;; URL: https://github.com/phasetr/enkan-repl
 ;; License: MIT
 
 ;; This file is not part of GNU Emacs.
@@ -31,7 +31,7 @@
 
 ;;; Commentary:
 
-;; claudemacs-repl revives interactive development culture for the AI era.
+;; enkan-repl revives interactive development culture for the AI era.
 ;; Send thoughts with `send-region`, receive Claude's response, and deepen
 ;; your thinking further - a new REPL experience woven by Emacs and AI.
 ;;
@@ -43,8 +43,8 @@
 ;; - File path support for Claude direct reading
 ;;
 ;; Quick Start:
-;;   M-x claudemacs-repl-start-claudemacs
-;;   M-x claudemacs-repl-open-project-input-file
+;;   M-x enkan-repl-start-claudemacs
+;;   M-x enkan-repl-open-project-input-file
 ;;
 ;; This package builds upon claudemacs and eat.  We extend our deepest
 ;; gratitude to their authors and contributors.
@@ -54,11 +54,11 @@
 (require 'cl-lib)
 
 ;; Load utility functions (require for template generation and cheatsheet)
-(when (locate-library "claudemacs-repl-utils")
-  (require 'claudemacs-repl-utils))
+(when (locate-library "enkan-repl-utils")
+  (require 'enkan-repl-utils))
 
 ;; Declare external functions to avoid byte-compile warnings
-(declare-function claudemacs-repl-utils--extract-function-info "claudemacs-repl-utils" (file-path))
+(declare-function enkan-repl-utils--extract-function-info "enkan-repl-utils" (file-path))
 
 ;; Compatibility check
 (when (locate-library "claudemacs")
@@ -71,90 +71,90 @@
 
 ;;;; Custom Variables
 
-(defgroup claudemacs-repl nil
-  "Enhanced REPL utilities for claudemacs."
+(defgroup enkan-repl nil
+  "Enhanced REPL utilities for enkan."
   :group 'tools
-  :prefix "claudemacs-repl-")
+  :prefix "enkan-repl-")
 
 ;;;; Constants
 
-(defconst claudemacs-repl-path-separator "--"
+(defconst enkan-repl-path-separator "--"
   "String to replace path separators (/) in filenames.
-This is a fixed part of the claudemacs-repl filename encoding scheme
+This is a fixed part of the enkan-repl filename encoding scheme
 and should not be changed to maintain compatibility and security.")
 
-(defconst claudemacs-repl-default-template-filename "default.org"
-  "Default template filename for claudemacs-repl input files.
+(defconst enkan-repl-default-template-filename "default.org"
+  "Default template filename for enkan-repl input files.
 This file should be located in the package directory and contains
 the standard template structure for new project input files.")
 
-(defconst claudemacs-repl-file-prefix "cer"
-  "Prefix for claudemacs-repl encoded filenames.
+(defconst enkan-repl-file-prefix "enkan"
+  "Prefix for enkan-repl encoded filenames.
 This is a fixed part of the filename encoding scheme and should not be changed
 to maintain compatibility with existing project files.")
 
-(defconst claudemacs-repl-command-categories
+(defconst enkan-repl-command-categories
   '("Command Palette"
     "Text Sender"
     "Session Controller"
     "Utilities")
-  "Command category names for claudemacs-repl package.
+  "Command category names for enkan-repl package.
 Command Palette is positioned first as the primary interface.
 This structure is used for documentation generation and organization.")
 
 ;;;; Internal Variables
 
-(defvar claudemacs-repl-debug-mode nil
+(defvar enkan-repl-debug-mode nil
   "When non-nil, enable debug messages for send operations.")
 
 ;; Declare external variable from constants file
-(defvar claudemacs-repl-cheatsheet-candidates nil
+(defvar enkan-repl-cheatsheet-candidates nil
   "Precompiled list of cheatsheet candidates from constants file.")
 
-(defun claudemacs-repl--find-template-directory ()
+(defun enkan-repl--find-template-directory ()
   "Find directory containing default template file.
 Returns the directory path where default.org is located."
   (or
    ;; Try load-file-name first (when loading with load command)
    (and load-file-name
         (let ((dir (file-name-directory load-file-name)))
-          (when (file-exists-p (expand-file-name claudemacs-repl-default-template-filename dir))
+          (when (file-exists-p (expand-file-name enkan-repl-default-template-filename dir))
             dir)))
    ;; Try buffer-file-name (when evaluating in buffer)
    (and buffer-file-name
         (let ((dir (file-name-directory buffer-file-name)))
-          (when (file-exists-p (expand-file-name claudemacs-repl-default-template-filename dir))
+          (when (file-exists-p (expand-file-name enkan-repl-default-template-filename dir))
             dir)))
    ;; Try locate-library result directory
-   (and (locate-library "claudemacs-repl")
-        (let ((dir (file-name-directory (locate-library "claudemacs-repl"))))
-          (when (file-exists-p (expand-file-name claudemacs-repl-default-template-filename dir))
+   (and (locate-library "enkan-repl")
+        (let ((dir (file-name-directory (locate-library "enkan-repl"))))
+          (when (file-exists-p (expand-file-name enkan-repl-default-template-filename dir))
             dir)))
    ;; For straight.el: try repos directory if build directory doesn't have template
-   (and (locate-library "claudemacs-repl")
-        (let* ((build-dir (file-name-directory (locate-library "claudemacs-repl")))
+   (and (locate-library "enkan-repl")
+        (let* ((build-dir (file-name-directory (locate-library "enkan-repl")))
                (straight-build-p (string-match-p "/straight/build/" build-dir))
                (repos-dir (and straight-build-p
                                (replace-regexp-in-string "/straight/build/" "/straight/repos/" build-dir))))
-          (when (and repos-dir (file-exists-p (expand-file-name claudemacs-repl-default-template-filename repos-dir)))
+          (when (and repos-dir (file-exists-p (expand-file-name enkan-repl-default-template-filename repos-dir)))
             repos-dir)))
    ;; Search for default.org in load-path directories
    (cl-some
     (lambda (dir)
       (let ((expanded-dir (expand-file-name dir))
-            (default-org-path (expand-file-name claudemacs-repl-default-template-filename (expand-file-name dir))))
+            (default-org-path (expand-file-name enkan-repl-default-template-filename (expand-file-name dir))))
         (when (file-exists-p default-org-path)
           expanded-dir)))
     load-path)
    ;; Final fallback to current directory
    default-directory))
 
-(defvar claudemacs-repl--package-directory
-  (claudemacs-repl--find-template-directory)
+(defvar enkan-repl--package-directory
+  (enkan-repl--find-template-directory)
   "Package directory determined at load time.")
 
-(defcustom claudemacs-repl-template-file nil
-  "Template file path for claudemacs-repl input files.
+(defcustom enkan-repl-template-file nil
+  "Template file path for enkan-repl input files.
 When nil, uses the default template (default.org).
 When set to a file path, uses that file as the template."
   :type
@@ -162,56 +162,56 @@ When set to a file path, uses that file as the template."
     (const :tag "Use default template" nil)
     (file :tag "Custom template file"))
   :group
-  'claudemacs-repl)
+  'enkan-repl)
 
 ;;;; Core Functions
 
 ;;;; File Naming and Path Management
 
-(defun claudemacs-repl--encode-full-path (path)
+(defun enkan-repl--encode-full-path (path)
   "Encode PATH by replacing forward slashes with the configured separator.
-Example: \\='/Users/phasetr/project1/\\=' -> \\='cer--Users--phasetr--project1\\='"
-  (claudemacs-repl--encode-full-path-pure
+Example: \\='/Users/phasetr/project1/\\=' -> \\='enkan--Users--phasetr--project1\\='"
+  (enkan-repl--encode-full-path-pure
    path
-   claudemacs-repl-file-prefix
-   claudemacs-repl-path-separator))
+   enkan-repl-file-prefix
+   enkan-repl-path-separator))
 
-(defun claudemacs-repl--decode-full-path (encoded-name)
+(defun enkan-repl--decode-full-path (encoded-name)
   "Decode ENCODED-NAME back to original path.
-Example: \\='cer--Users--phasetr--project1\\=' -> \\='/Users/phasetr/project1/\\='"
-  (claudemacs-repl--decode-full-path-pure
+Example: \\='enkan--Users--phasetr--project1\\=' -> \\='/Users/phasetr/project1/\\='"
+  (enkan-repl--decode-full-path-pure
    encoded-name
-   claudemacs-repl-file-prefix
-   claudemacs-repl-path-separator))
+   enkan-repl-file-prefix
+   enkan-repl-path-separator))
 
-(defun claudemacs-repl--get-project-file-path (&optional directory)
+(defun enkan-repl--get-project-file-path (&optional directory)
   "Get the full path for the project file based on DIRECTORY.
 If DIRECTORY is nil, use the current `default-directory'."
   (let*
       ((target-dir (or directory default-directory))
-       (encoded-name (claudemacs-repl--encode-full-path target-dir))
+       (encoded-name (enkan-repl--encode-full-path target-dir))
        (filename (concat encoded-name ".org")))
     (expand-file-name filename target-dir)))
 
 ;;;; Template Loading Functions
 
-(defun claudemacs-repl--get-package-directory ()
+(defun enkan-repl--get-package-directory ()
   "Get package directory for template files.
 Returns directory path where default templates are located."
-  (or (claudemacs-repl--find-template-directory)
-      claudemacs-repl--package-directory
+  (or (enkan-repl--find-template-directory)
+      enkan-repl--package-directory
       default-directory))
 
-(defvar claudemacs-repl--testing-mode nil
+(defvar enkan-repl--testing-mode nil
   "When non-nil, disable interactive prompts for testing.")
 
-(defun claudemacs-repl--handle-missing-template (template-path)
+(defun enkan-repl--handle-missing-template (template-path)
   "Handle missing template file with interactive user choices.
 TEMPLATE-PATH is the path to the missing template file.
 Returns the template path to use, or nil to use default template."
   ;; In testing mode, just return nil to use default template
   (if
-      claudemacs-repl--testing-mode
+      enkan-repl--testing-mode
       nil
     (let
         ((choice
@@ -253,23 +253,23 @@ Returns the template path to use, or nil to use default template."
                (insert "Edit this content to match your needs.\n\n")
                (insert "** Available Commands\n\n")
                ;; Insert static function list
-               (insert "- ~M-x claudemacs-repl-send-region~ - Send selected text to Claude\n")
-               (insert "- ~M-x claudemacs-repl-send-buffer~ - Send entire buffer content\n")
-               (insert "- ~M-x claudemacs-repl-send-rest-of-buffer~ - Send from cursor position to end\n")
-               (insert "- ~M-x claudemacs-repl-send-line~ - Send current line\n")
-               (insert "- ~M-x claudemacs-repl-send-enter~ - Send enter key for prompts\n")
-               (insert "- ~M-x claudemacs-repl-send-1~ - Send '1' for numbered choice prompts\n")
-               (insert "- ~M-x claudemacs-repl-send-2~ - Send '2' for numbered choice prompts\n")
-               (insert "- ~M-x claudemacs-repl-send-3~ - Send '3' for numbered choice prompts\n")
-               (insert "- ~M-x claudemacs-repl-send-escape~ - Send ESC key to interrupt operations\n")
-               (insert "- ~M-x claudemacs-repl-open-project-input-file~ - Open or create project input file\n")
-               (insert "- ~M-x claudemacs-repl-start-claudemacs~ - Start claudemacs session\n")
-               (insert "- ~M-x claudemacs-repl-setup-window-layout~ - Set up convenient window layout\n")
-               (insert "- ~M-x claudemacs-repl-output-template~ - Export template for customization\n")
-               (insert "- ~M-x claudemacs-repl-status~ - Show diagnostic information\n")
-               (insert "- ~M-x claudemacs-repl-toggle-debug-mode~ - Toggle debug mode\n")
-               (insert "- ~M-x claudemacs-repl-enable-debug-mode~ - Enable debug mode\n")
-               (insert "- ~M-x claudemacs-repl-disable-debug-mode~ - Disable debug mode\n")
+               (insert "- ~M-x enkan-repl-send-region~ - Send selected text to Claude\n")
+               (insert "- ~M-x enkan-repl-send-buffer~ - Send entire buffer content\n")
+               (insert "- ~M-x enkan-repl-send-rest-of-buffer~ - Send from cursor position to end\n")
+               (insert "- ~M-x enkan-repl-send-line~ - Send current line\n")
+               (insert "- ~M-x enkan-repl-send-enter~ - Send enter key for prompts\n")
+               (insert "- ~M-x enkan-repl-send-1~ - Send '1' for numbered choice prompts\n")
+               (insert "- ~M-x enkan-repl-send-2~ - Send '2' for numbered choice prompts\n")
+               (insert "- ~M-x enkan-repl-send-3~ - Send '3' for numbered choice prompts\n")
+               (insert "- ~M-x enkan-repl-send-escape~ - Send ESC key to interrupt operations\n")
+               (insert "- ~M-x enkan-repl-open-project-input-file~ - Open or create project input file\n")
+               (insert "- ~M-x enkan-repl-start-claudemacs~ - Start claudemacs session\n")
+               (insert "- ~M-x enkan-repl-setup-window-layout~ - Set up convenient window layout\n")
+               (insert "- ~M-x enkan-repl-output-template~ - Export template for customization\n")
+               (insert "- ~M-x enkan-repl-status~ - Show diagnostic information\n")
+               (insert "- ~M-x enkan-repl-toggle-debug-mode~ - Toggle debug mode\n")
+               (insert "- ~M-x enkan-repl-enable-debug-mode~ - Enable debug mode\n")
+               (insert "- ~M-x enkan-repl-disable-debug-mode~ - Disable debug mode\n")
                (insert "\n** Working Notes\n")
                (insert "Write your thoughts and notes here.\n")
                (insert "Send specific parts to Claude Code using the commands above.\n"))
@@ -278,45 +278,45 @@ Returns the template path to use, or nil to use default template."
         (?q
          (user-error "Operation cancelled by user"))))))
 
-(defun claudemacs-repl--load-template ()
-  "Load template content based on claudemacs-repl-template-file setting.
+(defun enkan-repl--load-template ()
+  "Load template content based on enkan-repl-template-file setting.
 Returns template content as string, using embedded template as fallback."
   (let
       ((template-path
         (cond
          ;; If custom template file is specified, check if it exists
-         (claudemacs-repl-template-file
-          (let ((custom-path (expand-file-name claudemacs-repl-template-file)))
+         (enkan-repl-template-file
+          (let ((custom-path (expand-file-name enkan-repl-template-file)))
             (if (file-exists-p custom-path)
                 custom-path
               ;; Handle missing custom template interactively
-              (or (claudemacs-repl--handle-missing-template custom-path)
+              (or (enkan-repl--handle-missing-template custom-path)
                   ;; Fall back to default if user chooses default
-                  (expand-file-name claudemacs-repl-default-template-filename
-                                    (claudemacs-repl--get-package-directory))))))
+                  (expand-file-name enkan-repl-default-template-filename
+                                    (enkan-repl--get-package-directory))))))
          ;; Otherwise, look for default template in package directory
-         (t (expand-file-name claudemacs-repl-default-template-filename
-                              (claudemacs-repl--get-package-directory))))))
+         (t (expand-file-name enkan-repl-default-template-filename
+                              (enkan-repl--get-package-directory))))))
     (if (and template-path (file-exists-p template-path))
         (with-temp-buffer
           (insert-file-contents template-path)
           (buffer-string))
       ;; Fall back to embedded template
-      (claudemacs-repl--get-embedded-template))))
+      (enkan-repl--get-embedded-template))))
 
-(defun claudemacs-repl--get-categorized-functions ()
+(defun enkan-repl--get-categorized-functions ()
   "Get categorized function list from constants file.
 Returns categorized functions as string, or falls back to static list."
   (condition-case nil
       (progn
         ;; Try to load constants file if not already loaded
-        (unless (featurep 'claudemacs-repl-constants)
-          (require 'claudemacs-repl-constants))
+        (unless (featurep 'enkan-repl-constants)
+          (require 'enkan-repl-constants))
         ;; Group functions by category
         (let ((categories (make-hash-table :test 'equal))
               (category-order '("Command Palette" "Text Sender" "Session Controller" "Utilities")))
           ;; Group functions by category
-          (dolist (candidate claudemacs-repl-cheatsheet-candidates)
+          (dolist (candidate enkan-repl-cheatsheet-candidates)
             (let* ((func-name (car candidate))
                    (description (cdr candidate))
                    (category (if (string-match "Category: \\([^\"]+\\)" description)
@@ -340,37 +340,37 @@ Returns categorized functions as string, or falls back to static list."
                 (setq result (concat result "\n"))))
             result)))
     ;; Fallback to static list if constants file is unavailable
-    (error (claudemacs-repl--get-static-functions))))
+    (error (enkan-repl--get-static-functions))))
 
-(defun claudemacs-repl--get-static-functions ()
+(defun enkan-repl--get-static-functions ()
   "Return static function list as fallback when constants unavailable."
   (concat "** Command Palette\n\n"
-          "- ~M-x claudemacs-repl-cheatsheet~ - Display interactive cheatsheet for claudemacs-repl commands.\n\n"
+          "- ~M-x enkan-repl-cheatsheet~ - Display interactive cheatsheet for enkan-repl commands.\n\n"
           "** Text Sender\n\n"
-          "- ~M-x claudemacs-repl-send-region~ - Send the text in region from START to END to claudemacs.\n"
-          "- ~M-x claudemacs-repl-send-buffer~ - Send the entire current buffer to claudemacs.\n"
-          "- ~M-x claudemacs-repl-send-rest-of-buffer~ - Send rest of buffer from cursor position to end to claudemacs.\n"
-          "- ~M-x claudemacs-repl-send-line~ - Send the current line to claudemacs.\n"
-          "- ~M-x claudemacs-repl-send-enter~ - Send enter key to claudemacs buffer.\n"
-          "- ~M-x claudemacs-repl-send-1~ - Send \\='1\\=' to claudemacs buffer for numbered choice prompts.\n"
-          "- ~M-x claudemacs-repl-send-2~ - Send \\='2\\=' to claudemacs buffer for numbered choice prompts.\n"
-          "- ~M-x claudemacs-repl-send-3~ - Send \\='3\\=' to claudemacs buffer for numbered choice prompts.\n"
-          "- ~M-x claudemacs-repl-send-escape~ - Send ESC key to claudemacs buffer.\n\n"
+          "- ~M-x enkan-repl-send-region~ - Send the text in region from START to END to claudemacs.\n"
+          "- ~M-x enkan-repl-send-buffer~ - Send the entire current buffer to claudemacs.\n"
+          "- ~M-x enkan-repl-send-rest-of-buffer~ - Send rest of buffer from cursor position to end to claudemacs.\n"
+          "- ~M-x enkan-repl-send-line~ - Send the current line to claudemacs.\n"
+          "- ~M-x enkan-repl-send-enter~ - Send enter key to claudemacs buffer.\n"
+          "- ~M-x enkan-repl-send-1~ - Send \\='1\\=' to claudemacs buffer for numbered choice prompts.\n"
+          "- ~M-x enkan-repl-send-2~ - Send \\='2\\=' to claudemacs buffer for numbered choice prompts.\n"
+          "- ~M-x enkan-repl-send-3~ - Send \\='3\\=' to claudemacs buffer for numbered choice prompts.\n"
+          "- ~M-x enkan-repl-send-escape~ - Send ESC key to claudemacs buffer.\n\n"
           "** Session Controller\n\n"
-          "- ~M-x claudemacs-repl-start-claudemacs~ - Start claudemacs and change to appropriate directory.\n"
-          "- ~M-x claudemacs-repl-setup-window-layout~ - Set up window layout with org file on left and claudemacs on right.\n\n"
+          "- ~M-x enkan-repl-start-claudemacs~ - Start claudemacs and change to appropriate directory.\n"
+          "- ~M-x enkan-repl-setup-window-layout~ - Set up window layout with org file on left and claudemacs on right.\n\n"
           "** Utilities\n\n"
-          "- ~M-x claudemacs-repl-open-project-input-file~ - Open or create project input file for current directory.\n"
-          "- ~M-x claudemacs-repl-output-template~ - Output current template content to a new buffer for customization.\n"
-          "- ~M-x claudemacs-repl-status~ - Show detailed diagnostic information for troubleshooting connection issues.\n"
-          "- ~M-x claudemacs-repl-toggle-debug-mode~ - Toggle debug mode for claudemacs-repl operations.\n"
-          "- ~M-x claudemacs-repl-enable-debug-mode~ - Enable debug mode for claudemacs-repl operations.\n"
-          "- ~M-x claudemacs-repl-disable-debug-mode~ - Disable debug mode for claudemacs-repl operations.\n\n"))
+          "- ~M-x enkan-repl-open-project-input-file~ - Open or create project input file for current directory.\n"
+          "- ~M-x enkan-repl-output-template~ - Output current template content to a new buffer for customization.\n"
+          "- ~M-x enkan-repl-status~ - Show detailed diagnostic information for troubleshooting connection issues.\n"
+          "- ~M-x enkan-repl-toggle-debug-mode~ - Toggle debug mode for enkan-repl operations.\n"
+          "- ~M-x enkan-repl-enable-debug-mode~ - Enable debug mode for enkan-repl operations.\n"
+          "- ~M-x enkan-repl-disable-debug-mode~ - Disable debug mode for enkan-repl operations.\n\n"))
 
-(defun claudemacs-repl--get-embedded-template ()
+(defun enkan-repl--get-embedded-template ()
   "Return embedded default template content as string."
   (concat "#+TITLE: Claude Input File\n\n"
-          "This is the default project template for claudemacs-repl.\n\n"
+          "This is the default project template for enkan-repl.\n\n"
           "* Quick Start\n\n"
           "Describe your main objective here.\n\n"
           "* Context\n\n"
@@ -379,7 +379,7 @@ Returns categorized functions as string, or falls back to static list."
           "Outline your planned approach or methodology.\n\n"
           "* Functions/Commands\n\n"
           "We open the following functions/commands.\n\n"
-          (claudemacs-repl--get-categorized-functions)
+          (enkan-repl--get-categorized-functions)
           "* Notes\n\n"
           "Add your thoughts, observations, or important points here.\n\n"
           "* Next Steps\n\n"
@@ -389,12 +389,12 @@ Returns categorized functions as string, or falls back to static list."
 
 ;;;; Pure Functions for Directory/Buffer Detection
 
-(defun claudemacs-repl--encode-full-path-pure (path prefix separator)
+(defun enkan-repl--encode-full-path-pure (path prefix separator)
   "Pure function: Encode PATH with PREFIX and SEPARATOR.
 PATH: Directory path to encode.
-PREFIX: Prefix string to add (e.g., \\='cer\\=').
+PREFIX: Prefix string to add (e.g., \\='enkan\\=').
 SEPARATOR: String to replace '/' with (e.g., '--').
-Example: \='/Users/project\=' + \='cer\=' + \='--\=' -> \='cer--Users--project\='"
+Example: \='/Users/project\=' + \='enkan\=' + \='--\=' -> \='enkan--Users--project\='"
   (let*
       ((expanded-path (expand-file-name path))
        (cleaned-path
@@ -404,12 +404,12 @@ Example: \='/Users/project\=' + \='cer\=' + \='--\=' -> \='cer--Users--project\=
           expanded-path)))
     (concat prefix (replace-regexp-in-string "/" separator cleaned-path))))
 
-(defun claudemacs-repl--decode-full-path-pure (encoded-name prefix separator)
+(defun enkan-repl--decode-full-path-pure (encoded-name prefix separator)
   "Pure function: Decode ENCODED-NAME with PREFIX and SEPARATOR.
 ENCODED-NAME: Encoded filename to decode.
-PREFIX: Expected prefix string (e.g., \\='cer\\=').
+PREFIX: Expected prefix string (e.g., \\='enkan\\=').
 SEPARATOR: String to replace with '/' (e.g., '--').
-Example: \='cer--Users--project\=' + \='cer\=' + \='--\=' -> \='/Users/project/\='"
+Example: \='enkan--Users--project\=' + \='enkan\=' + \='--\=' -> \='/Users/project/\='"
   (when (string-prefix-p prefix encoded-name)
     (let
         ((path-part (substring encoded-name (length prefix))))  ; Remove prefix
@@ -417,33 +417,33 @@ Example: \='cer--Users--project\=' + \='cer\=' + \='--\=' -> \='/Users/project/\
 
 ;;;; Debug Functions
 
-(defun claudemacs-repl--debug-message (format-string &rest args)
+(defun enkan-repl--debug-message (format-string &rest args)
   "Print debug message if debug mode is enabled.
 FORMAT-STRING is the format string.  ARGS are the arguments."
-  (when claudemacs-repl-debug-mode
+  (when enkan-repl-debug-mode
     (apply #'message (concat "[CLAUDEMACS-REPL-DEBUG] " format-string) args)))
 
-(defun claudemacs-repl--sanitize-content (content)
+(defun enkan-repl--sanitize-content (content)
   "Sanitize CONTENT to ensure it can be safely sent to claudemacs.
 This function handles edge cases with special characters and ensures
 proper formatting for terminal input.  Also addresses Claude Code
 interpretation issues and Mac region selection problems."
   (when content
     (let ((sanitized content))
-      (claudemacs-repl--debug-message "Input content: %S" content)
-      (claudemacs-repl--debug-message "Input content length: %d" (length content))
+      (enkan-repl--debug-message "Input content: %S" content)
+      (enkan-repl--debug-message "Input content length: %d" (length content))
       ;; Step 1: Remove all carriage return characters (\r) immediately
       ;; This is the most likely cause of "extra newlines" on Mac
       (setq sanitized (replace-regexp-in-string "\r" "" sanitized))
-      (claudemacs-repl--debug-message "After \\r removal: %S" sanitized)
+      (enkan-repl--debug-message "After \\r removal: %S" sanitized)
       ;; Step 2: Normalize all newline variations to single LF
       ;; Handles \r\n, \n\r, and other combinations that might remain
       (setq sanitized (replace-regexp-in-string "\\(\r\n\\|\n\r\\)" "\n" sanitized))
-      (claudemacs-repl--debug-message "After newline normalization: %S" sanitized)
+      (enkan-repl--debug-message "After newline normalization: %S" sanitized)
       ;; Step 3: Collapse consecutive newlines to single newlines
       ;; This prevents sending empty lines that might confuse Claude Code
       (setq sanitized (replace-regexp-in-string "\n\n+" "\n" sanitized))
-      (claudemacs-repl--debug-message "After consecutive newline collapse: %S" sanitized)
+      (enkan-repl--debug-message "After consecutive newline collapse: %S" sanitized)
       ;; Step 4: Remove other problematic control characters
       ;; Keep only \n (newline) and \t (tab) among control characters
       (setq
@@ -457,50 +457,50 @@ interpretation issues and Mac region selection problems."
            ;; Remove other control characters
            (t "")))
         sanitized))
-      (claudemacs-repl--debug-message "After control char cleanup: %S" sanitized);
+      (enkan-repl--debug-message "After control char cleanup: %S" sanitized);
       ;; Step 5: Remove Unicode line separators that might cause issues
       ;; U+0085 (NEL), U+2028 (LINE SEPARATOR), U+2029 (PARAGRAPH SEPARATOR)
       (setq sanitized (replace-regexp-in-string "[\u0085\u2028\u2029]" "" sanitized))
-      (claudemacs-repl--debug-message "After Unicode separator removal: %S" sanitized)
+      (enkan-repl--debug-message "After Unicode separator removal: %S" sanitized)
       ;; Step 6: Final cleanup of any remaining problematic characters at end
       (setq sanitized (replace-regexp-in-string "[\x0B\x0C\x0E-\x1F]+\\'" "" sanitized))
-      (claudemacs-repl--debug-message "After final cleanup: %S" sanitized)
+      (enkan-repl--debug-message "After final cleanup: %S" sanitized)
       ;; Step 7: File path interpretation workaround (existing logic)
-      (claudemacs-repl--debug-message
+      (enkan-repl--debug-message
        "File path pattern match: %s"
        (if (string-match-p "~/[^[:space:]]*\\.[a-zA-Z0-9]+\\'" sanitized) "YES" "NO"))
-      (claudemacs-repl--debug-message
+      (enkan-repl--debug-message
        "Punctuation pattern match: %s"
        (if (string-match-p "[.!?。！？]\\'" sanitized) "YES" "NO"))
       (when
           (and
            (string-match-p "~/[^[:space:]]*\\.[a-zA-Z0-9]+\\'" sanitized)
            (not (string-match-p "[.!?。！？]\\'" sanitized)))
-        (claudemacs-repl--debug-message "Adding end marker to prevent file path interpretation")
-        (setq sanitized (concat sanitized "\n(This text is added by claudemacs-repl as a workaround for Claude Code's special interpretation of file paths)")))
+        (enkan-repl--debug-message "Adding end marker to prevent file path interpretation")
+        (setq sanitized (concat sanitized "\n(This text is added by enkan-repl as a workaround for Claude Code's special interpretation of file paths)")))
       ;; Step 8: Final trim and validation
       (setq sanitized (string-trim sanitized))
-      (claudemacs-repl--debug-message "Final sanitized content: %S" sanitized)
-      (claudemacs-repl--debug-message "Final content length: %d" (length sanitized))
+      (enkan-repl--debug-message "Final sanitized content: %S" sanitized)
+      (enkan-repl--debug-message "Final content length: %d" (length sanitized))
       sanitized)))
 
 ;;;; Target Directory Detection Functions
 
-(defun claudemacs-repl--get-target-directory-for-buffer ()
+(defun enkan-repl--get-target-directory-for-buffer ()
   "Get the target directory for current buffer.
 For persistent files, extract directory from filename.
 For other buffers, use current `default-directory'."
   (if
       (and
        buffer-file-name
-       (string-match-p "cer-.+\\.org$" (file-name-nondirectory buffer-file-name)))
+       (string-match-p "enkan-.+\\.org$" (file-name-nondirectory buffer-file-name)))
       ;; This is a persistent file, extract directory from filename
-      (claudemacs-repl--decode-full-path
+      (enkan-repl--decode-full-path
        (file-name-base (file-name-nondirectory buffer-file-name)))
     ;; Use current directory
     default-directory))
 
-(defun claudemacs-repl--get-buffer-for-directory (&optional directory)
+(defun enkan-repl--get-buffer-for-directory (&optional directory)
   "Get the claudemacs buffer for DIRECTORY if it exists and is live.
 If DIRECTORY is nil, use current `default-directory'."
   (let
@@ -545,7 +545,7 @@ If DIRECTORY is nil, use current `default-directory'."
             (cl-return-from search-buffers)))))
     matching-buffer))
 
-(defun claudemacs-repl--buffer-matches-directory (buffer target-dir)
+(defun enkan-repl--buffer-matches-directory (buffer target-dir)
   "Check if BUFFER's working directory matches TARGET-DIR."
   (with-current-buffer buffer
     (when (boundp 'default-directory)
@@ -555,11 +555,11 @@ If DIRECTORY is nil, use current `default-directory'."
 
 ;;;; Send Functions - Internal Helpers
 
-(defun claudemacs-repl--can-send-text (&optional directory)
+(defun enkan-repl--can-send-text (&optional directory)
   "Check if text can actually be sent to claudemacs (strict check).
 If DIRECTORY is provided, check for claudemacs in that directory.
 Otherwise, use current `default-directory'."
-  (let ((claude-buffer (claudemacs-repl--get-buffer-for-directory directory)))
+  (let ((claude-buffer (enkan-repl--get-buffer-for-directory directory)))
     (when claude-buffer
       (with-current-buffer claude-buffer
         (and
@@ -567,14 +567,14 @@ Otherwise, use current `default-directory'."
          eat--process
          (process-live-p eat--process))))))
 
-(defun claudemacs-repl--send-text (text &optional directory)
+(defun enkan-repl--send-text (text &optional directory)
   "Send TEXT to claudemacs buffer.
 If DIRECTORY is provided, send to claudemacs in that directory.
 Otherwise, use current `default-directory'."
   (let
       ((claude-buffer
-        (claudemacs-repl--get-buffer-for-directory directory)))
-    (claudemacs-repl--debug-message
+        (enkan-repl--get-buffer-for-directory directory)))
+    (enkan-repl--debug-message
      "send-text called with text length: %d, buffer: %s"
      (length text) (if claude-buffer (buffer-name claude-buffer) "nil"))
     (when
@@ -583,36 +583,36 @@ Otherwise, use current `default-directory'."
                (and (boundp 'eat--process)
                     eat--process
                     (process-live-p eat--process))))
-      (claudemacs-repl--debug-message
+      (enkan-repl--debug-message
        "Sending text to claude buffer: %S"
        (substring text 0 (min 50 (length text))))
       (with-current-buffer claude-buffer
         (eat--send-string eat--process text)
         (eat--send-string eat--process "\r")
-        (claudemacs-repl--debug-message "Text sent successfully")
+        (enkan-repl--debug-message "Text sent successfully")
         t))))
 
-(defun claudemacs-repl--send-numbered-choice (number)
+(defun enkan-repl--send-numbered-choice (number)
   "Send NUMBER as string to claudemacs buffer for numbered choice prompt.
 NUMBER should be a string (e.g., \\='1\\=', \\='2\\=', \\='3\\=') or empty string for enter."
   (let
-      ((target-dir (claudemacs-repl--get-target-directory-for-buffer)))
+      ((target-dir (enkan-repl--get-target-directory-for-buffer)))
     (if
-        (claudemacs-repl--can-send-text target-dir)
+        (enkan-repl--can-send-text target-dir)
         (progn
-          (claudemacs-repl--send-text number target-dir)
+          (enkan-repl--send-text number target-dir)
           (if
               (= (length number) 0)
               (message "Sent enter to Claude")
             (message "Sent '%s' to Claude" number)))
       (message "❌ Cannot send - no matching claudemacs buffer found for this directory"))))
 
-(defun claudemacs-repl--send-escape-directly ()
+(defun enkan-repl--send-escape-directly ()
   "Send ESC key to claudemacs buffer directly."
   (let
       ((claude-buffer
-        (claudemacs-repl--get-buffer-for-directory
-         (claudemacs-repl--get-target-directory-for-buffer))))
+        (enkan-repl--get-buffer-for-directory
+         (enkan-repl--get-target-directory-for-buffer))))
     (if
         (and claude-buffer
              (with-current-buffer claude-buffer
@@ -620,14 +620,14 @@ NUMBER should be a string (e.g., \\='1\\=', \\='2\\=', \\='3\\=') or empty strin
                     eat--process
                     (process-live-p eat--process))))
         (progn
-          (claudemacs-repl--debug-message "Sending ESC key to claude buffer")
+          (enkan-repl--debug-message "Sending ESC key to claude buffer")
           (with-current-buffer claude-buffer
             (eat--send-string eat--process "\e")
-            (claudemacs-repl--debug-message "ESC key sent successfully"))
+            (enkan-repl--debug-message "ESC key sent successfully"))
           (message "Sent ESC to Claude"))
       (message "❌ Cannot send - no matching claudemacs buffer found for this directory"))))
 
-(defun claudemacs-repl--send-buffer-content (start end content-description &optional skip-empty-check)
+(defun enkan-repl--send-buffer-content (start end content-description &optional skip-empty-check)
   "Send buffer content from START to END with CONTENT-DESCRIPTION.
 START and END define the region to send.
 CONTENT-DESCRIPTION is used in success message.
@@ -636,22 +636,22 @@ If SKIP-EMPTY-CHECK is non-nil, send content even if empty."
       ((raw-content
         (buffer-substring-no-properties start end))
        (content
-        (claudemacs-repl--sanitize-content (string-trim raw-content)))
+        (enkan-repl--sanitize-content (string-trim raw-content)))
        (target-dir
-        (claudemacs-repl--get-target-directory-for-buffer)))
-    (claudemacs-repl--debug-message
+        (enkan-repl--get-target-directory-for-buffer)))
+    (enkan-repl--debug-message
      "Raw content length: %d, trimmed: %d"
      (length raw-content)
      (length content))
-    (claudemacs-repl--debug-message
+    (enkan-repl--debug-message
      "Content empty?: %s, target-dir: %s"
      (= (length content) 0)
      target-dir)
     (if
         (or skip-empty-check (and content (not (= (length content) 0))))
         (progn
-          (claudemacs-repl--debug-message "Attempting to send content")
-          (if (claudemacs-repl--send-text content target-dir)
+          (enkan-repl--debug-message "Attempting to send content")
+          (if (enkan-repl--send-text content target-dir)
               (message "%s sent to Claude (%d characters)"
                        content-description (length content))
             (message "❌ Cannot send - no matching claudemacs buffer found for this directory")))
@@ -660,89 +660,89 @@ If SKIP-EMPTY-CHECK is non-nil, send content even if empty."
 ;;;; Public API - Send Functions
 
 ;;;###autoload
-(defun claudemacs-repl-send-region (start end)
+(defun enkan-repl-send-region (start end)
   "Send the text in region from START to END to claudemacs.
 
 Category: Text Sender"
   (interactive "r")
   (when (use-region-p)
-    (claudemacs-repl--send-buffer-content start end "Region")))
+    (enkan-repl--send-buffer-content start end "Region")))
 
 ;;;###autoload
-(defun claudemacs-repl-send-buffer ()
+(defun enkan-repl-send-buffer ()
   "Send the entire current buffer to claudemacs.
 
 Category: Text Sender"
   (interactive)
-  (claudemacs-repl--send-buffer-content
+  (enkan-repl--send-buffer-content
    (point-min) (point-max)
    (format "File %s" (buffer-name)) t))
 
 ;;;###autoload
-(defun claudemacs-repl-send-rest-of-buffer ()
+(defun enkan-repl-send-rest-of-buffer ()
   "Send rest of buffer from cursor position to end to claudemacs.
 
 Category: Text Sender"
   (interactive)
-  (claudemacs-repl--send-buffer-content (point) (point-max) "Rest of buffer"))
+  (enkan-repl--send-buffer-content (point) (point-max) "Rest of buffer"))
 
 ;;;###autoload
-(defun claudemacs-repl-send-line ()
+(defun enkan-repl-send-line ()
   "Send the current line to claudemacs.
 
 Category: Text Sender"
   (interactive)
-  (claudemacs-repl--send-buffer-content
+  (enkan-repl--send-buffer-content
    (line-beginning-position) (line-end-position) "Line"))
 
 ;;;###autoload
-(defun claudemacs-repl-send-enter ()
+(defun enkan-repl-send-enter ()
   "Send enter key to claudemacs buffer.
 
 Category: Text Sender"
   (interactive)
-  (claudemacs-repl--send-numbered-choice ""))
+  (enkan-repl--send-numbered-choice ""))
 
 ;;;###autoload
-(defun claudemacs-repl-send-1 ()
+(defun enkan-repl-send-1 ()
   "Send \\='1\\=' to claudemacs buffer for numbered choice prompt.
 
 Category: Text Sender"
   (interactive)
-  (claudemacs-repl--send-numbered-choice "1"))
+  (enkan-repl--send-numbered-choice "1"))
 
 ;;;###autoload
-(defun claudemacs-repl-send-2 ()
+(defun enkan-repl-send-2 ()
   "Send \\='2\\=' to claudemacs buffer for numbered choice prompt.
 
 Category: Text Sender"
   (interactive)
-  (claudemacs-repl--send-numbered-choice "2"))
+  (enkan-repl--send-numbered-choice "2"))
 
 ;;;###autoload
-(defun claudemacs-repl-send-3 ()
+(defun enkan-repl-send-3 ()
   "Send \\='3\\=' to claudemacs buffer for numbered choice prompt.
 
 Category: Text Sender"
   (interactive)
-  (claudemacs-repl--send-numbered-choice "3"))
+  (enkan-repl--send-numbered-choice "3"))
 
 ;;;###autoload
-(defun claudemacs-repl-send-escape ()
+(defun enkan-repl-send-escape ()
   "Send ESC key to claudemacs buffer.
 
 Category: Text Sender"
   (interactive)
-  (claudemacs-repl--send-escape-directly))
+  (enkan-repl--send-escape-directly))
 
-(defun claudemacs-repl--create-project-input-file (target-directory)
+(defun enkan-repl--create-project-input-file (target-directory)
   "Create project input file for TARGET-DIRECTORY from template.
 Returns the created file path."
   (let*
       ((file-path
-        (claudemacs-repl--get-project-file-path target-directory))
+        (enkan-repl--get-project-file-path target-directory))
        (template-content
-        (claudemacs-repl--load-template)))
+        (enkan-repl--load-template)))
     ;; Ensure target directory exists
     (unless (file-exists-p (file-name-directory file-path))
       (make-directory (file-name-directory file-path) t))
@@ -752,7 +752,7 @@ Returns the created file path."
     file-path))
 
 ;;;###autoload
-(defun claudemacs-repl-open-project-input-file (&optional directory)
+(defun enkan-repl-open-project-input-file (&optional directory)
   "Open or create project input file for DIRECTORY.
 If DIRECTORY is nil, use current `default-directory'.
 If project input file exists, open it directly.
@@ -764,11 +764,11 @@ Category: Utilities"
       ((target-dir
         (or directory default-directory))
        (file-path
-        (claudemacs-repl--get-project-file-path target-dir)))
+        (enkan-repl--get-project-file-path target-dir)))
     ;; Create file if it doesn't exist
     (unless
         (file-exists-p file-path)
-      (claudemacs-repl--create-project-input-file target-dir))
+      (enkan-repl--create-project-input-file target-dir))
     ;; Open the file
     (let ((buffer (find-file file-path)))
       (with-current-buffer buffer
@@ -782,22 +782,22 @@ Category: Utilities"
       (goto-char (point-min))
       (message "Project input file ready: %s" (file-name-nondirectory file-path)))))
 
-(defun claudemacs-repl--get-session-info ()
+(defun enkan-repl--get-session-info ()
   "Get session information for current buffer.
 Returns (target-dir existing-buffer can-send) as a list."
-  (let ((target-dir (claudemacs-repl--get-target-directory-for-buffer)))
-    (let ((existing-buffer (claudemacs-repl--get-buffer-for-directory target-dir)))
-      (let ((can-send (claudemacs-repl--can-send-text target-dir)))
+  (let ((target-dir (enkan-repl--get-target-directory-for-buffer)))
+    (let ((existing-buffer (enkan-repl--get-buffer-for-directory target-dir)))
+      (let ((can-send (enkan-repl--can-send-text target-dir)))
         (list target-dir existing-buffer can-send)))))
 
-(defun claudemacs-repl--execute-claudemacs-command (command-symbol success-message)
+(defun enkan-repl--execute-claudemacs-command (command-symbol success-message)
   "Execute a claudemacs command with proper setup and error handling.
 This function temporarily changes the working directory to the target directory,
 executes the command, and restores the original directory afterward.
 
 COMMAND-SYMBOL is the command to execute (e.g., \\='claudemacs-transient-menu).
 SUCCESS-MESSAGE is the message format string for successful execution."
-  (let ((target-dir (car (claudemacs-repl--get-session-info)))
+  (let ((target-dir (car (enkan-repl--get-session-info)))
         (original-default-directory default-directory))
     (unwind-protect
         (progn
@@ -813,7 +813,7 @@ SUCCESS-MESSAGE is the message format string for successful execution."
       ;; Always restore original directory
       (cd original-default-directory))))
 
-(defun claudemacs-repl--handle-dead-session (existing-buffer target-dir prompt-format restart-func)
+(defun enkan-repl--handle-dead-session (existing-buffer target-dir prompt-format restart-func)
   "Handle dead session with user confirmation.
 EXISTING-BUFFER is the dead buffer to handle.
 TARGET-DIR is the target directory.
@@ -828,14 +828,14 @@ RESTART-FUNC is a zero-argument function to call for restart.
       (message "Removed dead claudemacs session buffer in: %s" target-dir))))
 
 ;;;###autoload
-(defun claudemacs-repl-start-claudemacs ()
+(defun enkan-repl-start-claudemacs ()
   "Start claudemacs and change to appropriate directory.
 Determines directory from current buffer filename if it's a persistent file.
 Checks for existing sessions to prevent double startup.
 
 Category: Session Controller"
   (interactive)
-  (let* ((session-info (claudemacs-repl--get-session-info))
+  (let* ((session-info (enkan-repl--get-session-info))
          (target-dir (nth 0 session-info))
          (existing-buffer (nth 1 session-info))
          (can-send (nth 2 session-info)))
@@ -846,28 +846,28 @@ Category: Session Controller"
                target-dir (buffer-name existing-buffer)))
      ;; Dead session exists - offer to restart
      (existing-buffer
-      (claudemacs-repl--handle-dead-session
+      (enkan-repl--handle-dead-session
        existing-buffer target-dir
        "Dead claudemacs session found in %s. Restart? "
-       #'claudemacs-repl-start-claudemacs))
+       #'enkan-repl-start-claudemacs))
      ;; No existing session - start new one
      (t
-      (claudemacs-repl--execute-claudemacs-command
+      (enkan-repl--execute-claudemacs-command
        'claudemacs-transient-menu
        "Started claudemacs in: %s")
       ;; Verify startup succeeded
-      (unless (claudemacs-repl--can-send-text target-dir)
+      (unless (enkan-repl--can-send-text target-dir)
         (error "Failed to start claudemacs session in: %s" target-dir))))))
 
 ;;;###autoload
-(defun claudemacs-repl-finish-claudemacs ()
+(defun enkan-repl-finish-claudemacs ()
   "Terminate claudemacs session and close its buffer.
 Determines directory from current buffer filename if it's a persistent file.
 Calls claudemacs-kill for proper session termination.
 
 Category: Session Controller"
   (interactive)
-  (let* ((session-info (claudemacs-repl--get-session-info))
+  (let* ((session-info (enkan-repl--get-session-info))
          (target-dir (nth 0 session-info))
          (existing-buffer (nth 1 session-info))
          (can-send (nth 2 session-info)))
@@ -878,48 +878,48 @@ Category: Session Controller"
      ;; Active session - terminate using claudemacs-kill
      (can-send
       (when (y-or-n-p (format "Terminate active claudemacs session in %s? " target-dir))
-        (claudemacs-repl--execute-claudemacs-command
+        (enkan-repl--execute-claudemacs-command
          'claudemacs-kill
          "Terminated claudemacs in: %s")))
      ;; Dead session exists - offer to clean up
      (existing-buffer
-      (claudemacs-repl--handle-dead-session
+      (enkan-repl--handle-dead-session
        existing-buffer target-dir
        "Clean up dead claudemacs session in %s? "
        nil)))))
 
 ;;;###autoload
-(defun claudemacs-repl-setup-window-layout ()
+(defun enkan-repl-setup-window-layout ()
   "Set up window layout with org file on left and claudemacs on right.
 This is the author's preference - customize as needed.
 
 Category: Session Controller"
   (interactive)
   (let
-      ((target-dir (claudemacs-repl--get-target-directory-for-buffer)))
+      ((target-dir (enkan-repl--get-target-directory-for-buffer)))
     (delete-other-windows)
     (split-window-right)
     (other-window 1)
-    (let ((claudemacs-buf (claudemacs-repl--get-buffer-for-directory target-dir)))
+    (let ((claudemacs-buf (enkan-repl--get-buffer-for-directory target-dir)))
       (if claudemacs-buf
           (switch-to-buffer claudemacs-buf)
-        (message "claudemacs buffer not found. Run (claudemacs-repl-start-claudemacs) first.")))
+        (message "claudemacs buffer not found. Run (enkan-repl-start-claudemacs) first.")))
     (other-window -1)
     (message "Window layout setup complete")))
 
 ;;;###autoload
-(defun claudemacs-repl-output-template ()
+(defun enkan-repl-output-template ()
   "Output current template content to a new buffer for customization.
 
 Category: Utilities"
   (interactive)
   (let*
       ((template-content
-        (claudemacs-repl--load-template))
+        (enkan-repl--load-template))
        (template-file
-        (or claudemacs-repl-template-file "default"))
+        (or enkan-repl-template-file "default"))
        (buffer-name
-        (format "*claudemacs-repl-template-%s*"
+        (format "*enkan-repl-template-%s*"
                 (file-name-base template-file))))
     (if template-content
         (progn
@@ -941,15 +941,15 @@ Category: Utilities"
 ;; They can be safely removed in production environments if needed.
 
 ;;;###autoload
-(defun claudemacs-repl-status ()
+(defun enkan-repl-status ()
   "Show detailed diagnostic information for troubleshooting connection issues.
 
 Category: Utilities"
   (interactive)
   (let*
-      ((target-dir (claudemacs-repl--get-target-directory-for-buffer))
-       (claude-buffer (claudemacs-repl--get-buffer-for-directory target-dir))
-       (can-send (claudemacs-repl--can-send-text target-dir))
+      ((target-dir (enkan-repl--get-target-directory-for-buffer))
+       (claude-buffer (enkan-repl--get-buffer-for-directory target-dir))
+       (can-send (enkan-repl--can-send-text target-dir))
        (expected-session (concat "*claudemacs:" target-dir "*"))
        (all-buffers (buffer-list))
        (claudemacs-sessions
@@ -969,8 +969,8 @@ Category: Utilities"
                       (string-match-p "claude" name)))))
          all-buffers)))
     (with-output-to-temp-buffer
-        "*claudemacs-repl-diagnostic*"
-      (princ "═══ claudemacs-repl Diagnostic Report ═══\n\n")
+        "*enkan-repl-diagnostic*"
+      (princ "═══ enkan-repl Diagnostic Report ═══\n\n")
       ;; Basic information
       (princ (format "Target directory: %s\n" target-dir))
       (princ (format "Current buffer: %s\n\n" (buffer-name)))
@@ -1000,11 +1000,11 @@ Category: Utilities"
       (if
           (and
            (buffer-file-name)
-           (string-match-p "cer-.+\\.org$" (file-name-nondirectory (buffer-file-name))))
+           (string-match-p "enkan-.+\\.org$" (file-name-nondirectory (buffer-file-name))))
           (let*
               ((encoded-name (file-name-base (file-name-nondirectory (buffer-file-name))))
-               (decoded-path (claudemacs-repl--decode-full-path encoded-name))
-               (re-encoded (claudemacs-repl--encode-full-path decoded-path)))
+               (decoded-path (enkan-repl--decode-full-path encoded-name))
+               (re-encoded (enkan-repl--encode-full-path decoded-path)))
             (princ "[✅] Path encoding: OK\n")
             (princ (format "  File: %s\n" (file-name-nondirectory (buffer-file-name))))
             (princ (format "  → Decoded to: %s\n" decoded-path))
@@ -1055,10 +1055,10 @@ Category: Utilities"
        (can-send
         (princ "✓ Connection is working. You can send text to Claude.\n"))
        ((not claudemacs-sessions)
-        (princ "1. Start claudemacs in target directory: (claudemacs-repl-start-claudemacs)\n")
-        (princ "2. Or run: M-x claudemacs-repl-start-claudemacs\n"))
+        (princ "1. Start claudemacs in target directory: (enkan-repl-start-claudemacs)\n")
+        (princ "2. Or run: M-x enkan-repl-start-claudemacs\n"))
        (t
-        (princ "1. Start claudemacs for target directory: (claudemacs-repl-start-claudemacs)\n")
+        (princ "1. Start claudemacs for target directory: (enkan-repl-start-claudemacs)\n")
         (princ "2. Or switch to existing session directory:\n")
         (dolist (buf claudemacs-sessions)
           (let
@@ -1067,60 +1067,60 @@ Category: Utilities"
                  "^\\*claudemacs:\\(.*\\)\\*$" "\\1"
                  (buffer-name buf))))
             (princ (format "   - %s\n" session-path))))))
-      (princ "\nFor more help: M-x claudemacs-repl-open-project-input-file\n"))))
+      (princ "\nFor more help: M-x enkan-repl-open-project-input-file\n"))))
 
 ;;;###autoload
-(defun claudemacs-repl-toggle-debug-mode ()
-  "Toggle debug mode for claudemacs-repl operations.
+(defun enkan-repl-toggle-debug-mode ()
+  "Toggle debug mode for enkan-repl operations.
 
 Category: Utilities"
   (interactive)
   (setq
-   claudemacs-repl-debug-mode
-   (not claudemacs-repl-debug-mode))
+   enkan-repl-debug-mode
+   (not enkan-repl-debug-mode))
   (message
-   "claudemacs-repl debug mode: %s"
-   (if claudemacs-repl-debug-mode "ENABLED" "DISABLED")))
+   "enkan-repl debug mode: %s"
+   (if enkan-repl-debug-mode "ENABLED" "DISABLED")))
 
 ;;;###autoload
-(defun claudemacs-repl-enable-debug-mode ()
-  "Enable debug mode for claudemacs-repl operations.
+(defun enkan-repl-enable-debug-mode ()
+  "Enable debug mode for enkan-repl operations.
 
 Category: Utilities"
   (interactive)
-  (setq claudemacs-repl-debug-mode t)
-  (message "claudemacs-repl debug mode: ENABLED"))
+  (setq enkan-repl-debug-mode t)
+  (message "enkan-repl debug mode: ENABLED"))
 
 ;;;###autoload
-(defun claudemacs-repl-disable-debug-mode ()
-  "Disable debug mode for claudemacs-repl operations.
+(defun enkan-repl-disable-debug-mode ()
+  "Disable debug mode for enkan-repl operations.
 
 Category: Utilities"
   (interactive)
-  (setq claudemacs-repl-debug-mode nil)
-  (message "claudemacs-repl debug mode: DISABLED"))
+  (setq enkan-repl-debug-mode nil)
+  (message "enkan-repl debug mode: DISABLED"))
 
 ;;; Interactive Cheatsheet Feature
 
 ;;;###autoload
-(defun claudemacs-repl-cheatsheet ()
-  "Display interactive cheatsheet for claudemacs-repl commands.
+(defun enkan-repl-cheatsheet ()
+  "Display interactive cheatsheet for enkan-repl commands.
 
 Category: Command Palette"
   (interactive)
-  (unless (featurep 'claudemacs-repl-constants)
-    (require 'claudemacs-repl-constants))
-  (let ((candidates claudemacs-repl-cheatsheet-candidates))
+  (unless (featurep 'enkan-repl-constants)
+    (require 'enkan-repl-constants))
+  (let ((candidates enkan-repl-cheatsheet-candidates))
     (let ((completion-extra-properties
            `(:annotation-function
              (lambda (candidate)
                (let ((description (alist-get candidate ',candidates nil nil #'string=)))
                  (when description
                    (format " — %s" description)))))))
-      (let ((selected-command (completing-read "claudemacs-repl commands: " candidates)))
+      (let ((selected-command (completing-read "enkan-repl commands: " candidates)))
         (when selected-command
           (call-interactively (intern selected-command)))))))
 
-(provide 'claudemacs-repl)
+(provide 'enkan-repl)
 
-;;; claudemacs-repl.el ends here
+;;; enkan-repl.el ends here
