@@ -1,6 +1,6 @@
 * enkan-repl
 
-[[https://github.com/phasetr/claudemacs-repl/workflows/CI/badge.svg]]
+[[https://github.com/phasetr/enkan-repl/workflows/CI/badge.svg]]
 [[https://img.shields.io/badge/License-MIT-yellow.svg]]
 
 This package builds upon the excellent work of:
@@ -321,5 +321,5 @@ This project is licensed under the MIT License - see the [[file:LICENSE][LICENSE
 
 ** Support
 
-- 🐛 [[https://github.com/phasetr/claudemacs-repl/issues][Issue Tracker]]
-- 💬 [[https://github.com/phasetr/claudemacs-repl/discussions][Discussions]]
+- 🐛 [[https://github.com/phasetr/enkan-repl/issues][Issue Tracker]]
+- 💬 [[https://github.com/phasetr/enkan-repl/discussions][Discussions]]
