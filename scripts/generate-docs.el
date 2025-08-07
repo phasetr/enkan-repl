@@ -50,26 +50,10 @@
           "- =enkan-repl-status= - Display connection status and diagnostics\n\n"))
 
 (defun enkan-repl--generate-readme (output-file)
-  "Generate README.org file with Core Functions section matching manual updates."
-  (let* ((readme-content (if (file-exists-p output-file)
-                             (with-temp-buffer
-                               (insert-file-contents output-file)
-                               (buffer-string))
-                           ""))
-         (new-section (enkan-repl--generate-core-functions-section)))
-    ;; Find start and end positions for Core Functions section
-    (let ((start-pos (string-match "\\*\\* Core Functions" readme-content))
-          (end-pos (string-match "\\*\\* Configuration" readme-content)))
-      (if (and start-pos end-pos)
-          ;; Replace the Core Functions section
-          (let ((before (substring readme-content 0 start-pos))
-                (after (substring readme-content end-pos)))
-            (with-temp-file output-file
-              (insert before)
-              (insert new-section)
-              (insert after)))
-        ;; If markers not found, keep file unchanged
-        (message "Core Functions section markers not found - file unchanged")))))
+  "Generate README.org file - currently disabled to preserve manual edits."
+  ;; README.org is now manually maintained
+  ;; This function is intentionally disabled to prevent overwriting manual changes
+  (message "README.org generation is disabled - file is manually maintained"))
 
 (defun generate-readme ()
   "Generate README.org with updated Core Functions section."
