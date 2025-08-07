@@ -35,7 +35,7 @@ module.exports = {
 				changelogFile: "CHANGELOG.md",
 			},
 		],
-		// Update version in claudemacs-repl.el and regenerate documentation
+		// Update version in enkan-repl.el and regenerate documentation
 		[
 			"@semantic-release/exec",
 			{
@@ -56,9 +56,9 @@ module.exports = {
 				assets: [
 					"CHANGELOG.md",
 					"package.json",
-					"claudemacs-repl.el",
+					"enkan-repl.el",
 					"README.org",
-					"claudemacs-repl-constants.el",
+					"enkan-repl-constants.el",
 				],
 				message:
 					"chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}",
