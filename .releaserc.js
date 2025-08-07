@@ -42,8 +42,8 @@ module.exports = {
 				prepareCmd: [
 					// Update version in .el file
 					"emacs --batch --load scripts/bump-version.el -- ${nextRelease.version}",
-					// NOTE: README.org generation is disabled - file is manually maintained
-					// "emacs --batch --load scripts/generate-docs.el --eval '(generate-all-docs)'",
+					// Regenerate documentation files with updated functions
+					"emacs --batch --load scripts/generate-docs.el --eval '(generate-all-docs)'",
 					// Regenerate precompiled constants for cheatsheet performance
 					"emacs --batch --load scripts/generate-constants.el --eval '(generate-cheatsheet-constants)'",
 				].join(" && "),
