@@ -59,7 +59,7 @@ Returns a list of plists, each containing :name, :args, :docstring,
                   (let ((next-line (nth next-line-idx lines)))
                     (cond
                      ;; Start of docstring
-                     ((and (not in-docstring) 
+                     ((and (not in-docstring)
                            (string-match "^\\s-*\"\\(.*\\)\"\\s-*$" next-line))
                       ;; Single line docstring
                       (setq docstring (match-string 1 next-line))
@@ -148,7 +148,6 @@ FUNCTIONS-LIST contains plists with :name, :docstring, :category."
   (let ((functions-info (enkan-repl-utils--extract-function-info file-path))
         (categorized-functions '())
         (categories '("Command Palette" "Text Sender" "Session Controller" "Utilities")))
-    
     ;; Extract categories from docstrings and group functions
     (dolist (func functions-info)
       (when (plist-get func :interactive)
@@ -165,7 +164,6 @@ FUNCTIONS-LIST contains plists with :name, :docstring, :category."
             (if category-entry
                 (setcdr category-entry (append (cdr category-entry) (list func-info)))
               (push (cons (or category "Uncategorized") (list func-info)) categorized-functions))))))
-    
     ;; Sort by predefined category order
     (let ((sorted-result '()))
       (dolist (category categories)
