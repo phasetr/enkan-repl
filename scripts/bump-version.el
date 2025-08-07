@@ -1,4 +1,4 @@
-;;; bump-version.el --- Update package version in claudemacs-repl.el -*- lexical-binding: t; -*-
+;;; bump-version.el --- Update package version in enkan-repl.el -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2025 [phasetr]
 
@@ -9,16 +9,16 @@
 
 ;;; Commentary:
 
-;; This script updates the version string in claudemacs-repl.el.
+;; This script updates the version string in enkan-repl.el.
 ;; It's designed to be called by semantic-release during the release process.
 
 ;;; Code:
 
-(defun claudemacs-repl-update-version (new-version)
-  "Update the version string in `claudemacs-repl.el` to NEW-VERSION."
+(defun enkan-repl-update-version (new-version)
+  "Update the version string in `enkan-repl.el` to NEW-VERSION."
   (let* ((script-dir (file-name-directory (or load-file-name buffer-file-name)))
          (project-root (file-name-directory (directory-file-name script-dir)))
-         (package-file (expand-file-name "claudemacs-repl.el" project-root)))
+         (package-file (expand-file-name "enkan-repl.el" project-root)))
     (unless (file-exists-p package-file)
       (error "Package file not found: %s" package-file))
     (let* ((file-content (with-temp-buffer
@@ -51,7 +51,7 @@
 
       (if version-arg
           (progn
-            (claudemacs-repl-update-version version-arg)
+            (enkan-repl-update-version version-arg)
             (message "Version updated to: %s" version-arg))
         (error "No valid version string found in arguments: %S" command-line-args)))))
 

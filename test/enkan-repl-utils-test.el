@@ -1,4 +1,4 @@
-;;; claudemacs-repl-utils-test.el --- Tests for claudemacs-repl-utils -*- lexical-binding: t -*-
+;;; enkan-repl-utils-test.el --- Tests for enkan-repl-utils -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2025 [phasetr]
 
@@ -9,7 +9,7 @@
 
 ;;; Commentary:
 
-;; Tests for claudemacs-repl-utils.el functions.
+;; Tests for enkan-repl-utils.el functions.
 
 ;;; Code:
 
@@ -20,9 +20,9 @@
 (let ((project-root (file-name-directory (directory-file-name (file-name-directory (or load-file-name buffer-file-name))))))
   (add-to-list 'load-path project-root))
 
-(require 'claudemacs-repl-utils)
+(require 'enkan-repl-utils)
 
-(ert-deftest test-claudemacs-repl-utils--extract-function-info-basic ()
+(ert-deftest test-enkan-repl-utils--extract-function-info-basic ()
   "Test basic function info extraction."
   (let ((test-file (make-temp-file "test-utils-" nil ".el")))
     (unwind-protect
@@ -38,7 +38,7 @@
             (insert "(defun test-private--function ()\n")
             (insert "  \"Private function.\"\n")
             (insert "  nil)\n"))
-          (let ((functions (claudemacs-repl-utils--extract-function-info test-file)))
+          (let ((functions (enkan-repl-utils--extract-function-info test-file)))
             (should (= (length functions) 1))
             (let ((func (car functions)))
               (should (string= (plist-get func :name) "test-function"))
@@ -48,7 +48,7 @@
       (when (file-exists-p test-file)
         (delete-file test-file)))))
 
-(ert-deftest test-claudemacs-repl-utils--extract-function-info-multiline-docstring ()
+(ert-deftest test-enkan-repl-utils--extract-function-info-multiline-docstring ()
   "Test extraction of multi-line docstrings."
   (let ((test-file (make-temp-file "test-utils-" nil ".el")))
     (unwind-protect
@@ -61,7 +61,7 @@
             (insert "Third line.\"\n")
             (insert "  (interactive)\n")
             (insert "  nil)\n"))
-          (let ((functions (claudemacs-repl-utils--extract-function-info test-file)))
+          (let ((functions (enkan-repl-utils--extract-function-info test-file)))
             (should (= (length functions) 1))
             (let ((func (car functions)))
               (should (string= (plist-get func :name) "test-multiline"))
@@ -71,7 +71,7 @@
       (when (file-exists-p test-file)
         (delete-file test-file)))))
 
-(ert-deftest test-claudemacs-repl-utils--extract-function-info-no-docstring ()
+(ert-deftest test-enkan-repl-utils--extract-function-info-no-docstring ()
   "Test extraction of functions without docstrings."
   (let ((test-file (make-temp-file "test-utils-" nil ".el")))
     (unwind-protect
@@ -81,7 +81,7 @@
             (insert "(defun test-no-docstring ()\n")
             (insert "  (interactive)\n")
             (insert "  nil)\n"))
-          (let ((functions (claudemacs-repl-utils--extract-function-info test-file)))
+          (let ((functions (enkan-repl-utils--extract-function-info test-file)))
             (should (= (length functions) 1))
             (let ((func (car functions)))
               (should (string= (plist-get func :name) "test-no-docstring"))
@@ -90,23 +90,23 @@
       (when (file-exists-p test-file)
         (delete-file test-file)))))
 
-(ert-deftest test-claudemacs-repl-utils--generate-function-list-flat ()
+(ert-deftest test-enkan-repl-utils--generate-function-list-flat ()
   "Test flat function list generation."
   (let ((functions '((:name "test-func1" :docstring "First function" :interactive t)
                      (:name "test-func2" :docstring "Second function" :interactive t)
                      (:name "test-func3" :docstring "" :interactive t))))
-    (let ((result (claudemacs-repl-utils--generate-function-list-flat functions)))
+    (let ((result (enkan-repl-utils--generate-function-list-flat functions)))
       (should (string-match-p "~M-x test-func1~ - First function" result))
       (should (string-match-p "~M-x test-func2~ - Second function" result))
       (should (string-match-p "~M-x test-func3~ - Send command" result))
       (should (string-match-p "\n" result)))))
 
-(ert-deftest test-claudemacs-repl-utils--generate-function-list-flat-empty ()
+(ert-deftest test-enkan-repl-utils--generate-function-list-flat-empty ()
   "Test flat function list generation with empty input."
-  (let ((result (claudemacs-repl-utils--generate-function-list-flat '())))
+  (let ((result (enkan-repl-utils--generate-function-list-flat '())))
     (should (string= result ""))))
 
-(ert-deftest test-claudemacs-repl-utils--get-all-public-functions-integration ()
+(ert-deftest test-enkan-repl-utils--get-all-public-functions-integration ()
   "Test complete integration of public function extraction."
   (let ((test-file (make-temp-file "test-utils-" nil ".el")))
     (unwind-protect
@@ -127,7 +127,7 @@
             (insert "(defun test-private--func ()\n")
             (insert "  \"Private function.\"\n")
             (insert "  nil)\n"))
-          (let ((result (claudemacs-repl-utils--get-all-public-functions test-file)))
+          (let ((result (enkan-repl-utils--get-all-public-functions test-file)))
             (should (string-match-p "~M-x test-public-func1~ - Public function one" result))
             (should (string-match-p "~M-x test-public-func2~ - Public function two" result))
             (should-not (string-match-p "test-private--func" result))
@@ -135,7 +135,7 @@
       (when (file-exists-p test-file)
         (delete-file test-file)))))
 
-(ert-deftest test-claudemacs-repl-utils--extract-function-info-complex-args ()
+(ert-deftest test-enkan-repl-utils--extract-function-info-complex-args ()
   "Test extraction of functions with complex argument lists."
   (let ((test-file (make-temp-file "test-utils-" nil ".el")))
     (unwind-protect
@@ -146,7 +146,7 @@
             (insert "  \"Function with complex args.\"\n")
             (insert "  (interactive \"r\")\n")
             (insert "  nil)\n"))
-          (let ((functions (claudemacs-repl-utils--extract-function-info test-file)))
+          (let ((functions (enkan-repl-utils--extract-function-info test-file)))
             (should (= (length functions) 1))
             (let ((func (car functions)))
               (should (string= (plist-get func :name) "test-complex-args"))
@@ -159,7 +159,7 @@
       (when (file-exists-p test-file)
         (delete-file test-file)))))
 
-(ert-deftest test-claudemacs-repl-utils--extract-function-info-noninteractive-autoload ()
+(ert-deftest test-enkan-repl-utils--extract-function-info-noninteractive-autoload ()
   "Test extraction of non-interactive autoload functions."
   (let ((test-file (make-temp-file "test-utils-" nil ".el")))
     (unwind-protect
@@ -170,7 +170,7 @@
             (insert "(defun test-autoload-only ()\n")
             (insert "  \"Autoload but not interactive.\"\n")
             (insert "  nil)\n"))
-          (let ((functions (claudemacs-repl-utils--extract-function-info test-file)))
+          (let ((functions (enkan-repl-utils--extract-function-info test-file)))
             (should (= (length functions) 1))
             (let ((func (car functions)))
               (should (string= (plist-get func :name) "test-autoload-only"))
@@ -180,6 +180,6 @@
       (when (file-exists-p test-file)
         (delete-file test-file)))))
 
-(provide 'claudemacs-repl-utils-test)
+(provide 'enkan-repl-utils-test)
 
-;;; claudemacs-repl-utils-test.el ends here
+;;; enkan-repl-utils-test.el ends here

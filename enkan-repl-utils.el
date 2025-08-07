@@ -1,4 +1,4 @@
-;;; claudemacs-repl-utils.el --- Utility functions for claudemacs-repl -*- lexical-binding: t -*-
+;;; enkan-repl-utils.el --- Utility functions for enkan-repl -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2025 [phasetr]
 
@@ -10,7 +10,7 @@
 
 ;;; Commentary:
 
-;; Utility functions for claudemacs-repl package.
+;; Utility functions for enkan-repl package.
 ;; This file provides shared functionality for documentation generation
 ;; and dynamic function listing that can be used by both the main package
 ;; and build/documentation scripts.
@@ -19,7 +19,7 @@
 
 (require 'cl-lib)
 
-(defun claudemacs-repl-utils--extract-function-info (file-path)
+(defun enkan-repl-utils--extract-function-info (file-path)
   "Extract public function information from an Emacs Lisp file.
 Returns a list of plists, each containing :name, :args, :docstring,
 :interactive, and :autoload status."
@@ -59,7 +59,7 @@ Returns a list of plists, each containing :name, :args, :docstring,
                   (let ((next-line (nth next-line-idx lines)))
                     (cond
                      ;; Start of docstring
-                     ((and (not in-docstring) 
+                     ((and (not in-docstring)
                            (string-match "^\\s-*\"\\(.*\\)\"\\s-*$" next-line))
                       ;; Single line docstring
                       (setq docstring (match-string 1 next-line))
@@ -110,10 +110,10 @@ Returns a list of plists, each containing :name, :args, :docstring,
           (setq current-line (1+ current-line))))
       (nreverse functions-info))))
 
-(defun claudemacs-repl-utils--generate-function-list-flat (functions)
+(defun enkan-repl-utils--generate-function-list-flat (functions)
   "Generate flat function list in org-mode format.
 FUNCTIONS should be a list of function info plists from
-`claudemacs-repl-utils--extract-function-info'."
+`enkan-repl-utils--extract-function-info'."
   (let ((result ""))
     (dolist (func functions)
       (let* ((name (plist-get func :name))
@@ -124,16 +124,16 @@ FUNCTIONS should be a list of function info plists from
         (setq result (concat result (format "- ~M-x %s~ - %s\n" name description)))))
     result))
 
-(defun claudemacs-repl-utils--get-all-public-functions (file-path)
+(defun enkan-repl-utils--get-all-public-functions (file-path)
   "Get all public functions from FILE-PATH as flat org-mode list.
 Returns a string containing org-mode formatted function list."
-  (let* ((functions (claudemacs-repl-utils--extract-function-info file-path))
+  (let* ((functions (enkan-repl-utils--extract-function-info file-path))
          (interactive-functions (cl-remove-if-not
                                 (lambda (f) (plist-get f :interactive))
                                 functions)))
-    (claudemacs-repl-utils--generate-function-list-flat interactive-functions)))
+    (enkan-repl-utils--generate-function-list-flat interactive-functions)))
 
-(defun claudemacs-repl-utils--extract-category-from-docstring (docstring)
+(defun enkan-repl-utils--extract-category-from-docstring (docstring)
   "Extract category information from DOCSTRING.
 Returns category string or nil if not found."
   (when (and docstring (stringp docstring))
@@ -141,19 +141,18 @@ Returns category string or nil if not found."
         (match-string 1 docstring)
       nil)))
 
-(defun claudemacs-repl-utils--get-categorized-functions (file-path)
+(defun enkan-repl-utils--get-categorized-functions (file-path)
   "Get functions organized by category from FILE-PATH.
 Returns an alist where each element is (CATEGORY . FUNCTIONS-LIST).
 FUNCTIONS-LIST contains plists with :name, :docstring, :category."
-  (let ((functions-info (claudemacs-repl-utils--extract-function-info file-path))
+  (let ((functions-info (enkan-repl-utils--extract-function-info file-path))
         (categorized-functions '())
         (categories '("Command Palette" "Text Sender" "Session Controller" "Utilities")))
-    
     ;; Extract categories from docstrings and group functions
     (dolist (func functions-info)
       (when (plist-get func :interactive)
         (let* ((docstring (plist-get func :docstring))
-               (category (claudemacs-repl-utils--extract-category-from-docstring docstring))
+               (category (enkan-repl-utils--extract-category-from-docstring docstring))
                (clean-docstring (if category
                                    (replace-regexp-in-string "  Category: .*$" "" docstring)
                                  docstring))
@@ -165,7 +164,6 @@ FUNCTIONS-LIST contains plists with :name, :docstring, :category."
             (if category-entry
                 (setcdr category-entry (append (cdr category-entry) (list func-info)))
               (push (cons (or category "Uncategorized") (list func-info)) categorized-functions))))))
-    
     ;; Sort by predefined category order
     (let ((sorted-result '()))
       (dolist (category categories)
@@ -178,7 +176,7 @@ FUNCTIONS-LIST contains plists with :name, :docstring, :category."
           (push (cons "Uncategorized" uncategorized) sorted-result)))
       (nreverse sorted-result))))
 
-(defun claudemacs-repl-utils--generate-org-section (category functions header-level)
+(defun enkan-repl-utils--generate-org-section (category functions header-level)
   "Generate org-mode section for CATEGORY with FUNCTIONS at HEADER-LEVEL.
 HEADER-LEVEL should be a number (1 for *, 2 for **, etc.)."
   (let ((header-prefix (make-string header-level ?*))
@@ -190,17 +188,17 @@ HEADER-LEVEL should be a number (1 for *, 2 for **, etc.)."
         (setq result (concat result (format "- ~M-x %s~ - %s\n" name (or docstring "No description"))))))
     (concat result "\n")))
 
-(defun claudemacs-repl-utils--generate-categorized-documentation (file-path header-level)
+(defun enkan-repl-utils--generate-categorized-documentation (file-path header-level)
   "Generate categorized documentation from FILE-PATH with HEADER-LEVEL.
 Returns org-mode formatted string with functions organized by category."
-  (let ((categorized-functions (claudemacs-repl-utils--get-categorized-functions file-path))
+  (let ((categorized-functions (enkan-repl-utils--get-categorized-functions file-path))
         (result ""))
     (dolist (category-entry categorized-functions)
       (let ((category (car category-entry))
             (functions (cdr category-entry)))
-        (setq result (concat result (claudemacs-repl-utils--generate-org-section category functions header-level)))))
+        (setq result (concat result (enkan-repl-utils--generate-org-section category functions header-level)))))
     result))
 
-(provide 'claudemacs-repl-utils)
+(provide 'enkan-repl-utils)
 
-;;; claudemacs-repl-utils.el ends here
+;;; enkan-repl-utils.el ends here

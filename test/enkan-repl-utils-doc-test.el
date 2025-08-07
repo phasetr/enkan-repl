@@ -1,4 +1,4 @@
-;;; claudemacs-repl-utils-doc-test.el --- Tests for documentation generation helpers -*- lexical-binding: t -*-
+;;; enkan-repl-utils-doc-test.el --- Tests for documentation generation helpers -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2025 [phasetr]
 
@@ -9,7 +9,7 @@
 
 ;;; Commentary:
 
-;; Tests for claudemacs-repl documentation generation utilities.
+;; Tests for enkan-repl documentation generation utilities.
 
 ;;; Code:
 
@@ -20,26 +20,26 @@
 (let ((project-root (file-name-directory (directory-file-name (file-name-directory (or load-file-name buffer-file-name))))))
   (add-to-list 'load-path project-root))
 
-(require 'claudemacs-repl-utils)
+(require 'enkan-repl-utils)
 
 (ert-deftest test-extract-category-from-docstring ()
   "Test category extraction from docstrings."
   (should (string= "Text Sender"
-                   (claudemacs-repl-utils--extract-category-from-docstring
+                   (enkan-repl-utils--extract-category-from-docstring
                     "Send region to Claude.\n\nCategory: Text Sender")))
   (should (string= "Command Palette"
-                   (claudemacs-repl-utils--extract-category-from-docstring
+                   (enkan-repl-utils--extract-category-from-docstring
                     "Display cheatsheet.\n\nCategory: Command Palette")))
-  (should (null (claudemacs-repl-utils--extract-category-from-docstring
+  (should (null (enkan-repl-utils--extract-category-from-docstring
                  "No category info")))
-  (should (null (claudemacs-repl-utils--extract-category-from-docstring nil))))
+  (should (null (enkan-repl-utils--extract-category-from-docstring nil))))
 
 (ert-deftest test-get-categorized-functions ()
   "Test function categorization from real file."
-  (let ((claudemacs-repl-file (expand-file-name "claudemacs-repl.el"))
+  (let ((enkan-repl-file (expand-file-name "enkan-repl.el"))
         categorized-functions)
-    (should (file-exists-p claudemacs-repl-file))
-    (setq categorized-functions (claudemacs-repl-utils--get-categorized-functions claudemacs-repl-file))
+    (should (file-exists-p enkan-repl-file))
+    (setq categorized-functions (enkan-repl-utils--get-categorized-functions enkan-repl-file))
 
     ;; Should have all expected categories
     (should (assoc "Command Palette" categorized-functions))
@@ -49,7 +49,7 @@
 
     ;; Command Palette should have cheatsheet
     (let ((command-palette-funcs (cdr (assoc "Command Palette" categorized-functions))))
-      (should (cl-some (lambda (f) (string= (plist-get f :name) "claudemacs-repl-cheatsheet"))
+      (should (cl-some (lambda (f) (string= (plist-get f :name) "enkan-repl-cheatsheet"))
                        command-palette-funcs)))
 
     ;; Text Sender should have multiple functions
@@ -63,23 +63,23 @@
   "Test org section generation."
   (let* ((functions '((:name "test-func-1" :docstring "First test function")
                      (:name "test-func-2" :docstring "Second test function")))
-         (result (claudemacs-repl-utils--generate-org-section "Test Category" functions 2)))
+         (result (enkan-repl-utils--generate-org-section "Test Category" functions 2)))
     (should (string-match-p "^\\*\\* Test Category" result))
     (should (string-match-p "~M-x test-func-1~ - First test function" result))
     (should (string-match-p "~M-x test-func-2~ - Second test function" result))))
 
 (ert-deftest test-generate-categorized-documentation ()
   "Test full categorized documentation generation."
-  (let ((claudemacs-repl-file (expand-file-name "claudemacs-repl.el"))
-        (result (claudemacs-repl-utils--generate-categorized-documentation
-                 (expand-file-name "claudemacs-repl.el") 3)))
+  (let ((enkan-repl-file (expand-file-name "enkan-repl.el"))
+        (result (enkan-repl-utils--generate-categorized-documentation
+                 (expand-file-name "enkan-repl.el") 3)))
     (should (string-match-p "^\\*\\*\\* Command Palette" result))
     (should (string-match-p "^\\*\\*\\* Text Sender" result))
     (should (string-match-p "^\\*\\*\\* Session Controller" result))
     (should (string-match-p "^\\*\\*\\* Utilities" result))
-    (should (string-match-p "~M-x claudemacs-repl-cheatsheet~" result))
-    (should (string-match-p "~M-x claudemacs-repl-send-region~" result))))
+    (should (string-match-p "~M-x enkan-repl-cheatsheet~" result))
+    (should (string-match-p "~M-x enkan-repl-send-region~" result))))
 
-(provide 'claudemacs-repl-utils-doc-test)
+(provide 'enkan-repl-utils-doc-test)
 
-;;; claudemacs-repl-utils-doc-test.el ends here
+;;; enkan-repl-utils-doc-test.el ends here
