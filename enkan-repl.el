@@ -3,7 +3,7 @@
 ;; Copyright (C) 2025 [phasetr]
 
 ;; Author: [phasetr] <phasetr@gmail.com>
-;; Version: 0.4.0
+;; Version: 0.5.0
 ;; Package-Requires: ((emacs "28.1") (claudemacs "0.1.0"))
 ;; Keywords: enkan ai tools convenience
 ;; URL: https://github.com/phasetr/claudemacs-repl

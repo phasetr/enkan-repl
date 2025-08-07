@@ -1,3 +1,20 @@
+# [0.5.0](https://github.com/phasetr/claudemacs-repl/compare/v0.4.0...v0.5.0) (2025-08-07)
+
+
+### Bug Fixes
+
+* correct repository URLs to fix semantic-release ([2cec2da](https://github.com/phasetr/claudemacs-repl/commit/2cec2da55bdeae768fa1de3ae2308d99d1904449))
+
+
+### Features
+
+* rename package from claudemacs-repl to enkan-repl ([d87e423](https://github.com/phasetr/claudemacs-repl/commit/d87e423dce44451f3d36fcbd6b03b5fdffc3b511))
+
+
+### BREAKING CHANGES
+
+* Package renamed from claudemacs-repl to enkan-repl
+
 # [0.4.0](https://github.com/phasetr/enkan-repl/compare/v0.3.0...v0.4.0) (2025-08-06)
 
 
