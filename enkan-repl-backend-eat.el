@@ -18,7 +18,12 @@
     (save-window-excursion
       (let ((eat-buffer-name buffer-name))
         (eat)))
-    (get-buffer buffer-name)))
+    (let ((buffer (get-buffer buffer-name)))
+      ;; Set up bell handler for notifications
+      (when buffer
+        (require 'enkan-repl-backend)
+        (enkan-repl-backend-setup-bell-handler buffer))
+      buffer)))
 
 (defun enkan-repl-backend-eat-send (text buffer)
   "Send TEXT to eat BUFFER."
@@ -26,8 +31,10 @@
     (when (and (boundp 'eat--process)
                eat--process
                (process-live-p eat--process))
+      ;; Send text without newline
       (eat--send-string eat--process text)
-      (eat--send-string eat--process "\n")
+      ;; Send C-m (Return key) to submit the input
+      (eat--send-string eat--process "\C-m")
       ;; Try to keep cursor at bottom
       (goto-char (point-max))
       (recenter -1))))
@@ -39,6 +46,22 @@
          (and (boundp 'eat--process)
               eat--process
               (process-live-p eat--process)))))
+
+(defun enkan-repl-backend-eat-finish (buffer)
+  "Finish eat BUFFER session and clean up."
+  (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      ;; Send exit command to the shell
+      (when (and (boundp 'eat--process)
+                 eat--process
+                 (process-live-p eat--process))
+        ;; Send exit command
+        (eat--send-string eat--process "exit\n")
+        ;; Give it a moment to exit gracefully
+        (sit-for 0.1)
+        ;; Force kill if still alive
+        (when (process-live-p eat--process)
+          (kill-process eat--process))))))
 
 (defun enkan-repl-backend-eat-get-content (buffer)
   "Get content from eat BUFFER."

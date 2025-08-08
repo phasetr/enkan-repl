@@ -24,15 +24,21 @@ With prefix arg NEW-SESSION-P, create a new session even if one exists."
 (defun enkan-repl-send-region (start end)
   "Send region from START to END to enkan-repl session."
   (interactive "r")
-  (let ((text (buffer-substring-no-properties start end)))
-    (enkan-repl-backend-send-text text)))
+  (let ((text (string-trim (buffer-substring-no-properties start end)))
+        (session-id (enkan-repl-backend--find-session-for-buffer)))
+    (if session-id
+        (enkan-repl-backend-send-text text session-id)
+      (user-error "No session found for current buffer. Start a session first with M-x enkan-repl-start-session"))))
 
 ;;;###autoload
 (defun enkan-repl-send-line ()
   "Send current line to enkan-repl session."
   (interactive)
-  (let ((line (thing-at-point 'line t)))
-    (enkan-repl-backend-send-text line)))
+  (let ((line (string-trim (thing-at-point 'line t)))
+        (session-id (enkan-repl-backend--find-session-for-buffer)))
+    (if session-id
+        (enkan-repl-backend-send-text line session-id)
+      (user-error "No session found for current buffer. Start a session first with M-x enkan-repl-start-session"))))
 
 ;;;###autoload
 (defun enkan-repl-list-sessions ()
@@ -58,6 +64,30 @@ With prefix arg NEW-SESSION-P, create a new session even if one exists."
                (buffer (enkan-repl-backend-get-buffer session-id)))
           (when buffer
             (switch-to-buffer buffer)))))))
+
+;;;###autoload
+(defun enkan-repl-finish-session (&optional session-id)
+  "Finish an enkan-repl session.
+If SESSION-ID is provided, finish that session.
+Otherwise, prompt for a session to finish."
+  (interactive)
+  (let* ((target-id (or session-id
+                        (enkan-repl-backend--find-session-for-buffer)))
+         (sessions (enkan-repl-backend-list-sessions))
+         (choice (when (and (not target-id) sessions)
+                  (completing-read "Session to finish: " sessions nil t))))
+    (when choice
+      ;; Extract session-id from display format
+      (when (string-match ".* (\\(.+\\))$" choice)
+        (setq target-id (match-string 1 choice))))
+    
+    (when target-id
+      (let* ((session (assoc target-id enkan-repl-sessions-alist))
+             (short-name (plist-get (cdr session) :short-name)))
+        (when (yes-or-no-p (format "Really finish session '%s'? " short-name))
+          (if (enkan-repl-backend-finish-session target-id)
+              (message "Finished session: %s" short-name)
+            (message "Failed to finish session: %s" short-name)))))))
 
 ;;;###autoload
 (defun enkan-repl-recenter-bottom ()
