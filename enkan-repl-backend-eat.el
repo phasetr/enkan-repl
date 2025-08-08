@@ -35,9 +35,11 @@
       (eat--send-string eat--process text)
       ;; Send C-m (Return key) to submit the input
       (eat--send-string eat--process "\C-m")
-      ;; Try to keep cursor at bottom
-      (goto-char (point-max))
-      (recenter -1))))
+      ;; Try to keep cursor at bottom - eat-mode needs special handling
+      (when (get-buffer-window buffer)
+        (with-selected-window (get-buffer-window buffer)
+          (goto-char (point-max))
+          (end-of-buffer))))))
 
 (defun enkan-repl-backend-eat-alive-p (buffer)
   "Check if eat BUFFER is alive."

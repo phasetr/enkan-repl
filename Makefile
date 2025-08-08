@@ -34,7 +34,14 @@ compile: ## Byte compile with warnings as errors
 checkdoc: ## Check documentation format
 	$(BATCH) --eval "(checkdoc-file \"enkan-repl.el\")"
 
-lint: ## Run package-lint checks
+lint: ## Run package-lint checks and check parentheses
+	@echo "Checking parentheses balance..."
+	@for file in *.el test/*.el; do \
+		if [ -f $$file ]; then \
+			$(BATCH) --eval "(progn (find-file \"$$file\") (condition-case err (check-parens) (error (message \"❌ %s: %s\" \"$$file\" (error-message-string err)) (kill-emacs 1)) (:success (message \"✓ %s\" \"$$file\"))))" 2>&1 | tail -1; \
+		fi \
+	done
+	@echo "Running package-lint..."
 	$(BATCH) --eval "(progn (package-initialize) (require 'package-lint) (with-temp-buffer (insert-file-contents \"enkan-repl.el\") (emacs-lisp-mode) (package-lint-current-buffer)))"
 
 format: ## Auto-format elisp files using built-in indent-region (spaces only)

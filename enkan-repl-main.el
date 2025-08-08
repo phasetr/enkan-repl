@@ -14,11 +14,13 @@
 With prefix arg NEW-SESSION-P, create a new session even if one exists."
   (interactive (list (read-directory-name "Directory: " default-directory)
                      current-prefix-arg))
-  (let ((buffer (enkan-repl-backend-create-session directory new-session-p)))
+  ;; Remove trailing slash from directory path
+  (let* ((normalized-dir (directory-file-name directory))
+         (buffer (enkan-repl-backend-create-session normalized-dir new-session-p)))
     (switch-to-buffer buffer)
     (message "Started %s session for %s"
              enkan-repl-backend-type
-             (enkan-repl-backend--extract-short-name directory))))
+             (enkan-repl-backend--extract-short-name normalized-dir))))
 
 ;;;###autoload
 (defun enkan-repl-send-region (start end)
@@ -93,7 +95,10 @@ Otherwise, prompt for a session to finish."
 (defun enkan-repl-recenter-bottom ()
   "Recenter current enkan-repl buffer to bottom."
   (interactive)
-  (enkan-repl-backend-recenter-bottom))
+  (let ((session-id (enkan-repl-backend--find-session-for-buffer)))
+    (if session-id
+        (enkan-repl-backend-recenter-bottom session-id)
+      (user-error "No enkan-repl session found for current buffer"))))
 
 ;;;###autoload
 (defun enkan-repl-switch-backend (backend)

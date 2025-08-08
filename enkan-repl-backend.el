@@ -180,9 +180,21 @@ Returns session-id if found, nil otherwise."
   (when-let ((buffer (if session-id
                          (enkan-repl-backend-get-buffer session-id)
                        (current-buffer))))
-    (with-current-buffer buffer
-      (goto-char (point-max))
-      (recenter -1))))
+    ;; Switch to the buffer's window if it's visible
+    (let ((window (get-buffer-window buffer)))
+      (if window
+          (with-selected-window window
+            (goto-char (point-max))
+            ;; For eat-mode, use end-of-buffer instead of recenter
+            (if (eq major-mode 'eat-mode)
+                (end-of-buffer)
+              (recenter -1)))
+        ;; If buffer is not visible, just switch to it
+        (switch-to-buffer buffer)
+        (goto-char (point-max))
+        (if (eq major-mode 'eat-mode)
+            (end-of-buffer)
+          (recenter -1))))))
 
 ;;; Notification System
 
