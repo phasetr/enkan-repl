@@ -17,8 +17,8 @@ help: ## Show this help message
 	@echo "Quick start:"
 	@echo "  make install-deps && make check"
 
-install-deps: ## Install required dependencies (package-lint)
-	$(BATCH) --eval "(progn (require 'package) (add-to-list 'package-archives '(\"melpa\" . \"https://melpa.org/packages/\")) (package-refresh-contents) (package-install 'package-lint))"
+install-deps: ## Install required dependencies (package-lint, claudemacs)
+	$(BATCH) --eval "(progn (require 'package) (add-to-list 'package-archives '(\"melpa\" . \"https://melpa.org/packages/\")) (package-refresh-contents) (package-install 'package-lint) (package-install 'claudemacs))"
 
 test: ## Run ERT tests
 	$(BATCH) --eval "(add-to-list 'load-path \".\")" -l enkan-repl.el -l test/enkan-repl-test.el -f ert-run-tests-batch-and-exit
