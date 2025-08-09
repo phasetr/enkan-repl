@@ -313,10 +313,22 @@ Avoids switching to eat window."
          ;; But not if we're in the input window editing a file
          (not (and (eq (selected-window) enkan-simple-3pane-input-left-up-window)
                 (buffer-file-name buffer))))
-        ;; Track buffer history for misc window
+        ;; Track buffer history for misc window (exclude temporary buffers)
         (let ((current-buffer (window-buffer enkan-simple-3pane-misc-left-down-window)))
-          (unless (eq current-buffer buffer)
-            (push current-buffer enkan-simple-3pane-misc-buffer-history)))
+          (when (and current-buffer
+                  (not (eq current-buffer buffer))
+                  ;; Only track non-temporary buffers
+                  (not (string-match-p "^\\*magit" (buffer-name current-buffer)))
+                  (not (string-match-p "^COMMIT_EDITMSG" (buffer-name current-buffer)))
+                  ;; Track file buffers and other persistent buffers
+                  (or (buffer-file-name current-buffer)
+                    (string-match-p "^\\*scratch\\*$" (buffer-name current-buffer))
+                    (string-match-p "^\\*Messages\\*$" (buffer-name current-buffer))))
+            (push current-buffer enkan-simple-3pane-misc-buffer-history)
+            ;; Keep history limited to avoid memory issues
+            (when (> (length enkan-simple-3pane-misc-buffer-history) 10)
+              (setq enkan-simple-3pane-misc-buffer-history
+                (butlast enkan-simple-3pane-misc-buffer-history)))))
         (set-window-buffer enkan-simple-3pane-misc-left-down-window buffer)
         (select-window enkan-simple-3pane-misc-left-down-window)
         enkan-simple-3pane-misc-left-down-window)
