@@ -1136,8 +1136,7 @@ Category: Session Controller"
       (enkan-repl--display-sessions-in-buffer sessions buffer-info-list))))
 
 (defun enkan-repl--delete-session-at-point ()
-  "Delete the session at point after confirmation."
-  (interactive)
+  "Delete the session at point after confirmation (internal function)."
   (let ((buf (get-text-property (point) 'session-buffer)))
     (if (not buf)
         (message "No session on this line")
