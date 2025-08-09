@@ -27,7 +27,7 @@
 
 ### Features
 
-* add interactive cheatsheet command for function discovery ([#7](https://github.com/phasetr/enkan-repl/issues/7)) ([2c3b140](https://github.com/phasetr/enkan-repl/commit/2c3b1405346eb82450230812da5dbf6b8b68d208))
+* add interactive cheat-sheet command for function discovery ([#7](https://github.com/phasetr/enkan-repl/issues/7)) ([2c3b140](https://github.com/phasetr/enkan-repl/commit/2c3b1405346eb82450230812da5dbf6b8b68d208))
 
 
 ### BREAKING CHANGES

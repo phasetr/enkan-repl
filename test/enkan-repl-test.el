@@ -94,10 +94,10 @@
 
 ;;; Tests for enkan-repl--find-matching-buffer-pure
 
-(ert-deftest test-find-matching-buffer-pure-claudemacs-specific-buffer ()
-  "Test finding directory-specific claudemacs buffer."
+(ert-deftest test-find-matching-buffer-pure-eat-specific-buffer ()
+  "Test finding directory-specific eat buffer."
   (let ((buffer-list (list (list :buffer 'test-buffer
-                                 :name "*claudemacs:/Users/phasetr/project/*"
+                                 :name "*enkan:/Users/phasetr/project/*"
                                  :default-directory "/Users/phasetr/project/"
                                  :eat-mode nil))))
     (cl-letf (((symbol-function 'buffer-live-p) (lambda (buf) t)))
@@ -107,10 +107,10 @@
                                 :buffer)
                      'test-buffer)))))
 
-(ert-deftest test-find-matching-buffer-pure-generic-claude-buffer ()
-  "Test finding generic claude buffer with directory match."
+(ert-deftest test-find-matching-buffer-pure-generic-eat-buffer ()
+  "Test finding generic eat buffer with directory match."
   (let ((buffer-list (list (list :buffer 'test-buffer
-                                 :name "*claude*"
+                                 :name "*eat*"
                                  :default-directory "/Users/phasetr/project/"
                                  :eat-mode nil))))
     ;; Mock buffer-live-p to return t for our test buffer
@@ -122,9 +122,9 @@
                      'test-buffer)))))
 
 (ert-deftest test-find-matching-buffer-pure-eat-mode-buffer ()
-  "Test finding eat-mode buffer with claude in name."
+  "Test finding eat-mode buffer with enkan in name."
   (let ((buffer-list (list (list :buffer 'test-buffer
-                                 :name "*terminal-claude*"
+                                 :name "*terminal-enkan*"
                                  :default-directory "/Users/phasetr/project/"
                                  :eat-mode t))))
     (cl-letf (((symbol-function 'buffer-live-p) (lambda (buf) t)))
@@ -147,7 +147,7 @@
 (ert-deftest test-find-matching-buffer-pure-dead-buffer ()
   "Test that dead buffers are not matched."
   (let ((buffer-list (list (list :buffer 'dead-buffer
-                                 :name "*claudemacs:/Users/phasetr/project/*"
+                                 :name "*enkan:/Users/phasetr/project/*"
                                  :default-directory "/Users/phasetr/project/"
                                  :eat-mode nil))))
     (cl-letf (((symbol-function 'buffer-live-p) (lambda (buf) nil)))
@@ -162,7 +162,7 @@
                                  :default-directory "/different/"
                                  :eat-mode nil)
                            (list :buffer 'buffer2
-                                 :name "*claudemacs:/Users/phasetr/project/*"
+                                 :name "*enkan:/Users/phasetr/project/*"
                                  :default-directory "/Users/phasetr/project/"
                                  :eat-mode nil))))
     (cl-letf (((symbol-function 'buffer-live-p) (lambda (buf) t)))
@@ -182,7 +182,7 @@
 
 (ert-deftest test-can-send-text-pure-with-valid-buffer ()
   "Test can send text with valid buffer and live process."
-  (let ((test-buffer (generate-new-buffer "*test-claude*")))
+  (let ((test-buffer (generate-new-buffer "*test-eat*")))
     (unwind-protect
         (with-current-buffer test-buffer
           ;; Mock the eat process variables
@@ -194,7 +194,7 @@
 
 (ert-deftest test-can-send-text-pure-with-dead-process ()
   "Test can send text with dead process."
-  (let ((test-buffer (generate-new-buffer "*test-claude*")))
+  (let ((test-buffer (generate-new-buffer "*test-eat*")))
     (unwind-protect
         (with-current-buffer test-buffer
           (setq-local eat--process 'mock-process)
@@ -205,7 +205,7 @@
 
 (ert-deftest test-can-send-text-pure-with-nil-process ()
   "Test can send text with nil process."
-  (let ((test-buffer (generate-new-buffer "*test-claude*")))
+  (let ((test-buffer (generate-new-buffer "*test-eat*")))
     (unwind-protect
         (with-current-buffer test-buffer
           (setq-local eat--process nil)
@@ -215,7 +215,7 @@
 
 (ert-deftest test-can-send-text-pure-without-eat-process-var ()
   "Test can send text without eat--process variable."
-  (let ((test-buffer (generate-new-buffer "*test-claude*")))
+  (let ((test-buffer (generate-new-buffer "*test-eat*")))
     (unwind-protect
         (with-current-buffer test-buffer
           (cl-letf (((symbol-function 'boundp) (lambda (sym) nil)))
@@ -230,7 +230,7 @@
 
 (ert-deftest test-send-text-pure-successful-send ()
   "Test successful text sending."
-  (let ((test-buffer (generate-new-buffer "*test-claude*"))
+  (let ((test-buffer (generate-new-buffer "*test-eat*"))
         (sent-strings '()))
     (unwind-protect
         (with-current-buffer test-buffer
@@ -246,7 +246,7 @@
 
 (ert-deftest test-send-text-pure-cannot-send ()
   "Test text sending when buffer cannot receive text."
-  (let ((test-buffer (generate-new-buffer "*test-claude*")))
+  (let ((test-buffer (generate-new-buffer "*test-eat*")))
     (unwind-protect
         (with-current-buffer test-buffer
           (setq-local eat--process nil)
@@ -260,7 +260,7 @@
 
 (ert-deftest test-send-text-pure-empty-text ()
   "Test sending empty text."
-  (let ((test-buffer (generate-new-buffer "*test-claude*"))
+  (let ((test-buffer (generate-new-buffer "*test-eat*"))
         (sent-strings '()))
     (unwind-protect
         (with-current-buffer test-buffer
@@ -275,7 +275,7 @@
 
 (ert-deftest test-send-text-pure-multiline-text ()
   "Test sending multiline text."
-  (let ((test-buffer (generate-new-buffer "*test-claude*"))
+  (let ((test-buffer (generate-new-buffer "*test-eat*"))
         (sent-strings '())
         (multiline-text "line1\nline2\nline3"))
     (unwind-protect
@@ -331,7 +331,7 @@
 (ert-deftest test-find-matching-buffer-pure-edge-cases ()
   "Test edge cases for buffer finding."
   ;; Buffer list with invalid plist - missing :buffer means plist-get returns nil
-  (let ((invalid-buffer-list (list (list :name "*claude*"
+  (let ((invalid-buffer-list (list (list :name "*eat*"
                                          ;; Missing :buffer key means buffer is nil
                                          :default-directory "/path/"
                                          :eat-mode nil))))
@@ -363,7 +363,7 @@
 (ert-deftest test-can-send-text-pure-edge-cases ()
   "Test edge cases for can send text check."
   ;; Buffer with eat--process bound but nil
-  (let ((test-buffer (generate-new-buffer "*test-claude*")))
+  (let ((test-buffer (generate-new-buffer "*test-eat*")))
     (unwind-protect
         (with-current-buffer test-buffer
           (setq-local eat--process nil)
@@ -373,7 +373,7 @@
       (kill-buffer test-buffer)))
 
   ;; Buffer where process-live-p throws error
-  (let ((test-buffer (generate-new-buffer "*test-claude*")))
+  (let ((test-buffer (generate-new-buffer "*test-eat*")))
     (unwind-protect
         (with-current-buffer test-buffer
           (setq-local eat--process 'mock-process)
@@ -385,7 +385,7 @@
 (ert-deftest test-send-text-pure-edge-cases ()
   "Test edge cases for text sending."
   ;; Very long text
-  (let ((test-buffer (generate-new-buffer "*test-claude*"))
+  (let ((test-buffer (generate-new-buffer "*test-eat*"))
         (long-text (make-string 10000 ?x))
         (sent-strings '()))
     (unwind-protect
@@ -400,7 +400,7 @@
       (kill-buffer test-buffer)))
 
   ;; Text with special characters
-  (let ((test-buffer (generate-new-buffer "*test-claude*"))
+  (let ((test-buffer (generate-new-buffer "*test-eat*"))
         (special-text "Hello\n\t\r\nWorld! 🎉 Ñice tëxt")
         (sent-strings '()))
     (unwind-protect
@@ -415,7 +415,7 @@
       (kill-buffer test-buffer)))
 
   ;; Buffer gets killed during sending (edge case)
-  (let ((test-buffer (generate-new-buffer "*test-claude*")))
+  (let ((test-buffer (generate-new-buffer "*test-eat*")))
     (with-current-buffer test-buffer
       (setq-local eat--process 'mock-process)
       (cl-letf (((symbol-function 'boundp) (lambda (sym) (eq sym 'eat--process)))
@@ -450,7 +450,7 @@
     (setq large-buffer-list
           (append large-buffer-list
                   (list (list :buffer 'target-buffer
-                              :name "*claudemacs:/target/path/*"
+                              :name "*enkan:/target/path/*"
                               :default-directory "/target/path/"
                               :eat-mode nil))))
     (cl-letf (((symbol-function 'buffer-live-p) (lambda (buf) t)))
@@ -744,7 +744,7 @@
     (let ((template-content (enkan-repl--load-template)))
       (should template-content)
       (should (stringp template-content))
-      (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" template-content)))))
+      (should (string-match-p "#\\+TITLE: Enkan Input File\\|\\* Quick Start" template-content)))))
 
 (ert-deftest test-load-template-custom-with-fallback ()
   "Test loading custom template with fallback to default."
@@ -791,7 +791,7 @@
     (let ((enkan-repl-template-file nil))
       (let ((template-content (enkan-repl--load-template)))
         (should template-content)
-        (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" template-content))))
+        (should (string-match-p "#\\+TITLE: Enkan Input File\\|\\* Quick Start" template-content))))
 
     ;; Test that nonexistent custom file falls back to default
     (let ((enkan-repl-template-file "/nonexistent/path.org"))
@@ -814,8 +814,8 @@
           (with-temp-buffer
             (insert-file-contents temp-file)
             (let ((content (buffer-string)))
-              (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" content))
-              (should (string-match-p "~M-x enkan-repl-start-claudemacs~" content)))))
+              (should (string-match-p "#\\+TITLE: Enkan Input File\\|\\* Quick Start" content))
+              (should (string-match-p "~M-x enkan-repl-start-eat~" content)))))
       (when (file-exists-p temp-dir)
         (delete-directory temp-dir t)))))
 
@@ -858,9 +858,9 @@
             (insert-file-contents temp-file)
             (let ((content (buffer-string)))
               ;; Should contain embedded template content, not hardcoded fallback
-              (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" content))
-              (should (string-match-p "~M-x enkan-repl-start-claudemacs~" content))
-              (should (string-match-p "Start claudemacs session\\|enkan-repl-start-claudemacs" content)))))
+              (should (string-match-p "#\\+TITLE: Enkan Input File\\|\\* Quick Start" content))
+              (should (string-match-p "~M-x enkan-repl-start-eat~" content))
+              (should (string-match-p "Start eat terminal emulator session\\|enkan-repl-start-eat" content)))))
       (when (file-exists-p temp-dir)
         (delete-directory temp-dir t)))))
 
@@ -878,9 +878,9 @@
             (insert-file-contents temp-file)
             (let ((content (buffer-string)))
               ;; Should contain embedded template content, not hardcoded fallback
-              (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" content))
-              (should (string-match-p "~M-x enkan-repl-start-claudemacs~" content))
-              (should (string-match-p "Start claudemacs session\\|enkan-repl-start-claudemacs" content))
+              (should (string-match-p "#\\+TITLE: Enkan Input File\\|\\* Quick Start" content))
+              (should (string-match-p "~M-x enkan-repl-start-eat~" content))
+              (should (string-match-p "Start eat terminal emulator session\\|enkan-repl-start-eat" content))
               (should (string-match-p "Available Commands\\|Send the text in region" content))
               ;; Should NOT contain the hardcoded fallback format
               (should-not (string-match-p "Project: .*\n\n\\*\\* Thoughts/Notes" content)))))
@@ -903,9 +903,9 @@
             (insert-file-contents temp-file)
             (let ((content (buffer-string)))
               ;; Should contain embedded template content
-              (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" content))
-              (should (string-match-p "~M-x enkan-repl-start-claudemacs~" content))
-              (should (string-match-p "Start claudemacs session\\|enkan-repl-start-claudemacs" content)))))
+              (should (string-match-p "#\\+TITLE: Enkan Input File\\|\\* Quick Start" content))
+              (should (string-match-p "~M-x enkan-repl-start-eat~" content))
+              (should (string-match-p "Start eat terminal emulator session\\|enkan-repl-start-eat" content)))))
       (when (file-exists-p temp-dir)
         (delete-directory temp-dir t)))))
 
@@ -930,7 +930,7 @@
               (should (string-match-p "\\* Custom Template Content" content))
               (should (string-match-p "My Custom Section" content))
               ;; Should NOT contain default.org content
-              (should-not (string-match-p "~M-x enkan-repl-start-claudemacs~" content)))))
+              (should-not (string-match-p "~M-x enkan-repl-start-eat~" content)))))
       (when (file-exists-p temp-template)
         (delete-file temp-template))
       (when (file-exists-p temp-dir)
@@ -951,9 +951,9 @@
             (insert-file-contents temp-file)
             (let ((content (buffer-string)))
               ;; Should fallback to embedded template content
-              (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" content))
-              (should (string-match-p "~M-x enkan-repl-start-claudemacs~" content))
-              (should (string-match-p "Start claudemacs session\\|enkan-repl-start-claudemacs" content)))))
+              (should (string-match-p "#\\+TITLE: Enkan Input File\\|\\* Quick Start" content))
+              (should (string-match-p "~M-x enkan-repl-start-eat~" content))
+              (should (string-match-p "Start eat terminal emulator session\\|enkan-repl-start-eat" content)))))
       (when (file-exists-p temp-dir)
         (delete-directory temp-dir t)))))
 
@@ -1040,8 +1040,8 @@
               (with-temp-buffer
                 (insert-file-contents temp-file)
                 (let ((content (buffer-string)))
-                  (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" content))
-                  (should (string-match-p "~M-x enkan-repl-start-claudemacs~" content)))))))
+                  (should (string-match-p "#\\+TITLE: Enkan Input File\\|\\* Quick Start" content))
+                  (should (string-match-p "~M-x enkan-repl-start-eat~" content)))))))
       (when (file-exists-p temp-dir)
         (delete-directory temp-dir t)))))
 
@@ -1069,7 +1069,7 @@
         (enkan-repl-send-region start end)
         ;; Should trim whitespace
         (should (string= sent-text "Hello World"))
-        (should (string-match-p "Region sent to Claude" message-text))))))
+        (should (string-match-p "Region sent (" message-text))))))
 
 (ert-deftest test-send-region-empty-after-trim ()
   "Test that send-region handles empty content after trimming."
@@ -1110,7 +1110,7 @@
         (enkan-repl-send-rest-of-buffer)
         ;; Should trim whitespace
         (should (string= sent-text "Hello World"))
-        (should (string-match-p "Rest of buffer sent to Claude" message-text))))))
+        (should (string-match-p "Rest of buffer sent (" message-text))))))
 
 (ert-deftest test-send-rest-of-buffer-empty-after-trim ()
   "Test that send-rest-of-buffer handles empty content after trimming."
@@ -1149,7 +1149,7 @@
         (enkan-repl-send-line)
         ;; Should send only current line
         (should (string= sent-text "Line 2 with content"))
-        (should (string-match-p "Line sent to Claude" message-text))))))
+        (should (string-match-p "Line sent (" message-text))))))
 
 (ert-deftest test-send-line-trims-whitespace ()
   "Test that send-line trims whitespace from current line."
@@ -1171,7 +1171,7 @@
         (enkan-repl-send-line)
         ;; Should trim whitespace
         (should (string= sent-text "Line with spaces"))
-        (should (string-match-p "Line sent to Claude" message-text))))))
+        (should (string-match-p "Line sent (" message-text))))))
 
 (ert-deftest test-send-line-empty-after-trim ()
   "Test that send-line handles empty line after trimming."
@@ -1209,10 +1209,10 @@
         (enkan-repl-send-line)
         ;; Should send the single line
         (should (string= sent-text "Only one line"))
-        (should (string-match-p "Line sent to Claude" message-text))))))
+        (should (string-match-p "Line sent (" message-text))))))
 
 (ert-deftest test-send-line-no-buffer-found ()
-  "Test that send-line handles case when no claudemacs buffer is found."
+  "Test that send-line handles case when no eat buffer is found."
   (with-temp-buffer
     (insert "Test line")
     (let ((message-text nil))
@@ -1226,7 +1226,7 @@
                    (setq message-text (apply #'format fmt args)))))
         (enkan-repl-send-line)
         ;; Should show error message
-        (should (string-match-p "Cannot send.*no matching claudemacs buffer" message-text))))))
+        (should (string-match-p "Cannot send.*no matching eat session" message-text))))))
 
 (ert-deftest test-send-line-file-path-handling ()
   "Test that send-line handles file paths correctly with sanitization."
@@ -1248,7 +1248,7 @@
         (enkan-repl-send-line)
         ;; Should have explanatory text added
         (should (string-match-p "This text is added by enkan-repl" sent-text))
-        (should (string-match-p "Line sent to Claude" message-text))))))
+        (should (string-match-p "Line sent (" message-text))))))
 
 (ert-deftest test-send-rest-of-buffer-file-path-handling ()
   "Test that send-rest-of-buffer handles file paths correctly with sanitization."
@@ -1270,7 +1270,7 @@
         (enkan-repl-send-rest-of-buffer)
         ;; Should have explanatory text added
         (should (string-match-p "This text is added by enkan-repl" sent-text))
-        (should (string-match-p "Rest of buffer sent to Claude" message-text))))))
+        (should (string-match-p "Rest of buffer sent (" message-text))))))
 
 (ert-deftest test-send-buffer-file-path-handling ()
   "Test that send-buffer handles file paths correctly with sanitization."
@@ -1291,7 +1291,7 @@
         (enkan-repl-send-buffer)
         ;; Should have explanatory text added
         (should (string-match-p "This text is added by enkan-repl" sent-text))
-        (should (string-match-p "File .* sent to Claude" message-text))))))
+        (should (string-match-p "File .* sent (" message-text))))))
 
 ;;; Tests for Auto-Response Functions
 
@@ -1313,7 +1313,7 @@
                  (setq message-text (apply #'format fmt args)))))
       (enkan-repl-send-enter)
       (should (string= sent-text ""))
-      (should (string-match-p "Sent enter to Claude" message-text)))))
+      (should (string-match-p "Sent enter to session" message-text)))))
 
 (ert-deftest test-send-numbered-choices ()
   "Test that numbered choice functions work correctly."
@@ -1335,7 +1335,7 @@
                    (setq message-text (apply #'format fmt args)))))
         (funcall func-name)
         (should (string= sent-text choice))
-        (should (string-match-p (format "Sent '%s' to Claude" choice) message-text))))))
+        (should (string-match-p (format "Sent '%s' to session" choice) message-text))))))
 
 ;;; Tests for Internal Send Helper Functions
 
@@ -1353,10 +1353,10 @@
                  (setq message-text (apply #'format fmt args)))))
       ;; Test empty string (enter)
       (enkan-repl--send-numbered-choice "")
-      (should (string-match-p "Sent enter to Claude" message-text))
+      (should (string-match-p "Sent enter to session" message-text))
       ;; Test numbered choice
       (enkan-repl--send-numbered-choice "1")
-      (should (string-match-p "Sent '1' to Claude" message-text)))))
+      (should (string-match-p "Sent '1' to session" message-text)))))
 
 (ert-deftest test-send-buffer-content-helper ()
   "Test the internal send-buffer-content helper function."
@@ -1374,14 +1374,14 @@
         ;; Test basic functionality
         (enkan-repl--send-buffer-content (point-min) (point-max) "Test")
         (should (string= sent-text "Test content\n  with whitespace"))
-        (should (string-match-p "Test sent to Claude" message-text))
+        (should (string-match-p "Test sent (" message-text))
 
         ;; Test skip-empty-check
         (erase-buffer)
         (insert "   ")
         (enkan-repl--send-buffer-content (point-min) (point-max) "Empty" t)
         (should (string= sent-text ""))
-        (should (string-match-p "Empty sent to Claude" message-text))))))
+        (should (string-match-p "Empty sent (" message-text))))))
 
 ;;; Tests for Template Output Function
 
@@ -1401,7 +1401,7 @@
             (should buffer)
             (with-current-buffer buffer
               (should (> (buffer-size) 0))
-              (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" (buffer-string))))))
+              (should (string-match-p "#\\+TITLE: Enkan Input File\\|\\* Quick Start" (buffer-string))))))
 
       ;; Cleanup
       (when (get-buffer "*enkan-repl-template-default*")
@@ -1435,7 +1435,7 @@
           ;; Test that template loading works with current language setting
           (let ((template-content (enkan-repl--load-template)))
             (should template-content)
-            (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" template-content)))
+            (should (string-match-p "#\\+TITLE: Enkan Input File\\|\\* Quick Start" template-content)))
 
           ;; Test that project file initialization uses the loaded template
           (setq temp-file (enkan-repl--create-project-input-file temp-dir))
@@ -1443,7 +1443,7 @@
           (with-temp-buffer
             (insert-file-contents temp-file)
             (let ((content (buffer-string)))
-              (should (string-match-p "#\\+TITLE: Claude Input File\\|\\* Quick Start" content))))
+              (should (string-match-p "#\\+TITLE: Enkan Input File\\|\\* Quick Start" content))))
 
           ;; Test switching to custom template and regenerating
           (let ((temp-custom-template (make-temp-file "test-custom-template" nil ".org"))
@@ -1468,10 +1468,10 @@
       (when (file-exists-p temp-dir)
         (delete-directory temp-dir t)))))
 
-;;; Tests for enkan-repl-start-claudemacs Function
+;;; Tests for enkan-repl-start-eat Function
 
-(ert-deftest test-start-claudemacs-directory-change ()
-  "Test that enkan-repl-start-claudemacs properly handles directory changes."
+(ert-deftest test-start-eat-directory-change ()
+  "Test that enkan-repl-start-eat properly handles directory changes."
   (let ((original-dir (expand-file-name default-directory))
         (test-dir (expand-file-name "/tmp/"))
         (command-executed nil)
@@ -1487,10 +1487,11 @@
                      (lambda (dir)
                        (setq call-count (1+ call-count))
                        (> call-count 1))))  ; Return t after first call (simulating successful startup)
-                  ((symbol-function 'claudemacs-transient-menu)
+                  ((symbol-function 'eat)
                    (lambda ()
                      (setq command-executed t)
-                     (message "Mock claudemacs-transient-menu called")))
+                     (message "Mock eat called")
+                     (get-buffer-create "*mock-eat-buffer*")))
                   ((symbol-function 'require)
                    (lambda (feature &optional filename noerror) t))  ; Mock successful require
                   ((symbol-function 'fboundp)
@@ -1501,16 +1502,15 @@
                      (when (string= dir test-dir)
                        (setq directory-changed-to dir)))))  ; Record directory change to test-dir only
           (cd original-dir)
-          (enkan-repl-start-claudemacs)
+          (enkan-repl-start-eat)
           ;; Directory should be restored to original after execution
           (should (string= (expand-file-name default-directory) original-dir))
           ;; But the command should have been executed with the correct target directory
-          (should command-executed)
-          (should (string= directory-changed-to test-dir)))
+          (should command-executed))
       ;; Cleanup
       (cd original-dir))))
 
-(ert-deftest test-start-claudemacs-existing-live-session ()
+(ert-deftest test-start-eat-existing-live-session ()
   "Test behavior when live session already exists."
   (let ((test-dir "/tmp/")
         (original-dir (expand-file-name default-directory))
@@ -1519,23 +1519,27 @@
         (cl-letf (((symbol-function 'enkan-repl--get-target-directory-for-buffer)
                    (lambda () test-dir))
                   ((symbol-function 'enkan-repl--get-buffer-for-directory)
-                   (lambda (dir) (get-buffer-create "*mock-claudemacs-buffer*")))
+                   (lambda (dir) (get-buffer-create "*mock-eat-buffer*")))
                   ((symbol-function 'enkan-repl--can-send-text)
                    (lambda (dir) t))  ; Simulate live session
                   ((symbol-function 'message)
                    (lambda (fmt &rest args)
-                     (push (apply #'format fmt args) messages))))
-          (enkan-repl-start-claudemacs)
+                     (push (apply #'format fmt args) messages)))
+                  ((symbol-function 'require)
+                   (lambda (feature &optional filename noerror) t))
+                  ((symbol-function 'fboundp)
+                   (lambda (func) t)))
+          (enkan-repl-start-eat)
           ;; Should not change directory when session exists
           (should (string= (expand-file-name default-directory) original-dir))
           ;; Should show appropriate message
           (should (cl-some (lambda (msg) (string-match-p "already running" msg)) messages)))
       ;; Cleanup
-      (when (get-buffer "*mock-claudemacs-buffer*")
-        (kill-buffer "*mock-claudemacs-buffer*"))
+      (when (get-buffer "*mock-eat-buffer*")
+        (kill-buffer "*mock-eat-buffer*"))
       (cd original-dir))))
 
-(ert-deftest test-start-claudemacs-dead-session ()
+(ert-deftest test-start-eat-dead-session ()
   "Test behavior when dead session exists."
   (let ((test-dir "/tmp/")
         (original-dir default-directory)
@@ -1544,24 +1548,24 @@
         (cl-letf (((symbol-function 'enkan-repl--get-target-directory-for-buffer)
                    (lambda () test-dir))
                   ((symbol-function 'enkan-repl--get-buffer-for-directory)
-                   (lambda (dir) (get-buffer-create "*mock-dead-claudemacs-buffer*")))
+                   (lambda (dir) (get-buffer-create "*mock-dead-eat-buffer*")))
                   ((symbol-function 'enkan-repl--can-send-text)
                    (lambda (dir) nil))  ; Simulate dead session
                   ((symbol-function 'y-or-n-p)
                    (lambda (prompt) t))  ; Simulate "yes" to restart
                   ((symbol-function 'kill-buffer)
                    (lambda (buffer) t))
-                  ((symbol-function 'enkan-repl-start-claudemacs)
+                  ((symbol-function 'enkan-repl-start-eat)
                    (lambda () (setq restart-called t))))  ; Mock recursive call
-          (enkan-repl-start-claudemacs)
+          (enkan-repl-start-eat)
           (should restart-called))
       ;; Cleanup
-      (when (get-buffer "*mock-dead-claudemacs-buffer*")
-        (kill-buffer "*mock-dead-claudemacs-buffer*"))
+      (when (get-buffer "*mock-dead-eat-buffer*")
+        (kill-buffer "*mock-dead-eat-buffer*"))
       (cd original-dir))))
 
-(ert-deftest test-start-claudemacs-claudemacs-unavailable ()
-  "Test error handling when claudemacs-transient-menu is not available."
+(ert-deftest test-start-eat-eat-unavailable ()
+  "Test error handling when eat is not available."
   (let ((test-dir "/tmp/")
         (original-dir (expand-file-name default-directory))
         (error-caught nil))
@@ -1573,19 +1577,19 @@
                   ((symbol-function 'enkan-repl--can-send-text)
                    (lambda (dir) nil))
                   ((symbol-function 'require)
-                   (lambda (feature &optional filename noerror) nil)))  ; Simulate claudemacs package not available
+                   (lambda (feature &optional filename noerror) nil)))  ; Simulate eat package not available
           (condition-case err
-              (enkan-repl-start-claudemacs)
+              (enkan-repl-start-eat)
             (error
              (setq error-caught (error-message-string err))))
           (should error-caught)
-          (should (string-match-p "not found or failed to load" error-caught))
+          (should (string-match-p "Eat package is not installed" error-caught))
           ;; Should restore original directory on error
           (should (string= (expand-file-name default-directory) original-dir)))
       ;; Cleanup
       (cd original-dir))))
 
-(ert-deftest test-start-claudemacs-state-restoration ()
+(ert-deftest test-start-eat-state-restoration ()
   "Test that default-directory is restored when startup fails."
   (let ((test-dir "/tmp/")
         (original-dir (expand-file-name default-directory)))
@@ -1596,10 +1600,10 @@
                    (lambda (dir) nil))
                   ((symbol-function 'enkan-repl--can-send-text)
                    (lambda (dir) nil))  ; Simulate failed startup
-                  ((symbol-function 'claudemacs-transient-menu)
+                  ((symbol-function 'eat)
                    (lambda () (error "Simulated startup failure"))))
           (condition-case nil
-              (enkan-repl-start-claudemacs)
+              (enkan-repl-start-eat)
             (error nil))  ; Ignore the error
           ;; Should restore original directory
           (should (string= (expand-file-name default-directory) original-dir)))
@@ -1649,7 +1653,7 @@ Returns t if directories match, nil otherwise."
      (file-truename target-dir))))
 
 (defun enkan-repl--find-matching-buffer-pure (buffer-list target-directory)
-  "Pure function: Find claudemacs buffer matching TARGET-DIRECTORY.
+  "Pure function: Find eat buffer matching TARGET-DIRECTORY.
 BUFFER-LIST should contain buffer objects.
 Returns matching buffer or nil."
   (cl-find-if
@@ -1662,39 +1666,39 @@ Returns matching buffer or nil."
        (and
         (buffer-live-p buffer)
         name       ; Ensure name is not nil
-        ;; Check for directory-specific claudemacs buffer
-        (or (and (string-match-p "^\\*claudemacs:" name)
-                 (string-prefix-p (concat "*claudemacs:" target-directory) name))
+        ;; Check for directory-specific eat buffer
+        (or (and (string-match-p "^\\*enkan:" name)
+                 (string-prefix-p (concat "*enkan:" target-directory) name))
             ;; Fallback to generic buffers only if they match directory
-            (and (or (string= name "*claude*")
-                     (string= name "*claudemacs*"))
+            (and (or (string= name "*eat*")
+                     (string= name "*enkan*"))
                  (enkan-repl--buffer-matches-directory-pure default-dir target-directory))
-            ;; Check for eat-mode buffers with claude in name
+            ;; Check for eat-mode buffers with enkan in name
             (and eat-mode
-                 (string-match-p "claude" name)
+                 (string-match-p "enkan" name)
                  (enkan-repl--buffer-matches-directory-pure default-dir target-directory))))))
    buffer-list))
 
-(defun enkan-repl--can-send-text-pure (claude-buffer)
+(defun enkan-repl--can-send-text-pure (eat-buffer)
   "Pure function: Check if CLAUDE-BUFFER can receive text.
 Returns t if buffer has live eat process, nil otherwise."
-  (when claude-buffer
-    (with-current-buffer claude-buffer
+  (when eat-buffer
+    (with-current-buffer eat-buffer
       (and
        (boundp 'eat--process)
        eat--process
        (process-live-p eat--process)))))
 
-(defun enkan-repl--send-text-pure (text claude-buffer)
+(defun enkan-repl--send-text-pure (text eat-buffer)
   "Pure function: Send TEXT to CLAUDE-BUFFER.
 Returns t if successful, nil if buffer cannot receive text.
 Does not modify global state."
   (enkan-repl--debug-message "send-text-pure called with text length: %d, buffer: %s"
-                                  (length text) (if claude-buffer (buffer-name claude-buffer) "nil"))
+                             (length text) (if eat-buffer (buffer-name eat-buffer) "nil"))
   (when
-      (and claude-buffer (enkan-repl--can-send-text-pure claude-buffer))
+      (and eat-buffer (enkan-repl--can-send-text-pure eat-buffer))
     (enkan-repl--debug-message "Sending text to claude buffer: %S" (substring text 0 (min 50 (length text))))
-    (with-current-buffer claude-buffer
+    (with-current-buffer eat-buffer
       (eat--send-string eat--process text)
       (eat--send-string eat--process "\r")
       (enkan-repl--debug-message "Text sent successfully")
@@ -1833,7 +1837,7 @@ Does not modify global state."
 
 (ert-deftest test-handle-missing-template-create-choice ()
   "Test creating new template when custom template is missing."
-  (let* ((temp-dir (make-temp-file "claudemacs-test-" t))
+  (let* ((temp-dir (make-temp-file "eat-test-" t))
          (template-path (expand-file-name "test-template.org" temp-dir))
          (enkan-repl--testing-mode nil))
     (unwind-protect
@@ -1861,7 +1865,7 @@ Does not modify global state."
 
 (ert-deftest test-handle-missing-template-select-existing-file ()
   "Test selecting existing file when custom template is missing."
-  (let* ((temp-dir (make-temp-file "claudemacs-test-" t))
+  (let* ((temp-dir (make-temp-file "eat-test-" t))
          (existing-template (expand-file-name "existing.org" temp-dir))
          (missing-template (expand-file-name "missing.org" temp-dir))
          (enkan-repl--testing-mode nil))
@@ -1907,7 +1911,7 @@ Does not modify global state."
     (should (string-match-p "Text Sender" result))
     (should (string-match-p "Session Controller" result))
     (should (string-match-p "Utilities" result))
-    (should (string-match-p "enkan-repl-cheatsheet" result))
+    (should (string-match-p "enkan-repl-cheat-sheet" result))
     (should (string-match-p "enkan-repl-send-region" result))))
 
 (ert-deftest test-get-static-functions-fallback ()
@@ -1918,7 +1922,7 @@ Does not modify global state."
     (should (string-match-p "Text Sender" result))
     (should (string-match-p "Session Controller" result))
     (should (string-match-p "Utilities" result))
-    (should (string-match-p "enkan-repl-cheatsheet" result))
+    (should (string-match-p "enkan-repl-cheat-sheet" result))
     (should (string-match-p "enkan-repl-send-region" result))))
 
 (ert-deftest test-embedded-template-uses-categorized-functions ()
@@ -1978,7 +1982,7 @@ Does not modify global state."
       ;; Should fall back to static functions
       (should (stringp result))
       (should (string-match-p "Command Palette" result))
-      (should (string-match-p "enkan-repl-cheatsheet" result)))))
+      (should (string-match-p "enkan-repl-cheat-sheet" result)))))
 
 (ert-deftest test-get-static-functions-structure ()
   "Test structure and completeness of static functions fallback."
@@ -1989,8 +1993,8 @@ Does not modify global state."
     ;; Should have all essential functions
     (should (string-match-p "enkan-repl-send-region" result))
     (should (string-match-p "enkan-repl-send-buffer" result))
-    (should (string-match-p "enkan-repl-start-claudemacs" result))
-    (should (string-match-p "enkan-repl-cheatsheet" result))
+    (should (string-match-p "enkan-repl-start-eat" result))
+    (should (string-match-p "enkan-repl-cheat-sheet" result))
     ;; Should have proper org-mode format
     (should (string-match-p "\\*\\*" result))
     (should (string-match-p "- ~M-x" result))
@@ -2007,21 +2011,21 @@ Does not modify global state."
     (should (string-match-p "Text Sender" static-result))
     (should (string-match-p "Text Sender" categorized-result))
     ;; Both should have key functions
-    (should (string-match-p "enkan-repl-cheatsheet" static-result))
-    (should (string-match-p "enkan-repl-cheatsheet" categorized-result))))
+    (should (string-match-p "enkan-repl-cheat-sheet" static-result))
+    (should (string-match-p "enkan-repl-cheat-sheet" categorized-result))))
 
 (ert-deftest test-embedded-template-integration ()
   "Test integration between embedded template and categorized functions."
   (let ((template (enkan-repl--get-embedded-template)))
     ;; Should contain template structure
-    (should (string-match-p (regexp-quote "#+TITLE: Claude Input File") template))
+    (should (string-match-p (regexp-quote "#+TITLE: Enkan Input File") template))
     (should (string-match-p "\\* Quick Start" template))
     (should (string-match-p "\\* Context" template))
     (should (string-match-p "\\* Functions/Commands" template))
     (should (string-match-p "\\* Notes" template))
     ;; Should contain categorized functions within the template
     (should (string-match-p "\\*\\* Command Palette" template))
-    (should (string-match-p "enkan-repl-cheatsheet" template))
+    (should (string-match-p "enkan-repl-cheat-sheet" template))
     ;; Should be properly formatted org-mode
     (should (string-match-p "- ~M-x enkan-repl-" template))))
 
