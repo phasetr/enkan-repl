@@ -1093,7 +1093,7 @@ Category: Utilities"
 ;;;###autoload
 (defun enkan-repl-list-sessions ()
   "Display a list of active enkan sessions with interactive selection.
-Users can select a session by number, then choose action: (s)witch, (d)elete, or (q)uit.
+Users can select a session, then choose action: (s)witch, (d)elete, or (q)uit.
 
 Category: Session Controller"
   (interactive)
@@ -1102,26 +1102,28 @@ Category: Session Controller"
          (sessions (enkan-repl--collect-sessions-pure buffer-info-list)))
     (if (null sessions)
         (message "No active sessions found")
-      ;; Display numbered session list
-      (let ((session-list-str (enkan-repl--format-numbered-sessions-pure sessions)))
-        ;; Show list and get selection
-        (let* ((prompt (concat session-list-str
-                              "\nSelect session number (1-" 
-                              (number-to-string (length sessions))
-                              ") or q to quit: "))
-               (choice (read-char prompt)))
-          (cond
-           ;; Quit
-           ((eq choice ?q)
-            (message "Cancelled"))
-           ;; Number selection
-           ((and (>= choice ?1) (<= choice (+ ?0 (length sessions))))
-            (let* ((selected-index (- choice ?1))
-                   (selected-session (nth selected-index sessions))
-                   (selected-name (plist-get selected-session :name))
-                   (buf (enkan-repl--find-session-buffer-pure selected-name buffer-info-list)))
+      ;; Prepare candidates for completing-read with annotations
+      (let* ((candidates (mapcar
+                         (lambda (session)
+                           (plist-get session :name))
+                         sessions))
+             (completion-extra-properties
+              `(:annotation-function
+                (lambda (candidate)
+                  (let ((session (cl-find-if
+                                 (lambda (s)
+                                   (string= (plist-get s :name) candidate))
+                                 ',sessions)))
+                    (when session
+                      (format " — Directory: %s, Status: %s"
+                              (plist-get session :directory)
+                              (plist-get session :status))))))))
+        ;; Get session selection using completing-read (like cheat-sheet)
+        (let ((selected-name (completing-read "Select enkan session: " candidates nil t)))
+          (when (and selected-name (not (string= selected-name "")))
+            (let ((buf (enkan-repl--find-session-buffer-pure selected-name buffer-info-list)))
               (when buf
-                ;; Ask for action
+                ;; Ask for action after selection
                 (let ((action (read-char-choice
                               (format "Session %s - (s)witch, (d)elete, (q)uit: " selected-name)
                               '(?s ?d ?q))))
@@ -1132,15 +1134,9 @@ Category: Session Controller"
                     (?d
                      (when (y-or-n-p (format "Delete session %s? " selected-name))
                        (kill-buffer buf)
-                       (message "Session deleted: %s" selected-name)
-                       ;; Refresh the list
-                       (enkan-repl-list-sessions)))
+                       (message "Session deleted: %s" selected-name)))
                     (?q
-                     (message "Cancelled")))))))
-           ;; Invalid selection
-           (t
-            (message "Invalid selection")
-            (enkan-repl-list-sessions))))))))
+                     (message "Cancelled"))))))))))))
 
 
 ;;;###autoload
