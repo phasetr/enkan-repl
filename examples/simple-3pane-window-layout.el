@@ -169,9 +169,9 @@ Negative value makes text smaller."
           (existing-buffer (get-buffer enkan-buffer-name)))
     (if (and existing-buffer (buffer-live-p existing-buffer))
       (switch-to-buffer existing-buffer)
-      ;; Create new eat session with appropriate name
-      (eat)
-      (rename-buffer enkan-buffer-name t)))
+      ;; Use enkan-repl-start-eat to create new session
+      (let ((default-directory input-dir))
+        (enkan-repl-start-eat))))
   ;; Adjust text scale in eat buffer only
   ;; Ensure this is buffer-local
   (with-current-buffer (current-buffer)
