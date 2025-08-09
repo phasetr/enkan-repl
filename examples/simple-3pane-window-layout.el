@@ -120,8 +120,11 @@ Negative value makes text smaller."
   ;; Lock input buffer
   (enkan-3pane-lock-input-buffer)
   ;; Enable the minor mode for keybindings
-  (enkan-3pane-mode 1)
-  (message "3-pane layout initialized. Use M-t to switch windows."))
+  (unless enkan-3pane-mode
+    (enkan-3pane-mode 1))
+  ;; Setup display-buffer rules for misc window
+  (enkan-3pane-setup-display-buffer-rules)
+  (message "3-pane layout initialized. Use C-t to switch windows."))
 
 (defun enkan-3pane-other-window ()
   "Switch between input and misc windows only.
@@ -206,6 +209,33 @@ Avoids switching to eat window."
 
 ;;; Helper Functions
 
+(defun enkan-3pane-setup-display-buffer-rules ()
+  "Setup display-buffer rules to force misc buffers to left-down window."
+  ;; Override the default display-buffer function
+  (advice-add 'display-buffer :around #'enkan-3pane-display-buffer-advice))
+
+(defun enkan-3pane-display-buffer-advice (orig-fun buffer &rest args)
+  "Advice to redirect buffers to misc window when appropriate."
+  (let ((buffer-name (buffer-name (get-buffer buffer))))
+    (cond
+     ;; Don't redirect eat buffers
+     ((string-match-p "^\\*enkan:" buffer-name)
+      (apply orig-fun buffer args))
+     ;; Don't redirect buffers that are already displayed
+     ((get-buffer-window buffer)
+      (apply orig-fun buffer args))
+     ;; Redirect everything else to misc window if it exists
+     ((and enkan-3pane-misc-left-down-window
+           (window-live-p enkan-3pane-misc-left-down-window)
+           ;; But not if we're in the input window editing a file
+           (not (and (eq (selected-window) enkan-3pane-input-left-up-window)
+                     (buffer-file-name buffer))))
+      (set-window-buffer enkan-3pane-misc-left-down-window buffer)
+      (select-window enkan-3pane-misc-left-down-window)
+      enkan-3pane-misc-left-down-window)
+     ;; Default behavior
+     (t (apply orig-fun buffer args)))))
+
 (defun enkan-3pane-reset ()
   "Reset all 3-pane related variables."
   (interactive)
@@ -213,6 +243,8 @@ Avoids switching to eat window."
     enkan-3pane-input-left-up-window nil
     enkan-3pane-misc-left-down-window nil
     enkan-3pane-eat-right-full-window nil)
+  ;; Remove display-buffer advice
+  (advice-remove 'display-buffer #'enkan-3pane-display-buffer-advice)
   (message "3-pane layout reset."))
 
 (defun enkan-3pane-status ()
@@ -238,6 +270,7 @@ Avoids switching to eat window."
       (let ((map (make-sparse-keymap)))
         (define-key map (kbd "C-c 3 s") 'enkan-3pane-setup)
         (define-key map (kbd "C-t") 'enkan-3pane-other-window)
+        (define-key map (kbd "M-t") 'other-window-or-split)
         (define-key map (kbd "C-c 3 l") 'enkan-3pane-lock-input-buffer)
         (define-key map (kbd "C-c 3 u") 'enkan-3pane-unlock-input-buffer)
         (define-key map (kbd "C-c 3 e") 'enkan-3pane-send-escape)
@@ -254,7 +287,7 @@ Avoids switching to eat window."
   :keymap enkan-3pane-mode-map  ; This is critical - must specify the keymap
   :global t
   (if enkan-3pane-mode
-      (message "enkan-3pane-mode enabled. C-t to switch windows.")
+    (message "enkan-3pane-mode enabled. C-t to switch windows.")
     (message "enkan-3pane-mode disabled.")))
 
 ;;; Provide
