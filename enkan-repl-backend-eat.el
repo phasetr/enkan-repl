@@ -8,6 +8,37 @@
 
 (require 'eat nil t)
 
+(defvar-local enkan-repl-backend-eat-idle-timer nil
+  "Timer for detecting idle state in eat buffer.")
+
+(defcustom enkan-repl-backend-eat-idle-seconds 3
+  "Seconds of inactivity before triggering notification."
+  :type 'integer
+  :group 'enkan-repl-backend)
+
+(defvar-local enkan-repl-backend-eat-last-output-time nil
+  "Time of last output in eat buffer.")
+
+(defun enkan-repl-backend-eat-reset-idle-timer (buffer)
+  "Reset idle timer for BUFFER."
+  (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      (setq enkan-repl-backend-eat-last-output-time (current-time))
+      (when enkan-repl-backend-eat-idle-timer
+        (cancel-timer enkan-repl-backend-eat-idle-timer))
+      (setq enkan-repl-backend-eat-idle-timer
+            (run-with-timer enkan-repl-backend-eat-idle-seconds nil
+                           #'enkan-repl-backend-eat-check-idle buffer)))))
+
+(defun enkan-repl-backend-eat-check-idle (buffer)
+  "Check if BUFFER has been idle and trigger notification."
+  (when (and enkan-repl-notify-on-completion
+             (buffer-live-p buffer))
+    (require 'enkan-repl-backend)
+    (enkan-repl-backend--system-notification
+     "Claude Code is ready for input"
+     "Task Completed")))
+
 ;;; Eat Backend Implementation
 
 (defun enkan-repl-backend-eat-create (directory session-id)
@@ -22,7 +53,12 @@
       ;; Set up bell handler for notifications
       (when buffer
         (require 'enkan-repl-backend)
-        (enkan-repl-backend-setup-bell-handler buffer))
+        (enkan-repl-backend-setup-bell-handler buffer)
+        (with-current-buffer buffer
+          (add-hook 'after-change-functions
+                    (lambda (&rest _) (enkan-repl-backend-eat-reset-idle-timer buffer))
+                    nil t))
+        (enkan-repl-backend-eat-reset-idle-timer buffer))
       buffer)))
 
 (defun enkan-repl-backend-eat-send (text buffer)
@@ -69,6 +105,16 @@
   "Get content from eat BUFFER."
   (with-current-buffer buffer
     (buffer-string)))
+
+;;;###autoload
+(defun enkan-repl-backend-eat-test-notification ()
+  "Test function to manually trigger notification."
+  (interactive)
+  (message "Testing notification...")
+  (require 'enkan-repl-backend)
+  (enkan-repl-backend--system-notification
+   "Test: Claude Code is ready"
+   "Test Notification"))
 
 (provide 'enkan-repl-backend-eat)
 ;;; enkan-repl-backend-eat.el ends here

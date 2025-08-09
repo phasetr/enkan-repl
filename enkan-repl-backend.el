@@ -103,6 +103,15 @@ If NEW-SESSION-P is non-nil, create a new session even if one exists."
                (assoc session-id enkan-repl-sessions-alist))
       (user-error "Session already exists for %s. Use prefix arg to create new session" normalized-dir))
 
+    ;; If new-session-p is true and session exists, generate unique ID
+    (when (and new-session-p
+               (assoc session-id enkan-repl-sessions-alist))
+      (let ((counter 2))
+        (while (assoc (format "%s<%d>" session-id counter) enkan-repl-sessions-alist)
+          (setq counter (1+ counter)))
+        (setq session-id (format "%s<%d>" session-id counter))
+        (setq short-name (format "%s<%d>" short-name counter))))
+
     ;; Create new session using backend-specific function
     (let ((buffer (funcall (intern (format "enkan-repl-backend-%s-create" backend))
                           normalized-dir session-id)))
@@ -168,12 +177,18 @@ If NEW-SESSION-P is non-nil, create a new session even if one exists."
 (defun enkan-repl-backend--find-session-for-buffer ()
   "Find the appropriate session for the current buffer.
 Returns session-id if found, nil otherwise."
-  (let ((current-dir (expand-file-name default-directory)))
-    ;; Find a session whose directory matches current buffer's directory
-    (cl-loop for (session-id . props) in enkan-repl-sessions-alist
-             for session-dir = (plist-get props :directory)
-             when (string-prefix-p session-dir current-dir)
-             return session-id)))
+  ;; First check if buffer has explicit session association
+  (if (and (boundp 'enkan-repl-current-session)
+           enkan-repl-current-session
+           (assoc enkan-repl-current-session enkan-repl-sessions-alist))
+      enkan-repl-current-session
+    ;; Otherwise find by directory matching
+    (let ((current-dir (expand-file-name default-directory)))
+      ;; Find a session whose directory matches current buffer's directory
+      (cl-loop for (session-id . props) in enkan-repl-sessions-alist
+               for session-dir = (plist-get props :directory)
+               when (string-prefix-p session-dir current-dir)
+               return session-id))))
 
 (defun enkan-repl-backend-recenter-bottom (&optional session-id)
   "Recenter SESSION-ID buffer to bottom."
