@@ -108,6 +108,9 @@ Negative value makes text smaller."
 (defun enkan-simple-3pane-setup ()
   "Setup 3-pane window layout for elisp development."
   (interactive)
+  ;; 3-pane-mode on
+  (enkan-simple-3pane-mode 1)
+  
   ;; set up the window layout
   (enkan-simple-3pane-window-setup)
 
