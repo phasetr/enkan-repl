@@ -1,3 +1,10 @@
+## [0.6.1](https://github.com/phasetr/enkan-repl/compare/v0.6.0...v0.6.1) (2025-08-09)
+
+
+### Bug Fixes
+
+* preserve internal empty lines and leading whitespace in send functions ([0034406](https://github.com/phasetr/enkan-repl/commit/0034406e0d9eec67246760c7913deb8ddeac1238))
+
 # [0.6.0](https://github.com/phasetr/enkan-repl/compare/v0.5.0...v0.6.0) (2025-08-09)
 
 
