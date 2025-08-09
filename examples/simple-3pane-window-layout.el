@@ -231,28 +231,31 @@ Avoids switching to eat window."
 
 ;;; Keybindings (optional - users can customize)
 
-(defvar enkan-3pane-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "C-c 3 s") 'enkan-3pane-setup)
-    (define-key map (kbd "C-t") 'enkan-3pane-other-window)
-    (define-key map (kbd "C-c 3 l") 'enkan-3pane-lock-input-buffer)
-    (define-key map (kbd "C-c 3 u") 'enkan-3pane-unlock-input-buffer)
-    (define-key map (kbd "C-c 3 e") 'enkan-3pane-send-escape)
-    (define-key map (kbd "C-c 3 1") 'enkan-3pane-send-1)
-    (define-key map (kbd "C-c 3 2") 'enkan-3pane-send-2)
-    (define-key map (kbd "C-c 3 3") 'enkan-3pane-send-3)
-    (define-key map (kbd "C-c 3 r") 'enkan-3pane-reset)
-    (define-key map (kbd "C-c 3 ?") 'enkan-3pane-status)
-    map)
+(defvar enkan-3pane-mode-map nil
   "Keymap for 3-pane layout commands.")
+
+(setq enkan-3pane-mode-map
+      (let ((map (make-sparse-keymap)))
+        (define-key map (kbd "C-c 3 s") 'enkan-3pane-setup)
+        (define-key map (kbd "C-t") 'enkan-3pane-other-window)
+        (define-key map (kbd "C-c 3 l") 'enkan-3pane-lock-input-buffer)
+        (define-key map (kbd "C-c 3 u") 'enkan-3pane-unlock-input-buffer)
+        (define-key map (kbd "C-c 3 e") 'enkan-3pane-send-escape)
+        (define-key map (kbd "C-c 3 1") 'enkan-3pane-send-1)
+        (define-key map (kbd "C-c 3 2") 'enkan-3pane-send-2)
+        (define-key map (kbd "C-c 3 3") 'enkan-3pane-send-3)
+        (define-key map (kbd "C-c 3 r") 'enkan-3pane-reset)
+        (define-key map (kbd "C-c 3 ?") 'enkan-3pane-status)
+        map))
 
 (define-minor-mode enkan-3pane-mode
   "Minor mode for 3-pane window layout with enkan-repl."
   :lighter " 3pane"
-  :keymap enkan-3pane-mode-map
+  :keymap enkan-3pane-mode-map  ; This is critical - must specify the keymap
   :global t
-  (when enkan-3pane-mode
-    (message "enkan-3pane-mode enabled. C-c 3 s to setup layout.")))
+  (if enkan-3pane-mode
+      (message "enkan-3pane-mode enabled. C-t to switch windows.")
+    (message "enkan-3pane-mode disabled.")))
 
 ;;; Provide
 
