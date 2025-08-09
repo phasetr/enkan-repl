@@ -29,7 +29,7 @@
                     "Send region to Claude.\n\nCategory: Text Sender")))
   (should (string= "Command Palette"
                    (enkan-repl-utils--extract-category-from-docstring
-                    "Display cheatsheet.\n\nCategory: Command Palette")))
+                    "Display cheat-sheet.\n\nCategory: Command Palette")))
   (should (null (enkan-repl-utils--extract-category-from-docstring
                  "No category info")))
   (should (null (enkan-repl-utils--extract-category-from-docstring nil))))
@@ -47,9 +47,9 @@
     (should (assoc "Session Controller" categorized-functions))
     (should (assoc "Utilities" categorized-functions))
 
-    ;; Command Palette should have cheatsheet
+    ;; Command Palette should have cheat-sheet
     (let ((command-palette-funcs (cdr (assoc "Command Palette" categorized-functions))))
-      (should (cl-some (lambda (f) (string= (plist-get f :name) "enkan-repl-cheatsheet"))
+      (should (cl-some (lambda (f) (string= (plist-get f :name) "enkan-repl-cheat-sheet"))
                        command-palette-funcs)))
 
     ;; Text Sender should have multiple functions
@@ -77,7 +77,7 @@
     (should (string-match-p "^\\*\\*\\* Text Sender" result))
     (should (string-match-p "^\\*\\*\\* Session Controller" result))
     (should (string-match-p "^\\*\\*\\* Utilities" result))
-    (should (string-match-p "~M-x enkan-repl-cheatsheet~" result))
+    (should (string-match-p "~M-x enkan-repl-cheat-sheet~" result))
     (should (string-match-p "~M-x enkan-repl-send-region~" result))))
 
 (provide 'enkan-repl-utils-doc-test)

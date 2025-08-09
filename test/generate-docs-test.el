@@ -72,82 +72,82 @@ It spans multiple lines for testing.\"
 
 (ert-deftest test-extract-function-info-basic ()
   "Test basic function information extraction."
-  (let* ((temp-file (extract-public-functions-test--create-temp-file 
+  (let* ((temp-file (extract-public-functions-test--create-temp-file
                      extract-public-functions-test-data))
          (functions (enkan-repl--extract-function-info temp-file)))
     (unwind-protect
         (progn
           ;; Should extract 5 public functions (autoload or interactive)
           (should (= (length functions) 5))
-          
+
           ;; Check first function (autoload with interactive)
-          (let ((first-func (cl-find "test-autoload-function" functions 
-                                     :key (lambda (f) (plist-get f :name)) 
+          (let ((first-func (cl-find "test-autoload-function" functions
+                                     :key (lambda (f) (plist-get f :name))
                                      :test #'string=)))
             (should first-func)
             (should (plist-get first-func :autoload))
             (should (plist-get first-func :interactive))
-            (should (string= (plist-get first-func :docstring) 
+            (should (string= (plist-get first-func :docstring)
                              "This is an autoload function with arguments."))
             (should (equal (plist-get first-func :args) '(arg1 arg2))))
-          
+
           ;; Check interactive-only function
-          (let ((interactive-func (cl-find "test-interactive-function" functions 
-                                           :key (lambda (f) (plist-get f :name)) 
+          (let ((interactive-func (cl-find "test-interactive-function" functions
+                                           :key (lambda (f) (plist-get f :name))
                                            :test #'string=)))
             (should interactive-func)
             (should-not (plist-get interactive-func :autoload))
             (should (plist-get interactive-func :interactive))))
-      
+
       ;; Cleanup
       (delete-file temp-file))))
 
 (ert-deftest test-extract-function-info-autoload-only ()
   "Test extraction of autoload-only functions."
-  (let* ((temp-file (extract-public-functions-test--create-temp-file 
+  (let* ((temp-file (extract-public-functions-test--create-temp-file
                      extract-public-functions-test-data))
          (functions (enkan-repl--extract-function-info temp-file)))
     (unwind-protect
-        (let ((autoload-func (cl-find "test-autoload-no-interactive" functions 
-                                      :key (lambda (f) (plist-get f :name)) 
+        (let ((autoload-func (cl-find "test-autoload-no-interactive" functions
+                                      :key (lambda (f) (plist-get f :name))
                                       :test #'string=)))
           (should autoload-func)
           (should (plist-get autoload-func :autoload))
           (should-not (plist-get autoload-func :interactive))
           (should (equal (plist-get autoload-func :args) '(param))))
-      
+
       ;; Cleanup
       (delete-file temp-file))))
 
 (ert-deftest test-extract-function-info-private-filtered ()
   "Test that private functions are filtered out."
-  (let* ((temp-file (extract-public-functions-test--create-temp-file 
+  (let* ((temp-file (extract-public-functions-test--create-temp-file
                      extract-public-functions-test-data))
          (functions (enkan-repl--extract-function-info temp-file)))
     (unwind-protect
         (progn
           ;; Private function should not be extracted
-          (let ((private-func (cl-find "test-private-function" functions 
-                                       :key (lambda (f) (plist-get f :name)) 
+          (let ((private-func (cl-find "test-private-function" functions
+                                       :key (lambda (f) (plist-get f :name))
                                        :test #'string=)))
             (should-not private-func)))
-      
+
       ;; Cleanup
       (delete-file temp-file))))
 
 (ert-deftest test-extract-function-info-no-docstring ()
   "Test handling of functions without docstrings."
-  (let* ((temp-file (extract-public-functions-test--create-temp-file 
+  (let* ((temp-file (extract-public-functions-test--create-temp-file
                      extract-public-functions-test-data))
          (functions (enkan-repl--extract-function-info temp-file)))
     (unwind-protect
-        (let ((no-doc-func (cl-find "test-no-docstring" functions 
-                                    :key (lambda (f) (plist-get f :name)) 
+        (let ((no-doc-func (cl-find "test-no-docstring" functions
+                                    :key (lambda (f) (plist-get f :name))
                                     :test #'string=)))
           (should no-doc-func)
           (should (plist-get no-doc-func :interactive))
           (should (string= (plist-get no-doc-func :docstring) "")))
-      
+
       ;; Cleanup
       (delete-file temp-file))))
 
@@ -184,13 +184,13 @@ It spans multiple lines for testing.\"
 
 (ert-deftest test-generate-public-api-docs ()
   "Test complete API documentation generation in org-mode format."
-  (let* ((temp-input (extract-public-functions-test--create-temp-file 
+  (let* ((temp-input (extract-public-functions-test--create-temp-file
                       extract-public-functions-test-data))
          (temp-output (make-temp-file "api-docs-" nil ".org")))
     (unwind-protect
         (progn
           (enkan-repl--generate-public-api-docs temp-input temp-output)
-          
+
           ;; Check that output file was created and has content
           (should (file-exists-p temp-output))
           (let ((content (with-temp-buffer
@@ -201,7 +201,7 @@ It spans multiple lines for testing.\"
             (should (string-match-p "test-autoload-function" content))
             (should (string-match-p "test-interactive-function" content))
             (should-not (string-match-p "test-private-function" content))))
-      
+
       ;; Cleanup
       (delete-file temp-input)
       (when (file-exists-p temp-output)
@@ -215,7 +215,7 @@ It spans multiple lines for testing.\"
          (functions (enkan-repl--extract-function-info temp-file)))
     (unwind-protect
         (should (= (length functions) 0))
-      
+
       ;; Cleanup
       (delete-file temp-file))))
 
@@ -227,7 +227,7 @@ It spans multiple lines for testing.\"
     (unwind-protect
         ;; Should not crash and return empty list for malformed content
         (should (listp functions))
-      
+
       ;; Cleanup
       (delete-file temp-file))))
 
@@ -239,7 +239,7 @@ It spans multiple lines for testing.\"
     (unwind-protect
         (progn
           (enkan-repl--generate-default-template temp-output)
-          
+
           ;; Check that output file was created and has content
           (should (file-exists-p temp-output))
           (let ((content (with-temp-buffer
@@ -249,13 +249,13 @@ It spans multiple lines for testing.\"
             (should (string-match-p "\\* Quick Start" content))
             (should (string-match-p "\\* Essential Commands" content))
             (should (string-match-p "\\* Working Notes" content))
-            
+
             ;; Check function references
-            (should (string-match-p "enkan-repl-start-claudemacs" content))
+            (should (string-match-p "enkan-repl-start-eat" content))
             (should (string-match-p "enkan-repl-setup-window-layout" content))
             (should (string-match-p "enkan-repl-send-region" content))
             (should (string-match-p "enkan-repl-status" content))))
-      
+
       ;; Cleanup
       (when (file-exists-p temp-output)
         (delete-file temp-output)))))
@@ -266,23 +266,23 @@ It spans multiple lines for testing.\"
     (unwind-protect
         (progn
           (enkan-repl--generate-default-template temp-output)
-          
+
           (let ((content (with-temp-buffer
                            (insert-file-contents temp-output)
                            (buffer-string))))
             ;; Check code blocks
             (should (string-match-p "#\\+BEGIN_SRC emacs-lisp" content))
             (should (string-match-p "#\\+END_SRC" content))
-            
+
             ;; Check emphasis markup
             (should (string-match-p "\\*Send current region\\*:" content))
             (should (string-match-p "~M-x enkan-repl-send-region~" content))
-            
+
             ;; Check hierarchical structure
             (should (string-match-p "^\\*\\* 1\\. Start Claude Code Session" content))
             (should (string-match-p "^\\*\\* Sending Content to Claude Code" content))
             (should (string-match-p "^\\*\\* Project Context" content))))
-      
+
       ;; Cleanup
       (when (file-exists-p temp-output)
         (delete-file temp-output)))))
@@ -291,32 +291,32 @@ It spans multiple lines for testing.\"
   "Test that generate-all-docs creates both API and template files."
   (let ((temp-api (make-temp-file "api-" nil ".org"))
         (temp-template (make-temp-file "template-" nil ".org"))
-        (temp-input (extract-public-functions-test--create-temp-file 
+        (temp-input (extract-public-functions-test--create-temp-file
                      extract-public-functions-test-data)))
     (unwind-protect
         (progn
           ;; Test individual generation functions directly
           (enkan-repl--generate-public-api-docs temp-input temp-api)
           (enkan-repl--generate-default-template temp-template)
-          
+
           ;; Check both files were created
           (should (file-exists-p temp-api))
           (should (file-exists-p temp-template))
-          
+
           ;; Check API file content
           (let ((api-content (with-temp-buffer
                                (insert-file-contents temp-api)
                                (buffer-string))))
             (should (string-match-p "#\\+TITLE: Public API" api-content))
             (should (string-match-p "test-autoload-function" api-content)))
-          
+
           ;; Check template file content
           (let ((template-content (with-temp-buffer
                                     (insert-file-contents temp-template)
                                     (buffer-string))))
             (should (string-match-p "\\* Quick Start" template-content))
-            (should (string-match-p "enkan-repl-start-claudemacs" template-content))))
-      
+            (should (string-match-p "enkan-repl-start-eat" template-content))))
+
       ;; Cleanup
       (delete-file temp-input)
       (when (file-exists-p temp-api)
@@ -345,9 +345,9 @@ It spans multiple lines for testing.\"
   "Test that generate-core-functions-section contains expected functions."
   (let ((result (enkan-repl--generate-core-functions-section)))
     ;; Should contain key functions
-    (should (string-match-p "enkan-repl-cheatsheet" result))
+    (should (string-match-p "enkan-repl-cheat-sheet" result))
     (should (string-match-p "enkan-repl-send-region" result))
-    (should (string-match-p "enkan-repl-start-claudemacs" result))
+    (should (string-match-p "enkan-repl-start-eat" result))
     (should (string-match-p "enkan-repl-open-project-input-file" result))
     ;; Should have proper org-mode formatting
     (should (string-match-p "- =" result))
@@ -385,7 +385,7 @@ It spans multiple lines for testing.\"
                                    (buffer-string))))
             (should (string-match-p "\\*\\* Core Functions" updated-content))
             (should (string-match-p "\\*\\*\\* Command Palette" updated-content))
-            (should (string-match-p "enkan-repl-cheatsheet" updated-content))
+            (should (string-match-p "enkan-repl-cheat-sheet" updated-content))
             ;; Should preserve other sections
             (should (string-match-p "\\*\\* Introduction" updated-content))
             (should (string-match-p "\\*\\* Configuration" updated-content))))
@@ -410,7 +410,7 @@ It spans multiple lines for testing.\"
                                    (buffer-string))))
             ;; Should preserve content before Core Functions
             (should (string-match-p "Before content" updated-content))
-            ;; Should preserve content after Core Functions  
+            ;; Should preserve content after Core Functions
             (should (string-match-p "After content" updated-content))
             ;; Should have updated Core Functions content
             (should (string-match-p "\\*\\*\\* Command Palette" updated-content))))
@@ -433,8 +433,8 @@ It spans multiple lines for testing.\"
                          (push (apply #'format format-str args) messages))))
               (enkan-repl--generate-readme temp-file)
               ;; Should get appropriate message about missing markers
-              (should (cl-some (lambda (msg) 
-                                (string-match-p "markers not found" msg)) 
+              (should (cl-some (lambda (msg)
+                                (string-match-p "markers not found" msg))
                               messages)))))
       (when (file-exists-p temp-file)
         (delete-file temp-file)))))

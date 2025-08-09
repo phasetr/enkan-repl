@@ -26,34 +26,34 @@
 (ert-deftest test-constants-file-exists ()
   "Test that constants file exists and loads correctly."
   (should (featurep 'enkan-repl-constants))
-  (should (boundp 'enkan-repl-cheatsheet-candidates))
-  (should (boundp 'enkan-repl-cheatsheet-function-count)))
+  (should (boundp 'enkan-repl-cheat-sheet-candidates))
+  (should (boundp 'enkan-repl-cheat-sheet-function-count)))
 
 (ert-deftest test-constants-structure ()
   "Test that constants have correct structure."
-  (should (listp enkan-repl-cheatsheet-candidates))
-  (should (> (length enkan-repl-cheatsheet-candidates) 10))
-  (should (numberp enkan-repl-cheatsheet-function-count)))
+  (should (listp enkan-repl-cheat-sheet-candidates))
+  (should (> (length enkan-repl-cheat-sheet-candidates) 10))
+  (should (numberp enkan-repl-cheat-sheet-function-count)))
 
 (ert-deftest test-constants-content ()
   "Test that constants contain expected functions."
-  (let ((function-names (mapcar #'car enkan-repl-cheatsheet-candidates)))
-    (should (member "enkan-repl-cheatsheet" function-names))
+  (let ((function-names (mapcar #'car enkan-repl-cheat-sheet-candidates)))
+    (should (member "enkan-repl-cheat-sheet" function-names))
     (should (member "enkan-repl-send-region" function-names))
     (should (member "enkan-repl-send-buffer" function-names))
-    (should (member "enkan-repl-start-claudemacs" function-names))))
+    (should (member "enkan-repl-start-eat" function-names))))
 
 (ert-deftest test-constants-consistency ()
   "Test that constants are consistent with function count."
-  (should (= (length enkan-repl-cheatsheet-candidates)
-             enkan-repl-cheatsheet-function-count)))
+  (should (= (length enkan-repl-cheat-sheet-candidates)
+             enkan-repl-cheat-sheet-function-count)))
 
-(ert-deftest test-cheatsheet-uses-constants ()
-  "Test that cheatsheet function uses precompiled constants."
-  ;; Test that constants are accessible in cheatsheet context
-  (should (boundp 'enkan-repl-cheatsheet-candidates))
+(ert-deftest test-cheat-sheet-uses-constants ()
+  "Test that cheat-sheet function uses precompiled constants."
+  ;; Test that constants are accessible in cheat-sheet context
+  (should (boundp 'enkan-repl-cheat-sheet-candidates))
   ;; Test that constants are properly formatted for completion
-  (let ((candidates enkan-repl-cheatsheet-candidates))
+  (let ((candidates enkan-repl-cheat-sheet-candidates))
     (should (cl-every (lambda (candidate)
                         (and (consp candidate)
                              (stringp (car candidate))
