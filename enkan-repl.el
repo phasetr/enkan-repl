@@ -720,7 +720,8 @@ Category: Text Sender"
 Category: Utilities"
   (interactive)
   (let* ((target-dir (enkan-repl--get-target-directory-for-buffer))
-         (session-buffer (enkan-repl--get-buffer-for-directory target-dir)))
+         (session-buffer (enkan-repl--get-buffer-for-directory target-dir))
+         (original-window (selected-window)))
     (if session-buffer
         (let ((window (get-buffer-window session-buffer)))
           (if window
@@ -730,6 +731,8 @@ Category: Utilities"
                 (with-current-buffer session-buffer
                   (goto-char (point-max))
                   (recenter -1))
+                ;; Return to original window
+                (select-window original-window)
                 (message "Cursor moved to bottom in eat buffer"))
             ;; If not visible, just move cursor without recenter
             (with-current-buffer session-buffer
