@@ -793,7 +793,7 @@ Category: Session Controller"
   (interactive)
   (require 'eat nil t)
   (unless (fboundp 'eat)
-    (error "Eat package is not installed. Please install it first"))
+    (error "Eat package is not installed.  Please install it first"))
   
   (let* ((session-info (enkan-repl--get-session-info))
          (target-dir (nth 0 session-info))
@@ -815,40 +815,42 @@ Category: Session Controller"
      (t
       (let ((default-directory target-dir)
             (original-window (selected-window))
-            (window-count (length (window-list))))
-        (let ((eat-buffer (eat)))
+            (window-count (length (window-list)))
+            (eat-buffer nil)
+            (target-window nil))
+        ;; Determine target window first
+        (cond
+         ;; Single window: will split and use new window
+         ((= window-count 1)
+          (split-window-right)
+          (setq target-window (next-window)))
+         ;; Two windows: use the other window
+         ((= window-count 2)
+          (setq target-window (next-window)))
+         ;; Three or more windows: split current window
+         (t
+          (split-window-right)
+          (setq target-window (next-window))))
+        
+        ;; Create eat buffer in target window
+        (with-selected-window target-window
+          (setq eat-buffer (eat))
           (when eat-buffer
             ;; Safely rename the eat buffer
             (condition-case err
-                (with-current-buffer eat-buffer
-                  (rename-buffer buffer-name t))
+                (rename-buffer buffer-name t)
               (error
                (message "Warning: Failed to rename eat buffer: %s" (error-message-string err))
-               ;; Continue anyway as the buffer is still functional
                nil))
-            ;; Smart window management based on current layout
-            (cond
-             ;; Single window: split horizontally and show eat on the right
-             ((= window-count 1)
-              (split-window-right)
-              (other-window 1)
-              (switch-to-buffer eat-buffer))
-             ;; Two windows: use right window for eat
-             ((= window-count 2)
-              (other-window 1)
-              (switch-to-buffer eat-buffer))
-             ;; Three or more windows: split original window horizontally
-             (t
-              (select-window original-window)
-              (split-window-right)
-              (other-window 1)
-              (switch-to-buffer eat-buffer)))
-            ;; Return to original window to keep focus on input file
-            (select-window original-window)))
-        (message "Started eat session in: %s" target-dir))
-      ;; Verify startup succeeded
-      (unless (enkan-repl--can-send-text target-dir)
-        (error "Failed to start eat session in: %s" target-dir))))))
+            ;; Ensure buffer is displayed in target window
+            (set-window-buffer target-window eat-buffer)))
+        
+        ;; Return focus to original window
+        (select-window original-window)
+        (message "Started eat session in: %s" target-dir)
+        ;; Verify startup succeeded
+        (unless (enkan-repl--can-send-text target-dir)
+          (error "Failed to start eat session in: %s" target-dir)))))))
 
 ;;;###autoload
 (defun enkan-repl-finish-eat ()
@@ -1037,7 +1039,7 @@ Category: Session Controller"
     ;; Collect all enkan sessions
     (dolist (buf all-buffers)
       (let ((name (buffer-name buf)))
-        (when (and name 
+        (when (and name
                    (string-match-p "^\\*enkan:" name))
           (let* ((dir (if (string-match "^\\*enkan:\\(.*?\\)\\*$" name)
                           (match-string 1 name)
