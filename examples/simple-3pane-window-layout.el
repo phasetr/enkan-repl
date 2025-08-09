@@ -91,12 +91,11 @@ Negative value makes text smaller."
                               (- 1 enkan-3pane-input-width-ratio)))))
     (split-window-horizontally (- right-width)))
 
-  ;; Move to left pane and split vertically
-  (setq enkan-3pane-misc-left-down-window (selected-window))
-  ;; Create bottom window for eat
-  (let ((eat-height (floor (* (window-height)
-                             (- 1 enkan-3pane-input-height-ratio)))))
-    (split-window-vertically (- eat-height)))
+  ;; Still in left-up window, split vertically
+  ;; Create bottom window for misc
+  (let ((top-height (floor (* (window-height)
+                               enkan-3pane-input-height-ratio))))
+    (setq enkan-3pane-misc-left-down-window (split-window-vertically top-height)))
   ;; Setup eat buffer in right window
   (other-window 2)
   (setq enkan-3pane-eat-right-full-window (selected-window))
@@ -229,7 +228,7 @@ Avoids switching to eat window."
 (defvar enkan-3pane-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "C-c 3 s") 'enkan-3pane-setup)
-    (define-key map (kbd "M-t") 'enkan-3pane-other-window)
+    (define-key map (kbd "C-t") 'enkan-3pane-other-window)
     (define-key map (kbd "C-c 3 l") 'enkan-3pane-lock-input-buffer)
     (define-key map (kbd "C-c 3 u") 'enkan-3pane-unlock-input-buffer)
     (define-key map (kbd "C-c 3 e") 'enkan-3pane-send-escape)
