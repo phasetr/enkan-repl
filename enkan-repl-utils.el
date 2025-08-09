@@ -120,6 +120,34 @@ Returns a formatted string with numbered sessions."
       (setq index (1+ index)))
     result))
 
+(defun enkan-repl--format-minibuffer-sessions-pure (sessions)
+  "Pure function to format sessions for minibuffer display.
+SESSIONS is a list of session info plists.
+Returns a list of formatted strings, one per session."
+  (let ((index 1)
+        (result '()))
+    (dolist (session sessions)
+      (push (format "%d. %s — Directory: %s, Status: %s"
+                    index
+                    (plist-get session :name)
+                    (plist-get session :directory)
+                    (plist-get session :status))
+            result)
+      (setq index (1+ index)))
+    (nreverse result)))
+
+(defun enkan-repl--prepare-session-candidates-pure (sessions)
+  "Pure function to prepare candidates for completing-read.
+SESSIONS is a list of session info plists.
+Returns an alist of (NAME . DESCRIPTION)."
+  (mapcar
+   (lambda (session)
+     (cons (plist-get session :name)
+           (format "Directory: %s, Status: %s"
+                   (plist-get session :directory)
+                   (plist-get session :status))))
+   sessions))
+
 (defun enkan-repl--find-session-buffer-pure (selected-name buffer-info-list)
   "Pure function to find buffer for selected session.
 SELECTED-NAME is the selected session name.
