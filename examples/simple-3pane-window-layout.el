@@ -100,10 +100,16 @@ Negative value makes text smaller."
   (other-window 2)
   (setq enkan-3pane-eat-right-full-window (selected-window))
 
-  ;; Start or switch to eat session
-  (if (get-buffer "*eat*")
-    (switch-to-buffer "*eat*")
-    (eat))
+  ;; Get or create enkan-repl buffer for current file's directory
+  (let* ((input-dir (file-name-directory (or (buffer-file-name enkan-3pane-input-buffer)
+                                              default-directory)))
+         (enkan-buffer-name (concat "*enkan:" input-dir "*"))
+         (existing-buffer (get-buffer enkan-buffer-name)))
+    (if (and existing-buffer (buffer-live-p existing-buffer))
+        (switch-to-buffer existing-buffer)
+      ;; Create new eat session with appropriate name
+      (eat)
+      (rename-buffer enkan-buffer-name t)))
   ;; Adjust text scale in eat buffer only
   ;; Ensure this is buffer-local
   (with-current-buffer (current-buffer)
