@@ -722,18 +722,19 @@ Category: Utilities"
   (let* ((target-dir (enkan-repl--get-target-directory-for-buffer))
          (session-buffer (enkan-repl--get-buffer-for-directory target-dir)))
     (if session-buffer
-        (progn
-          ;; Switch to the eat buffer window if it's visible
-          (let ((window (get-buffer-window session-buffer)))
-            (if window
-                (progn
-                  (select-window window)
+        (let ((window (get-buffer-window session-buffer)))
+          (if window
+              ;; If window is visible, switch to it and move cursor
+              (progn
+                (select-window window)
+                (with-current-buffer session-buffer
                   (goto-char (point-max))
                   (recenter -1))
-              ;; If not visible, operate in the buffer without switching
-              (with-current-buffer session-buffer
-                (goto-char (point-max)))))
-          (message "Cursor moved to bottom in eat buffer"))
+                (message "Cursor moved to bottom in eat buffer"))
+            ;; If not visible, just move cursor without recenter
+            (with-current-buffer session-buffer
+              (goto-char (point-max))
+              (message "Cursor moved to bottom in eat buffer (not visible)"))))
       (message "No eat session found for directory: %s" target-dir))))
 
 (defun enkan-repl--create-project-input-file (target-directory)
