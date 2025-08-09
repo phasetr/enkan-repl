@@ -68,7 +68,7 @@ Negative value makes text smaller."
   :type 'float
   :group 'enkan-repl)
 
-(defcustom enkan-3pane-misc-height-ratio 0.2
+(defcustom enkan-3pane-misc-height-ratio 0.8
   "Height ratio for misc window in right pane (0.0 to 1.0)."
   :type 'float
   :group 'enkan-repl)
@@ -91,14 +91,13 @@ Negative value makes text smaller."
                               (- 1 enkan-3pane-input-width-ratio)))))
     (split-window-horizontally (- right-width)))
 
-  ;; Move to right pane and split vertically
-  ;; (other-window 1)
+  ;; Move to left pane and split vertically
   (setq enkan-3pane-misc-left-down-window (selected-window))
   ;; Create bottom window for eat
   (let ((eat-height (floor (* (window-height)
                              (- 1 enkan-3pane-misc-height-ratio)))))
     (split-window-vertically (- eat-height)))
-  ;; Setup eat buffer in bottom window
+  ;; Setup eat buffer in right window
   (other-window 2)
   (setq enkan-3pane-eat-right-full-window (selected-window))
 
