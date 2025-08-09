@@ -11,19 +11,20 @@
 ;;; Code:
 
 (defconst enkan-repl-cheatsheet-candidates
-  '(("enkan-repl-send-region" . "Send the text in region from START to END to claudemacs.  Category: Text Sender")
-    ("enkan-repl-send-buffer" . "Send the entire current buffer to claudemacs.  Category: Text Sender")
-    ("enkan-repl-send-rest-of-buffer" . "Send rest of buffer from cursor position to end to claudemacs.  Category: Text Sender")
-    ("enkan-repl-send-line" . "Send the current line to claudemacs.  Category: Text Sender")
-    ("enkan-repl-send-enter" . "Send enter key to claudemacs buffer.  Category: Text Sender")
-    ("enkan-repl-send-1" . "Send \\\\='1\\\\=' to claudemacs buffer for numbered choice prompt.  Category: Text Sender")
-    ("enkan-repl-send-2" . "Send \\\\='2\\\\=' to claudemacs buffer for numbered choice prompt.  Category: Text Sender")
-    ("enkan-repl-send-3" . "Send \\\\='3\\\\=' to claudemacs buffer for numbered choice prompt.  Category: Text Sender")
-    ("enkan-repl-send-escape" . "Send ESC key to claudemacs buffer.  Category: Text Sender")
+  '(("enkan-repl-send-region" . "Send the text in region from START to END to eat session.  Category: Text Sender")
+    ("enkan-repl-send-buffer" . "Send the entire current buffer to eat session.  Category: Text Sender")
+    ("enkan-repl-send-rest-of-buffer" . "Send rest of buffer from cursor position to end to eat session.  Category: Text Sender")
+    ("enkan-repl-send-line" . "Send the current line to eat session.  Category: Text Sender")
+    ("enkan-repl-send-enter" . "Send enter key to eat session buffer.  Category: Text Sender")
+    ("enkan-repl-send-1" . "Send \\\\='1\\\\=' to eat session buffer for numbered choice prompt.  Category: Text Sender")
+    ("enkan-repl-send-2" . "Send \\\\='2\\\\=' to eat session buffer for numbered choice prompt.  Category: Text Sender")
+    ("enkan-repl-send-3" . "Send \\\\='3\\\\=' to eat session buffer for numbered choice prompt.  Category: Text Sender")
+    ("enkan-repl-send-escape" . "Send ESC key to eat session buffer.  Category: Text Sender")
     ("enkan-repl-open-project-input-file" . "Open or create project input file for DIRECTORY. If DIRECTORY is nil, use current `default-directory'. If project input file exists, open it directly. If not exists, create from template then open.  Category: Utilities")
-    ("enkan-repl-start-claudemacs" . "Start claudemacs and change to appropriate directory. Determines directory from current buffer filename if it's a persistent file. Checks for existing sessions to prevent double startup.  Category: Session Controller")
-    ("enkan-repl-finish-claudemacs" . "Terminate claudemacs session and close its buffer. Determines directory from current buffer filename if it's a persistent file. Calls claudemacs-kill for proper session termination.  Category: Session Controller")
-    ("enkan-repl-setup-window-layout" . "Set up window layout with org file on left and claudemacs on right. This is the author's preference - customize as needed.  Category: Session Controller")
+    ("enkan-repl-start-eat" . "Start eat terminal emulator session in appropriate directory. Determines directory from current buffer filename if it's a persistent file. Checks for existing sessions to prevent double startup.  Category: Session Controller")
+    ("enkan-repl-finish-eat" . "Terminate eat session and close its buffer. Determines directory from current buffer filename if it's a persistent file.  Category: Session Controller")
+    ("enkan-repl-list-sessions" . "Display list of active enkan sessions with delete functionality. Users can delete sessions with 'd' and quit with 'q'.  Category: Session Controller")
+    ("enkan-repl-setup-window-layout" . "Set up window layout with org file on left and eat session on right. This is the author's preference - customize as needed.  Category: Session Controller")
     ("enkan-repl-output-template" . "Output current template content to a new buffer for customization.  Category: Utilities")
     ("enkan-repl-status" . "Show detailed diagnostic information for troubleshooting connection issues.  Category: Utilities")
     ("enkan-repl-toggle-debug-mode" . "Toggle debug mode for enkan-repl operations.  Category: Utilities")
@@ -34,7 +35,7 @@
 Each element is a cons cell (FUNCTION-NAME . DESCRIPTION).")
 
 (defconst enkan-repl-cheatsheet-function-count
-  19
+  20
   "Number of functions in cheatsheet.")
 
 (provide 'enkan-repl-constants)

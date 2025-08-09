@@ -45,7 +45,9 @@
           "- =enkan-repl-send-enter= - Send enter key\n"
           "- =enkan-repl-send-1/2/3= - Send numbered choices for AI prompts\n\n"
           "*** Utilities\n"
-          "- =enkan-repl-start-claudemacs= - Start Claude session in appropriate directory\n"
+          "- =enkan-repl-start-eat= - Start eat terminal session in appropriate directory\n"
+          "- =enkan-repl-finish-eat= - Terminate eat session and close its buffer\n"
+          "- =enkan-repl-list-sessions= - Display list of active sessions with delete functionality\n"
           "- =enkan-repl-setup-window-layout= - Arrange windows for (the author's) optimal workflow\n"
           "- =enkan-repl-status= - Display connection status and diagnostics\n\n"))
 

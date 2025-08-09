@@ -4,7 +4,7 @@
 
 ;; Author: [phasetr] <phasetr@gmail.com>
 ;; Version: 0.5.0
-;; Package-Requires: ((emacs "28.1") (claudemacs "0.1.0"))
+;; Package-Requires: ((emacs "28.1") (eat "0.9.4"))
 ;; Keywords: enkan ai tools convenience
 ;; URL: https://github.com/phasetr/enkan-repl
 ;; License: MIT
@@ -32,21 +32,21 @@
 ;;; Commentary:
 
 ;; enkan-repl revives interactive development culture for the AI era.
-;; Send thoughts with `send-region`, receive Claude's response, and deepen
-;; your thinking further - a new REPL experience woven by Emacs and AI.
+;; Send text to terminal sessions with `send-region`, interact with AI tools,
+;; and deepen your thinking further - a new REPL experience woven by Emacs.
 ;;
 ;; Core Features:
 ;; - Text sending capabilities (region, buffer, line, etc.)
 ;; - Persistent org-mode input files with template system
-;; - Directory-based Claude session targeting
+;; - Directory-based terminal session targeting
 ;; - M-x driven workflow with no default keybindings
-;; - File path support for Claude direct reading
+;; - File path support for AI tool direct reading
 ;;
 ;; Quick Start:
-;;   M-x enkan-repl-start-claudemacs
+;;   M-x enkan-repl-start-eat
 ;;   M-x enkan-repl-open-project-input-file
 ;;
-;; This package builds upon claudemacs and eat.  We extend our deepest
+;; This package builds upon eat terminal emulator.  We extend our deepest
 ;; gratitude to their authors and contributors.
 
 ;;; Code:
@@ -60,9 +60,6 @@
 ;; Declare external functions to avoid byte-compile warnings
 (declare-function enkan-repl-utils--extract-function-info "enkan-repl-utils" (file-path))
 
-;; Compatibility check
-(when (locate-library "claudemacs")
-  (require 'claudemacs))
 
 ;; Declare external functions to avoid byte-compiler warnings
 (declare-function eat--send-string "eat" (process string))
@@ -263,7 +260,7 @@ Returns the template path to use, or nil to use default template."
                (insert "- ~M-x enkan-repl-send-3~ - Send '3' for numbered choice prompts\n")
                (insert "- ~M-x enkan-repl-send-escape~ - Send ESC key to interrupt operations\n")
                (insert "- ~M-x enkan-repl-open-project-input-file~ - Open or create project input file\n")
-               (insert "- ~M-x enkan-repl-start-claudemacs~ - Start claudemacs session\n")
+               (insert "- ~M-x enkan-repl-start-eat~ - Start eat terminal session\n")
                (insert "- ~M-x enkan-repl-setup-window-layout~ - Set up convenient window layout\n")
                (insert "- ~M-x enkan-repl-output-template~ - Export template for customization\n")
                (insert "- ~M-x enkan-repl-status~ - Show diagnostic information\n")
@@ -347,18 +344,18 @@ Returns categorized functions as string, or falls back to static list."
   (concat "** Command Palette\n\n"
           "- ~M-x enkan-repl-cheatsheet~ - Display interactive cheatsheet for enkan-repl commands.\n\n"
           "** Text Sender\n\n"
-          "- ~M-x enkan-repl-send-region~ - Send the text in region from START to END to claudemacs.\n"
-          "- ~M-x enkan-repl-send-buffer~ - Send the entire current buffer to claudemacs.\n"
-          "- ~M-x enkan-repl-send-rest-of-buffer~ - Send rest of buffer from cursor position to end to claudemacs.\n"
-          "- ~M-x enkan-repl-send-line~ - Send the current line to claudemacs.\n"
-          "- ~M-x enkan-repl-send-enter~ - Send enter key to claudemacs buffer.\n"
-          "- ~M-x enkan-repl-send-1~ - Send \\='1\\=' to claudemacs buffer for numbered choice prompts.\n"
-          "- ~M-x enkan-repl-send-2~ - Send \\='2\\=' to claudemacs buffer for numbered choice prompts.\n"
-          "- ~M-x enkan-repl-send-3~ - Send \\='3\\=' to claudemacs buffer for numbered choice prompts.\n"
-          "- ~M-x enkan-repl-send-escape~ - Send ESC key to claudemacs buffer.\n\n"
+          "- ~M-x enkan-repl-send-region~ - Send the text in region from START to END to eat session.\n"
+          "- ~M-x enkan-repl-send-buffer~ - Send the entire current buffer to eat session.\n"
+          "- ~M-x enkan-repl-send-rest-of-buffer~ - Send rest of buffer from cursor position to end to eat session.\n"
+          "- ~M-x enkan-repl-send-line~ - Send the current line to eat session.\n"
+          "- ~M-x enkan-repl-send-enter~ - Send enter key to eat session buffer.\n"
+          "- ~M-x enkan-repl-send-1~ - Send \\='1\\=' to eat session buffer for numbered choice prompts.\n"
+          "- ~M-x enkan-repl-send-2~ - Send \\='2\\=' to eat session buffer for numbered choice prompts.\n"
+          "- ~M-x enkan-repl-send-3~ - Send \\='3\\=' to eat session buffer for numbered choice prompts.\n"
+          "- ~M-x enkan-repl-send-escape~ - Send ESC key to eat session buffer.\n\n"
           "** Session Controller\n\n"
-          "- ~M-x enkan-repl-start-claudemacs~ - Start claudemacs and change to appropriate directory.\n"
-          "- ~M-x enkan-repl-setup-window-layout~ - Set up window layout with org file on left and claudemacs on right.\n\n"
+          "- ~M-x enkan-repl-start-eat~ - Start eat terminal and change to appropriate directory.\n"
+          "- ~M-x enkan-repl-setup-window-layout~ - Set up window layout with org file on left and eat on right.\n\n"
           "** Utilities\n\n"
           "- ~M-x enkan-repl-open-project-input-file~ - Open or create project input file for current directory.\n"
           "- ~M-x enkan-repl-output-template~ - Output current template content to a new buffer for customization.\n"
@@ -369,7 +366,7 @@ Returns categorized functions as string, or falls back to static list."
 
 (defun enkan-repl--get-embedded-template ()
   "Return embedded default template content as string."
-  (concat "#+TITLE: Claude Input File\n\n"
+  (concat "#+TITLE: Enkan Input File\n\n"
           "This is the default project template for enkan-repl.\n\n"
           "* Quick Start\n\n"
           "Describe your main objective here.\n\n"
@@ -424,7 +421,7 @@ FORMAT-STRING is the format string.  ARGS are the arguments."
     (apply #'message (concat "[CLAUDEMACS-REPL-DEBUG] " format-string) args)))
 
 (defun enkan-repl--sanitize-content (content)
-  "Sanitize CONTENT to ensure it can be safely sent to claudemacs.
+  "Sanitize CONTENT to ensure it can be safely sent to eat session.
 This function handles edge cases with special characters and ensures
 proper formatting for terminal input.  Also addresses Claude Code
 interpretation issues and Mac region selection problems."
@@ -501,7 +498,7 @@ For other buffers, use current `default-directory'."
     default-directory))
 
 (defun enkan-repl--get-buffer-for-directory (&optional directory)
-  "Get the claudemacs buffer for DIRECTORY if it exists and is live.
+  "Get the eat buffer for DIRECTORY if it exists and is live.
 If DIRECTORY is nil, use current `default-directory'."
   (let
       ((target-dir (or directory default-directory))
@@ -510,37 +507,17 @@ If DIRECTORY is nil, use current `default-directory'."
       (dolist (buf (buffer-list))
         (let
             ((name (buffer-name buf))
-             (default-dir
-               (with-current-buffer buf
-                 (when (boundp 'default-directory)
-                   default-directory)))
              (eat-mode
               (with-current-buffer buf
                 (and (boundp 'eat-mode) eat-mode))))
           (when
               (and (buffer-live-p buf)
                    name     ; Ensure name is not nil
-                   ;; Check for directory-specific claudemacs buffer
-                   (or
-                    (and
-                     (string-match-p "^\\*claudemacs:" name)
-                     (string-prefix-p (concat "*claudemacs:" target-dir) name))
-                    ;; Fallback to generic buffers only if they match directory
-                    (and
-                     (or
-                      (string= name "*claude*")
-                      (string= name "*claudemacs*"))
-                     (when default-dir
-                       (string=
-                        (file-truename default-dir)
-                        (file-truename target-dir))))
-                    ;; Check for eat-mode buffers with claude in name
-                    (and eat-mode
-                         (string-match-p "claude" name)
-                         (when default-dir
-                           (string=
-                            (file-truename default-dir)
-                            (file-truename target-dir))))))
+                   ;; Check for directory-specific enkan buffer
+                   ;; Check for enkan eat buffers
+                   (and
+                    (string-match-p "^\\*enkan:" name)
+                    (string-prefix-p (concat "*enkan:" target-dir) name)))
             (setq matching-buffer buf)
             (cl-return-from search-buffers)))))
     matching-buffer))
@@ -556,44 +533,44 @@ If DIRECTORY is nil, use current `default-directory'."
 ;;;; Send Functions - Internal Helpers
 
 (defun enkan-repl--can-send-text (&optional directory)
-  "Check if text can actually be sent to claudemacs (strict check).
-If DIRECTORY is provided, check for claudemacs in that directory.
+  "Check if text can actually be sent to eat session (strict check).
+If DIRECTORY is provided, check for eat session in that directory.
 Otherwise, use current `default-directory'."
-  (let ((claude-buffer (enkan-repl--get-buffer-for-directory directory)))
-    (when claude-buffer
-      (with-current-buffer claude-buffer
+  (let ((session-buffer (enkan-repl--get-buffer-for-directory directory)))
+    (when session-buffer
+      (with-current-buffer session-buffer
         (and
          (boundp 'eat--process)
          eat--process
          (process-live-p eat--process))))))
 
 (defun enkan-repl--send-text (text &optional directory)
-  "Send TEXT to claudemacs buffer.
-If DIRECTORY is provided, send to claudemacs in that directory.
+  "Send TEXT to eat session buffer.
+If DIRECTORY is provided, send to eat session in that directory.
 Otherwise, use current `default-directory'."
   (let
-      ((claude-buffer
+      ((session-buffer
         (enkan-repl--get-buffer-for-directory directory)))
     (enkan-repl--debug-message
      "send-text called with text length: %d, buffer: %s"
-     (length text) (if claude-buffer (buffer-name claude-buffer) "nil"))
+     (length text) (if session-buffer (buffer-name session-buffer) "nil"))
     (when
-        (and claude-buffer
-             (with-current-buffer claude-buffer
+        (and session-buffer
+             (with-current-buffer session-buffer
                (and (boundp 'eat--process)
                     eat--process
                     (process-live-p eat--process))))
       (enkan-repl--debug-message
-       "Sending text to claude buffer: %S"
+       "Sending text to session buffer: %S"
        (substring text 0 (min 50 (length text))))
-      (with-current-buffer claude-buffer
+      (with-current-buffer session-buffer
         (eat--send-string eat--process text)
         (eat--send-string eat--process "\r")
         (enkan-repl--debug-message "Text sent successfully")
         t))))
 
 (defun enkan-repl--send-numbered-choice (number)
-  "Send NUMBER as string to claudemacs buffer for numbered choice prompt.
+  "Send NUMBER as string to eat session buffer for numbered choice prompt.
 NUMBER should be a string (e.g., \\='1\\=', \\='2\\=', \\='3\\=') or empty string for enter."
   (let
       ((target-dir (enkan-repl--get-target-directory-for-buffer)))
@@ -603,29 +580,29 @@ NUMBER should be a string (e.g., \\='1\\=', \\='2\\=', \\='3\\=') or empty strin
           (enkan-repl--send-text number target-dir)
           (if
               (= (length number) 0)
-              (message "Sent enter to Claude")
-            (message "Sent '%s' to Claude" number)))
-      (message "❌ Cannot send - no matching claudemacs buffer found for this directory"))))
+              (message "Sent enter to session")
+            (message "Sent '%s' to session" number)))
+      (message "❌ Cannot send - no matching eat session found for this directory"))))
 
 (defun enkan-repl--send-escape-directly ()
-  "Send ESC key to claudemacs buffer directly."
+  "Send ESC key to eat session buffer directly."
   (let
-      ((claude-buffer
+      ((session-buffer
         (enkan-repl--get-buffer-for-directory
          (enkan-repl--get-target-directory-for-buffer))))
     (if
-        (and claude-buffer
-             (with-current-buffer claude-buffer
+        (and session-buffer
+             (with-current-buffer session-buffer
                (and (boundp 'eat--process)
                     eat--process
                     (process-live-p eat--process))))
         (progn
-          (enkan-repl--debug-message "Sending ESC key to claude buffer")
-          (with-current-buffer claude-buffer
+          (enkan-repl--debug-message "Sending ESC key to session buffer")
+          (with-current-buffer session-buffer
             (eat--send-string eat--process "\e")
             (enkan-repl--debug-message "ESC key sent successfully"))
-          (message "Sent ESC to Claude"))
-      (message "❌ Cannot send - no matching claudemacs buffer found for this directory"))))
+          (message "Sent ESC to session"))
+      (message "❌ Cannot send - no matching eat session found for this directory"))))
 
 (defun enkan-repl--send-buffer-content (start end content-description &optional skip-empty-check)
   "Send buffer content from START to END with CONTENT-DESCRIPTION.
@@ -652,16 +629,16 @@ If SKIP-EMPTY-CHECK is non-nil, send content even if empty."
         (progn
           (enkan-repl--debug-message "Attempting to send content")
           (if (enkan-repl--send-text content target-dir)
-              (message "%s sent to Claude (%d characters)"
+              (message "%s sent (%d characters)"
                        content-description (length content))
-            (message "❌ Cannot send - no matching claudemacs buffer found for this directory")))
+            (message "❌ Cannot send - no matching eat session found for this directory")))
       (message "No content to send (empty or whitespace only)"))))
 
 ;;;; Public API - Send Functions
 
 ;;;###autoload
 (defun enkan-repl-send-region (start end)
-  "Send the text in region from START to END to claudemacs.
+  "Send the text in region from START to END to eat session.
 
 Category: Text Sender"
   (interactive "r")
@@ -670,7 +647,7 @@ Category: Text Sender"
 
 ;;;###autoload
 (defun enkan-repl-send-buffer ()
-  "Send the entire current buffer to claudemacs.
+  "Send the entire current buffer to eat session.
 
 Category: Text Sender"
   (interactive)
@@ -680,7 +657,7 @@ Category: Text Sender"
 
 ;;;###autoload
 (defun enkan-repl-send-rest-of-buffer ()
-  "Send rest of buffer from cursor position to end to claudemacs.
+  "Send rest of buffer from cursor position to end to eat session.
 
 Category: Text Sender"
   (interactive)
@@ -688,7 +665,7 @@ Category: Text Sender"
 
 ;;;###autoload
 (defun enkan-repl-send-line ()
-  "Send the current line to claudemacs.
+  "Send the current line to eat session.
 
 Category: Text Sender"
   (interactive)
@@ -697,7 +674,7 @@ Category: Text Sender"
 
 ;;;###autoload
 (defun enkan-repl-send-enter ()
-  "Send enter key to claudemacs buffer.
+  "Send enter key to eat session buffer.
 
 Category: Text Sender"
   (interactive)
@@ -705,7 +682,7 @@ Category: Text Sender"
 
 ;;;###autoload
 (defun enkan-repl-send-1 ()
-  "Send \\='1\\=' to claudemacs buffer for numbered choice prompt.
+  "Send \\='1\\=' to eat session buffer for numbered choice prompt.
 
 Category: Text Sender"
   (interactive)
@@ -713,7 +690,7 @@ Category: Text Sender"
 
 ;;;###autoload
 (defun enkan-repl-send-2 ()
-  "Send \\='2\\=' to claudemacs buffer for numbered choice prompt.
+  "Send \\='2\\=' to eat session buffer for numbered choice prompt.
 
 Category: Text Sender"
   (interactive)
@@ -721,7 +698,7 @@ Category: Text Sender"
 
 ;;;###autoload
 (defun enkan-repl-send-3 ()
-  "Send \\='3\\=' to claudemacs buffer for numbered choice prompt.
+  "Send \\='3\\=' to eat session buffer for numbered choice prompt.
 
 Category: Text Sender"
   (interactive)
@@ -729,7 +706,7 @@ Category: Text Sender"
 
 ;;;###autoload
 (defun enkan-repl-send-escape ()
-  "Send ESC key to claudemacs buffer.
+  "Send ESC key to eat session buffer.
 
 Category: Text Sender"
   (interactive)
@@ -790,28 +767,6 @@ Returns (target-dir existing-buffer can-send) as a list."
       (let ((can-send (enkan-repl--can-send-text target-dir)))
         (list target-dir existing-buffer can-send)))))
 
-(defun enkan-repl--execute-claudemacs-command (command-symbol success-message)
-  "Execute a claudemacs command with proper setup and error handling.
-This function temporarily changes the working directory to the target directory,
-executes the command, and restores the original directory afterward.
-
-COMMAND-SYMBOL is the command to execute (e.g., \\='claudemacs-transient-menu).
-SUCCESS-MESSAGE is the message format string for successful execution."
-  (let ((target-dir (car (enkan-repl--get-session-info)))
-        (original-default-directory default-directory))
-    (unwind-protect
-        (progn
-          (cd target-dir)
-          ;; Ensure claudemacs is loaded and command is available
-          (unless (require 'claudemacs nil t)
-            (error "Claudemacs package not found or failed to load.  Please install and configure claudemacs first"))
-          (unless (fboundp command-symbol)
-            (error "%s not available after loading claudemacs package" command-symbol))
-          ;; Execute the command
-          (funcall command-symbol)
-          (message success-message target-dir))
-      ;; Always restore original directory
-      (cd original-default-directory))))
 
 (defun enkan-repl--handle-dead-session (existing-buffer target-dir prompt-format restart-func)
   "Handle dead session with user confirmation.
@@ -825,45 +780,58 @@ RESTART-FUNC is a zero-argument function to call for restart.
     (kill-buffer existing-buffer)
     (if restart-func
         (funcall restart-func)
-      (message "Removed dead claudemacs session buffer in: %s" target-dir))))
+      (message "Removed dead eat session buffer in: %s" target-dir))))
 
 ;;;###autoload
-(defun enkan-repl-start-claudemacs ()
-  "Start claudemacs and change to appropriate directory.
+(defun enkan-repl-start-eat ()
+  "Start eat terminal emulator session.
 Determines directory from current buffer filename if it's a persistent file.
 Checks for existing sessions to prevent double startup.
 
 Category: Session Controller"
   (interactive)
+  (require 'eat nil t)
+  (unless (fboundp 'eat)
+    (error "Eat package is not installed. Please install it first"))
+  
   (let* ((session-info (enkan-repl--get-session-info))
          (target-dir (nth 0 session-info))
          (existing-buffer (nth 1 session-info))
-         (can-send (nth 2 session-info)))
+         (can-send (nth 2 session-info))
+         (buffer-name (concat "*enkan:" target-dir "*")))
     (cond
      ;; Active session already exists
      (can-send
-      (message "Claudemacs session already running in: %s (buffer: %s)"
+      (message "Eat session already running in: %s (buffer: %s)"
                target-dir (buffer-name existing-buffer)))
      ;; Dead session exists - offer to restart
      (existing-buffer
       (enkan-repl--handle-dead-session
        existing-buffer target-dir
-       "Dead claudemacs session found in %s. Restart? "
-       #'enkan-repl-start-claudemacs))
+       "Dead eat session found in %s. Restart? "
+       #'enkan-repl-start-eat))
      ;; No existing session - start new one
      (t
-      (enkan-repl--execute-claudemacs-command
-       'claudemacs-transient-menu
-       "Started claudemacs in: %s")
+      (let ((default-directory target-dir))
+        (let ((eat-buffer (eat)))
+          (when eat-buffer
+            ;; Safely rename the eat buffer
+            (condition-case err
+                (with-current-buffer eat-buffer
+                  (rename-buffer buffer-name t))
+              (error
+               (message "Warning: Failed to rename eat buffer: %s" (error-message-string err))
+               ;; Continue anyway as the buffer is still functional
+               nil))))
+        (message "Started eat session in: %s" target-dir))
       ;; Verify startup succeeded
       (unless (enkan-repl--can-send-text target-dir)
-        (error "Failed to start claudemacs session in: %s" target-dir))))))
+        (error "Failed to start eat session in: %s" target-dir))))))
 
 ;;;###autoload
-(defun enkan-repl-finish-claudemacs ()
-  "Terminate claudemacs session and close its buffer.
+(defun enkan-repl-finish-eat ()
+  "Terminate eat session and close its buffer.
 Determines directory from current buffer filename if it's a persistent file.
-Calls claudemacs-kill for proper session termination.
 
 Category: Session Controller"
   (interactive)
@@ -874,23 +842,18 @@ Category: Session Controller"
     (cond
      ;; No session found
      ((not existing-buffer)
-      (message "No claudemacs session found for directory: %s" target-dir))
-     ;; Active session - terminate using claudemacs-kill
-     (can-send
-      (when (y-or-n-p (format "Terminate active claudemacs session in %s? " target-dir))
-        (enkan-repl--execute-claudemacs-command
-         'claudemacs-kill
-         "Terminated claudemacs in: %s")))
-     ;; Dead session exists - offer to clean up
-     (existing-buffer
-      (enkan-repl--handle-dead-session
-       existing-buffer target-dir
-       "Clean up dead claudemacs session in %s? "
-       nil)))))
+      (message "No eat session found for directory: %s" target-dir))
+     ;; Active or dead session - terminate
+     (t
+      (when (or (not can-send)
+                (y-or-n-p (format "Terminate eat session in %s? " target-dir)))
+        (kill-buffer existing-buffer)
+        (message "Terminated eat session in: %s" target-dir))))))
+
 
 ;;;###autoload
 (defun enkan-repl-setup-window-layout ()
-  "Set up window layout with org file on left and claudemacs on right.
+  "Set up window layout with org file on left and eat on right.
 This is the author's preference - customize as needed.
 
 Category: Session Controller"
@@ -900,10 +863,10 @@ Category: Session Controller"
     (delete-other-windows)
     (split-window-right)
     (other-window 1)
-    (let ((claudemacs-buf (enkan-repl--get-buffer-for-directory target-dir)))
-      (if claudemacs-buf
-          (switch-to-buffer claudemacs-buf)
-        (message "claudemacs buffer not found. Run (enkan-repl-start-claudemacs) first.")))
+    (let ((session-buf (enkan-repl--get-buffer-for-directory target-dir)))
+      (if session-buf
+          (switch-to-buffer session-buf)
+        (message "eat session buffer not found. Run (enkan-repl-start-eat) first.")))
     (other-window -1)
     (message "Window layout setup complete")))
 
@@ -948,25 +911,14 @@ Category: Utilities"
   (interactive)
   (let*
       ((target-dir (enkan-repl--get-target-directory-for-buffer))
-       (claude-buffer (enkan-repl--get-buffer-for-directory target-dir))
+       (session-buffer (enkan-repl--get-buffer-for-directory target-dir))
        (can-send (enkan-repl--can-send-text target-dir))
-       (expected-session (concat "*claudemacs:" target-dir "*"))
+       (expected-session (concat "*enkan:" target-dir "*"))
        (all-buffers (buffer-list))
-       (claudemacs-sessions
+       (enkan-sessions
         (seq-filter
          (lambda (buf)
-           (string-match-p "^\\*claudemacs:" (buffer-name buf)))
-         all-buffers))
-       (other-claude-buffers
-        (seq-filter
-         (lambda (buf)
-           (let
-               ((name (buffer-name buf)))
-             (or (string= name "*claude*")
-                 (string= name "*claudemacs*")
-                 (and (with-current-buffer buf
-                        (and (boundp 'eat-mode) eat-mode))
-                      (string-match-p "claude" name)))))
+           (string-match-p "^\\*enkan:" (buffer-name buf)))
          all-buffers)))
     (with-output-to-temp-buffer
         "*enkan-repl-diagnostic*"
@@ -979,7 +931,7 @@ Category: Utilities"
           can-send
           (princ
            (format "[✅] Session status: CONNECTED\n  Active session: %s\n\n"
-                   (buffer-name claude-buffer)))
+                   (buffer-name session-buffer)))
         (princ "[❌] Session status: NO MATCHING SESSION FOUND\n\n"))
       ;; Target directory analysis
       (princ "Target directory analysis:\n")
@@ -1016,9 +968,9 @@ Category: Utilities"
             (princ "\n"))
         (princ "[ℹ️] Path encoding: Not applicable (not a persistent file)\n\n"))
       ;; Found sessions
-      (princ "Found claudemacs sessions:\n")
-      (if claudemacs-sessions
-          (dolist (buf claudemacs-sessions)
+      (princ "Found enkan sessions:\n")
+      (if enkan-sessions
+          (dolist (buf enkan-sessions)
             (let*
                 ((name (buffer-name buf))
                  (process-status
@@ -1029,45 +981,94 @@ Category: Utilities"
                              (process-live-p eat--process))
                         "alive" "dead"))))
               (princ (format "  - %s (process: %s)\n" name process-status))))
-        (princ "  (no claudemacs sessions found)\n"))
-      ;; Other Claude buffers
-      (when other-claude-buffers
-        (princ "\nOther Claude-related buffers:\n")
-        (dolist (buf other-claude-buffers)
-          (let*
-              ((name (buffer-name buf))
-               (dir
-                (with-current-buffer buf
-                  (when (boundp 'default-directory)
-                    default-directory)))
-               (process-status
-                (with-current-buffer buf
-                  (if
-                      (and (boundp 'eat--process)
-                           eat--process
-                           (process-live-p eat--process))
-                      "alive" "dead"))))
-            (princ (format "  - %s in %s (process: %s)\n" name (or dir "unknown") process-status)))))
+        (princ "  (no enkan sessions found)\n"))
       (princ "\n")
       ;; Recommended actions
       (princ "Recommended actions:\n")
       (cond
        (can-send
-        (princ "✓ Connection is working. You can send text to Claude.\n"))
-       ((not claudemacs-sessions)
-        (princ "1. Start claudemacs in target directory: (enkan-repl-start-claudemacs)\n")
-        (princ "2. Or run: M-x enkan-repl-start-claudemacs\n"))
+        (princ "✓ Connection is working. You can send text to session.\n"))
+       ((not enkan-sessions)
+        (princ "1. Start eat session in target directory: (enkan-repl-start-eat)\n")
+        (princ "2. Or run: M-x enkan-repl-start-eat\n"))
        (t
-        (princ "1. Start claudemacs for target directory: (enkan-repl-start-claudemacs)\n")
+        (princ "1. Start eat session for target directory: (enkan-repl-start-eat)\n")
         (princ "2. Or switch to existing session directory:\n")
-        (dolist (buf claudemacs-sessions)
+        (dolist (buf enkan-sessions)
           (let
               ((session-path
                 (replace-regexp-in-string
-                 "^\\*claudemacs:\\(.*\\)\\*$" "\\1"
+                 "^\\*enkan:\\(.*\\)\\*$" "\\1"
                  (buffer-name buf))))
             (princ (format "   - %s\n" session-path))))))
       (princ "\nFor more help: M-x enkan-repl-open-project-input-file\n"))))
+
+;;;###autoload
+(defun enkan-repl-list-sessions ()
+  "Display a list of active enkan sessions.
+Users can delete sessions with \='d\=' and quit with \='q\='.
+
+Category: Session Controller"
+  (interactive)
+  (let ((sessions '())
+        (all-buffers (buffer-list)))
+    ;; Collect all enkan sessions
+    (dolist (buf all-buffers)
+      (let ((name (buffer-name buf)))
+        (when (and name 
+                   (string-match-p "^\\*enkan:" name))
+          (let* ((dir (if (string-match "^\\*enkan:\\(.*?\\)\\*$" name)
+                          (match-string 1 name)
+                        "unknown"))
+                 (process-status (with-current-buffer buf
+                                   (if (and (boundp 'eat--process)
+                                            eat--process
+                                            (process-live-p eat--process))
+                                       'alive
+                                     'dead))))
+            (push (list name dir process-status buf) sessions)))))
+    
+    ;; Display sessions in a buffer
+    (if (not sessions)
+        (message "No active sessions found")
+      (with-current-buffer (get-buffer-create "*enkan-repl-sessions*")
+        (let ((inhibit-read-only t))
+          (erase-buffer)
+          (insert "Active enkan-repl sessions:\n")
+          (insert "Press 'd' to delete a session, 'q' to quit\n")
+          (insert "─────────────────────────────────────────\n\n")
+          
+          (dolist (session (reverse sessions))
+            (let ((name (nth 0 session))
+                  (dir (nth 1 session))
+                  (status (nth 2 session))
+                  (buf (nth 3 session)))
+              (insert (format "  %s\n" name))
+              (insert (format "    Directory: %s\n" dir))
+              (insert (format "    Status: %s\n" status))
+              (put-text-property (line-beginning-position -2) (line-beginning-position)
+                                 'session-buffer buf)
+              (insert "\n"))))
+        
+        ;; Set up key bindings for the session list buffer
+        (use-local-map (make-sparse-keymap))
+        (local-set-key "d" 'enkan-repl--delete-session-at-point)
+        (local-set-key "q" 'quit-window)
+        (setq buffer-read-only t)
+        (goto-char (point-min))
+        (forward-line 4)  ; Skip header
+        (switch-to-buffer "*enkan-repl-sessions*")))))
+
+(defun enkan-repl--delete-session-at-point ()
+  "Delete the session at point after confirmation."
+  (interactive)
+  (let ((buf (get-text-property (line-beginning-position) 'session-buffer)))
+    (if (not buf)
+        (message "No session on this line")
+      (when (y-or-n-p (format "Delete session %s? " (buffer-name buf)))
+        (kill-buffer buf)
+        (enkan-repl-list-sessions)  ; Refresh the list
+        (message "Session deleted")))))
 
 ;;;###autoload
 (defun enkan-repl-toggle-debug-mode ()

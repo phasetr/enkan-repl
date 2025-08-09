@@ -251,7 +251,7 @@ It spans multiple lines for testing.\"
             (should (string-match-p "\\* Working Notes" content))
             
             ;; Check function references
-            (should (string-match-p "enkan-repl-start-claudemacs" content))
+            (should (string-match-p "enkan-repl-start-eat" content))
             (should (string-match-p "enkan-repl-setup-window-layout" content))
             (should (string-match-p "enkan-repl-send-region" content))
             (should (string-match-p "enkan-repl-status" content))))
@@ -315,7 +315,7 @@ It spans multiple lines for testing.\"
                                     (insert-file-contents temp-template)
                                     (buffer-string))))
             (should (string-match-p "\\* Quick Start" template-content))
-            (should (string-match-p "enkan-repl-start-claudemacs" template-content))))
+            (should (string-match-p "enkan-repl-start-eat" template-content))))
       
       ;; Cleanup
       (delete-file temp-input)
@@ -347,7 +347,7 @@ It spans multiple lines for testing.\"
     ;; Should contain key functions
     (should (string-match-p "enkan-repl-cheatsheet" result))
     (should (string-match-p "enkan-repl-send-region" result))
-    (should (string-match-p "enkan-repl-start-claudemacs" result))
+    (should (string-match-p "enkan-repl-start-eat" result))
     (should (string-match-p "enkan-repl-open-project-input-file" result))
     ;; Should have proper org-mode formatting
     (should (string-match-p "- =" result))

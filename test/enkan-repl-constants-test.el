@@ -41,7 +41,7 @@
     (should (member "enkan-repl-cheatsheet" function-names))
     (should (member "enkan-repl-send-region" function-names))
     (should (member "enkan-repl-send-buffer" function-names))
-    (should (member "enkan-repl-start-claudemacs" function-names))))
+    (should (member "enkan-repl-start-eat" function-names))))
 
 (ert-deftest test-constants-consistency ()
   "Test that constants are consistent with function count."
