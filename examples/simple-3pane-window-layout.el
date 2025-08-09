@@ -68,7 +68,7 @@ Negative value makes text smaller."
   :type 'float
   :group 'enkan-repl)
 
-(defcustom enkan-3pane-misc-height-ratio 0.55
+(defcustom enkan-3pane-input-height-ratio 0.55
   "Height ratio for misc window in left pane (0.0 to 1.0)."
   :type 'float
   :group 'enkan-repl)
@@ -95,7 +95,7 @@ Negative value makes text smaller."
   (setq enkan-3pane-misc-left-down-window (selected-window))
   ;; Create bottom window for eat
   (let ((eat-height (floor (* (window-height)
-                             (- 1 enkan-3pane-misc-height-ratio)))))
+                             (- 1 enkan-3pane-input-height-ratio)))))
     (split-window-vertically (- eat-height)))
   ;; Setup eat buffer in right window
   (other-window 2)
@@ -114,7 +114,9 @@ Negative value makes text smaller."
   (select-window enkan-3pane-input-left-up-window)
   ;; Lock input buffer
   (enkan-3pane-lock-input-buffer)
-  (message "3-pane layout initialized. Use C-c 3 o to switch windows."))
+  ;; Enable the minor mode for keybindings
+  (enkan-3pane-mode 1)
+  (message "3-pane layout initialized. Use M-t to switch windows."))
 
 (defun enkan-3pane-other-window ()
   "Switch between input and misc windows only.
