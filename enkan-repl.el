@@ -567,6 +567,8 @@ Otherwise, use current `default-directory'."
       (with-current-buffer session-buffer
         (eat--send-string eat--process text)
         (eat--send-string eat--process "\r")
+        ;; Move cursor to bottom after sending
+        (goto-char (point-max))
         (enkan-repl--debug-message "Text sent successfully")
         t))))
 
@@ -601,6 +603,8 @@ NUMBER should be a string (e.g., \\='1\\=', \\='2\\=', \\='3\\=') or empty strin
         (enkan-repl--debug-message "Sending ESC key to session buffer")
         (with-current-buffer session-buffer
           (eat--send-string eat--process "\e")
+          ;; Move cursor to bottom after sending
+          (goto-char (point-max))
           (enkan-repl--debug-message "ESC key sent successfully"))
         (message "Sent ESC to session"))
       (message "❌ Cannot send - no matching eat session found for this directory"))))
