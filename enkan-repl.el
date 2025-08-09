@@ -814,7 +814,6 @@ Category: Session Controller"
      ;; No existing session - start new one
      (t
       (let ((default-directory target-dir)
-            (original-window (selected-window))
             (window-count (length (window-list)))
             (eat-buffer nil)
             (target-window nil))
@@ -823,30 +822,32 @@ Category: Session Controller"
          ;; Single window: will split and use new window
          ((= window-count 1)
           (split-window-right)
-          (setq target-window (next-window)))
-         ;; Two windows: use the other window
+          (other-window 1)
+          (setq target-window (selected-window)))
+         ;; Two windows: use the right window (like setup-window-layout)
          ((= window-count 2)
-          (setq target-window (next-window)))
+          ;; Move to the other window
+          (other-window 1)
+          (setq target-window (selected-window)))
          ;; Three or more windows: split current window
          (t
           (split-window-right)
-          (setq target-window (next-window))))
+          (other-window 1)
+          (setq target-window (selected-window))))
         
-        ;; Create eat buffer in target window
-        (with-selected-window target-window
-          (setq eat-buffer (eat))
-          (when eat-buffer
-            ;; Safely rename the eat buffer
-            (condition-case err
-                (rename-buffer buffer-name t)
-              (error
-               (message "Warning: Failed to rename eat buffer: %s" (error-message-string err))
-               nil))
-            ;; Ensure buffer is displayed in target window
-            (set-window-buffer target-window eat-buffer)))
+        ;; Create eat buffer in target window (already selected)
+        (setq eat-buffer (eat))
+        (when eat-buffer
+          ;; Safely rename the eat buffer
+          (condition-case err
+              (rename-buffer buffer-name t)
+            (error
+             (message "Warning: Failed to rename eat buffer: %s" (error-message-string err))
+             nil))
+          ;; Ensure buffer is displayed in target window
+          (set-window-buffer target-window eat-buffer))
         
-        ;; Return focus to original window
-        (select-window original-window)
+        ;; Stay in eat buffer (do not return to original window)
         (message "Started eat session in: %s" target-dir)
         ;; Verify startup succeeded
         (unless (enkan-repl--can-send-text target-dir)

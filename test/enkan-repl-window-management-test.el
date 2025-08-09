@@ -59,13 +59,13 @@
             (setq windows-after-start (length (window-list)))
             (should (= 2 windows-after-start))
             
-            ;; Check that input buffer is in left window
-            (should (eq (window-buffer (selected-window)) test-buffer))
-            
-            ;; Check that eat buffer is in right window
-            (other-window 1)
+            ;; Check that focus moved to eat buffer
             (should (buffer-live-p mock-eat-buffer))
-            (should (eq (window-buffer (selected-window)) mock-eat-buffer)))
+            (should (eq (window-buffer (selected-window)) mock-eat-buffer))
+            
+            ;; Check that input buffer is in left window
+            (other-window 1)
+            (should (eq (window-buffer (selected-window)) test-buffer)))
         ;; Cleanup
         (when (and test-buffer (buffer-live-p test-buffer))
           (kill-buffer test-buffer))
@@ -123,13 +123,13 @@
             (setq windows-after-start (length (window-list)))
             (should (= 2 windows-after-start))
             
-            ;; Check that input buffer is still in left window
-            (should (eq (window-buffer (selected-window)) test-buffer-left))
-            
-            ;; Check that eat buffer replaced right window
-            (other-window 1)
+            ;; Check that focus moved to eat buffer (right window)
             (should (buffer-live-p mock-eat-buffer))
             (should (eq (window-buffer (selected-window)) mock-eat-buffer))
+            
+            ;; Check that input buffer is still in left window
+            (other-window 1)
+            (should (eq (window-buffer (selected-window)) test-buffer-left))
             
             ;; Check that test-buffer-right is no longer displayed
             (let ((displayed nil))
@@ -200,8 +200,9 @@
             (setq windows-after-start (length (window-list)))
             (should (= 4 windows-after-start))
             
-            ;; Check that input buffer is still in current window
-            (should (eq (window-buffer (selected-window)) test-buffer-1)))
+            ;; Check that focus moved to eat buffer
+            (should (buffer-live-p mock-eat-buffer))
+            (should (eq (window-buffer (selected-window)) mock-eat-buffer)))
         ;; Cleanup
         (when (and test-buffer-1 (buffer-live-p test-buffer-1))
           (kill-buffer test-buffer-1))
