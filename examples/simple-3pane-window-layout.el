@@ -328,16 +328,16 @@ Avoids switching to eat window."
 ;;; Keybindings (optional - users can customize)
 
 (setq enkan-simple-3pane-mode-map
-      (let ((map (make-sparse-keymap)))
-        (define-key map (kbd "C-t") 'enkan-simple-3pane-other-window)
-        (define-key map (kbd "M-t") 'other-window-or-split)
-        (define-key map (kbd "C-c 3 l") 'enkan-simple-3pane-lock-input-buffer)
-        (define-key map (kbd "C-c 3 u") 'enkan-simple-3pane-unlock-input-buffer)
-        (define-key map (kbd "Esc") 'enkan-simple-3pane-send-escape)
-        (define-key map (kbd "C-M-1") 'enkan-simple-3pane-send-1)
-        (define-key map (kbd "C-M-2") 'enkan-simple-3pane-send-2)
-        (define-key map (kbd "C-M-3") 'enkan-simple-3pane-send-3)
-        map))
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "C-t") 'enkan-simple-3pane-other-window)
+    (define-key map (kbd "M-t") 'other-window-or-split)
+    (define-key map (kbd "C-c 3 l") 'enkan-simple-3pane-lock-input-buffer)
+    (define-key map (kbd "C-c 3 u") 'enkan-simple-3pane-unlock-input-buffer)
+    (define-key map (kbd "Esc") 'enkan-simple-3pane-send-escape)
+    (define-key map (kbd "C-M-1") 'enkan-simple-3pane-send-1)
+    (define-key map (kbd "C-M-2") 'enkan-simple-3pane-send-2)
+    (define-key map (kbd "C-M-3") 'enkan-simple-3pane-send-3)
+    map))
 
 ;;; Provide
 
