@@ -1088,43 +1088,11 @@ Category: Utilities"
              :buffer buf)))
    (buffer-list)))
 
-(defun enkan-repl--display-sessions-in-buffer (sessions buffer-info-list)
-  "Display SESSIONS in the session list buffer.
-SESSIONS is the list of session info plists.
-BUFFER-INFO-LIST is used to associate buffers with session entries."
-  (with-current-buffer (get-buffer-create "*enkan-repl-sessions*")
-    (let ((inhibit-read-only t))
-      (erase-buffer)
-      (insert (enkan-repl--format-sessions-pure sessions))
-      
-      ;; Add text properties for buffer association
-      (goto-char (point-min))
-      (dolist (session sessions)
-        (when (search-forward (plist-get session :name) nil t)
-          (let* ((name (plist-get session :name))
-                 (buf-info (cl-find-if
-                            (lambda (info)
-                              (equal (plist-get info :name) name))
-                            buffer-info-list))
-                 (buf (and buf-info (plist-get buf-info :buffer))))
-            (when buf
-              (beginning-of-line)
-              (put-text-property (point) (1+ (point)) 'session-buffer buf)
-              (forward-line 3))))))  ; Skip to next session
-    
-    ;; Set up key bindings
-    (use-local-map (make-sparse-keymap))
-    (local-set-key "d" 'enkan-repl--delete-session-at-point)
-    (local-set-key "q" 'quit-window)
-    (setq buffer-read-only t)
-    (goto-char (point-min))
-    (forward-line 4)  ; Skip header
-    (switch-to-buffer "*enkan-repl-sessions*")))
 
 ;;;###autoload
 (defun enkan-repl-list-sessions ()
-  "Display a list of active enkan sessions.
-Users can delete sessions with \='d\=' and quit with \='q\='.
+  "Display a list of active enkan sessions with interactive selection.
+Users can select a session to switch to it, or delete with confirmation.
 
 Category: Session Controller"
   (interactive)
@@ -1133,18 +1101,50 @@ Category: Session Controller"
          (sessions (enkan-repl--collect-sessions-pure buffer-info-list)))
     (if (null sessions)
         (message "No active sessions found")
-      (enkan-repl--display-sessions-in-buffer sessions buffer-info-list))))
+      ;; Create candidates list for completing-read
+      (let* ((candidates
+              (mapcar
+               (lambda (session)
+                 (cons (plist-get session :name)
+                       (format "Directory: %s, Status: %s"
+                               (plist-get session :directory)
+                               (plist-get session :status))))
+               sessions))
+             (completion-extra-properties
+              `(:annotation-function
+                (lambda (candidate)
+                  (let ((description (alist-get candidate ',candidates nil nil #'string=)))
+                    (when description
+                      (format " — %s" description)))))))
+        ;; Show interactive selection
+        (let ((selected (completing-read 
+                         "Active sessions (RET to switch, C-d to delete): " 
+                         candidates)))
+          (when selected
+            ;; Find the buffer for selected session
+            (let* ((buf-info (cl-find-if
+                              (lambda (info)
+                                (equal (plist-get info :name) selected))
+                              buffer-info-list))
+                   (buf (and buf-info (plist-get buf-info :buffer))))
+              (when buf
+                ;; Ask for action
+                (let ((action (read-char-choice
+                               (format "Session %s - (s)witch, (d)elete, (c)ancel? " selected)
+                               '(?s ?d ?c))))
+                  (cl-case action
+                    (?s
+                     (switch-to-buffer buf)
+                     (message "Switched to session: %s" selected))
+                    (?d
+                     (when (y-or-n-p (format "Delete session %s? " selected))
+                       (kill-buffer buf)
+                       (message "Session deleted: %s" selected)
+                       ;; Refresh the list
+                       (enkan-repl-list-sessions)))
+                    (?c
+                     (message "Cancelled"))))))))))))
 
-(defun enkan-repl--delete-session-at-point ()
-  "Delete the session at point after confirmation (internal function)."
-  (let ((buf (get-text-property (point) 'session-buffer)))
-    (if (not buf)
-        (message "No session on this line")
-      (when (y-or-n-p (format "Delete session %s? " (buffer-name buf)))
-        (kill-buffer buf)
-        ;; Immediately refresh the list
-        (enkan-repl-list-sessions)
-        (message "Session deleted")))))
 
 ;;;###autoload
 (defun enkan-repl-toggle-debug-mode ()
