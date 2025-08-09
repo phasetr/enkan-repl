@@ -1092,7 +1092,7 @@ Category: Utilities"
 ;;;###autoload
 (defun enkan-repl-list-sessions ()
   "Display a list of active enkan sessions with interactive selection.
-Users can select a session to switch to it, or delete with confirmation.
+Users can select a session by number, then choose action: (s)witch, (d)elete, or (q)uit.
 
 Category: Session Controller"
   (interactive)
@@ -1101,49 +1101,45 @@ Category: Session Controller"
          (sessions (enkan-repl--collect-sessions-pure buffer-info-list)))
     (if (null sessions)
         (message "No active sessions found")
-      ;; Create candidates list for completing-read
-      (let* ((candidates
-              (mapcar
-               (lambda (session)
-                 (cons (plist-get session :name)
-                       (format "Directory: %s, Status: %s"
-                               (plist-get session :directory)
-                               (plist-get session :status))))
-               sessions))
-             (completion-extra-properties
-              `(:annotation-function
-                (lambda (candidate)
-                  (let ((description (alist-get candidate ',candidates nil nil #'string=)))
-                    (when description
-                      (format " — %s" description)))))))
-        ;; Show interactive selection
-        (let ((selected (completing-read 
-                         "Active sessions (RET to switch, C-d to delete): " 
-                         candidates)))
-          (when selected
-            ;; Find the buffer for selected session
-            (let* ((buf-info (cl-find-if
-                              (lambda (info)
-                                (equal (plist-get info :name) selected))
-                              buffer-info-list))
-                   (buf (and buf-info (plist-get buf-info :buffer))))
+      ;; Display numbered session list
+      (let ((session-list-str (enkan-repl--format-numbered-sessions-pure sessions)))
+        ;; Show list and get selection
+        (let* ((prompt (concat session-list-str
+                              "\nSelect session number (1-" 
+                              (number-to-string (length sessions))
+                              ") or q to quit: "))
+               (choice (read-char prompt)))
+          (cond
+           ;; Quit
+           ((eq choice ?q)
+            (message "Cancelled"))
+           ;; Number selection
+           ((and (>= choice ?1) (<= choice (+ ?0 (length sessions))))
+            (let* ((selected-index (- choice ?1))
+                   (selected-session (nth selected-index sessions))
+                   (selected-name (plist-get selected-session :name))
+                   (buf (enkan-repl--find-session-buffer-pure selected-name buffer-info-list)))
               (when buf
                 ;; Ask for action
                 (let ((action (read-char-choice
-                               (format "Session %s - (s)witch, (d)elete, (c)ancel? " selected)
-                               '(?s ?d ?c))))
+                              (format "Session %s - (s)witch, (d)elete, (q)uit: " selected-name)
+                              '(?s ?d ?q))))
                   (cl-case action
                     (?s
                      (switch-to-buffer buf)
-                     (message "Switched to session: %s" selected))
+                     (message "Switched to session: %s" selected-name))
                     (?d
-                     (when (y-or-n-p (format "Delete session %s? " selected))
+                     (when (y-or-n-p (format "Delete session %s? " selected-name))
                        (kill-buffer buf)
-                       (message "Session deleted: %s" selected)
+                       (message "Session deleted: %s" selected-name)
                        ;; Refresh the list
                        (enkan-repl-list-sessions)))
-                    (?c
-                     (message "Cancelled"))))))))))))
+                    (?q
+                     (message "Cancelled")))))))
+           ;; Invalid selection
+           (t
+            (message "Invalid selection")
+            (enkan-repl-list-sessions))))))))
 
 
 ;;;###autoload

@@ -103,6 +103,49 @@ or nil if not on a session entry."
               :end-line (min (+ current-line 2) (length lines))))
        (t nil)))))
 
+(defun enkan-repl--format-numbered-sessions-pure (sessions)
+  "Pure function to format numbered session list.
+SESSIONS is a list of session info plists.
+Returns a formatted string with numbered sessions."
+  (let ((result "")
+        (index 1))
+    (dolist (session sessions)
+      (setq result
+            (concat result
+                    (format "%d. %s — Directory: %s, Status: %s\n"
+                            index
+                            (plist-get session :name)
+                            (plist-get session :directory)
+                            (plist-get session :status))))
+      (setq index (1+ index)))
+    result))
+
+(defun enkan-repl--find-session-buffer-pure (selected-name buffer-info-list)
+  "Pure function to find buffer for selected session.
+SELECTED-NAME is the selected session name.
+BUFFER-INFO-LIST is the list of buffer info plists.
+Returns the buffer object or nil."
+  (let ((buf-info (cl-find-if
+                   (lambda (info)
+                     (equal (plist-get info :name) selected-name))
+                   buffer-info-list)))
+    (and buf-info (plist-get buf-info :buffer))))
+
+(defun enkan-repl--session-action-pure (action selected-name)
+  "Pure function to determine session action result.
+ACTION is the action character (?s, ?d, ?c).
+SELECTED-NAME is the selected session name.
+Returns a plist with :type and :message."
+  (cl-case action
+    (?s (list :type 'switch
+              :message (format "Switched to session: %s" selected-name)))
+    (?d (list :type 'delete
+              :message (format "Session deleted: %s" selected-name)))
+    (?c (list :type 'cancel
+              :message "Cancelled"))
+    (t (list :type 'unknown
+             :message "Unknown action"))))
+
 (defun enkan-repl-utils--extract-function-info (file-path)
   "Extract public function information from an Emacs Lisp file.
 Returns a list of plists, each containing :name, :args, :docstring,

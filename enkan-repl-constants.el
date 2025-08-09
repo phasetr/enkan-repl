@@ -27,7 +27,7 @@
     ("enkan-repl-setup-window-layout" . "Set up window layout with org file on left and eat on right. This is the author's preference - customize as needed.  Category: Session Controller")
     ("enkan-repl-output-template" . "Output current template content to a new buffer for customization.  Category: Utilities")
     ("enkan-repl-status" . "Show detailed diagnostic information for troubleshooting connection issues.  Category: Utilities")
-    ("enkan-repl-list-sessions" . "Display a list of active enkan sessions with interactive selection. Users can select a session to switch to it, or delete with confirmation.  Category: Session Controller")
+    ("enkan-repl-list-sessions" . "Display a list of active enkan sessions with interactive selection. Users can select a session by number, then choose action: (s)witch, (d)elete, or (q)uit.  Category: Session Controller")
     ("enkan-repl-toggle-debug-mode" . "Toggle debug mode for enkan-repl operations.  Category: Utilities")
     ("enkan-repl-enable-debug-mode" . "Enable debug mode for enkan-repl operations.  Category: Utilities")
     ("enkan-repl-disable-debug-mode" . "Disable debug mode for enkan-repl operations.  Category: Utilities")
