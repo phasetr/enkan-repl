@@ -167,8 +167,8 @@ Negative value makes text smaller."
     (face-remap-add-relative 'default :height enkan-simple-3pane-eat-text-scale))
   ;; Return to input window
   (select-window enkan-simple-3pane-input-left-up-window)
-  ;; Lock input buffer
-  (enkan-simple-3pane-lock-input-buffer))
+  ;; Lock input and eat windows
+  (enkan-simple-3pane-lock-windows))
 
 ;;; Configuration Utilities
 
@@ -187,25 +187,47 @@ Avoids switching to eat window."
       (when (window-live-p enkan-simple-3pane-input-left-up-window)
         (select-window enkan-simple-3pane-input-left-up-window)))))
 
-(defun enkan-simple-3pane-lock-input-buffer ()
-  "Lock input buffer to prevent opening other files in it."
+(defun enkan-simple-3pane-lock-windows ()
+  "Lock input and eat windows to prevent opening other files in them."
   (interactive)
-  (when (and enkan-simple-3pane-input-buffer
-          (buffer-live-p enkan-simple-3pane-input-buffer))
-    (let ((window (get-buffer-window enkan-simple-3pane-input-buffer)))
-      (when window
-        (set-window-dedicated-p window t)
-        (message "Input buffer locked.")))))
+  (let ((locked-windows '()))
+    ;; Lock input window
+    (when (and enkan-simple-3pane-input-buffer
+               (buffer-live-p enkan-simple-3pane-input-buffer))
+      (let ((window (get-buffer-window enkan-simple-3pane-input-buffer)))
+        (when window
+          (set-window-dedicated-p window t)
+          (push "input" locked-windows))))
+    ;; Lock eat window
+    (when (and enkan-simple-3pane-eat-right-full-window
+               (window-live-p enkan-simple-3pane-eat-right-full-window))
+      (set-window-dedicated-p enkan-simple-3pane-eat-right-full-window t)
+      (push "eat" locked-windows))
+    ;; Report what was locked
+    (if locked-windows
+        (message "Locked windows: %s" (string-join (nreverse locked-windows) ", "))
+      (message "No windows to lock."))))
 
-(defun enkan-simple-3pane-unlock-input-buffer ()
-  "Unlock input buffer to allow opening other files."
+(defun enkan-simple-3pane-unlock-windows ()
+  "Unlock input and eat windows to allow opening other files."
   (interactive)
-  (when (and enkan-simple-3pane-input-buffer
-          (buffer-live-p enkan-simple-3pane-input-buffer))
-    (let ((window (get-buffer-window enkan-simple-3pane-input-buffer)))
-      (when window
-        (set-window-dedicated-p window nil)
-        (message "Input buffer unlocked.")))))
+  (let ((unlocked-windows '()))
+    ;; Unlock input window
+    (when (and enkan-simple-3pane-input-buffer
+               (buffer-live-p enkan-simple-3pane-input-buffer))
+      (let ((window (get-buffer-window enkan-simple-3pane-input-buffer)))
+        (when window
+          (set-window-dedicated-p window nil)
+          (push "input" unlocked-windows))))
+    ;; Unlock eat window
+    (when (and enkan-simple-3pane-eat-right-full-window
+               (window-live-p enkan-simple-3pane-eat-right-full-window))
+      (set-window-dedicated-p enkan-simple-3pane-eat-right-full-window nil)
+      (push "eat" unlocked-windows))
+    ;; Report what was unlocked
+    (if unlocked-windows
+        (message "Unlocked windows: %s" (string-join (nreverse unlocked-windows) ", "))
+      (message "No windows to unlock."))))
 
 ;;; Remote eat Control
 
@@ -350,8 +372,6 @@ Avoids switching to eat window."
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "C-t") 'enkan-simple-3pane-other-window)
     (define-key map (kbd "M-t") 'other-window-or-split)
-    (define-key map (kbd "C-c 3 l") 'enkan-simple-3pane-lock-input-buffer)
-    (define-key map (kbd "C-c 3 u") 'enkan-simple-3pane-unlock-input-buffer)
     (define-key map (kbd "Esc") 'enkan-simple-3pane-send-escape)
     (define-key map (kbd "C-M-1") 'enkan-simple-3pane-send-1)
     (define-key map (kbd "C-M-2") 'enkan-simple-3pane-send-2)
