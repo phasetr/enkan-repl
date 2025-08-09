@@ -62,6 +62,7 @@
 
 
 ;; Declare external functions to avoid byte-compiler warnings
+(declare-function eat "eat" (&optional program))
 (declare-function eat--send-string "eat" (process string))
 (defvar eat--process)
 (defvar eat-mode)
@@ -812,7 +813,9 @@ Category: Session Controller"
        #'enkan-repl-start-eat))
      ;; No existing session - start new one
      (t
-      (let ((default-directory target-dir))
+      (let ((default-directory target-dir)
+            (original-window (selected-window))
+            (window-count (length (window-list))))
         (let ((eat-buffer (eat)))
           (when eat-buffer
             ;; Safely rename the eat buffer
@@ -822,7 +825,26 @@ Category: Session Controller"
               (error
                (message "Warning: Failed to rename eat buffer: %s" (error-message-string err))
                ;; Continue anyway as the buffer is still functional
-               nil))))
+               nil))
+            ;; Smart window management based on current layout
+            (cond
+             ;; Single window: split horizontally and show eat on the right
+             ((= window-count 1)
+              (split-window-right)
+              (other-window 1)
+              (switch-to-buffer eat-buffer))
+             ;; Two windows: use right window for eat
+             ((= window-count 2)
+              (other-window 1)
+              (switch-to-buffer eat-buffer))
+             ;; Three or more windows: split original window horizontally
+             (t
+              (select-window original-window)
+              (split-window-right)
+              (other-window 1)
+              (switch-to-buffer eat-buffer)))
+            ;; Return to original window to keep focus on input file
+            (select-window original-window)))
         (message "Started eat session in: %s" target-dir))
       ;; Verify startup succeeded
       (unless (enkan-repl--can-send-text target-dir)
