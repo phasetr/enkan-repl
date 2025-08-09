@@ -29,7 +29,7 @@
   "Generate Core Functions section matching manual update structure."
   (concat "** Core Functions\n\n"
           "*** Command Palette\n"
-          "- =enkan-repl-cheatsheet= - *Interactive command browser with fuzzy search*\n"
+          "- =enkan-repl-cheat-sheet= - *Interactive command browser with fuzzy search*\n"
           "  - Browse all available functions with descriptions\n"
           "  - Filter functions by typing partial names\n"
           "  - Functions organized by category for easy discovery\n"

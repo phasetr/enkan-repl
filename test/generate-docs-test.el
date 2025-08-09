@@ -345,7 +345,7 @@ It spans multiple lines for testing.\"
   "Test that generate-core-functions-section contains expected functions."
   (let ((result (enkan-repl--generate-core-functions-section)))
     ;; Should contain key functions
-    (should (string-match-p "enkan-repl-cheatsheet" result))
+    (should (string-match-p "enkan-repl-cheat-sheet" result))
     (should (string-match-p "enkan-repl-send-region" result))
     (should (string-match-p "enkan-repl-start-eat" result))
     (should (string-match-p "enkan-repl-open-project-input-file" result))
@@ -385,7 +385,7 @@ It spans multiple lines for testing.\"
                                    (buffer-string))))
             (should (string-match-p "\\*\\* Core Functions" updated-content))
             (should (string-match-p "\\*\\*\\* Command Palette" updated-content))
-            (should (string-match-p "enkan-repl-cheatsheet" updated-content))
+            (should (string-match-p "enkan-repl-cheat-sheet" updated-content))
             ;; Should preserve other sections
             (should (string-match-p "\\*\\* Introduction" updated-content))
             (should (string-match-p "\\*\\* Configuration" updated-content))))

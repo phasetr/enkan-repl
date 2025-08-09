@@ -53,7 +53,7 @@
 
 (require 'cl-lib)
 
-;; Load utility functions (require for template generation and cheatsheet)
+;; Load utility functions (require for template generation and cheat-sheet)
 (when (locate-library "enkan-repl-utils")
   (require 'enkan-repl-utils))
 
@@ -106,8 +106,8 @@ This structure is used for documentation generation and organization.")
   "When non-nil, enable debug messages for send operations.")
 
 ;; Declare external variable from constants file
-(defvar enkan-repl-cheatsheet-candidates nil
-  "Precompiled list of cheatsheet candidates from constants file.")
+(defvar enkan-repl-cheat-sheet-candidates nil
+  "Precompiled list of cheat-sheet candidates from constants file.")
 
 (defun enkan-repl--find-template-directory ()
   "Find directory containing default template file.
@@ -314,7 +314,7 @@ Returns categorized functions as string, or falls back to static list."
         (let ((categories (make-hash-table :test 'equal))
               (category-order '("Command Palette" "Text Sender" "Session Controller" "Utilities")))
           ;; Group functions by category
-          (dolist (candidate enkan-repl-cheatsheet-candidates)
+          (dolist (candidate enkan-repl-cheat-sheet-candidates)
             (let* ((func-name (car candidate))
                    (description (cdr candidate))
                    (category (if (string-match "Category: \\([^\"]+\\)" description)
@@ -343,7 +343,7 @@ Returns categorized functions as string, or falls back to static list."
 (defun enkan-repl--get-static-functions ()
   "Return static function list as fallback when constants unavailable."
   (concat "** Command Palette\n\n"
-          "- ~M-x enkan-repl-cheatsheet~ - Display interactive cheatsheet for enkan-repl commands.\n\n"
+          "- ~M-x enkan-repl-cheat-sheet~ - Display interactive cheat-sheet for enkan-repl commands.\n\n"
           "** Text Sender\n\n"
           "- ~M-x enkan-repl-send-region~ - Send the text in region from START to END to eat session.\n"
           "- ~M-x enkan-repl-send-buffer~ - Send the entire current buffer to eat session.\n"
@@ -1174,17 +1174,17 @@ Category: Utilities"
   (setq enkan-repl-debug-mode nil)
   (message "enkan-repl debug mode: DISABLED"))
 
-;;; Interactive Cheatsheet Feature
+;;; Interactive Cheat-sheet Feature
 
 ;;;###autoload
-(defun enkan-repl-cheatsheet ()
-  "Display interactive cheatsheet for enkan-repl commands.
+(defun enkan-repl-cheat-sheet ()
+  "Display interactive cheat-sheet for enkan-repl commands.
 
 Category: Command Palette"
   (interactive)
   (unless (featurep 'enkan-repl-constants)
     (require 'enkan-repl-constants))
-  (let ((candidates enkan-repl-cheatsheet-candidates))
+  (let ((candidates enkan-repl-cheat-sheet-candidates))
     (let ((completion-extra-properties
            `(:annotation-function
              (lambda (candidate)

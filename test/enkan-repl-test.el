@@ -1911,7 +1911,7 @@ Does not modify global state."
     (should (string-match-p "Text Sender" result))
     (should (string-match-p "Session Controller" result))
     (should (string-match-p "Utilities" result))
-    (should (string-match-p "enkan-repl-cheatsheet" result))
+    (should (string-match-p "enkan-repl-cheat-sheet" result))
     (should (string-match-p "enkan-repl-send-region" result))))
 
 (ert-deftest test-get-static-functions-fallback ()
@@ -1922,7 +1922,7 @@ Does not modify global state."
     (should (string-match-p "Text Sender" result))
     (should (string-match-p "Session Controller" result))
     (should (string-match-p "Utilities" result))
-    (should (string-match-p "enkan-repl-cheatsheet" result))
+    (should (string-match-p "enkan-repl-cheat-sheet" result))
     (should (string-match-p "enkan-repl-send-region" result))))
 
 (ert-deftest test-embedded-template-uses-categorized-functions ()
@@ -1982,7 +1982,7 @@ Does not modify global state."
       ;; Should fall back to static functions
       (should (stringp result))
       (should (string-match-p "Command Palette" result))
-      (should (string-match-p "enkan-repl-cheatsheet" result)))))
+      (should (string-match-p "enkan-repl-cheat-sheet" result)))))
 
 (ert-deftest test-get-static-functions-structure ()
   "Test structure and completeness of static functions fallback."
@@ -1994,7 +1994,7 @@ Does not modify global state."
     (should (string-match-p "enkan-repl-send-region" result))
     (should (string-match-p "enkan-repl-send-buffer" result))
     (should (string-match-p "enkan-repl-start-eat" result))
-    (should (string-match-p "enkan-repl-cheatsheet" result))
+    (should (string-match-p "enkan-repl-cheat-sheet" result))
     ;; Should have proper org-mode format
     (should (string-match-p "\\*\\*" result))
     (should (string-match-p "- ~M-x" result))
@@ -2011,8 +2011,8 @@ Does not modify global state."
     (should (string-match-p "Text Sender" static-result))
     (should (string-match-p "Text Sender" categorized-result))
     ;; Both should have key functions
-    (should (string-match-p "enkan-repl-cheatsheet" static-result))
-    (should (string-match-p "enkan-repl-cheatsheet" categorized-result))))
+    (should (string-match-p "enkan-repl-cheat-sheet" static-result))
+    (should (string-match-p "enkan-repl-cheat-sheet" categorized-result))))
 
 (ert-deftest test-embedded-template-integration ()
   "Test integration between embedded template and categorized functions."
@@ -2025,7 +2025,7 @@ Does not modify global state."
     (should (string-match-p "\\* Notes" template))
     ;; Should contain categorized functions within the template
     (should (string-match-p "\\*\\* Command Palette" template))
-    (should (string-match-p "enkan-repl-cheatsheet" template))
+    (should (string-match-p "enkan-repl-cheat-sheet" template))
     ;; Should be properly formatted org-mode
     (should (string-match-p "- ~M-x enkan-repl-" template))))
 

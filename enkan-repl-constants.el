@@ -5,12 +5,12 @@
 
 ;;; Commentary:
 
-;; Precompiled constants for cheatsheet functionality to improve performance
+;; Precompiled constants for cheat-sheet functionality to improve performance
 ;; by avoiding runtime file I/O and parsing.
 
 ;;; Code:
 
-(defconst enkan-repl-cheatsheet-candidates
+(defconst enkan-repl-cheat-sheet-candidates
   '(("enkan-repl-send-region" . "Send the text in region from START to END to eat session.  Category: Text Sender")
     ("enkan-repl-send-buffer" . "Send the entire current buffer to eat session.  Category: Text Sender")
     ("enkan-repl-send-rest-of-buffer" . "Send rest of buffer from cursor position to end to eat session.  Category: Text Sender")
@@ -27,17 +27,17 @@
     ("enkan-repl-setup-window-layout" . "Set up window layout with org file on left and eat on right. This is the author's preference - customize as needed.  Category: Session Controller")
     ("enkan-repl-output-template" . "Output current template content to a new buffer for customization.  Category: Utilities")
     ("enkan-repl-status" . "Show detailed diagnostic information for troubleshooting connection issues.  Category: Utilities")
-    ("enkan-repl-list-sessions" . "Display a list of active enkan sessions with interactive selection. Users can select a session, then choose action: switch or delete.  Category: Session Controller")
+    ("enkan-repl-list-sessions" . "Display a list of active enkan sessions with interactive selection. Users can select a session by number, then choose action: (s)witch, (d)elete, or (q)uit.  Category: Session Controller")
     ("enkan-repl-toggle-debug-mode" . "Toggle debug mode for enkan-repl operations.  Category: Utilities")
     ("enkan-repl-enable-debug-mode" . "Enable debug mode for enkan-repl operations.  Category: Utilities")
     ("enkan-repl-disable-debug-mode" . "Disable debug mode for enkan-repl operations.  Category: Utilities")
-    ("enkan-repl-cheatsheet" . "Display interactive cheatsheet for enkan-repl commands.  Category: Command Palette"))
-  "Precompiled list of cheatsheet candidates.
+    ("enkan-repl-cheat-sheet" . "Display interactive cheat-sheet for enkan-repl commands.  Category: Command Palette"))
+  "Precompiled list of cheat-sheet candidates.
 Each element is a cons cell (FUNCTION-NAME . DESCRIPTION).")
 
-(defconst enkan-repl-cheatsheet-function-count
+(defconst enkan-repl-cheat-sheet-function-count
   21
-  "Number of functions in cheatsheet.")
+  "Number of functions in cheat-sheet.")
 
 (provide 'enkan-repl-constants)
 

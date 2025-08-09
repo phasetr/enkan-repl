@@ -89,23 +89,23 @@ We intentionally provide no default keybindings for several reasons:
 - Avoiding conflicts with existing user workflows
 
 Even if your Emacs configuration is heavily customized with no available keybindings,
-the interactive cheatsheet (=M-x enkan-repl-cheatsheet=) provides quick access
+the interactive cheat-sheet (=M-x enkan-repl-cheat-sheet=) provides quick access
 to all functions with fuzzy search and filtering capabilities.
 
 *** =M-x= Driven Workflow with Interactive Cheatsheet
-As the author's personal approach, we introduce a "partial keybinding abandonment + cheatsheet strategy."
+As the author's personal approach, we introduce a "partial keybinding abandonment + cheat-sheet strategy."
 Since there's little potential harm, we assigned direct org-mode keys for numbers and Esc as buffer-local variables.
 We also bound the central sending command =send-region= to a key, also as a buffer-local variable.
 For everything else, we abandoned keybinding configurations since they're rarely used.
 
-Instead, we added a cheatsheet feature to quickly access only the commands you need.
+Instead, we added a cheat-sheet feature to quickly access only the commands you need.
 You can filter by keywords directly related to the operation you want to perform.
 For infrequently used operations, this overhead is perfectly acceptable.
 At least for me.
 
-You could assign a keybinding to the cheatsheet itself, but I can't remember them.
+You could assign a keybinding to the cheat-sheet itself, but I can't remember them.
 My memory/configuration approach doesn't align well with this -
-I get confused thinking "is it 'c' for cheatsheet? or 's' for sheet?
+I get confused thinking "is it 'c' for cheat-sheet? or 's' for sheet?
 wait, did I use 'open' somewhere, so 'o'?" even though 'open' isn't even in the actual command name.
 
 Furthermore, once you decide on settings, you want to reuse them to some extent.
@@ -113,7 +113,7 @@ To make this easy, we made it possible to specify your own default configuration
 We also added =enkan-repl-output-template= to output your custom configuration file
 to a temporary buffer, making it as easy as possible to reconfigure multiple files.
 
-The interactive cheatsheet (=M-x enkan-repl-cheatsheet=) makes this workflow
+The interactive cheat-sheet (=M-x enkan-repl-cheat-sheet=) makes this workflow
 even more practical by providing:
 - *Command Palette*: Quick access to all functions with descriptions
 - *Fuzzy Search*: Type partial names to find functions instantly
@@ -122,7 +122,7 @@ even more practical by providing:
 
 During Claude development work,
 frequently used functions naturally appear at the top of completion lists,
-and the cheatsheet ensures you never miss useful functionality.
+and the cheat-sheet ensures you never miss useful functionality.
 
 ** Installation
 
@@ -172,7 +172,7 @@ compatibility with other environments has not been verified.
 3. *Open project file*: =M-x enkan-repl-open-project-input-file=
 4. *Start Claude session*: =M-x enkan-repl-start-claudemacs=
 5. *Write your thoughts* in the org-mode file
-6. *Access functions easily*: Use =M-x enkan-repl-cheatsheet= to browse and select functions
+6. *Access functions easily*: Use =M-x enkan-repl-cheat-sheet= to browse and select functions
 7. *Send specific parts* using =M-x enkan-repl-send-region= or =M-x enkan-repl-send-rest-of-buffer=
 
 *** For Existing Projects
@@ -188,7 +188,7 @@ The generated project file includes template functions and usage instructions.
 ** Core Functions
 
 *** Command Palette
-- =enkan-repl-cheatsheet= - *Interactive command browser with fuzzy search*
+- =enkan-repl-cheat-sheet= - *Interactive command browser with fuzzy search*
   - Browse all available functions with descriptions
   - Filter functions by typing partial names
   - Functions organized by category for easy discovery

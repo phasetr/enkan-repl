@@ -44,8 +44,8 @@ module.exports = {
 					"emacs --batch --load scripts/bump-version.el -- ${nextRelease.version}",
 					// Regenerate documentation files with updated functions
 					"emacs --batch --load scripts/generate-docs.el --eval '(generate-all-docs)'",
-					// Regenerate precompiled constants for cheatsheet performance
-					"emacs --batch --load scripts/generate-constants.el --eval '(generate-cheatsheet-constants)'",
+					// Regenerate precompiled constants for cheat-sheet performance
+					"emacs --batch --load scripts/generate-constants.el --eval '(generate-cheat-sheet-constants)'",
 				].join(" && "),
 			},
 		],
