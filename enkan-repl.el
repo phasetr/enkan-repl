@@ -471,7 +471,7 @@ interpretation issues and Mac region selection problems."
         (enkan-repl--debug-message "Adding end marker to prevent file path interpretation")
         (setq sanitized (concat sanitized "\n(This text is added by enkan-repl as a workaround for Claude Code's special interpretation of file paths)")))
       ;; Only remove trailing whitespace/newlines
-      (setq sanitized (replace-regexp-in-string "[[:space:]\n]+\\'" "" sanitized))
+      (setq sanitized (replace-regexp-in-string "[[:space:]]+\\'" "" sanitized))
       (enkan-repl--debug-message "Final sanitized content: %S" sanitized)
       (enkan-repl--debug-message "Final content length: %d" (length sanitized))
       sanitized)))
