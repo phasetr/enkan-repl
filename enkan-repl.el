@@ -713,6 +713,29 @@ Category: Text Sender"
   (interactive)
   (enkan-repl--send-escape-directly))
 
+;;;###autoload
+(defun enkan-repl-recenter-bottom ()
+  "Move cursor to bottom of eat buffer for current directory.
+
+Category: Utilities"
+  (interactive)
+  (let* ((target-dir (enkan-repl--get-target-directory-for-buffer))
+         (session-buffer (enkan-repl--get-buffer-for-directory target-dir)))
+    (if session-buffer
+        (progn
+          ;; Switch to the eat buffer window if it's visible
+          (let ((window (get-buffer-window session-buffer)))
+            (if window
+                (progn
+                  (select-window window)
+                  (goto-char (point-max))
+                  (recenter -1))
+              ;; If not visible, operate in the buffer without switching
+              (with-current-buffer session-buffer
+                (goto-char (point-max)))))
+          (message "Cursor moved to bottom in eat buffer"))
+      (message "No eat session found for directory: %s" target-dir))))
+
 (defun enkan-repl--create-project-input-file (target-directory)
   "Create project input file for TARGET-DIRECTORY from template.
 Returns the created file path."
