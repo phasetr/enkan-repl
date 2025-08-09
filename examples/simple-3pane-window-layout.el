@@ -61,6 +61,9 @@ This is set automatically when enkan-simple-3pane-setup is called.")
 (defvar enkan-simple-3pane-eat-right-full-window nil
   "Window for eat terminal.")
 
+(defvar enkan-simple-3pane-misc-buffer-history nil
+  "History of buffers displayed in misc window.")
+
 (defvar enkan-simple-3pane-mode-map nil
   "Keymap for 3-pane layout commands.")
 
@@ -276,6 +279,10 @@ Avoids switching to eat window."
            ;; But not if we're in the input window editing a file
            (not (and (eq (selected-window) enkan-simple-3pane-input-left-up-window)
                      (buffer-file-name buffer))))
+      ;; Track buffer history for misc window
+      (let ((current-buffer (window-buffer enkan-simple-3pane-misc-left-down-window)))
+        (unless (eq current-buffer buffer)
+          (push current-buffer enkan-simple-3pane-misc-buffer-history)))
       (set-window-buffer enkan-simple-3pane-misc-left-down-window buffer)
       (select-window enkan-simple-3pane-misc-left-down-window)
       enkan-simple-3pane-misc-left-down-window)
@@ -303,11 +310,22 @@ Avoids switching to eat window."
     (if (or (eq win enkan-simple-3pane-input-left-up-window)
             (eq win enkan-simple-3pane-misc-left-down-window)
             (eq win enkan-simple-3pane-eat-right-full-window))
-        ;; For protected windows, just bury buffer without deleting window
+        ;; For protected windows, switch to previous buffer
         (progn
           (with-selected-window win
-            (bury-buffer)
-            (switch-to-buffer (other-buffer)))
+            (if (and (eq win enkan-simple-3pane-misc-left-down-window)
+                     enkan-simple-3pane-misc-buffer-history)
+                ;; For misc window, use buffer history
+                (let ((prev-buffer (pop enkan-simple-3pane-misc-buffer-history)))
+                  (while (and prev-buffer
+                              (not (buffer-live-p prev-buffer))
+                              enkan-simple-3pane-misc-buffer-history)
+                    (setq prev-buffer (pop enkan-simple-3pane-misc-buffer-history)))
+                  (if (and prev-buffer (buffer-live-p prev-buffer))
+                      (switch-to-buffer prev-buffer)
+                    (switch-to-buffer (other-buffer))))
+              ;; For other windows, use standard other-buffer
+              (switch-to-buffer (other-buffer))))
           nil)
       ;; For other windows, use original behavior
       (apply orig-fun kill window nil))))
@@ -318,7 +336,8 @@ Avoids switching to eat window."
   (setq enkan-simple-3pane-input-buffer nil
     enkan-simple-3pane-input-left-up-window nil
     enkan-simple-3pane-misc-left-down-window nil
-    enkan-simple-3pane-eat-right-full-window nil)
+    enkan-simple-3pane-eat-right-full-window nil
+    enkan-simple-3pane-misc-buffer-history nil)
   ;; Remove all advices
   (advice-remove 'display-buffer #'enkan-simple-3pane-display-buffer-advice)
   (advice-remove 'delete-window #'enkan-simple-3pane-protect-window-advice)
