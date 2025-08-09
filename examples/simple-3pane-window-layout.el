@@ -114,7 +114,7 @@ Negative value makes text smaller."
   (message "3-pane layout initialized. Use C-c 3 o to switch windows."))
 
 (defun enkan-3pane-other-window ()
-p  "Switch between input and misc windows only.
+  "Switch between input and misc windows only.
 Avoids switching to eat window."
   (interactive)
   (cond
