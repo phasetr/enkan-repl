@@ -45,6 +45,10 @@
 
 ;;; Variables
 
+(defvar enkan-simple-3pane-input-file-path nil
+  "Path to the input file determined from the current directory.
+This is set automatically when enkan-simple-3pane-setup is called.")
+
 (defvar enkan-simple-3pane-input-buffer nil
   "Buffer for input file (prompts).")
 
@@ -86,16 +90,29 @@ Negative value makes text smaller."
     (enkan-simple-3pane-mode 1))
   ;; Setup display-buffer rules for misc window
   (enkan-simple-3pane-setup-display-buffer-rules)
-  (message "3-pane layout initialized. Use C-t to switch windows."))
+  (message "3-pane layout initialized. Input file: %s"
+           (file-name-nondirectory enkan-simple-3pane-input-file-path)))
 
 ;;; Window Management
 
 (defun enkan-simple-3pane-window-setup ()
   "Set up fundamental 3-pane window layout"
-  ;; Save current buffer as input buffer
-  (setq enkan-simple-3pane-input-buffer (current-buffer))
+  ;; Determine input file path from current directory
+  (setq enkan-simple-3pane-input-file-path
+    (enkan-repl--get-project-file-path default-directory))
+  ;; Open or create the input file and set as input buffer
+  (let ((input-file enkan-simple-3pane-input-file-path))
+    ;; Create file if it doesn't exist
+    (unless (file-exists-p input-file)
+      (enkan-repl--create-project-input-file default-directory))
+    ;; Open the file
+    (setq enkan-simple-3pane-input-buffer (find-file-noselect input-file)))
+
   ;; Delete other windows to start fresh
   (delete-other-windows)
+
+  ;; Switch to input buffer in current window
+  (switch-to-buffer enkan-simple-3pane-input-buffer)
 
   ;; Setup left window (input)
   (setq enkan-simple-3pane-input-left-up-window (selected-window))
