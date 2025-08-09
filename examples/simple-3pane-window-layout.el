@@ -57,19 +57,19 @@
 (defvar enkan-3pane-eat-right-full-window nil
   "Window for eat terminal.")
 
-(defcustom enkan-3pane-eat-text-scale -0.5
+(defcustom enkan-3pane-eat-text-scale 0.85
   "Text scale adjustment for eat buffer.
 Negative value makes text smaller."
   :type 'integer
   :group 'enkan-repl)
 
-(defcustom enkan-3pane-input-width-ratio 0.8
+(defcustom enkan-3pane-input-width-ratio 0.6
   "Width ratio for input window (0.0 to 1.0)."
   :type 'float
   :group 'enkan-repl)
 
-(defcustom enkan-3pane-misc-height-ratio 0.8
-  "Height ratio for misc window in right pane (0.0 to 1.0)."
+(defcustom enkan-3pane-misc-height-ratio 0.55
+  "Height ratio for misc window in left pane (0.0 to 1.0)."
   :type 'float
   :group 'enkan-repl)
 
@@ -105,10 +105,11 @@ Negative value makes text smaller."
   (if (get-buffer "*eat*")
     (switch-to-buffer "*eat*")
     (eat))
-  ;; Adjust text scale in eat buffer
-  ;; Clear all existing face remappings first
-  (setq-local face-remapping-alist nil)
-  (face-remap-add-relative 'default :height enkan-3pane-eat-text-scale)
+  ;; Adjust text scale in eat buffer only
+  ;; Ensure this is buffer-local
+  (with-current-buffer (current-buffer)
+    (setq-local face-remapping-alist nil)
+    (face-remap-add-relative 'default :height enkan-3pane-eat-text-scale))
   ;; Return to input window
   (select-window enkan-3pane-input-left-up-window)
   ;; Lock input buffer
