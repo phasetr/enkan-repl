@@ -1070,6 +1070,57 @@ Category: Utilities"
             (princ (format "   - %s\n" session-path))))))
       (princ "\nFor more help: M-x enkan-repl-open-project-input-file\n"))))
 
+(defun enkan-repl--get-buffer-info-list ()
+  "Get buffer info list for all buffers (side-effect: reads `buffer-list')."
+  (mapcar
+   (lambda (buf)
+     (let ((name (buffer-name buf))
+           (live-p (buffer-live-p buf))
+           (process-info (with-current-buffer buf
+                           (cons (boundp 'eat--process)
+                                 (and (boundp 'eat--process)
+                                      eat--process
+                                      (process-live-p eat--process))))))
+       (list :name name
+             :live-p live-p
+             :has-eat-process (car process-info)
+             :process-live-p (cdr process-info)
+             :buffer buf)))
+   (buffer-list)))
+
+(defun enkan-repl--display-sessions-in-buffer (sessions buffer-info-list)
+  "Display SESSIONS in the session list buffer.
+SESSIONS is the list of session info plists.
+BUFFER-INFO-LIST is used to associate buffers with session entries."
+  (with-current-buffer (get-buffer-create "*enkan-repl-sessions*")
+    (let ((inhibit-read-only t))
+      (erase-buffer)
+      (insert (enkan-repl--format-sessions-pure sessions))
+      
+      ;; Add text properties for buffer association
+      (goto-char (point-min))
+      (dolist (session sessions)
+        (when (search-forward (plist-get session :name) nil t)
+          (let* ((name (plist-get session :name))
+                 (buf-info (cl-find-if
+                            (lambda (info)
+                              (equal (plist-get info :name) name))
+                            buffer-info-list))
+                 (buf (and buf-info (plist-get buf-info :buffer))))
+            (when buf
+              (beginning-of-line)
+              (put-text-property (point) (1+ (point)) 'session-buffer buf)
+              (forward-line 3))))))  ; Skip to next session
+    
+    ;; Set up key bindings
+    (use-local-map (make-sparse-keymap))
+    (local-set-key "d" 'enkan-repl--delete-session-at-point)
+    (local-set-key "q" 'quit-window)
+    (setq buffer-read-only t)
+    (goto-char (point-min))
+    (forward-line 4)  ; Skip header
+    (switch-to-buffer "*enkan-repl-sessions*")))
+
 ;;;###autoload
 (defun enkan-repl-list-sessions ()
   "Display a list of active enkan sessions.
@@ -1077,64 +1128,23 @@ Users can delete sessions with \='d\=' and quit with \='q\='.
 
 Category: Session Controller"
   (interactive)
-  (let ((sessions '())
-        (all-buffers (buffer-list)))
-    ;; Collect all enkan sessions
-    (dolist (buf all-buffers)
-      (let ((name (buffer-name buf)))
-        (when (and name
-                   (string-match-p "^\\*enkan:" name))
-          (let* ((dir (if (string-match "^\\*enkan:\\(.*?\\)\\*$" name)
-                          (match-string 1 name)
-                        "unknown"))
-                 (process-status (with-current-buffer buf
-                                   (if (and (boundp 'eat--process)
-                                            eat--process
-                                            (process-live-p eat--process))
-                                       'alive
-                                     'dead))))
-            (push (list name dir process-status buf) sessions)))))
-
-    ;; Display sessions in a buffer
-    (if (not sessions)
+  (require 'enkan-repl-utils)
+  (let* ((buffer-info-list (enkan-repl--get-buffer-info-list))
+         (sessions (enkan-repl--collect-sessions-pure buffer-info-list)))
+    (if (null sessions)
         (message "No active sessions found")
-      (with-current-buffer (get-buffer-create "*enkan-repl-sessions*")
-        (let ((inhibit-read-only t))
-          (erase-buffer)
-          (insert "Active enkan-repl sessions:\n")
-          (insert "Press 'd' to delete a session, 'q' to quit\n")
-          (insert "─────────────────────────────────────────\n\n")
-
-          (dolist (session (reverse sessions))
-            (let ((name (nth 0 session))
-                  (dir (nth 1 session))
-                  (status (nth 2 session))
-                  (buf (nth 3 session)))
-              (insert (format "  %s\n" name))
-              (insert (format "    Directory: %s\n" dir))
-              (insert (format "    Status: %s\n" status))
-              (put-text-property (line-beginning-position -2) (line-beginning-position)
-                                 'session-buffer buf)
-              (insert "\n"))))
-
-        ;; Set up key bindings for the session list buffer
-        (use-local-map (make-sparse-keymap))
-        (local-set-key "d" 'enkan-repl--delete-session-at-point)
-        (local-set-key "q" 'quit-window)
-        (setq buffer-read-only t)
-        (goto-char (point-min))
-        (forward-line 4)  ; Skip header
-        (switch-to-buffer "*enkan-repl-sessions*")))))
+      (enkan-repl--display-sessions-in-buffer sessions buffer-info-list))))
 
 (defun enkan-repl--delete-session-at-point ()
   "Delete the session at point after confirmation."
   (interactive)
-  (let ((buf (get-text-property (line-beginning-position) 'session-buffer)))
+  (let ((buf (get-text-property (point) 'session-buffer)))
     (if (not buf)
         (message "No session on this line")
       (when (y-or-n-p (format "Delete session %s? " (buffer-name buf)))
         (kill-buffer buf)
-        (enkan-repl-list-sessions)  ; Refresh the list
+        ;; Immediately refresh the list
+        (enkan-repl-list-sessions)
         (message "Session deleted")))))
 
 ;;;###autoload

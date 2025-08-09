@@ -19,6 +19,90 @@
 
 (require 'cl-lib)
 
+;;;; Session List Pure Functions
+
+(defun enkan-repl--extract-session-info-pure (buffer-name buffer-live-p has-eat-process process-live-p)
+  "Pure function to extract session info from buffer properties.
+BUFFER-NAME is the name of the buffer.
+BUFFER-LIVE-P indicates if buffer is live.
+HAS-EAT-PROCESS indicates if buffer has eat--process variable.
+PROCESS-LIVE-P indicates if the process is alive.
+Returns a plist with :name, :directory, and :status, or nil if not a session."
+  (when (and buffer-name
+             buffer-live-p
+             (string-match "^\\*enkan:\\(.*?\\)\\*$" buffer-name))
+    (let ((dir (match-string 1 buffer-name))
+          (status (if (and has-eat-process process-live-p)
+                      'alive
+                    'dead)))
+      (list :name buffer-name
+            :directory dir
+            :status status))))
+
+(defun enkan-repl--collect-sessions-pure (buffer-info-list)
+  "Pure function to collect session info from buffer info list.
+BUFFER-INFO-LIST is a list of plists with buffer properties.
+Each plist should have :name, :live-p, :has-eat-process, and :process-live-p.
+Returns a list of session info plists."
+  (let ((sessions '()))
+    (dolist (buffer-info buffer-info-list)
+      (let ((session-info
+             (enkan-repl--extract-session-info-pure
+              (plist-get buffer-info :name)
+              (plist-get buffer-info :live-p)
+              (plist-get buffer-info :has-eat-process)
+              (plist-get buffer-info :process-live-p))))
+        (when session-info
+          (push session-info sessions))))
+    (nreverse sessions)))
+
+(defun enkan-repl--format-sessions-pure (sessions)
+  "Pure function to format sessions for display.
+SESSIONS is a list of session info plists.
+Returns a formatted string for display."
+  (if (null sessions)
+      "No active sessions found\n"
+    (concat "Active enkan-repl sessions:\n"
+            "Press 'd' to delete a session, 'q' to quit\n"
+            "─────────────────────────────────────────\n\n"
+            (mapconcat
+             (lambda (session)
+               (format "  %s\n    Directory: %s\n    Status: %s\n\n"
+                       (plist-get session :name)
+                       (plist-get session :directory)
+                       (plist-get session :status)))
+             sessions
+             ""))))
+
+(defun enkan-repl--find-deletion-bounds-pure (lines current-line)
+  "Pure function to find bounds for deletion.
+LINES is a list of strings (buffer lines).
+CURRENT-LINE is the current line number (0-indexed).
+Returns a plist with :start-line and :end-line for deletion bounds,
+or nil if not on a session entry."
+  (when (and (>= current-line 0)
+             (< current-line (length lines)))
+    (let ((line (nth current-line lines)))
+      ;; Check if we're on or near a session entry
+      (cond
+       ;; On session name line
+       ((string-match "^  \\*enkan:" line)
+        (list :start-line current-line
+              :end-line (min (+ current-line 4) (length lines))))
+       ;; On directory line
+       ((and (> current-line 0)
+             (string-match "^    Directory:" line)
+             (string-match "^  \\*enkan:" (nth (1- current-line) lines)))
+        (list :start-line (1- current-line)
+              :end-line (min (+ current-line 3) (length lines))))
+       ;; On status line
+       ((and (> current-line 1)
+             (string-match "^    Status:" line)
+             (string-match "^  \\*enkan:" (nth (- current-line 2) lines)))
+        (list :start-line (- current-line 2)
+              :end-line (min (+ current-line 2) (length lines))))
+       (t nil)))))
+
 (defun enkan-repl-utils--extract-function-info (file-path)
   "Extract public function information from an Emacs Lisp file.
 Returns a list of plists, each containing :name, :args, :docstring,
