@@ -693,14 +693,14 @@
 
 (ert-deftest test-sanitize-content-control-characters ()
   "Test that problematic control characters are removed."
-  ;; Test carriage return removal
-  (should (string= (enkan-repl--sanitize-content "Test\rContent") "TestContent"))
+  ;; Test carriage return conversion to newline
+  (should (string= (enkan-repl--sanitize-content "Test\rContent") "Test\nContent"))
 
   ;; Test mixed control characters at end
   (should (string= (enkan-repl--sanitize-content "Test Content\r\x0B\x0C") "Test Content"))
 
-  ;; Test that normal whitespace trimming still works
-  (should (string= (enkan-repl--sanitize-content "  Test Content  ") "Test Content")))
+  ;; Test that only trailing whitespace is trimmed (preserve leading spaces)
+  (should (string= (enkan-repl--sanitize-content "  Test Content  ") "  Test Content")))
 
 (ert-deftest test-sanitize-content-problematic-string ()
   "Test sanitization with the specific problematic string reported by user."
@@ -1067,8 +1067,32 @@
                  (lambda (fmt &rest args)
                    (setq message-text (apply #'format fmt args)))))
         (enkan-repl-send-region start end)
-        ;; Should trim whitespace
-        (should (string= sent-text "Hello World"))
+        ;; Should preserve leading whitespace
+        (should (string= sent-text "  \n\t  Hello World"))
+        (should (string-match-p "Region sent (" message-text))))))
+
+(ert-deftest test-send-region-trims-only-end-lines ()
+  "Test that send-region trims only end lines and white spaces."
+  (with-temp-buffer
+    (insert "\nLine1\nLine2\n\nLine3\nLine4\n\t\n  ")
+    (let ((start (point-min))
+          (end (point-max))
+          (sent-text nil)
+          (message-text nil))
+      ;; Mock functions
+      (cl-letf (((symbol-function 'use-region-p) (lambda () t))
+                ((symbol-function 'enkan-repl--get-target-directory-for-buffer)
+                 (lambda () "/test/dir"))
+                ((symbol-function 'enkan-repl--send-text)
+                 (lambda (text dir)
+                   (setq sent-text text)
+                   t))
+                ((symbol-function 'message)
+                 (lambda (fmt &rest args)
+                   (setq message-text (apply #'format fmt args)))))
+        (enkan-repl-send-region start end)
+        ;; Should preserve leading whitespace
+        (should (string= sent-text "\nLine1\nLine2\n\nLine3\nLine4"))
         (should (string-match-p "Region sent (" message-text))))))
 
 (ert-deftest test-send-region-empty-after-trim ()
@@ -1076,15 +1100,15 @@
   (with-temp-buffer
     (insert "  \n\t  \n  ")
     (let ((start (point-min))
-          (end (point-max))
-          (message-text nil))
+           (end (point-max))
+           (message-text nil))
       ;; Mock functions
       (cl-letf (((symbol-function 'use-region-p) (lambda () t))
-                ((symbol-function 'enkan-repl--get-target-directory-for-buffer)
-                 (lambda () "/test/dir"))
-                ((symbol-function 'message)
-                 (lambda (fmt &rest args)
-                   (setq message-text (apply #'format fmt args)))))
+                 ((symbol-function 'enkan-repl--get-target-directory-for-buffer)
+                   (lambda () "/test/dir"))
+                 ((symbol-function 'message)
+                   (lambda (fmt &rest args)
+                     (setq message-text (apply #'format fmt args)))))
         (enkan-repl-send-region start end)
         ;; Should detect empty content
         (should (string-match-p "No content to send" message-text))))))
@@ -1108,8 +1132,8 @@
                  (lambda (fmt &rest args)
                    (setq message-text (apply #'format fmt args)))))
         (enkan-repl-send-rest-of-buffer)
-        ;; Should trim whitespace
-        (should (string= sent-text "Hello World"))
+        ;; Should preserve leading whitespace
+        (should (string= sent-text "  \n\t  Hello World"))
         (should (string-match-p "Rest of buffer sent (" message-text))))))
 
 (ert-deftest test-send-rest-of-buffer-empty-after-trim ()
@@ -1169,8 +1193,8 @@
                  (lambda (fmt &rest args)
                    (setq message-text (apply #'format fmt args)))))
         (enkan-repl-send-line)
-        ;; Should trim whitespace
-        (should (string= sent-text "Line with spaces"))
+        ;; Should preserve leading whitespace
+        (should (string= sent-text "  \t  Line with spaces"))
         (should (string-match-p "Line sent (" message-text))))))
 
 (ert-deftest test-send-line-empty-after-trim ()
@@ -1791,18 +1815,18 @@ Does not modify global state."
   "Test comprehensive newline normalization and Mac-specific issues."
   ;; Test \r\n normalization to \n
   (should (string= (enkan-repl--sanitize-content "Line1\r\nLine2") "Line1\nLine2"))
-  ;; Test \n\r normalization to \n
-  (should (string= (enkan-repl--sanitize-content "Line1\n\rLine2") "Line1\nLine2"))
-  ;; Test mixed \r removal
-  (should (string= (enkan-repl--sanitize-content "Line1\rLine2\r\nLine3") "Line1Line2\nLine3"))
-  ;; Test consecutive newlines collapse
-  (should (string= (enkan-repl--sanitize-content "Line1\n\n\nLine2") "Line1\nLine2"))
-  ;; Test combination of \r and consecutive newlines
-  (should (string= (enkan-repl--sanitize-content "Line1\r\n\n\rLine2") "Line1\nLine2"))
+  ;; Test \n\r normalization (\r becomes \n, so \n\r becomes \n\n)
+  (should (string= (enkan-repl--sanitize-content "Line1\n\rLine2") "Line1\n\nLine2"))
+  ;; Test mixed \r conversion
+  (should (string= (enkan-repl--sanitize-content "Line1\rLine2\r\nLine3") "Line1\nLine2\nLine3"))
+  ;; Test consecutive newlines are preserved (no collapse)
+  (should (string= (enkan-repl--sanitize-content "Line1\n\n\nLine2") "Line1\n\n\nLine2"))
+  ;; Test combination of \r normalization but preserve consecutive newlines
+  (should (string= (enkan-repl--sanitize-content "Line1\r\n\n\rLine2") "Line1\n\n\nLine2"))
   ;; Test Unicode line separators removal
   (should (string= (enkan-repl--sanitize-content "Line1\u0085Line2\u2028Line3\u2029Line4") "Line1Line2Line3Line4"))
-  ;; Test real-world Mac selection scenario
-  (should (string= (enkan-repl--sanitize-content "send-region test\r\n\nwith extra newlines\r") "send-region test\nwith extra newlines")))
+  ;; Test real-world Mac selection scenario (preserve empty lines, only trim end)
+  (should (string= (enkan-repl--sanitize-content "send-region test\r\n\nwith extra newlines\r") "send-region test\n\nwith extra newlines")))
 
 ;;; Tests for Template Error Handling
 
