@@ -59,6 +59,9 @@
 
 ;; Declare external functions to avoid byte-compile warnings
 (declare-function enkan-repl-utils--extract-function-info "enkan-repl-utils" (file-path))
+(declare-function enkan-repl--find-session-buffer-pure "enkan-repl-utils" (selected-name buffer-info-list))
+(declare-function enkan-repl--collect-sessions-pure "enkan-repl-utils" (buffer-info-list))
+(declare-function enkan-repl--format-numbered-sessions-pure "enkan-repl-utils" (sessions))
 
 
 ;; Declare external functions to avoid byte-compiler warnings

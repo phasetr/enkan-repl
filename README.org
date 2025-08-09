@@ -202,30 +202,37 @@ The generated project file includes template functions and usage instructions.
 ** Core Functions
 
 *** Command Palette
-- =enkan-repl-cheat-sheet= *Interactive command browser with fuzzy search*
+- =enkan-repl-cheat-sheet= - *Interactive command browser with fuzzy search*
   - Browse all available functions with descriptions
   - Filter functions by typing partial names
   - Functions organized by category for easy discovery
   - No need to memorize function names
 
 *** File Management
-- =enkan-repl-open-project-input-file= Create/open persistent input file for current directory
+- =enkan-repl-open-project-input-file= - Create/open persistent input file for current directory
 
 *** Text Sending
-- =enkan-repl-send-region= Send selected text (the author most commonly used)
-- =enkan-repl-send-rest-of-buffer= Send from cursor to end
-- =enkan-repl-send-buffer= Send entire buffer
-- =enkan-repl-send-line= Send current line only
+- =enkan-repl-send-region= - Send selected text (the author most commonly used)
+- =enkan-repl-send-buffer= - Send entire buffer
+- =enkan-repl-send-rest-of-buffer= - Send from cursor to end
+- =enkan-repl-send-line= - Send current line only
+- =enkan-repl-send-enter= - Send enter key
+- =enkan-repl-send-1/2/3= - Send numbered choices for AI prompts
+- =enkan-repl-send-escape= - Send ESC key to eat session buffer.
 
 *** Session Control
-- =enkan-repl-send-enter= Send enter key
-- =enkan-repl-send-1/2/3= Send numbered choices for AI prompts
+- =enkan-repl-start-eat= - Start eat terminal emulator session. Determines directory from current buffer filename if it's a persistent file. Checks for existing sessions to prevent double startup.
+- =enkan-repl-finish-eat= - Terminate eat session and close its buffer. Determines directory from current buffer filename if it's a persistent file.
+- =enkan-repl-setup-window-layout= - Arrange windows for (the author's) optimal workflow
+- =enkan-repl-list-sessions= - Display a list of active enkan sessions with interactive selection. Users can select a session, then choose action: (s)witch, (d)elete, or (q)uit.
 
 *** Utilities
-- =enkan-repl-start-eat= Start eat session in appropriate directory
-- =enkan-repl-finish-eat= Start eat session in appropriate directory
-- =enkan-repl-setup-window-layout= Arrange windows for (the author's) optimal workflow
-- =enkan-repl-status= Display connection status and diagnostics
+- =enkan-repl-recenter-bottom= - Move cursor to bottom of eat buffer for current directory.
+- =enkan-repl-output-template= - Output current template content to a new buffer for customization.
+- =enkan-repl-status= - Show detailed diagnostic information for troubleshooting connection issues.
+- =enkan-repl-toggle-debug-mode= - Toggle debug mode for enkan-repl operations.
+- =enkan-repl-enable-debug-mode= - Enable debug mode for enkan-repl operations.
+- =enkan-repl-disable-debug-mode= - Disable debug mode for enkan-repl operations.
 
 ** Configuration
 
