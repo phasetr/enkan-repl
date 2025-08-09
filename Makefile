@@ -57,6 +57,6 @@ generate-template: ## Generate default template file
 generate-constants: ## Generate precompiled constants for cheat-sheet performance
 	$(BATCH) -l scripts/generate-constants.el --eval "(generate-cheat-sheet-constants)"
 
-docs: ## Generate all documentation files (API, template, and constants)
-	$(BATCH) -l scripts/generate-docs.el --eval "(generate-all-docs)"
+docs: ## Generate all documentation files (constants first, then docs)
 	$(BATCH) -l scripts/generate-constants.el --eval "(generate-cheat-sheet-constants)"
+	$(BATCH) -l scripts/generate-docs.el --eval "(generate-all-docs)"
