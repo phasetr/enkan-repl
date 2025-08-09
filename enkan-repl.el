@@ -892,7 +892,8 @@ Category: Session Controller"
                nil)))
           ;; Ensure buffer is displayed in target window
           (set-window-buffer target-window eat-buffer))
-        ;; Stay in eat buffer (do not return to original window)
+        ;; Return to original window (input file)
+        (other-window -1)
         (message "Started eat session in: %s" target-dir))))))
 
 ;;;###autoload
