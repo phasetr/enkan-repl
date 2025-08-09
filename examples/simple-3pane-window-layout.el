@@ -106,7 +106,9 @@ Negative value makes text smaller."
     (switch-to-buffer "*eat*")
     (eat))
   ;; Adjust text scale in eat buffer
-  (text-scale-adjust enkan-3pane-eat-text-scale)
+  ;; Clear all existing face remappings first
+  (setq-local face-remapping-alist nil)
+  (face-remap-add-relative 'default :height enkan-3pane-eat-text-scale)
   ;; Return to input window
   (select-window enkan-3pane-input-left-up-window)
   ;; Lock input buffer
@@ -224,7 +226,7 @@ Avoids switching to eat window."
 (defvar enkan-3pane-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "C-c 3 s") 'enkan-3pane-setup)
-    (define-key map (kbd "C-c 3 o") 'enkan-3pane-other-window)
+    (define-key map (kbd "M-t") 'enkan-3pane-other-window)
     (define-key map (kbd "C-c 3 l") 'enkan-3pane-lock-input-buffer)
     (define-key map (kbd "C-c 3 u") 'enkan-3pane-unlock-input-buffer)
     (define-key map (kbd "C-c 3 e") 'enkan-3pane-send-escape)
