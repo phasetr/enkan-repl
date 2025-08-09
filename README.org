@@ -1,4 +1,4 @@
-* enkan-repl
+* enkan-repl (円環-REPL)
 
 [[https://github.com/phasetr/enkan-repl/workflows/CI/badge.svg]]
 [[https://img.shields.io/badge/License-MIT-yellow.svg]]
@@ -42,7 +42,7 @@ Here lies a completely new programming horizon woven by Emacs and AI.
 (See [[#why-enkan][Why "enkan"?]] and [[#future-directions][Future Directions]] for more details about the philosophy and roadmap)
 
 ** Motivation
-The development motivation stems from the current usability issues with Claude Code and Gemini CLI,
+The development motivation stems from the current (2025/8) usability issues with Claude Code and Gemini CLI,
 particularly the difficulty of text input and the non-persistent nature of personal input history.
 While file-based input is somewhat possible,
 it's extremely cumbersome to use.
@@ -65,6 +65,11 @@ keeping inspired thoughts noted for immediate use after AI work is complete.
 For text work, I naturally turned to Emacs.
 After trying several packages that didn't quite fit,
 I decided to build my own on top of [[https://github.com/cpoile/claudemacs][claudemacs]].
+In reality, various CLIs appear daily,
+and their performance improves at their own pace.
+It would be inconvenient if we couldn't use them interchangeably.
+Therefore, to cut individual dependencies,
+we decided to use Emacs's terminal emulator, [[https://github.com/akib/emacs-eat][eat]].
 
 This package enables you to send numbered choices directly from your input file
 using functions like =M-x enkan-repl-send-1/2/3=.
@@ -81,6 +86,14 @@ leveraging Emacs's native compatibility and structured document capabilities.
 Rather than supporting multiple formats like Markdown,
 we focus on what works best within the Emacs ecosystem.
 
+*** Dependency for a terminal emulator, [[https://github.com/akib/emacs-eat][eat]]
+
+What we want to do is to develop software services.
+As various tools and services emerge,
+I don't want to spend time developing tools.
+Therefore, with the expectation that CLIs will be the main interface for programmers,
+I will fully commit to relying entirely on the terminal emulator, [[https://github.com/akib/emacs-eat][eat]].
+
 *** No Default Keybindings
 We intentionally provide no default keybindings for several reasons:
 - Org-mode itself already has a vast number of features and keybindings
@@ -94,7 +107,7 @@ to all functions with fuzzy search and filtering capabilities.
 
 *** =M-x= Driven Workflow with Interactive Cheatsheet
 As the author's personal approach, we introduce a "partial keybinding abandonment + cheat-sheet strategy."
-Since there's little potential harm, we assigned direct org-mode keys for numbers and Esc as buffer-local variables.
+Since there's little potential harm, we assigned some key-bindings, like numbers and Esc, as buffer-local variables.
 We also bound the central sending command =send-region= to a key, also as a buffer-local variable.
 For everything else, we abandoned keybinding configurations since they're rarely used.
 
@@ -170,14 +183,15 @@ compatibility with other environments has not been verified.
    /This ensures Claude sessions are isolated and changes are tracked safely./
 
 3. *Open project file*: =M-x enkan-repl-open-project-input-file=
-4. *Start Claude session*: =M-x enkan-repl-start-claudemacs=
-5. *Write your thoughts* in the org-mode file
+4. *Start eat session*: =M-x enkan-repl-start-eat=
+5. *Write your thoughts* in the input org-mode file
 6. *Access functions easily*: Use =M-x enkan-repl-cheat-sheet= to browse and select functions
 7. *Send specific parts* using =M-x enkan-repl-send-region= or =M-x enkan-repl-send-rest-of-buffer=
 
 *** For Existing Projects
 
-*Important*: claude (or claudemacs) automatically detects Git repositories or something and may start sessions in parent directories: see [[https://github.com/cpoile/claudemacs?tab=readme-ov-file#workspace-and-project-aware-sessions][the usage section for claudemacs]].
+*Important*: claude automatically detects Git repositories or something and may start sessions in parent directories: see [[https://github.com/cpoile/claudemacs?tab=readme-ov-file#workspace-and-project-aware-sessions][the usage section for claudemacs]].
+Please refer to the respective manuals for other CLIs.
 
 To ensure predictable behavior:
 - Work within properly initialized Git repositories (=git init=)
@@ -188,29 +202,30 @@ The generated project file includes template functions and usage instructions.
 ** Core Functions
 
 *** Command Palette
-- =enkan-repl-cheat-sheet= - *Interactive command browser with fuzzy search*
+- =enkan-repl-cheat-sheet= *Interactive command browser with fuzzy search*
   - Browse all available functions with descriptions
   - Filter functions by typing partial names
   - Functions organized by category for easy discovery
   - No need to memorize function names
 
 *** File Management
-- =enkan-repl-open-project-input-file= - Create/open persistent input file for current directory
+- =enkan-repl-open-project-input-file= Create/open persistent input file for current directory
 
 *** Text Sending
-- =enkan-repl-send-region= - Send selected text (the author most commonly used)
-- =enkan-repl-send-rest-of-buffer= - Send from cursor to end
-- =enkan-repl-send-buffer= - Send entire buffer
-- =enkan-repl-send-line= - Send current line only
+- =enkan-repl-send-region= Send selected text (the author most commonly used)
+- =enkan-repl-send-rest-of-buffer= Send from cursor to end
+- =enkan-repl-send-buffer= Send entire buffer
+- =enkan-repl-send-line= Send current line only
 
 *** Session Control
-- =enkan-repl-send-enter= - Send enter key
-- =enkan-repl-send-1/2/3= - Send numbered choices for AI prompts
+- =enkan-repl-send-enter= Send enter key
+- =enkan-repl-send-1/2/3= Send numbered choices for AI prompts
 
 *** Utilities
-- =enkan-repl-start-claudemacs= - Start Claude session in appropriate directory
-- =enkan-repl-setup-window-layout= - Arrange windows for (the author's) optimal workflow
-- =enkan-repl-status= - Display connection status and diagnostics
+- =enkan-repl-start-eat= Start eat session in appropriate directory
+- =enkan-repl-finish-eat= Start eat session in appropriate directory
+- =enkan-repl-setup-window-layout= Arrange windows for (the author's) optimal workflow
+- =enkan-repl-status= Display connection status and diagnostics
 
 ** Configuration
 
@@ -228,16 +243,6 @@ The generated project file includes template functions and usage instructions.
 
 To create a custom template,
 use =M-x enkan-repl-output-template= to export the default template to a buffer for editing.
-
-** Troubleshooting
-If you encounter "❌ Cannot send - no matching claudemacs buffer found for this directory":
-
-1. Ensure claudemacs is running: =M-x claudemacs-transient-menu=
-2. Verify Claude Code CLI is properly configured
-3. Run =M-x enkan-repl-status= for detailed diagnostic information
-4. Check that you're in the correct directory or using the appropriate project file
-
-For debug information, enable debug mode with =M-x enkan-repl-toggle-debug-mode=.
 
 ** Development
 
@@ -277,7 +282,7 @@ which I have adopted.
 I'm not sure if this is the right approach,
 but I'll run with it for now.
 
-** Why "enkan"?
+** Why "enkan" (円環, circle/torus)?
 :PROPERTIES:
 :CUSTOM_ID: why-enkan
 :END:
@@ -300,6 +305,8 @@ The journey to this name reflects our philosophy:
 
 This package is currently built on Claude Code due to the overwhelmingly superior experience it provides within my current usage scope.
 However, if superior services emerge that surpass Claude Code through future technological and service developments, I intend to migrate to those alternatives.
+We are actually switching to relying on terminal emulators,
+anticipating the rise of CLI services for programmers.
 
 The "enkan" philosophy already embraces multiple AI collaboration:
 We leverage Claude's exceptional reasoning capabilities while compensating for its limited search abilities
