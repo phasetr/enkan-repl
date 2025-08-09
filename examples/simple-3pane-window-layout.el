@@ -14,9 +14,9 @@
 ;;; Commentary:
 
 ;; This example provides a 3-pane window layout configuration:
-;; - Left-top (60%): Input file buffer (locked, for composing prompts)
-;; - Left-bottom (40%): Miscellaneous files buffer (for viewing docs/tests)
-;; - Right (full height): eat terminal buffer (for AI interaction)
+;; - Left: Input file buffer (locked, for composing prompts)
+;; - Right-top: Miscellaneous files buffer (for viewing docs/tests)
+;; - Right-bottom: eat terminal buffer (for AI interaction)
 ;;
 ;; Features:
 ;; - Quick switching between input and misc windows only
@@ -48,13 +48,13 @@
 (defvar enkan-3pane-input-buffer nil
   "Buffer for input file (prompts).")
 
-(defvar enkan-3pane-input-window nil
+(defvar enkan-3pane-input-left-up-window nil
   "Window for input file.")
 
-(defvar enkan-3pane-misc-window nil
+(defvar enkan-3pane-misc-left-down-window nil
   "Window for miscellaneous files.")
 
-(defvar enkan-3pane-eat-window nil
+(defvar enkan-3pane-eat-right-full-window nil
   "Window for eat terminal.")
 
 (defcustom enkan-3pane-eat-text-scale -1
@@ -63,91 +63,76 @@ Negative value makes text smaller."
   :type 'integer
   :group 'enkan-repl)
 
-(defcustom enkan-3pane-left-width-ratio 0.5
-  "Width ratio for left pane (0.0 to 1.0)."
+(defcustom enkan-3pane-input-width-ratio 0.6
+  "Width ratio for input window (0.0 to 1.0)."
   :type 'float
   :group 'enkan-repl)
 
-(defcustom enkan-3pane-input-height-ratio 0.6
-  "Height ratio for input window in left pane (0.0 to 1.0)."
+(defcustom enkan-3pane-misc-height-ratio 0.4
+  "Height ratio for misc window in right pane (0.0 to 1.0)."
   :type 'float
   :group 'enkan-repl)
 
 ;;; Layout Management
 
 (defun enkan-3pane-setup ()
-  "Setup 3-pane window layout for elisp development.
-Left-top: Input buffer (60%)
-Left-bottom: Misc files (40%)
-Right: eat terminal (full height)"
+  "Setup 3-pane window layout for elisp development."
   (interactive)
   ;; Save current buffer as input buffer
   (setq enkan-3pane-input-buffer (current-buffer))
-  
   ;; Delete other windows to start fresh
   (delete-other-windows)
-  
-  ;; Setup left-top window (input)
-  (setq enkan-3pane-input-window (selected-window))
-  
-  ;; Create right pane for eat (50% width)
-  (let ((right-width (floor (* (window-width) 
-                                (- 1 enkan-3pane-left-width-ratio)))))
+
+  ;; Setup left window (input)
+  (setq enkan-3pane-input-left-up-window (selected-window))
+
+  ;; Create right pane
+  (let ((right-width (floor (* (window-width)
+                              (- 1 enkan-3pane-input-width-ratio)))))
     (split-window-horizontally (- right-width)))
-  
-  ;; Setup eat in right window
+
+  ;; Move to right pane and split vertically
   (other-window 1)
-  (setq enkan-3pane-eat-window (selected-window))
-  
+  (setq enkan-3pane-misc-left-down-window (selected-window))
+  ;; Create bottom window for eat
+  (let ((eat-height (floor (* (window-height)
+                             (- 1 enkan-3pane-misc-height-ratio)))))
+    (split-window-vertically (- eat-height)))
+  ;; Setup eat buffer in bottom window
+  (other-window 1)
+  (setq enkan-3pane-eat-right-full-window (selected-window))
   ;; Start or switch to eat session
   (if (get-buffer "*eat*")
-      (switch-to-buffer "*eat*")
+    (switch-to-buffer "*eat*")
     (eat))
-  
   ;; Adjust text scale in eat buffer
   (text-scale-adjust enkan-3pane-eat-text-scale)
-  
-  ;; Go back to left pane and split vertically
-  (select-window enkan-3pane-input-window)
-  
-  ;; Create bottom window for misc files (40% of left pane)
-  ;; split-window-vertically takes the size of the top window
-  (let ((input-height (floor (* (window-height) 
-                                 enkan-3pane-input-height-ratio))))
-    (split-window-vertically input-height))
-  
-  ;; Setup misc window
-  (other-window 1)
-  (setq enkan-3pane-misc-window (selected-window))
-  
   ;; Return to input window
-  (select-window enkan-3pane-input-window)
-  
+  (select-window enkan-3pane-input-left-up-window)
   ;; Lock input buffer
   (enkan-3pane-lock-input-buffer)
-  
   (message "3-pane layout initialized. Use C-c 3 o to switch windows."))
 
 (defun enkan-3pane-other-window ()
-  "Switch between input and misc windows only.
+p  "Switch between input and misc windows only.
 Avoids switching to eat window."
   (interactive)
   (cond
-   ;; From input window -> go to misc
-   ((and enkan-3pane-input-window
-         (eq (selected-window) enkan-3pane-input-window))
-    (when (window-live-p enkan-3pane-misc-window)
-      (select-window enkan-3pane-misc-window)))
-   ;; From anywhere else -> go to input
-   (t
-    (when (window-live-p enkan-3pane-input-window)
-      (select-window enkan-3pane-input-window)))))
+    ;; From input window -> go to misc
+    ((and enkan-3pane-input-left-up-window
+       (eq (selected-window) enkan-3pane-input-left-up-window))
+      (when (window-live-p enkan-3pane-misc-left-down-window)
+        (select-window enkan-3pane-misc-left-down-window)))
+    ;; From anywhere else -> go to input
+    (t
+      (when (window-live-p enkan-3pane-input-left-up-window)
+        (select-window enkan-3pane-input-left-up-window)))))
 
 (defun enkan-3pane-lock-input-buffer ()
   "Lock input buffer to prevent opening other files in it."
   (interactive)
   (when (and enkan-3pane-input-buffer
-             (buffer-live-p enkan-3pane-input-buffer))
+          (buffer-live-p enkan-3pane-input-buffer))
     (let ((window (get-buffer-window enkan-3pane-input-buffer)))
       (when window
         (set-window-dedicated-p window t)
@@ -157,7 +142,7 @@ Avoids switching to eat window."
   "Unlock input buffer to allow opening other files."
   (interactive)
   (when (and enkan-3pane-input-buffer
-             (buffer-live-p enkan-3pane-input-buffer))
+          (buffer-live-p enkan-3pane-input-buffer))
     (let ((window (get-buffer-window enkan-3pane-input-buffer)))
       (when window
         (set-window-dedicated-p window nil)
@@ -168,45 +153,45 @@ Avoids switching to eat window."
 (defun enkan-3pane-send-escape ()
   "Send ESC to eat buffer from any window."
   (interactive)
-  (if (and enkan-3pane-eat-window
-           (window-live-p enkan-3pane-eat-window))
-      (save-window-excursion
-        (select-window enkan-3pane-eat-window)
-        (enkan-repl-send-escape)
-        (message "Sent ESC to eat buffer"))
+  (if (and enkan-3pane-eat-right-full-window
+        (window-live-p enkan-3pane-eat-right-full-window))
+    (save-window-excursion
+      (select-window enkan-3pane-eat-right-full-window)
+      (enkan-repl-send-escape)
+      (message "Sent ESC to eat buffer"))
     (message "No eat window found. Run M-x enkan-3pane-setup first.")))
 
 (defun enkan-3pane-send-1 ()
   "Send choice 1 to eat buffer from any window."
   (interactive)
-  (if (and enkan-3pane-eat-window
-           (window-live-p enkan-3pane-eat-window))
-      (save-window-excursion
-        (select-window enkan-3pane-eat-window)
-        (enkan-repl-send-1)
-        (message "Sent 1 to eat buffer"))
+  (if (and enkan-3pane-eat-right-full-window
+        (window-live-p enkan-3pane-eat-right-full-window))
+    (save-window-excursion
+      (select-window enkan-3pane-eat-right-full-window)
+      (enkan-repl-send-1)
+      (message "Sent 1 to eat buffer"))
     (message "No eat window found. Run M-x enkan-3pane-setup first.")))
 
 (defun enkan-3pane-send-2 ()
   "Send choice 2 to eat buffer from any window."
   (interactive)
-  (if (and enkan-3pane-eat-window
-           (window-live-p enkan-3pane-eat-window))
-      (save-window-excursion
-        (select-window enkan-3pane-eat-window)
-        (enkan-repl-send-2)
-        (message "Sent 2 to eat buffer"))
+  (if (and enkan-3pane-eat-right-full-window
+        (window-live-p enkan-3pane-eat-right-full-window))
+    (save-window-excursion
+      (select-window enkan-3pane-eat-right-full-window)
+      (enkan-repl-send-2)
+      (message "Sent 2 to eat buffer"))
     (message "No eat window found. Run M-x enkan-3pane-setup first.")))
 
 (defun enkan-3pane-send-3 ()
   "Send choice 3 to eat buffer from any window."
   (interactive)
-  (if (and enkan-3pane-eat-window
-           (window-live-p enkan-3pane-eat-window))
-      (save-window-excursion
-        (select-window enkan-3pane-eat-window)
-        (enkan-repl-send-3)
-        (message "Sent 3 to eat buffer"))
+  (if (and enkan-3pane-eat-right-full-window
+        (window-live-p enkan-3pane-eat-right-full-window))
+    (save-window-excursion
+      (select-window enkan-3pane-eat-right-full-window)
+      (enkan-repl-send-3)
+      (message "Sent 3 to eat buffer"))
     (message "No eat window found. Run M-x enkan-3pane-setup first.")))
 
 ;;; Helper Functions
@@ -215,41 +200,24 @@ Avoids switching to eat window."
   "Reset all 3-pane related variables."
   (interactive)
   (setq enkan-3pane-input-buffer nil
-        enkan-3pane-input-window nil
-        enkan-3pane-misc-window nil
-        enkan-3pane-eat-window nil)
+    enkan-3pane-input-left-up-window nil
+    enkan-3pane-misc-left-down-window nil
+    enkan-3pane-eat-right-full-window nil)
   (message "3-pane layout reset."))
 
 (defun enkan-3pane-status ()
   "Show status of 3-pane layout."
   (interactive)
   (message "3-pane status: Input:%s Misc:%s Eat:%s"
-           (if (and enkan-3pane-input-window 
-                    (window-live-p enkan-3pane-input-window))
-               "active" "inactive")
-           (if (and enkan-3pane-misc-window
-                    (window-live-p enkan-3pane-misc-window))
-               "active" "inactive")
-           (if (and enkan-3pane-eat-window
-                    (window-live-p enkan-3pane-eat-window))
-               "active" "inactive")))
-
-(defun enkan-3pane-balance-windows ()
-  "Rebalance windows to default ratios."
-  (interactive)
-  (when (and enkan-3pane-input-window
-             (window-live-p enkan-3pane-input-window))
-    (select-window enkan-3pane-input-window)
-    ;; Resize horizontally
-    (let ((total-width (frame-width))
-          (target-width (floor (* (frame-width) enkan-3pane-left-width-ratio))))
-      (window-resize nil (- target-width (window-width)) t))
-    ;; Resize vertically
-    (let ((left-height (window-height (frame-root-window)))
-          (target-height (floor (* (window-height (frame-root-window))
-                                   enkan-3pane-input-height-ratio))))
-      (window-resize nil (- target-height (window-height)) nil)))
-  (message "Windows rebalanced."))
+    (if (and enkan-3pane-input-left-up-window
+          (window-live-p enkan-3pane-input-left-up-window))
+      "active" "inactive")
+    (if (and enkan-3pane-misc-left-down-window
+          (window-live-p enkan-3pane-misc-left-down-window))
+      "active" "inactive")
+    (if (and enkan-3pane-eat-right-full-window
+          (window-live-p enkan-3pane-eat-right-full-window))
+      "active" "inactive")))
 
 ;;; Keybindings (optional - users can customize)
 
@@ -264,7 +232,6 @@ Avoids switching to eat window."
     (define-key map (kbd "C-c 3 2") 'enkan-3pane-send-2)
     (define-key map (kbd "C-c 3 3") 'enkan-3pane-send-3)
     (define-key map (kbd "C-c 3 r") 'enkan-3pane-reset)
-    (define-key map (kbd "C-c 3 b") 'enkan-3pane-balance-windows)
     (define-key map (kbd "C-c 3 ?") 'enkan-3pane-status)
     map)
   "Keymap for 3-pane layout commands.")
