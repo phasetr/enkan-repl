@@ -61,6 +61,9 @@ This is set automatically when enkan-simple-3pane-setup is called.")
 (defvar enkan-simple-3pane-eat-right-full-window nil
   "Window for eat terminal.")
 
+(defvar enkan-simple-3pane-mode-map nil
+  "Keymap for 3-pane layout commands.")
+
 (defcustom enkan-simple-3pane-eat-text-scale 0.85
   "Text scale adjustment for eat buffer.
 Negative value makes text smaller."
@@ -77,6 +80,17 @@ Negative value makes text smaller."
   :type 'float
   :group 'enkan-repl)
 
+;;; minor mode
+
+(define-minor-mode enkan-simple-3pane-mode
+  "Minor mode for 3-pane window layout with enkan-repl."
+  :lighter " 3pane"
+  :keymap enkan-simple-3pane-mode-map ; This is critical - must specify the keymap
+  :global t
+  (if enkan-simple-3pane-mode
+    (message "enkan-simple-3pane-mode enabled. C-t to switch windows.")
+    (message "enkan-simple-3pane-mode disabled.")))
+
 ;;; Layout Management
 
 (defun enkan-simple-3pane-setup ()
@@ -91,7 +105,7 @@ Negative value makes text smaller."
   ;; Setup display-buffer rules for misc window
   (enkan-simple-3pane-setup-display-buffer-rules)
   (message "3-pane layout initialized. Input file: %s"
-           (file-name-nondirectory enkan-simple-3pane-input-file-path)))
+    (file-name-nondirectory enkan-simple-3pane-input-file-path)))
 
 ;;; Window Management
 
@@ -239,7 +253,10 @@ Avoids switching to eat window."
 (defun enkan-simple-3pane-setup-display-buffer-rules ()
   "Setup display-buffer rules to force misc buffers to left-down window."
   ;; Override the default display-buffer function
-  (advice-add 'display-buffer :around #'enkan-simple-3pane-display-buffer-advice))
+  (advice-add 'display-buffer :around #'enkan-simple-3pane-display-buffer-advice)
+  ;; Prevent deletion of misc window
+  (advice-add 'delete-window :around #'enkan-simple-3pane-protect-window-advice)
+  (advice-add 'quit-window :around #'enkan-simple-3pane-quit-window-advice))
 
 (defun enkan-simple-3pane-display-buffer-advice (orig-fun buffer &rest args)
   "Advice to redirect buffers to misc window when appropriate."
@@ -263,6 +280,36 @@ Avoids switching to eat window."
      ;; Default behavior
      (t (apply orig-fun buffer args)))))
 
+(defun enkan-simple-3pane-protect-window-advice (orig-fun &optional window)
+  "Prevent deletion of protected windows in 3-pane layout."
+  (let ((win (or window (selected-window))))
+    (cond
+     ;; Never allow deletion of our 3 main windows
+     ((or (eq win enkan-simple-3pane-input-left-up-window)
+          (eq win enkan-simple-3pane-misc-left-down-window)
+          (eq win enkan-simple-3pane-eat-right-full-window))
+      ;; Just switch to scratch buffer instead of deleting window
+      (with-selected-window win
+        (switch-to-buffer (get-buffer-create "*scratch*")))
+      nil)
+     ;; Allow deletion of other windows
+     (t (apply orig-fun window nil)))))
+
+(defun enkan-simple-3pane-quit-window-advice (orig-fun &optional kill window)
+  "Prevent quit-window from deleting protected windows."
+  (let ((win (or window (selected-window))))
+    (if (or (eq win enkan-simple-3pane-input-left-up-window)
+            (eq win enkan-simple-3pane-misc-left-down-window)
+            (eq win enkan-simple-3pane-eat-right-full-window))
+        ;; For protected windows, just bury buffer without deleting window
+        (progn
+          (with-selected-window win
+            (bury-buffer)
+            (switch-to-buffer (other-buffer)))
+          nil)
+      ;; For other windows, use original behavior
+      (apply orig-fun kill window nil))))
+
 (defun enkan-simple-3pane-reset ()
   "Reset all 3-pane related variables."
   (interactive)
@@ -270,14 +317,13 @@ Avoids switching to eat window."
     enkan-simple-3pane-input-left-up-window nil
     enkan-simple-3pane-misc-left-down-window nil
     enkan-simple-3pane-eat-right-full-window nil)
-  ;; Remove display-buffer advice
+  ;; Remove all advices
   (advice-remove 'display-buffer #'enkan-simple-3pane-display-buffer-advice)
+  (advice-remove 'delete-window #'enkan-simple-3pane-protect-window-advice)
+  (advice-remove 'quit-window #'enkan-simple-3pane-quit-window-advice)
   (message "3-pane layout reset."))
 
 ;;; Keybindings (optional - users can customize)
-
-(defvar enkan-simple-3pane-mode-map nil
-  "Keymap for 3-pane layout commands.")
 
 (setq enkan-simple-3pane-mode-map
       (let ((map (make-sparse-keymap)))
@@ -292,15 +338,6 @@ Avoids switching to eat window."
         (define-key map (kbd "C-c 3 3") 'enkan-simple-3pane-send-3)
         (define-key map (kbd "C-c 3 r") 'enkan-simple-3pane-reset)
         map))
-
-(define-minor-mode enkan-simple-3pane-mode
-  "Minor mode for 3-pane window layout with enkan-repl."
-  :lighter " 3pane"
-  :keymap enkan-simple-3pane-mode-map  ; This is critical - must specify the keymap
-  :global t
-  (if enkan-simple-3pane-mode
-    (message "enkan-simple-3pane-mode enabled. C-t to switch windows.")
-    (message "enkan-simple-3pane-mode disabled.")))
 
 ;;; Provide
 
