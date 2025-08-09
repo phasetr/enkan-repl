@@ -3,7 +3,7 @@
 ;; Copyright (C) 2025 [phasetr]
 
 ;; Author: [phasetr] <phasetr@gmail.com>
-;; Version: 0.5.0
+;; Version: 0.6.0
 ;; Package-Requires: ((emacs "28.1") (eat "0.9.4"))
 ;; Keywords: enkan ai tools convenience
 ;; URL: https://github.com/phasetr/enkan-repl
@@ -1107,16 +1107,16 @@ Category: Session Controller"
         (message "No active sessions found")
       ;; Prepare candidates for completing-read with annotations
       (let* ((candidates (mapcar
-                         (lambda (session)
-                           (plist-get session :name))
-                         sessions))
+                          (lambda (session)
+                            (plist-get session :name))
+                          sessions))
              (completion-extra-properties
               `(:annotation-function
                 (lambda (candidate)
                   (let ((session (cl-find-if
-                                 (lambda (s)
-                                   (string= (plist-get s :name) candidate))
-                                 ',sessions)))
+                                  (lambda (s)
+                                    (string= (plist-get s :name) candidate))
+                                  ',sessions)))
                     (when session
                       (format " — Directory: %s, Status: %s"
                               (plist-get session :directory)
@@ -1128,8 +1128,8 @@ Category: Session Controller"
               (when buf
                 ;; Ask for action after selection
                 (let ((action (read-char-choice
-                              (format "Session %s - (s)witch, (d)elete, (q)uit: " selected-name)
-                              '(?s ?d ?q))))
+                               (format "Session %s - (s)witch, (d)elete, (q)uit: " selected-name)
+                               '(?s ?d ?q))))
                   (cl-case action
                     (?s
                      (switch-to-buffer buf)

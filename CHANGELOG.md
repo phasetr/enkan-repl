@@ -1,3 +1,251 @@
+# [0.6.0](https://github.com/phasetr/enkan-repl/compare/v0.5.0...v0.6.0) (2025-08-09)
+
+
+### Features
+
+* migrate from claudemacs to eat terminal backend ([09d6517](https://github.com/phasetr/enkan-repl/commit/09d651715c6247370065780f9f0a57aad3a09166))
+
+
+### BREAKING CHANGES
+
+* claudemacs dependency replaced with eat
+
+- Add enkan-repl-start-eat and enkan-repl-finish-eat functions
+- Update buffer detection to support *enkan:* naming pattern
+- Replace ALL claudemacs references with eat/session throughout codebase
+- Add enkan-repl-list-sessions for session management with d/q keys
+- Update package dependencies from claudemacs to eat
+- Remove all backward compatibility code and claudemacs functions
+- Update constants and test files to reference eat instead of claudemacs
+- Fix all test file references from claudemacs to eat/enkan
+- Update mock functions and test assertions for eat backend
+
+This is a minor version bump as it adds new functionality while
+maintaining the same public API surface (renamed functions).
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+* feat: improve window management for eat buffer display
+
+- Display eat buffer in appropriate window based on current layout
+  - Single window: split horizontally, show eat on right
+  - Two windows: use right window for eat (like setup-window-layout)
+  - Three+ windows: split input file window horizontally
+- Keep focus on input file after starting eat session
+- Add declare-function for eat to avoid byte-compile warnings
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+* feat: fix window management for eat buffer display
+
+- Ensure eat buffer is displayed in correct target window
+- Fix window selection logic for 1, 2, and 3+ window configurations
+- Add comprehensive window management tests
+- Fix syntax errors and paren balance
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+* fix: ensure eat buffer displays in right window and keeps focus
+
+- Fix two-window layout to use right window like setup-window-layout
+- Keep focus on eat buffer after startup for immediate interaction
+- Update tests to verify correct focus behavior
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+* fix: ensure eat buffer displays in right window and keeps focus
+
+- Fix eat buffer window management to display in right window
+- Maintain focus on org input buffer after eat buffer creation
+- Ensure window stays split and focus remains stable
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+* fix: return focus to org buffer after creating eat session
+
+eatバッファを右ウィンドウに作成後、元のorgバッファにフォーカスを戻すように修正
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+* feat: add enkan-repl-recenter-bottom function
+
+eatバッファのカーソルを最下段に移動する関数を実装。
+ウィンドウが表示されている場合はselect-windowを使用し、
+表示されていない場合はwith-current-bufferを使用。
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+* fix: fix recenter error in enkan-repl-recenter-bottom
+
+select-windowでウィンドウに切り替えた後、with-current-bufferで
+バッファコンテキストを確実に設定してからrecenterを実行するように修正。
+これにより「'recenter'ing a window that does not display current-buffer」
+エラーを回避。
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+* fix: return focus to original window after recenter-bottom
+
+enkan-repl-recenter-bottom実行後、カーソルを元のウィンドウ（入力ファイル）に戻すように修正
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+* fix: keep eat buffer cursor at bottom after sending text
+
+send系関数でテキスト送信後、eatバッファのカーソルを最下段（point-max）に
+移動するように修正。これによりカーソルが上に飛ぶ問題を解決。
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+* fix: keep eat buffer cursor at bottom after sending text using async timer
+
+テキスト送信後にeatバッファのカーソルが上に飛ぶ問題を修正。
+run-at-timeを使用して非同期でカーソルを最下段に移動するように変更。
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+* refactor: pure function approach for session list management
+
+セッションリスト機能を純粋関数と副作用のある関数に分離：
+- 純粋関数: extract-session-info, collect-sessions, format-sessions, find-deletion-bounds
+- 副作用関数: get-buffer-info-list, display-sessions-in-buffer
+- 削除後の即座のリスト更新を実装
+- 15個の純粋関数テストを追加して堅牢性を向上
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+* fix: remove interactive from internal function and update constants
+
+- enkan-repl--delete-session-at-pointから(interactive)を削除（内部関数のため）
+- constants ファイルを再生成（21個の公開関数を含む）
+- enkan-repl-recenter-bottomが正しくcheatsheetに含まれることを確認
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+* feat: refactor session list to use interactive completing-read UI
+
+Replace buffer-based session list display with interactive completing-read
+interface matching the cheatsheet UI pattern. Users can now select sessions
+interactively and choose to switch or delete with confirmation.
+
+Key changes:
+- Remove buffer-based display functions (enkan-repl--display-sessions-in-buffer)
+- Remove internal delete function (enkan-repl--delete-session-at-point)
+- Implement completing-read with annotations for session details
+- Add action selection (switch/delete/cancel) after session selection
+- Update constants file with new function descriptions
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+* feat: simplify session list with numbered selection
+
+Replace completing-read with simple numbered list selection to avoid
+complex minibuffer keymap issues. Users now select sessions by number
+and then choose action (switch/delete/quit).
+
+Key changes:
+- Remove complex minibuffer keymap configuration
+- Implement simple numbered list display (one-line format)
+- Add pure function for formatted session list generation
+- Remove non-functional eat cursor tests
+- Add comprehensive tests for new functionality
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+* claude destroys codes completely
+
+* fix: return cursor to input file after starting eat session
+
+After starting eat session, cursor now returns to the original input file window
+instead of staying in the eat buffer. This provides better workflow continuity.
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+* refactor: rename cheatsheet to cheat-sheet for consistency
+
+Changed all occurrences of 'cheatsheet' to 'cheat-sheet' across the codebase
+for better readability and consistency with compound word conventions.
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+* refactor: update list-sessions to use minibuffer interface like cheat-sheet
+
+Changed enkan-repl-list-sessions to use completing-read with annotations
+instead of numbered selection. Now shows sessions in minibuffer with
+directory and status info, then prompts for action after selection.
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+* docs: update README with eat terminal backend information
+
+Updated README.org to reflect the switch from claudemacs to eat terminal
+emulator as the backend, and clarified the package's philosophy of
+supporting multiple AI CLIs through terminal emulation.
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+* fix: correct documentation generation flow order
+
+Changed the build flow to generate constants before docs:
+- Makefile: constants generation now runs before docs generation
+- .releaserc.js: same order adjustment for release process
+- Updated enkan-repl-constants.el with latest function descriptions
+
+This ensures documentation can potentially use the generated constants.
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+* fix: restore dynamic Core Functions generation and fix compilation warnings
+
+- Fixed generate-docs.el to dynamically generate Core Functions from constants
+- Added missing function declarations to avoid byte-compile warnings
+- Core Functions section now automatically reflects actual functions in code
+- Updated README.org with dynamically generated Core Functions
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
 # [0.5.0](https://github.com/phasetr/claudemacs-repl/compare/v0.4.0...v0.5.0) (2025-08-07)
 
 
