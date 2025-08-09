@@ -841,7 +841,6 @@ Category: Session Controller"
               (split-window-right)
               (other-window 1)
               (setq target-window (selected-window))))
-
           ;; Create eat buffer in target window (already selected)
           (setq eat-buffer (eat))
           (when eat-buffer
