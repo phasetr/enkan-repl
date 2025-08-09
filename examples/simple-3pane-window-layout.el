@@ -57,7 +57,7 @@
 (defvar enkan-3pane-eat-right-full-window nil
   "Window for eat terminal.")
 
-(defcustom enkan-3pane-eat-text-scale -1
+(defcustom enkan-3pane-eat-text-scale -0.5
   "Text scale adjustment for eat buffer.
 Negative value makes text smaller."
   :type 'integer
@@ -99,8 +99,9 @@ Negative value makes text smaller."
                              (- 1 enkan-3pane-misc-height-ratio)))))
     (split-window-vertically (- eat-height)))
   ;; Setup eat buffer in bottom window
-  (other-window 1)
+  (other-window 2)
   (setq enkan-3pane-eat-right-full-window (selected-window))
+
   ;; Start or switch to eat session
   (if (get-buffer "*eat*")
     (switch-to-buffer "*eat*")
