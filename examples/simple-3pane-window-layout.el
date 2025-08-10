@@ -48,12 +48,17 @@
       (keybinding-file (expand-file-name "keybinding.el"
                                           (file-name-directory load-file-name))))
   (when (file-exists-p constants-file)
-    (load constants-file))
+    (condition-case err
+        (load constants-file)
+      (error (message "Warning: Failed to load keybinding-constants.el: %s" err))))
   (when (file-exists-p keybinding-file)
-    (load keybinding-file)
-    ;; Install base keybindings as default
-    (when (fboundp 'enkan-install-base-keymap)
-      (enkan-install-base-keymap))))
+    (condition-case err
+        (progn
+          (load keybinding-file)
+          ;; Install base keybindings as default
+          (when (fboundp 'enkan-install-base-keymap)
+            (enkan-install-base-keymap)))
+      (error (message "Warning: Failed to load keybinding.el: %s" err)))))
 
 ;;; ========================================
 ;;; Customization Variables
@@ -143,7 +148,7 @@ This is set automatically when enkan-simple-3pane-setup is called.")
     (let ((map (make-sparse-keymap)))
       ;; These bindings override the base keybindings when 3pane mode is active
       (define-key map (kbd "C-t") 'enkan-simple-3pane-other-window)
-      (define-key map (kbd "M-t") 'other-window-or-split)
+      (define-key map (kbd "M-t") 'other-window)
       (define-key map (kbd "<escape>") 'enkan-simple-3pane-send-escape)
       (define-key map (kbd "C-M-1") 'enkan-simple-3pane-send-1)
       (define-key map (kbd "C-M-2") 'enkan-simple-3pane-send-2)
@@ -231,9 +236,9 @@ This is set automatically when enkan-simple-3pane-setup is called.")
   (setq enkan-simple-3pane-input-left-up-window (selected-window))
 
   ;; Create right pane (eat window)
-  (let ((right-width (floor (* (window-width)
-                              (- 1 enkan-simple-3pane-input-width-ratio)))))
-    (split-window-horizontally (- right-width)))
+  (let ((left-width (floor (* (window-width)
+                             enkan-simple-3pane-input-width-ratio))))
+    (split-window-horizontally left-width))
 
   ;; Still in left-up window, split vertically to create misc window
   (let ((top-height (floor (* (window-height)

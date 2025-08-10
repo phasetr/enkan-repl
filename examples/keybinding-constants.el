@@ -28,8 +28,8 @@
 
 (defconst enkan-keybinding-definitions
   '(;; Window Navigation
-     ("C-t" other-window-or-split "Other window or split" window-navigation)
-     ("M-t" other-window-or-split "Other window or split" window-navigation)
+     ("C-t" other-window "Other window" window-navigation)
+     ("M-t" other-window "Other window" window-navigation)
      ("C-M-l" enkan-repl-setup "Setup window layout" window-navigation)
 
      ;; Text Sending

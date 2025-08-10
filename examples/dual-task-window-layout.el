@@ -48,12 +48,17 @@
        (keybinding-file (expand-file-name "keybinding.el"
                           (file-name-directory load-file-name))))
   (when (file-exists-p constants-file)
-    (load constants-file))
+    (condition-case err
+        (load constants-file)
+      (error (message "Warning: Failed to load keybinding-constants.el: %s" err))))
   (when (file-exists-p keybinding-file)
-    (load keybinding-file)
-    ;; Install base keybindings as default
-    (when (fboundp 'enkan-install-base-keymap)
-      (enkan-install-base-keymap))))
+    (condition-case err
+        (progn
+          (load keybinding-file)
+          ;; Install base keybindings as default
+          (when (fboundp 'enkan-install-base-keymap)
+            (enkan-install-base-keymap)))
+      (error (message "Warning: Failed to load keybinding.el: %s" err)))))
 
 ;;; ========================================
 ;;; Customization Variables
