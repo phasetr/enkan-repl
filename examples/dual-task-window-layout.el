@@ -107,26 +107,26 @@
 
 (defvar enkan-dual-task-cheat-sheet-candidates
   (if (boundp 'enkan-dual-task-command-definitions)
-      ;; Use centralized definitions with keybinding hints
-      (mapcar (lambda (def)
-                (let* ((command (nth 0 def))
-                       (description (nth 1 def))
-                       (command-name (symbol-name command))
-                       ;; Find keybinding if exists
-                       (key (when (boundp 'enkan-dual-task-keybinding-overrides)
-                              (car (seq-find (lambda (binding)
-                                               (eq (nth 1 binding) command))
-                                             enkan-dual-task-keybinding-overrides)))))
-                  (cons command-name
-                        (if key
-                            (format "%s (%s)" description key)
-                          description))))
-              enkan-dual-task-command-definitions)
+    ;; Use centralized definitions with keybinding hints
+    (mapcar (lambda (def)
+              (let* ((command (nth 0 def))
+                      (description (nth 1 def))
+                      (command-name (symbol-name command))
+                      ;; Find keybinding if exists
+                      (key (when (boundp 'enkan-dual-task-keybinding-overrides)
+                             (car (seq-find (lambda (binding)
+                                              (eq (nth 1 binding) command))
+                                    enkan-dual-task-keybinding-overrides)))))
+                (cons command-name
+                  (if key
+                    (format "%s (%s)" description key)
+                    description))))
+      enkan-dual-task-command-definitions)
     ;; Fallback definitions
     '(("enkan-dual-task-setup" . "Setup dual task window layout")
-      ("enkan-dual-task-reset" . "Reset dual task layout")
-      ("enkan-dual-task-describe-layout" . "Show dual task layout status")
-      ("enkan-dual-task-switch-input" . "Switch between input windows (C-t)")))
+       ("enkan-dual-task-reset" . "Reset dual task layout")
+       ("enkan-dual-task-describe-layout" . "Show dual task layout status")
+       ("enkan-dual-task-switch-input" . "Switch between input windows (C-t)")))
   "Additional commands for dual task layout to add to cheat sheet.")
 
 ;;; ========================================
@@ -135,8 +135,8 @@
 
 (setq enkan-dual-task-mode-map
   (if (boundp 'enkan-dual-task-keybinding-overrides)
-      ;; Use centralized definitions if available
-      (enkan-keybinding-make-keymap enkan-dual-task-keybinding-overrides)
+    ;; Use centralized definitions if available
+    (enkan-keybinding-make-keymap enkan-dual-task-keybinding-overrides)
     ;; Fallback to manual definition
     (let ((map (make-sparse-keymap)))
       (define-key map (kbd "C-t") 'enkan-dual-task-switch-input)
@@ -152,9 +152,9 @@
   :keymap enkan-dual-task-mode-map
   :global t
   (if enkan-dual-task-mode
-      (progn
-        (enkan-dual-task-setup-cheat-sheet-advice)
-        (message "enkan-dual-task-mode enabled. C-t to switch between input files."))
+    (progn
+      (enkan-dual-task-setup-cheat-sheet-advice)
+      (message "enkan-dual-task-mode enabled. C-t to switch between input files."))
     (progn
       (enkan-dual-task-remove-cheat-sheet-advice)
       (message "enkan-dual-task-mode disabled."))))
@@ -163,49 +163,69 @@
 ;;; Main Setup Functions
 ;;; ========================================
 
-(defun enkan-dual-task-setup ()
-  "Setup dual task window layout."
-  (interactive)
+(defun enkan-dual-task-setup (&optional force-reselect)
+  "Setup dual task window layout.
+If FORCE-RESELECT is non-nil or no sessions are remembered,
+prompt for session selection. Otherwise, reuse remembered sessions."
+  (interactive "P")
 
-  ;; Select two enkan-eat sessions
-  (let ((sessions (enkan-dual-task-select-sessions)))
-    (unless sessions
-      (error "Need at least 2 enkan-repl sessions. Please start them first"))
+  ;; Check if we have remembered sessions and they're still valid
+  (if (and (not force-reselect)
+        enkan-dual-task-main-eat-buffer
+        enkan-dual-task-sub-eat-buffer
+        (buffer-live-p enkan-dual-task-main-eat-buffer)
+        (buffer-live-p enkan-dual-task-sub-eat-buffer))
+    ;; Reuse existing sessions
+    (progn
+      (message "Reusing remembered sessions: Main: %s, Sub: %s"
+        (buffer-name enkan-dual-task-main-eat-buffer)
+        (buffer-name enkan-dual-task-sub-eat-buffer))
 
-    (setq enkan-dual-task-main-eat-buffer (car sessions))
-    (setq enkan-dual-task-sub-eat-buffer (cadr sessions))
+      ;; Get corresponding input files
+      (setq enkan-dual-task-main-input-buffer
+        (enkan-dual-task-get-input-buffer-for-eat enkan-dual-task-main-eat-buffer))
+      (setq enkan-dual-task-sub-input-buffer
+        (enkan-dual-task-get-input-buffer-for-eat enkan-dual-task-sub-eat-buffer)))
 
-    ;; Get corresponding input files
-    (setq enkan-dual-task-main-input-buffer
-          (enkan-dual-task-get-input-buffer-for-eat enkan-dual-task-main-eat-buffer))
-    (setq enkan-dual-task-sub-input-buffer
-          (enkan-dual-task-get-input-buffer-for-eat enkan-dual-task-sub-eat-buffer))
+    ;; Select new sessions
+    (let ((sessions (enkan-dual-task-select-sessions)))
+      (unless sessions
+        (error "Need at least 2 enkan-repl sessions. Please start them first"))
 
-    ;; Setup window layout
-    (enkan-dual-task-window-setup)
+      (setq enkan-dual-task-main-eat-buffer (car sessions))
+      (setq enkan-dual-task-sub-eat-buffer (cadr sessions))
 
-    ;; Setup display-buffer rules (currently minimal, can be extended)
-    (enkan-dual-task-setup-display-buffer-rules)
+      ;; Get corresponding input files
+      (setq enkan-dual-task-main-input-buffer
+        (enkan-dual-task-get-input-buffer-for-eat enkan-dual-task-main-eat-buffer))
+      (setq enkan-dual-task-sub-input-buffer
+        (enkan-dual-task-get-input-buffer-for-eat enkan-dual-task-sub-eat-buffer))))
 
-    ;; Enable mode
-    (enkan-dual-task-mode 1)
+  ;; Setup window layout
+  (enkan-dual-task-window-setup)
 
-    (message "Dual task layout initialized. Main: %s, Sub: %s"
-             (buffer-name enkan-dual-task-main-eat-buffer)
-             (buffer-name enkan-dual-task-sub-eat-buffer))))
+  ;; Setup display-buffer rules (currently minimal, can be extended)
+  (enkan-dual-task-setup-display-buffer-rules)
+
+  ;; Enable mode
+  (enkan-dual-task-mode 1)
+
+  (message "Dual task layout initialized. Main: %s, Sub: %s"
+    (buffer-name enkan-dual-task-main-eat-buffer)
+    (buffer-name enkan-dual-task-sub-eat-buffer)))
 
 (defun enkan-dual-task-reset ()
   "Reset all dual task related variables and remove advices."
   (interactive)
   ;; Clear variables
   (setq enkan-dual-task-main-input-buffer nil
-        enkan-dual-task-sub-input-buffer nil
-        enkan-dual-task-main-eat-buffer nil
-        enkan-dual-task-sub-eat-buffer nil
-        enkan-dual-task-main-input-window nil
-        enkan-dual-task-sub-input-window nil
-        enkan-dual-task-main-eat-window nil
-        enkan-dual-task-sub-eat-window nil)
+    enkan-dual-task-sub-input-buffer nil
+    enkan-dual-task-main-eat-buffer nil
+    enkan-dual-task-sub-eat-buffer nil
+    enkan-dual-task-main-input-window nil
+    enkan-dual-task-sub-input-window nil
+    enkan-dual-task-main-eat-window nil
+    enkan-dual-task-sub-eat-window nil)
 
   ;; Remove any advices if added
   (advice-remove 'display-buffer #'enkan-dual-task-display-buffer-advice)
@@ -231,8 +251,8 @@
   ;; Create three vertical columns (3:4:3 ratio)
   ;; Total width = 10 units, left=3, middle=4, right=3
   (let* ((total-width (window-width))
-         (left-width (floor (* total-width enkan-dual-task-input-column-ratio)))
-         (middle-width (floor (* total-width enkan-dual-task-main-eat-ratio))))
+          (left-width (floor (* total-width enkan-dual-task-input-column-ratio)))
+          (middle-width (floor (* total-width enkan-dual-task-main-eat-ratio))))
 
     ;; Split for middle column
     (split-window-horizontally left-width)
@@ -267,8 +287,8 @@
     ;; Return to main input window
     (select-window enkan-dual-task-main-input-window)))
 
-  ;; Note: Window locking (window-dedicated-p) disabled to prevent eat scrolling issues
-  ;; Note: Face remapping removed to prevent minibuffer interaction issues
+;; Note: Window locking (window-dedicated-p) disabled to prevent eat scrolling issues
+;; Note: Face remapping removed to prevent minibuffer interaction issues
 
 ;;; ========================================
 ;;; Keybinding Help Functions
@@ -297,7 +317,7 @@
     (princ "Dual Task Mode Overrides:\n")
     (princ "-------------------------\n")
     (if (boundp 'enkan-dual-task-keybinding-overrides)
-        (princ (enkan-keybinding-format-description enkan-dual-task-keybinding-overrides))
+      (princ (enkan-keybinding-format-description enkan-dual-task-keybinding-overrides))
       ;; Fallback if constants not loaded
       (princ "  C-t         - Switch between input windows\n"))
 
@@ -312,20 +332,20 @@
 Avoids switching to eat windows."
   (interactive)
   (cond
-   ;; From main input -> go to sub input
-   ((and enkan-dual-task-main-input-window
-         (eq (selected-window) enkan-dual-task-main-input-window))
-    (when (window-live-p enkan-dual-task-sub-input-window)
-      (select-window enkan-dual-task-sub-input-window)))
-   ;; From sub input -> go to main input
-   ((and enkan-dual-task-sub-input-window
-         (eq (selected-window) enkan-dual-task-sub-input-window))
-    (when (window-live-p enkan-dual-task-main-input-window)
-      (select-window enkan-dual-task-main-input-window)))
-   ;; From eat windows -> go to main input
-   (t
-    (when (window-live-p enkan-dual-task-main-input-window)
-      (select-window enkan-dual-task-main-input-window)))))
+    ;; From main input -> go to sub input
+    ((and enkan-dual-task-main-input-window
+       (eq (selected-window) enkan-dual-task-main-input-window))
+      (when (window-live-p enkan-dual-task-sub-input-window)
+        (select-window enkan-dual-task-sub-input-window)))
+    ;; From sub input -> go to main input
+    ((and enkan-dual-task-sub-input-window
+       (eq (selected-window) enkan-dual-task-sub-input-window))
+      (when (window-live-p enkan-dual-task-main-input-window)
+        (select-window enkan-dual-task-main-input-window)))
+    ;; From eat windows -> go to main input
+    (t
+      (when (window-live-p enkan-dual-task-main-input-window)
+        (select-window enkan-dual-task-main-input-window)))))
 
 ;;; ========================================
 ;;; Window Lock/Unlock Functions (placeholder)
@@ -379,47 +399,47 @@ Currently disabled to prevent eat scrolling issues."
 FUNC is the function to call, MSG is the message to display.
 Sends to the eat buffer corresponding to the current input window."
   (let ((target-eat-window
-         (cond
-          ;; If in main input window, send to main eat
-          ((and enkan-dual-task-main-input-window
-                (eq (selected-window) enkan-dual-task-main-input-window))
-           enkan-dual-task-main-eat-window)
-          ;; If in sub input window, send to sub eat
-          ((and enkan-dual-task-sub-input-window
-                (eq (selected-window) enkan-dual-task-sub-input-window))
-           enkan-dual-task-sub-eat-window)
-          ;; Default to main eat window
-          (t enkan-dual-task-main-eat-window))))
+          (cond
+            ;; If in main input window, send to main eat
+            ((and enkan-dual-task-main-input-window
+               (eq (selected-window) enkan-dual-task-main-input-window))
+              enkan-dual-task-main-eat-window)
+            ;; If in sub input window, send to sub eat
+            ((and enkan-dual-task-sub-input-window
+               (eq (selected-window) enkan-dual-task-sub-input-window))
+              enkan-dual-task-sub-eat-window)
+            ;; Default to main eat window
+            (t enkan-dual-task-main-eat-window))))
     (if (and target-eat-window
-             (window-live-p target-eat-window))
-        (save-window-excursion
-          (select-window target-eat-window)
-          (funcall func)
-          (message "Sent %s to %s"
-                   msg
-                   (if (eq target-eat-window enkan-dual-task-main-eat-window)
-                       "main eat buffer"
-                     "sub eat buffer")))
-      (message "No eat window found. Run M-x enkan-dual-task-setup first.")))
+          (window-live-p target-eat-window))
+      (save-window-excursion
+        (select-window target-eat-window)
+        (funcall func)
+        (message "Sent %s to %s"
+          msg
+          (if (eq target-eat-window enkan-dual-task-main-eat-window)
+            "main eat buffer"
+            "sub eat buffer")))
+      (message "No eat window found. Run M-x enkan-dual-task-setup first."))))
 
 (defun enkan-dual-task-send-to-main ()
   "Send text to main eat buffer explicitly."
   (interactive)
   (if (and enkan-dual-task-main-eat-window
-           (window-live-p enkan-dual-task-main-eat-window))
-      (save-window-excursion
-        (select-window enkan-dual-task-main-eat-window)
-        (message "Switched to main eat buffer for input"))
+        (window-live-p enkan-dual-task-main-eat-window))
+    (save-window-excursion
+      (select-window enkan-dual-task-main-eat-window)
+      (message "Switched to main eat buffer for input"))
     (message "Main eat window not found.")))
 
 (defun enkan-dual-task-send-to-sub ()
   "Send text to sub eat buffer explicitly."
   (interactive)
   (if (and enkan-dual-task-sub-eat-window
-           (window-live-p enkan-dual-task-sub-eat-window))
-      (save-window-excursion
-        (select-window enkan-dual-task-sub-eat-window)
-        (message "Switched to sub eat buffer for input"))
+        (window-live-p enkan-dual-task-sub-eat-window))
+    (save-window-excursion
+      (select-window enkan-dual-task-sub-eat-window)
+      (message "Switched to sub eat buffer for input"))
     (message "Sub eat window not found.")))
 
 ;;; ========================================
@@ -438,14 +458,14 @@ Currently minimal to avoid eat scrolling issues."
 Currently minimal implementation to avoid interfering with dual task workflow."
   (let ((buffer-name (buffer-name (get-buffer buffer))))
     (cond
-     ;; Don't redirect eat buffers
-     ((string-match-p "^\\*enkan:" buffer-name)
-      (apply orig-fun buffer args))
-     ;; Don't redirect buffers that are already displayed
-     ((get-buffer-window buffer)
-      (apply orig-fun buffer args))
-     ;; Default behavior for dual task layout
-     (t (apply orig-fun buffer args)))))
+      ;; Don't redirect eat buffers
+      ((string-match-p "^\\*enkan:" buffer-name)
+        (apply orig-fun buffer args))
+      ;; Don't redirect buffers that are already displayed
+      ((get-buffer-window buffer)
+        (apply orig-fun buffer args))
+      ;; Default behavior for dual task layout
+      (t (apply orig-fun buffer args)))))
 
 (defun enkan-dual-task-protect-window-advice (orig-fun &optional window)
   "Prevent deletion of protected windows in dual task layout.
@@ -471,35 +491,35 @@ Placeholder for consistency with 3pane."
 
     ;; Select main session
     (let* ((main-name (completing-read "Select MAIN enkan session: "
-                                        (mapcar #'buffer-name eat-buffers)
-                                        nil t))
-           (main-buffer (get-buffer main-name))
-           ;; Filter out selected main for sub selection
-           (remaining (remove main-buffer eat-buffers))
-           (sub-name (completing-read "Select SUB enkan session: "
-                                      (mapcar #'buffer-name remaining)
-                                      nil t))
-           (sub-buffer (get-buffer sub-name)))
+                        (mapcar #'buffer-name eat-buffers)
+                        nil t))
+            (main-buffer (get-buffer main-name))
+            ;; Filter out selected main for sub selection
+            (remaining (remove main-buffer eat-buffers))
+            (sub-name (completing-read "Select SUB enkan session: "
+                        (mapcar #'buffer-name remaining)
+                        nil t))
+            (sub-buffer (get-buffer sub-name)))
       (list main-buffer sub-buffer))))
 
 (defun enkan-dual-task-get-all-eat-buffers ()
   "Get all enkan-eat buffers."
   (seq-filter (lambda (buffer)
                 (string-match-p "^\\*enkan:" (buffer-name buffer)))
-              (buffer-list)))
+    (buffer-list)))
 
 (defun enkan-dual-task-get-input-buffer-for-eat (eat-buffer)
   "Get the input file buffer corresponding to EAT-BUFFER."
   (when eat-buffer
     (let* ((buffer-name (buffer-name eat-buffer))
-           ;; Extract directory from buffer name like "*enkan:/path/to/dir/*"
-           (dir (when (string-match "^\\*enkan:\\(.+\\)\\*$" buffer-name)
-                  (match-string 1 buffer-name)))
-           (input-file (when dir
-                        (enkan-repl--get-project-file-path dir))))
+            ;; Extract directory from buffer name like "*enkan:/path/to/dir/*"
+            (dir (when (string-match "^\\*enkan:\\(.+\\)\\*$" buffer-name)
+                   (match-string 1 buffer-name)))
+            (input-file (when dir
+                          (enkan-repl--get-project-file-path dir))))
       (when input-file
         (if (file-exists-p input-file)
-            (find-file-noselect input-file)
+          (find-file-noselect input-file)
           ;; Create if doesn't exist
           (enkan-repl--create-project-input-file dir)
           (find-file-noselect input-file))))))
@@ -517,23 +537,23 @@ Placeholder for consistency with 3pane."
 
     (princ "Main Task:\n")
     (princ (format "  Input: %s\n"
-                   (if enkan-dual-task-main-input-buffer
-                       (buffer-name enkan-dual-task-main-input-buffer)
-                     "Not set")))
+             (if enkan-dual-task-main-input-buffer
+               (buffer-name enkan-dual-task-main-input-buffer)
+               "Not set")))
     (princ (format "  Eat:   %s\n\n"
-                   (if enkan-dual-task-main-eat-buffer
-                       (buffer-name enkan-dual-task-main-eat-buffer)
-                     "Not set")))
+             (if enkan-dual-task-main-eat-buffer
+               (buffer-name enkan-dual-task-main-eat-buffer)
+               "Not set")))
 
     (princ "Sub Task:\n")
     (princ (format "  Input: %s\n"
-                   (if enkan-dual-task-sub-input-buffer
-                       (buffer-name enkan-dual-task-sub-input-buffer)
-                     "Not set")))
+             (if enkan-dual-task-sub-input-buffer
+               (buffer-name enkan-dual-task-sub-input-buffer)
+               "Not set")))
     (princ (format "  Eat:   %s\n\n"
-                   (if enkan-dual-task-sub-eat-buffer
-                       (buffer-name enkan-dual-task-sub-eat-buffer)
-                     "Not set")))
+             (if enkan-dual-task-sub-eat-buffer
+               (buffer-name enkan-dual-task-sub-eat-buffer)
+               "Not set")))
 
     (princ "Window Layout:\n")
     (princ "  [Input Main] [Main Eat ] [Sub Eat  ]\n")
@@ -565,40 +585,40 @@ Placeholder for consistency with 3pane - minimal implementation."
 (defun enkan-dual-task-cheat-sheet-advice (orig-fun)
   "Advice to add dual task commands to enkan-repl cheat sheet."
   (if enkan-dual-task-mode
-      ;; When dual task mode is active, show combined cheat sheet
-      (progn
-        (unless (featurep 'enkan-repl-constants)
-          (require 'enkan-repl-constants nil t))
-        (let* ((original-candidates
-                (if (boundp 'enkan-repl-cheat-sheet-candidates)
-                    enkan-repl-cheat-sheet-candidates
-                  '()))
-               ;; Combine original and dual task candidates
-               (candidates (append original-candidates
-                                   enkan-dual-task-cheat-sheet-candidates)))
-          (let ((completion-extra-properties
-                 `(:annotation-function
+    ;; When dual task mode is active, show combined cheat sheet
+    (progn
+      (unless (featurep 'enkan-repl-constants)
+        (require 'enkan-repl-constants nil t))
+      (let* ((original-candidates
+               (if (boundp 'enkan-repl-cheat-sheet-candidates)
+                 enkan-repl-cheat-sheet-candidates
+                 '()))
+              ;; Combine original and dual task candidates
+              (candidates (append original-candidates
+                            enkan-dual-task-cheat-sheet-candidates)))
+        (let ((completion-extra-properties
+                `(:annotation-function
                    (lambda (candidate)
                      (let ((description (alist-get candidate ',candidates
-                                                   nil nil #'string=)))
+                                          nil nil #'string=)))
                        (when description
                          (format " — %s" description)))))))
-            (let ((selected-command
-                   (completing-read "enkan-repl & dual task commands: " candidates)))
-              (when selected-command
-                (call-interactively (intern selected-command)))))))
+          (let ((selected-command
+                  (completing-read "enkan-repl & dual task commands: " candidates)))
+            (when selected-command
+              (call-interactively (intern selected-command)))))))
     ;; When dual task mode is not active, use original function
     (funcall orig-fun)))
 
 (defun enkan-dual-task-setup-cheat-sheet-advice ()
   "Setup advice for cheat sheet integration."
   (advice-add 'enkan-repl-cheat-sheet :around
-              #'enkan-dual-task-cheat-sheet-advice))
+    #'enkan-dual-task-cheat-sheet-advice))
 
 (defun enkan-dual-task-remove-cheat-sheet-advice ()
   "Remove advice for cheat sheet integration."
   (advice-remove 'enkan-repl-cheat-sheet
-                 #'enkan-dual-task-cheat-sheet-advice))
+    #'enkan-dual-task-cheat-sheet-advice))
 
 ;;; ========================================
 ;;; Provide
