@@ -14,8 +14,7 @@
 ;;; Code:
 
 (defun other-window-or-split ()
-  "split it horizontally and move
-if the window is not split."
+  "Split window horizontally and move to it if only one window exists, otherwise cycle to next window."
   (interactive)
   (cond ((one-window-p)
           (split-window-horizontally)
