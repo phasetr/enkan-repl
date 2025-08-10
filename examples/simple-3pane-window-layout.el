@@ -102,15 +102,33 @@ This is set automatically when enkan-simple-3pane-setup is called.")
   "Keymap for 3-pane layout commands.")
 
 (defvar enkan-simple-3pane-cheat-sheet-candidates
-  '(("enkan-simple-3pane-setup" . "Setup 3-pane window layout")
-     ("enkan-simple-3pane-reset" . "Reset 3-pane layout")
-     ("enkan-simple-3pane-other-window" . "Switch between input/misc windows (C-t)")
-     ("enkan-simple-3pane-lock-windows" . "Lock input and eat windows")
-     ("enkan-simple-3pane-unlock-windows" . "Unlock input and eat windows")
-     ("enkan-simple-3pane-send-escape" . "Send ESC to eat buffer (Esc)")
-     ("enkan-simple-3pane-send-1" . "Send 1 to eat buffer (C-M-1)")
-     ("enkan-simple-3pane-send-2" . "Send 2 to eat buffer (C-M-2)")
-     ("enkan-simple-3pane-send-3" . "Send 3 to eat buffer (C-M-3)"))
+  (if (boundp 'enkan-simple-3pane-command-definitions)
+      ;; Use centralized definitions with keybinding hints
+      (mapcar (lambda (def)
+                (let* ((command (nth 0 def))
+                       (description (nth 1 def))
+                       (command-name (symbol-name command))
+                       ;; Find keybinding if exists
+                       (key (when (boundp 'enkan-simple-3pane-keybinding-overrides)
+                              (car (seq-find (lambda (binding)
+                                               (eq (nth 1 binding) command))
+                                             enkan-simple-3pane-keybinding-overrides)))))
+                  (cons command-name
+                        (if key
+                            (format "%s (%s)" description key)
+                          description))))
+              enkan-simple-3pane-command-definitions)
+    ;; Fallback definitions
+    '(("enkan-simple-3pane-setup" . "Setup 3-pane window layout")
+      ("enkan-simple-3pane-reset" . "Reset 3-pane layout")
+      ("enkan-simple-3pane-describe-keybindings" . "Show 3pane keybindings")
+      ("enkan-simple-3pane-other-window" . "Switch between input/misc windows (C-t)")
+      ("enkan-simple-3pane-lock-windows" . "Lock input and eat windows")
+      ("enkan-simple-3pane-unlock-windows" . "Unlock input and eat windows")
+      ("enkan-simple-3pane-send-escape" . "Send ESC to eat buffer (Esc)")
+      ("enkan-simple-3pane-send-1" . "Send 1 to eat buffer (C-M-1)")
+      ("enkan-simple-3pane-send-2" . "Send 2 to eat buffer (C-M-2)")
+      ("enkan-simple-3pane-send-3" . "Send 3 to eat buffer (C-M-3)")))
   "Additional commands for 3-pane layout to add to cheat sheet.")
 
 ;;; ========================================
@@ -249,6 +267,43 @@ This is set automatically when enkan-simple-3pane-setup is called.")
 
   ;; Lock windows
   (enkan-simple-3pane-lock-windows))
+
+;;; ========================================
+;;; Keybinding Help Functions
+;;; ========================================
+
+(defun enkan-simple-3pane-describe-keybindings ()
+  "Display keybindings active in 3pane mode."
+  (interactive)
+  (with-output-to-temp-buffer "*Enkan 3pane Keybindings*"
+    (princ "Enkan Simple 3pane Mode Keybindings\n")
+    (princ "====================================\n\n")
+    
+    ;; Show base keybindings
+    (princ "Base Keybindings (inherited):\n")
+    (princ "------------------------------\n")
+    (when (boundp 'enkan-keybinding-definitions)
+      ;; Show non-overridden base bindings
+      (let ((overridden-keys (when (boundp 'enkan-simple-3pane-keybinding-overrides)
+                               (mapcar #'car enkan-simple-3pane-keybinding-overrides))))
+        (dolist (def enkan-keybinding-definitions)
+          (unless (member (car def) overridden-keys)
+            (princ (format "  %-15s - %s\n" (nth 0 def) (nth 2 def)))))))
+    (princ "\n")
+    
+    ;; Show 3pane-specific overrides
+    (princ "3pane Mode Overrides:\n")
+    (princ "----------------------\n")
+    (if (boundp 'enkan-simple-3pane-keybinding-overrides)
+        (princ (enkan-keybinding-format-description enkan-simple-3pane-keybinding-overrides))
+      ;; Fallback if constants not loaded
+      (princ "  C-t         - Switch between input/misc windows\n")
+      (princ "  ESC         - Send ESC to eat buffer\n")
+      (princ "  C-M-1       - Send 1 to eat buffer\n")
+      (princ "  C-M-2       - Send 2 to eat buffer\n")
+      (princ "  C-M-3       - Send 3 to eat buffer\n"))
+    
+    (princ "\nNote: 3pane mode overrides take precedence over base keybindings.\n")))
 
 ;;; ========================================
 ;;; Window Navigation Functions

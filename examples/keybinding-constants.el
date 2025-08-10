@@ -73,6 +73,20 @@ Each entry is (KEY COMMAND DESCRIPTION CATEGORY).")
   "Keybinding overrides for 3pane mode.
 Each entry is (KEY COMMAND DESCRIPTION CATEGORY).")
 
+(defconst enkan-simple-3pane-command-definitions
+  '((enkan-simple-3pane-setup "Setup 3-pane window layout")
+    (enkan-simple-3pane-reset "Reset 3-pane layout")
+    (enkan-simple-3pane-describe-keybindings "Show 3pane keybindings")
+    (enkan-simple-3pane-other-window "Switch between input/misc windows")
+    (enkan-simple-3pane-lock-windows "Lock input and eat windows")
+    (enkan-simple-3pane-unlock-windows "Unlock input and eat windows")
+    (enkan-simple-3pane-send-escape "Send ESC to eat buffer")
+    (enkan-simple-3pane-send-1 "Send 1 to eat buffer")
+    (enkan-simple-3pane-send-2 "Send 2 to eat buffer")
+    (enkan-simple-3pane-send-3 "Send 3 to eat buffer"))
+  "Command definitions for 3pane mode cheat sheet.
+Each entry is (COMMAND DESCRIPTION).")
+
 (defconst enkan-mode-keybinding-overrides
   `((enkan-simple-3pane-mode . ,enkan-simple-3pane-keybinding-overrides))
   "Alist of modes to their keybinding override definitions.")
