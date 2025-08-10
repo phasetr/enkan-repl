@@ -1,3 +1,10 @@
+# [0.7.0](https://github.com/phasetr/enkan-repl/compare/v0.6.1...v0.7.0) (2025-08-10)
+
+
+### Features
+
+* Add keybinding management and window layout examples ([0c6bc44](https://github.com/phasetr/enkan-repl/commit/0c6bc44d7cee79d9243e294fcbba4e5871b22512))
+
 ## [0.6.1](https://github.com/phasetr/enkan-repl/compare/v0.6.0...v0.6.1) (2025-08-09)
 
 
