@@ -77,7 +77,7 @@ This provides a consistent set of keybindings for enkan-repl development."
   "Check which base keybindings will be overridden by MODE.
 If MODE is nil, check all known modes."
   (interactive (list (when current-prefix-arg
-                       (intern (completing-read "Mode: " 
+                       (intern (completing-read "Mode: "
                                                 (mapcar #'car enkan-mode-keybinding-overrides))))))
   (let ((modes (if mode
                    (list (cons mode (cdr (assq mode enkan-mode-keybinding-overrides))))

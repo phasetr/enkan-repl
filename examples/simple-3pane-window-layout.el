@@ -43,9 +43,9 @@
 (require 'enkan-repl)
 
 ;; Load keybinding definitions and base keymap
-(let ((constants-file (expand-file-name "keybinding-constants.el" 
+(let ((constants-file (expand-file-name "keybinding-constants.el"
                                          (file-name-directory load-file-name)))
-      (keybinding-file (expand-file-name "keybinding.el" 
+      (keybinding-file (expand-file-name "keybinding.el"
                                           (file-name-directory load-file-name))))
   (when (file-exists-p constants-file)
     (load constants-file))
