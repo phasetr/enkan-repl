@@ -1,3 +1,10 @@
+## [0.8.1](https://github.com/phasetr/enkan-repl/compare/v0.8.0...v0.8.1) (2025-08-10)
+
+
+### Bug Fixes
+
+* Unify keybinding configuration and improve consistency ([7ed3e06](https://github.com/phasetr/enkan-repl/commit/7ed3e06d05c69ed782d10396f08fc9993897dfe3))
+
 # [0.8.0](https://github.com/phasetr/enkan-repl/compare/v0.7.0...v0.8.0) (2025-08-10)
 
 
