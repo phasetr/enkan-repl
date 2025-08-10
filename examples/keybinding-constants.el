@@ -30,7 +30,7 @@
   '(;; Window Navigation
      ("C-t" other-window-or-split "Other window or split" window-navigation)
      ("M-t" other-window-or-split "Other window or split" window-navigation)
-     ("C-M-l" enkan-repl-setup-window-layout "Setup window layout" window-navigation)
+     ("C-M-l" enkan-repl-setup "Setup window layout" window-navigation)
 
      ;; Text Sending
      ("C-M-<return>" enkan-repl-send-region "Send region to REPL" text-sending)

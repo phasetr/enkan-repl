@@ -24,7 +24,7 @@
     ("enkan-repl-open-project-input-file" . "Open or create project input file for DIRECTORY. If DIRECTORY is nil, use current `default-directory'. If project input file exists, open it directly. If not exists, create from template then open.  Category: Utilities")
     ("enkan-repl-start-eat" . "Start eat terminal emulator session. Determines directory from current buffer filename if it's a persistent file. Checks for existing sessions to prevent double startup.  Category: Session Controller")
     ("enkan-repl-finish-eat" . "Terminate eat session and close its buffer. Determines directory from current buffer filename if it's a persistent file.  Category: Session Controller")
-    ("enkan-repl-setup-window-layout" . "Set up window layout with org file on left and eat on right. This is the author's preference - customize as needed.  Category: Session Controller")
+    ("enkan-repl-setup" . "Set up window layout with org file on left and eat on right. This is the author's preference - customize as needed.  Category: Session Controller")
     ("enkan-repl-output-template" . "Output current template content to a new buffer for customization.  Category: Utilities")
     ("enkan-repl-status" . "Show detailed diagnostic information for troubleshooting connection issues.  Category: Utilities")
     ("enkan-repl-list-sessions" . "Display a list of active enkan sessions with interactive selection. Users can select a session, then choose action: (s)witch, (d)elete, or (q)uit.  Category: Session Controller")
