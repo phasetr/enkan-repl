@@ -87,8 +87,22 @@ Each entry is (KEY COMMAND DESCRIPTION CATEGORY).")
   "Command definitions for 3pane mode cheat sheet.
 Each entry is (COMMAND DESCRIPTION).")
 
+(defconst enkan-dual-task-keybinding-overrides
+  '(("C-t" enkan-dual-task-switch-input "Switch between input windows" window-navigation))
+  "Keybinding overrides for dual task mode.
+Each entry is (KEY COMMAND DESCRIPTION CATEGORY).")
+
+(defconst enkan-dual-task-command-definitions
+  '((enkan-dual-task-setup "Setup dual task window layout")
+    (enkan-dual-task-reset "Reset dual task layout")
+    (enkan-dual-task-describe-layout "Show dual task layout status")
+    (enkan-dual-task-switch-input "Switch between input windows"))
+  "Command definitions for dual task mode.
+Each entry is (COMMAND DESCRIPTION).")
+
 (defconst enkan-mode-keybinding-overrides
-  `((enkan-simple-3pane-mode . ,enkan-simple-3pane-keybinding-overrides))
+  `((enkan-simple-3pane-mode . ,enkan-simple-3pane-keybinding-overrides)
+    (enkan-dual-task-mode . ,enkan-dual-task-keybinding-overrides))
   "Alist of modes to their keybinding override definitions.")
 
 ;;; ========================================
