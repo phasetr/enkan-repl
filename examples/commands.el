@@ -17,9 +17,10 @@
   "split it horizontally and move
 if the window is not split."
   (interactive)
-  (cond ((one-window-p)
-          (split-window-horizontally)
-          (other-window 1))
+  (cond
+    ((one-window-p)
+      (split-window-horizontally)
+      (other-window 1))
     (t
       (other-window 1))))
 
