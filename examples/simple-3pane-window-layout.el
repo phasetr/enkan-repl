@@ -42,6 +42,19 @@
 
 (require 'enkan-repl)
 
+;; Load keybinding definitions and base keymap
+(let ((constants-file (expand-file-name "keybinding-constants.el" 
+                                         (file-name-directory load-file-name)))
+      (keybinding-file (expand-file-name "keybinding.el" 
+                                          (file-name-directory load-file-name))))
+  (when (file-exists-p constants-file)
+    (load constants-file))
+  (when (file-exists-p keybinding-file)
+    (load keybinding-file)
+    ;; Install base keybindings as default
+    (when (fboundp 'enkan-install-base-keymap)
+      (enkan-install-base-keymap))))
+
 ;;; ========================================
 ;;; Customization Variables
 ;;; ========================================
@@ -105,14 +118,19 @@ This is set automatically when enkan-simple-3pane-setup is called.")
 ;;; ========================================
 
 (setq enkan-simple-3pane-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "C-t") 'enkan-simple-3pane-other-window)
-    (define-key map (kbd "M-t") 'other-window-or-split)
-    (define-key map (kbd "<escape>") 'enkan-simple-3pane-send-escape)
-    (define-key map (kbd "C-M-1") 'enkan-simple-3pane-send-1)
-    (define-key map (kbd "C-M-2") 'enkan-simple-3pane-send-2)
-    (define-key map (kbd "C-M-3") 'enkan-simple-3pane-send-3)
-    map))
+  (if (boundp 'enkan-simple-3pane-keybinding-overrides)
+      ;; Use centralized definitions if available
+      (enkan-keybinding-make-keymap enkan-simple-3pane-keybinding-overrides)
+    ;; Fallback to manual definition
+    (let ((map (make-sparse-keymap)))
+      ;; These bindings override the base keybindings when 3pane mode is active
+      (define-key map (kbd "C-t") 'enkan-simple-3pane-other-window)
+      (define-key map (kbd "M-t") 'other-window-or-split)
+      (define-key map (kbd "<escape>") 'enkan-simple-3pane-send-escape)
+      (define-key map (kbd "C-M-1") 'enkan-simple-3pane-send-1)
+      (define-key map (kbd "C-M-2") 'enkan-simple-3pane-send-2)
+      (define-key map (kbd "C-M-3") 'enkan-simple-3pane-send-3)
+      map)))
 
 ;;; ========================================
 ;;; Minor Mode Definition

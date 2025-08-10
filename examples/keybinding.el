@@ -1,4 +1,4 @@
-;;; keybinding.el --- Sample keybindings for enkan-repl development -*- lexical-binding: t -*-
+;;; keybinding.el --- Base keybindings for enkan-repl development -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2025 phasetr
 
@@ -7,59 +7,28 @@
 
 ;; This file is NOT part of GNU Emacs.
 
-;; This file provides sample keybindings for enkan-repl development.
-;; These bindings can be used as a base configuration and partially
-;; overridden by 3pane mode.
+;; This file provides base keybindings for enkan-repl development.
+;; These bindings can be overridden by various window layout modes.
 
 ;;; Commentary:
 
-;; Sample keybinding configuration for enkan-repl development workflow.
-;; These bindings are designed to work well with AI-assisted development.
-;;
-;; The keybindings are organized into categories:
-;; - Window navigation
-;; - Buffer operations
-;; - Text sending to REPL
-;; - Development utilities
-;;
-;; When 3pane mode is active, some of these bindings will be overridden
-;; to provide 3pane-specific functionality.
+;; Base keybinding configuration for enkan-repl development workflow.
+;; All keybinding definitions are centralized in keybinding-constants.el
+;; to avoid duplication and ensure consistency.
 
 ;;; Code:
+
+(require 'keybinding-constants)
 
 ;;; ========================================
 ;;; Base Keymap Definition
 ;;; ========================================
 
 (defvar enkan-base-keymap
-  (let ((map (make-sparse-keymap)))
-    ;; Window Navigation
-    (define-key map (kbd "C-t") 'other-window-or-split)
-    (define-key map (kbd "M-t") 'other-window-or-split)
-    (define-key map (kdb "C-M-l") 'enkan-repl-setup-window-layout)
-
-    ;; Text Sending (Basic REPL interaction)
-    (define-key map (kbd "C-M-<return>") 'enkan-repl-send-region)
-    (define-key map (kbd "C-M-i") 'enkan-repl-send-line)
-
-    ;; Quick Actions (Will be enhanced by 3pane)
-    (define-key map (kbd "<escape>") 'enkan-repl-send-escape)
-    (define-key map (kbd "C-M-1") 'enkan-repl-send-1)
-    (define-key map (kbd "C-M-2") 'enkan-repl-send-2)
-    (define-key map (kbd "C-M-3") 'enkan-repl-send-3)
-    (define-key map (kbd "C-M-b") 'enkan-repl-recenter-bottom)
-
-    ;; Project Management
-    (define-key map (kbd "C-M-s") 'enkan-repl-start-eat)
-    (define-key map (kbd "C-M-s") 'enkan-repl-finish-eat)
-
-    ;; Help and Documentation
-    (define-key map (kbd "C-M-c") 'enkan-repl-cheat-sheet)
-
-    map)
+  (enkan-keybinding-make-keymap enkan-keybinding-definitions)
   "Base keymap for enkan-repl development.
-This keymap provides standard bindings that work in any context.
-Some bindings will be overridden when some mode is active.")
+This keymap is generated from `enkan-keybinding-definitions'.
+Some bindings may be overridden when specific window layout modes are active.")
 
 ;;; ========================================
 ;;; Keymap Installation Functions
@@ -70,21 +39,19 @@ Some bindings will be overridden when some mode is active.")
 This provides a consistent set of keybindings for enkan-repl development."
   (interactive)
   ;; Install keybindings globally
-  (dolist (binding (cdr enkan-base-keymap))
-    (when (consp binding)
-      (let ((key (car binding))
-             (command (cdr binding)))
-        (global-set-key key command))))
+  (dolist (def enkan-keybinding-definitions)
+    (let ((key (kbd (nth 0 def)))
+          (command (nth 1 def)))
+      (global-set-key key command)))
   (message "Enkan base keybindings installed globally."))
 
 (defun enkan-uninstall-base-keymap ()
   "Uninstall the base keymap globally."
   (interactive)
   ;; Remove keybindings
-  (dolist (binding (cdr enkan-base-keymap))
-    (when (consp binding)
-      (let ((key (car binding)))
-        (global-unset-key key))))
+  (dolist (def enkan-keybinding-definitions)
+    (let ((key (kbd (nth 0 def))))
+      (global-unset-key key)))
   (message "Enkan base keybindings removed."))
 
 ;;; ========================================
@@ -97,86 +64,63 @@ This provides a consistent set of keybindings for enkan-repl development."
   (with-output-to-temp-buffer "*Enkan Base Keybindings*"
     (princ "Enkan-REPL Base Keybindings\n")
     (princ "============================\n\n")
-
-    (princ "Window Navigation:\n")
-    (princ "  C-t         - Switch to other window (overridden in 3pane)\n")
-    (princ "  M-t         - Other window or split\n")
-    (princ "  C-x t       - Toggle split direction\n\n")
-
-    (princ "Buffer Operations:\n")
-    (princ "  C-c b r     - Revert buffer\n")
-    (princ "  C-c b k     - Kill current buffer\n")
-    (princ "  C-c b s     - Save buffer\n")
-    (princ "  C-c b S     - Save some buffers\n\n")
-
-    (princ "Text Sending:\n")
-    (princ "  C-c C-c     - Send entire buffer\n")
-    (princ "  C-c C-r     - Send region\n")
-    (princ "  C-c C-l     - Send current line\n")
-    (princ "  C-c C-e     - Send rest of buffer\n\n")
-
-    (princ "Quick Actions:\n")
-    (princ "  ESC         - Quit (overridden in 3pane to send ESC)\n")
-    (princ "  C-M-1       - Delete other windows (overridden in 3pane)\n")
-    (princ "  C-M-2       - Split window below (overridden in 3pane)\n")
-    (princ "  C-M-3       - Split window right (overridden in 3pane)\n\n")
-
-    (princ "Development Utilities:\n")
-    (princ "  C-c d f     - Find function definition\n")
-    (princ "  C-c d v     - Find variable definition\n")
-    (princ "  C-c d l     - Find library\n")
-    (princ "  C-c d d     - Describe function\n")
-    (princ "  C-c d k     - Describe key\n")
-    (princ "  C-c d m     - Describe mode\n\n")
-
-    (princ "File Navigation:\n")
-    (princ "  C-c f f     - Find file\n")
-    (princ "  C-c f r     - Recent files\n")
-    (princ "  C-c f d     - Open dired\n")
-    (princ "  C-c f j     - Jump to dired\n\n")
-
-    (princ "Search and Replace:\n")
-    (princ "  C-c s s     - Regexp search\n")
-    (princ "  C-c s r     - Query replace regexp\n")
-    (princ "  C-c s o     - Occur\n")
-    (princ "  C-c s g     - Grep\n\n")
-
-    (princ "Evaluation:\n")
-    (princ "  C-c e e     - Eval last sexp\n")
-    (princ "  C-c e b     - Eval buffer\n")
-    (princ "  C-c e r     - Eval region\n")
-    (princ "  C-c e f     - Eval defun\n\n")
-
-    (princ "Help and Documentation:\n")
-    (princ "  C-c h h     - Enkan cheat sheet\n")
-    (princ "  C-c h s     - Enkan status\n")
-    (princ "  C-c h d     - Toggle debug mode\n\n")
-
-    (princ "Project Management:\n")
-    (princ "  C-c p o     - Open project input file\n")
-    (princ "  C-c p s     - Start eat session\n")
-    (princ "  C-c p w     - Setup window layout\n\n")
-
-    (princ "Note: Bindings marked as 'overridden in 3pane' will have\n")
-    (princ "      different behavior when 3pane mode is active.\n")))
+    (princ (enkan-keybinding-format-description enkan-keybinding-definitions))
+    (princ "Note: These are base keybindings that apply globally.\n")
+    (princ "      Window layout modes (3pane, etc.) may override some bindings\n")
+    (princ "      to provide mode-specific functionality.\n")))
 
 ;;; ========================================
-;;; Integration with 3pane Mode
+;;; Mode Override Information
 ;;; ========================================
 
-(defun enkan-keybinding-3pane-compatibility-check ()
-  "Check which base keybindings will be overridden by 3pane mode."
+(defun enkan-keybinding-check-overrides (&optional mode)
+  "Check which base keybindings will be overridden by MODE.
+If MODE is nil, check all known modes."
+  (interactive (list (when current-prefix-arg
+                       (intern (completing-read "Mode: " 
+                                                (mapcar #'car enkan-mode-keybinding-overrides))))))
+  (let ((modes (if mode
+                   (list (cons mode (cdr (assq mode enkan-mode-keybinding-overrides))))
+                 enkan-mode-keybinding-overrides)))
+    (with-output-to-temp-buffer "*Keybinding Overrides*"
+      (princ "Keybinding Overrides by Window Layout Modes\n")
+      (princ "============================================\n\n")
+      (dolist (mode-entry modes)
+        (when mode-entry
+          (let ((mode-name (car mode-entry))
+                (overrides (cdr mode-entry)))
+            (princ (format "Mode: %s\n" mode-name))
+            (princ "----------------------------------------\n")
+            (when overrides
+              (princ (enkan-keybinding-format-description overrides)))
+            (princ "\n"))))
+      (princ "Note: These overrides only apply when the respective mode is active.\n"))))
+
+(defun enkan-keybinding-show-conflicts ()
+  "Show potential conflicts between base and override keybindings."
   (interactive)
-  (let ((overrides '(("C-t" . "Switch between input/misc windows")
-                      ("<escape>" . "Send ESC to eat buffer")
-                      ("C-M-1" . "Send 1 to eat buffer")
-                      ("C-M-2" . "Send 2 to eat buffer")
-                      ("C-M-3" . "Send 3 to eat buffer"))))
-    (with-output-to-temp-buffer "*3pane Keybinding Overrides*"
-      (princ "Keybindings that will be overridden in 3pane mode:\n")
-      (princ "==================================================\n\n")
-      (dolist (override overrides)
-        (princ (format "  %-10s -> %s\n" (car override) (cdr override)))))))
+  (let ((base-keys (mapcar #'car enkan-keybinding-definitions))
+        (conflicts '()))
+    (dolist (mode-entry enkan-mode-keybinding-overrides)
+      (let ((mode (car mode-entry))
+            (overrides (cdr mode-entry)))
+        (dolist (override overrides)
+          (let ((key (car override)))
+            (when (member key base-keys)
+              (push (list mode key
+                          (nth 2 (assoc key enkan-keybinding-definitions))
+                          (nth 2 override))
+                    conflicts))))))
+    (with-output-to-temp-buffer "*Keybinding Conflicts*"
+      (princ "Keybinding Conflicts (Base vs Mode Overrides)\n")
+      (princ "==============================================\n\n")
+      (if conflicts
+          (dolist (conflict (nreverse conflicts))
+            (princ (format "Mode: %s\n" (nth 0 conflict)))
+            (princ (format "  Key: %s\n" (nth 1 conflict)))
+            (princ (format "    Base:     %s\n" (nth 2 conflict)))
+            (princ (format "    Override: %s\n\n" (nth 3 conflict))))
+        (princ "No conflicts found.\n")))))
 
 ;;; ========================================
 ;;; Provide
