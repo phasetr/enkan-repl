@@ -28,8 +28,6 @@
 
 (defconst enkan-keybinding-definitions
   '(;; Window Navigation
-     ("C-t" other-window-or-split "Other window" window-navigation)
-     ("M-t" other-window-or-split "Other window" window-navigation)
      ("C-M-l" enkan-repl-setup "Setup window layout" window-navigation)
 
      ;; Text Sending
@@ -65,7 +63,7 @@ Each entry is (KEY COMMAND DESCRIPTION CATEGORY).")
 ;;; ========================================
 
 (defconst enkan-simple-3pane-keybinding-overrides
-  '(("C-t" enkan-simple-3pane-other-window "Switch between input/misc windows" window-navigation)
+  '(("C-M-t" enkan-simple-3pane-other-window "Switch between input/misc windows" window-navigation)
      ("<escape>" enkan-simple-3pane-send-escape "Send ESC to eat buffer" quick-actions)
      ("C-M-1" enkan-simple-3pane-send-1 "Send 1 to eat buffer" quick-actions)
      ("C-M-2" enkan-simple-3pane-send-2 "Send 2 to eat buffer" quick-actions)
@@ -88,7 +86,7 @@ Each entry is (KEY COMMAND DESCRIPTION CATEGORY).")
 Each entry is (COMMAND DESCRIPTION).")
 
 (defconst enkan-dual-task-keybinding-overrides
-  '(("C-t" enkan-dual-task-switch-input "Switch between input windows" window-navigation))
+  '(("C-M-t" enkan-dual-task-other-window "Switch between input windows" window-navigation))
   "Keybinding overrides for dual task mode.
 Each entry is (KEY COMMAND DESCRIPTION CATEGORY).")
 
@@ -96,7 +94,7 @@ Each entry is (KEY COMMAND DESCRIPTION CATEGORY).")
   '((enkan-dual-task-setup "Setup dual task window layout")
     (enkan-dual-task-reset "Reset dual task layout")
     (enkan-dual-task-describe-layout "Show dual task layout status")
-    (enkan-dual-task-switch-input "Switch between input windows"))
+    (enkan-dual-task-other-window "Switch between input windows"))
   "Command definitions for dual task mode.
 Each entry is (COMMAND DESCRIPTION).")
 
