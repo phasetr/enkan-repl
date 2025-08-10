@@ -131,7 +131,7 @@
     '(("enkan-dual-task-setup" . "Setup dual task window layout")
        ("enkan-dual-task-reset" . "Reset dual task layout")
        ("enkan-dual-task-describe-layout" . "Show dual task layout status")
-       ("enkan-dual-task-switch-input" . "Switch between input windows (C-t)")))
+       ("enkan-dual-task-other-window" . "Switch between input windows (C-M-t)")))
   "Additional commands for dual task layout to add to cheat sheet.")
 
 ;;; ========================================
@@ -144,7 +144,7 @@
     (enkan-keybinding-make-keymap enkan-dual-task-keybinding-overrides)
     ;; Fallback to manual definition
     (let ((map (make-sparse-keymap)))
-      (define-key map (kbd "C-t") 'enkan-dual-task-switch-input)
+      (define-key map (kbd "C-M-t") 'enkan-dual-task-other-window)
       map)))
 
 ;;; ========================================
@@ -332,7 +332,7 @@ prompt for session selection. Otherwise, reuse remembered sessions."
 ;;; Window Navigation Functions
 ;;; ========================================
 
-(defun enkan-dual-task-switch-input ()
+(defun enkan-dual-task-other-window ()
   "Switch between main and sub input windows only.
 Avoids switching to eat windows."
   (interactive)
