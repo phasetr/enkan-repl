@@ -265,7 +265,7 @@ Returns the template path to use, or nil to use default template."
                (insert "- ~M-x enkan-repl-send-escape~ - Send ESC key to interrupt operations\n")
                (insert "- ~M-x enkan-repl-open-project-input-file~ - Open or create project input file\n")
                (insert "- ~M-x enkan-repl-start-eat~ - Start eat terminal session\n")
-               (insert "- ~M-x enkan-repl-setup-window-layout~ - Set up convenient window layout\n")
+               (insert "- ~M-x enkan-repl-setup~ - Set up convenient window layout\n")
                (insert "- ~M-x enkan-repl-output-template~ - Export template for customization\n")
                (insert "- ~M-x enkan-repl-status~ - Show diagnostic information\n")
                (insert "- ~M-x enkan-repl-toggle-debug-mode~ - Toggle debug mode\n")
@@ -359,7 +359,7 @@ Returns categorized functions as string, or falls back to static list."
           "- ~M-x enkan-repl-send-escape~ - Send ESC key to eat session buffer.\n\n"
           "** Session Controller\n\n"
           "- ~M-x enkan-repl-start-eat~ - Start eat terminal and change to appropriate directory.\n"
-          "- ~M-x enkan-repl-setup-window-layout~ - Set up window layout with org file on left and eat on right.\n\n"
+          "- ~M-x enkan-repl-setup~ - Set up window layout with org file on left and eat on right.\n\n"
           "** Utilities\n\n"
           "- ~M-x enkan-repl-open-project-input-file~ - Open or create project input file for current directory.\n"
           "- ~M-x enkan-repl-output-template~ - Output current template content to a new buffer for customization.\n"
@@ -914,7 +914,7 @@ Category: Session Controller"
 
 
 ;;;###autoload
-(defun enkan-repl-setup-window-layout ()
+(defun enkan-repl-setup ()
   "Set up window layout with org file on left and eat on right.
 This is the author's preference - customize as needed.
 
