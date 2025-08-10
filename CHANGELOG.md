@@ -1,3 +1,10 @@
+# [0.8.0](https://github.com/phasetr/enkan-repl/compare/v0.7.0...v0.8.0) (2025-08-10)
+
+
+### Features
+
+* Add custom window navigation command ([51517a7](https://github.com/phasetr/enkan-repl/commit/51517a715510d72d86344df11078eccf9c9f0168))
+
 # [0.7.0](https://github.com/phasetr/enkan-repl/compare/v0.6.1...v0.7.0) (2025-08-10)
 
 
