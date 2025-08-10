@@ -252,7 +252,7 @@ It spans multiple lines for testing.\"
 
             ;; Check function references
             (should (string-match-p "enkan-repl-start-eat" content))
-            (should (string-match-p "enkan-repl-setup-window-layout" content))
+            (should (string-match-p "enkan-repl-setup" content))
             (should (string-match-p "enkan-repl-send-region" content))
             (should (string-match-p "enkan-repl-status" content))))
 

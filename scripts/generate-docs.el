@@ -107,7 +107,7 @@
                   (setq result (concat result "- =enkan-repl-send-1/2/3= - Send numbered choices for AI prompts\n"))))
                ((string= func-name "enkan-repl-open-project-input-file")
                 (setq result (concat result "- =" func-name "= - Create/open persistent input file for current directory\n")))
-               ((string= func-name "enkan-repl-setup-window-layout")
+               ((string= func-name "enkan-repl-setup")
                 (setq result (concat result "- =" func-name "= - Arrange windows for (the author's) optimal workflow\n")))
                (t
                 (setq result (concat result "- =" func-name "= - " description "\n"))))))
