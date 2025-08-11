@@ -33,6 +33,7 @@
      ;; Text Sending
      ("C-M-<return>" enkan-repl-send-region "Send region to REPL" text-sending)
      ("C-M-i" enkan-repl-send-line "Send current line to REPL" text-sending)
+     ("C-M-e" enkan-repl-send-enter "Send enter to REPL" text-sending)
 
      ;; Quick Actions
      ("<escape>" enkan-repl-send-escape "Send ESC to REPL" quick-actions)
