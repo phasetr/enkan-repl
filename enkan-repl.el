@@ -57,6 +57,10 @@
 (when (locate-library "enkan-repl-utils")
   (require 'enkan-repl-utils))
 
+;; Load macOS specific notifications if on macOS
+(when (and (eq system-type 'darwin) (locate-library "enkan-repl-mac-notify"))
+  (require 'enkan-repl-mac-notify))
+
 ;; Declare external functions to avoid byte-compile warnings
 (declare-function enkan-repl-utils--extract-function-info "enkan-repl-utils" (file-path))
 (declare-function enkan-repl--find-session-buffer-pure "enkan-repl-utils" (selected-name buffer-info-list))
@@ -883,7 +887,11 @@ Category: Session Controller"
                 (rename-buffer new-buffer-name t)
               (error
                (message "Warning: Failed to rename eat buffer: %s" (error-message-string err))
-               nil)))
+               nil))
+            ;; Setup bell handler for Claude Code notifications
+            (when (and (eq system-type 'darwin)
+                       (fboundp 'enkan-repl-setup-bell-handler))
+              (run-at-time 0.5 nil #'enkan-repl-setup-bell-handler)))
           ;; Ensure buffer is displayed in target window
           (set-window-buffer target-window eat-buffer))
         ;; Return to original window (input file)
