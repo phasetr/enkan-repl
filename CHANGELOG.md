@@ -1,3 +1,10 @@
+# [0.10.0](https://github.com/phasetr/enkan-repl/compare/v0.9.0...v0.10.0) (2025-08-11)
+
+
+### Features
+
+* Add macOS notification support for Claude Code task completion ([f9a8779](https://github.com/phasetr/enkan-repl/commit/f9a8779bad60b0a360c19b849d06d96f663eb3d2))
+
 # [0.9.0](https://github.com/phasetr/enkan-repl/compare/v0.8.1...v0.9.0) (2025-08-11)
 
 
