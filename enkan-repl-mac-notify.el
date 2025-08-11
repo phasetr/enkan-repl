@@ -72,8 +72,8 @@ Defaults to a system sound. Change this to your preferred sound."
   "Build osascript command for notification with MESSAGE and TITLE.
 This is a pure function for testing."
   (format "display notification \"%s\" with title \"%s\""
-          (replace-regexp-in-string "\"" "\\\\\"" message t t)
-          (replace-regexp-in-string "\"" "\\\\\"" title t t)))
+          (replace-regexp-in-string "\"" "\\\"" message t t)
+          (replace-regexp-in-string "\"" "\\\"" title t t)))
 
 (defun enkan-repl--should-play-sound-p (sys-type enabled-p file-path)
   "Check if sound should be played based on SYS-TYPE, ENABLED-P, and FILE-PATH.

@@ -24,15 +24,15 @@
   
   ;; Message with quotes that need escaping
   (should (equal (enkan-repl--build-notification-command "He said \"Hello\"" "Title")
-                 "display notification \"He said \\\\\"Hello\\\\\"\" with title \"Title\""))
+                 "display notification \"He said \\\"Hello\\\"\" with title \"Title\""))
   
   ;; Title with quotes that need escaping
   (should (equal (enkan-repl--build-notification-command "Message" "\"Important\" Title")
-                 "display notification \"Message\" with title \"\\\\\"Important\\\\\" Title\""))
+                 "display notification \"Message\" with title \"\\\"Important\\\" Title\""))
   
   ;; Both with quotes
   (should (equal (enkan-repl--build-notification-command "\"Quoted\" message" "\"Quoted\" title")
-                 "display notification \"\\\\\"Quoted\\\\\" message\" with title \"\\\\\"Quoted\\\\\" title\""))
+                 "display notification \"\\\"Quoted\\\" message\" with title \"\\\"Quoted\\\" title\""))
   
   ;; Empty strings
   (should (equal (enkan-repl--build-notification-command "" "")
