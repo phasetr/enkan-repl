@@ -1,3 +1,10 @@
+# [0.9.0](https://github.com/phasetr/enkan-repl/compare/v0.8.1...v0.9.0) (2025-08-11)
+
+
+### Features
+
+* Add C-M-e keybinding for sending enter to REPL ([d5c8997](https://github.com/phasetr/enkan-repl/commit/d5c8997930807fe27615a61a2661d434915c2fc3))
+
 ## [0.8.1](https://github.com/phasetr/enkan-repl/compare/v0.8.0...v0.8.1) (2025-08-10)
 
 
