@@ -1,3 +1,10 @@
+# [0.11.0](https://github.com/phasetr/enkan-repl/compare/v0.10.0...v0.11.0) (2025-08-15)
+
+
+### Features
+
+* extend keybindings to 5 and remove 3pane-specific send functions ([7b40e04](https://github.com/phasetr/enkan-repl/commit/7b40e0471b5e2d158c3c513991b8d2bfa783ee3d))
+
 # [0.10.0](https://github.com/phasetr/enkan-repl/compare/v0.9.0...v0.10.0) (2025-08-11)
 
 
