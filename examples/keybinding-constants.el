@@ -40,6 +40,8 @@
      ("C-M-1" enkan-repl-send-1 "Send 1 to REPL" quick-actions)
      ("C-M-2" enkan-repl-send-2 "Send 2 to REPL" quick-actions)
      ("C-M-3" enkan-repl-send-3 "Send 3 to REPL" quick-actions)
+     ("C-M-4" enkan-repl-send-4 "Send 4 to REPL" quick-actions)
+     ("C-M-5" enkan-repl-send-5 "Send 5 to REPL" quick-actions)
      ("C-M-b" enkan-repl-recenter-bottom "Recenter at bottom" quick-actions)
 
      ;; Project Management
@@ -64,11 +66,7 @@ Each entry is (KEY COMMAND DESCRIPTION CATEGORY).")
 ;;; ========================================
 
 (defconst enkan-simple-3pane-keybinding-overrides
-  '(("C-M-t" enkan-simple-3pane-other-window "Switch between input/misc windows" window-navigation)
-     ("<escape>" enkan-simple-3pane-send-escape "Send ESC to eat buffer" quick-actions)
-     ("C-M-1" enkan-simple-3pane-send-1 "Send 1 to eat buffer" quick-actions)
-     ("C-M-2" enkan-simple-3pane-send-2 "Send 2 to eat buffer" quick-actions)
-     ("C-M-3" enkan-simple-3pane-send-3 "Send 3 to eat buffer" quick-actions))
+  '(("C-M-t" enkan-simple-3pane-other-window "Switch between input/misc windows" window-navigation))
   "Keybinding overrides for 3pane mode.
 Each entry is (KEY COMMAND DESCRIPTION CATEGORY).")
 
@@ -78,11 +76,7 @@ Each entry is (KEY COMMAND DESCRIPTION CATEGORY).")
     (enkan-simple-3pane-describe-keybindings "Show 3pane keybindings")
     (enkan-simple-3pane-other-window "Switch between input/misc windows")
     (enkan-simple-3pane-lock-windows "Lock input and eat windows")
-    (enkan-simple-3pane-unlock-windows "Unlock input and eat windows")
-    (enkan-simple-3pane-send-escape "Send ESC to eat buffer")
-    (enkan-simple-3pane-send-1 "Send 1 to eat buffer")
-    (enkan-simple-3pane-send-2 "Send 2 to eat buffer")
-    (enkan-simple-3pane-send-3 "Send 3 to eat buffer"))
+    (enkan-simple-3pane-unlock-windows "Unlock input and eat windows"))
   "Command definitions for 3pane mode cheat sheet.
 Each entry is (COMMAND DESCRIPTION).")
 
