@@ -129,11 +129,7 @@ This is set automatically when enkan-simple-3pane-setup is called.")
       ("enkan-simple-3pane-describe-keybindings" . "Show 3pane keybindings")
       ("enkan-simple-3pane-other-window" . "Switch between input/misc windows (C-t)")
       ("enkan-simple-3pane-lock-windows" . "Lock input and eat windows")
-      ("enkan-simple-3pane-unlock-windows" . "Unlock input and eat windows")
-      ("enkan-simple-3pane-send-escape" . "Send ESC to eat buffer (Esc)")
-      ("enkan-simple-3pane-send-1" . "Send 1 to eat buffer (C-M-1)")
-      ("enkan-simple-3pane-send-2" . "Send 2 to eat buffer (C-M-2)")
-      ("enkan-simple-3pane-send-3" . "Send 3 to eat buffer (C-M-3)")))
+      ("enkan-simple-3pane-unlock-windows" . "Unlock input and eat windows")))
   "Additional commands for 3-pane layout to add to cheat sheet.")
 
 ;;; ========================================
@@ -149,10 +145,6 @@ This is set automatically when enkan-simple-3pane-setup is called.")
       ;; These bindings override the base keybindings when 3pane mode is active
       (define-key map (kbd "C-t") 'enkan-simple-3pane-other-window)
       (define-key map (kbd "M-t") 'other-window)
-      (define-key map (kbd "<escape>") 'enkan-simple-3pane-send-escape)
-      (define-key map (kbd "C-M-1") 'enkan-simple-3pane-send-1)
-      (define-key map (kbd "C-M-2") 'enkan-simple-3pane-send-2)
-      (define-key map (kbd "C-M-3") 'enkan-simple-3pane-send-3)
       map)))
 
 ;;; ========================================
@@ -302,11 +294,7 @@ This is set automatically when enkan-simple-3pane-setup is called.")
     (if (boundp 'enkan-simple-3pane-keybinding-overrides)
         (princ (enkan-keybinding-format-description enkan-simple-3pane-keybinding-overrides))
       ;; Fallback if constants not loaded
-      (princ "  C-t         - Switch between input/misc windows\n")
-      (princ "  ESC         - Send ESC to eat buffer\n")
-      (princ "  C-M-1       - Send 1 to eat buffer\n")
-      (princ "  C-M-2       - Send 2 to eat buffer\n")
-      (princ "  C-M-3       - Send 3 to eat buffer\n"))
+      (princ "  C-t         - Switch between input/misc windows\n"))
     
     (princ "\nNote: 3pane mode overrides take precedence over base keybindings.\n")))
 
@@ -376,45 +364,6 @@ Avoids switching to eat window."
       (message "Unlocked windows: %s"
         (string-join (nreverse unlocked-windows) ", "))
       (message "No windows to unlock."))))
-
-;;; ========================================
-;;; Remote eat Control Functions
-;;; ========================================
-
-(defun enkan-simple-3pane-send-escape ()
-  "Send ESC to eat buffer from any window."
-  (interactive)
-  (enkan-simple-3pane--send-to-eat
-    'enkan-repl-send-escape "ESC"))
-
-(defun enkan-simple-3pane-send-1 ()
-  "Send choice 1 to eat buffer from any window."
-  (interactive)
-  (enkan-simple-3pane--send-to-eat
-    'enkan-repl-send-1 "1"))
-
-(defun enkan-simple-3pane-send-2 ()
-  "Send choice 2 to eat buffer from any window."
-  (interactive)
-  (enkan-simple-3pane--send-to-eat
-    'enkan-repl-send-2 "2"))
-
-(defun enkan-simple-3pane-send-3 ()
-  "Send choice 3 to eat buffer from any window."
-  (interactive)
-  (enkan-simple-3pane--send-to-eat
-    'enkan-repl-send-3 "3"))
-
-(defun enkan-simple-3pane--send-to-eat (func msg)
-  "Helper function to send commands to eat buffer.
-FUNC is the function to call, MSG is the message to display."
-  (if (and enkan-simple-3pane-eat-right-full-window
-        (window-live-p enkan-simple-3pane-eat-right-full-window))
-    (save-window-excursion
-      (select-window enkan-simple-3pane-eat-right-full-window)
-      (funcall func)
-      (message "Sent %s to eat buffer" msg))
-    (message "No eat window found. Run M-x enkan-simple-3pane-setup first.")))
 
 ;;; ========================================
 ;;; Display Buffer Management
