@@ -136,6 +136,65 @@
     (should (string= "/complex/path/with spaces/project-name/"
                      (enkan-repl--find-directory-by-project-name "project-name"))))
 
+(ert-deftest enkan-repl-test--prefix-no-buffer-should-auto-start ()
+  "Test that prefix notation auto-starts session when project directory exists."
+  (let ((enkan-repl-project-aliases '(("pt" . "pt-tools") ("er" . "enkan-repl")))
+        (enkan-repl-center-file "/tmp/center.org")
+        (enkan-repl-center-project-registry '(("pt" . ("pt-tools" . "/existing/pt-tools"))
+                                              ("er" . ("enkan-repl" . "/existing/enkan-repl"))))
+        (started-sessions '())
+        (sent-commands '()))
+    
+    ;; Mock auto-start function
+    (cl-letf (((symbol-function 'enkan-repl-start-eat)
+               (lambda ()
+                 (let ((project-name (file-name-nondirectory 
+                                     (directory-file-name default-directory))))
+                   (push project-name started-sessions))))
+              ((symbol-function 'enkan-repl--send-text)
+               (lambda (text directory)
+                 (push (list text directory) sent-commands)
+                 t))
+              ((symbol-function 'file-directory-p)
+               (lambda (dir)
+                 (string-match-p "/existing/" dir))))
+      
+      (with-temp-buffer
+        (let ((buffer-file-name "/tmp/center.org")
+              (default-directory "/existing/pt-tools/"))
+          (insert ":pt ls")
+          
+          ;; Should auto-start session and then send command
+          (enkan-repl--send-buffer-content 1 (point-max) "Line" t)
+          
+          ;; Verify session was started and command sent
+          (should (member "pt-tools" started-sessions))
+          (should (equal '(("ls" "/existing/pt-tools/")) sent-commands)))))))
+
+(ert-deftest enkan-repl-test--prefix-no-buffer-invalid-project ()
+  "Test that prefix notation shows error when project directory doesn't exist."
+  (let ((enkan-repl-project-aliases '(("invalid" . "invalid-project")))
+        (enkan-repl-center-file "/tmp/center.org")
+        (enkan-repl-center-project-registry '(("invalid" . ("invalid-project" . "/nonexistent/path"))))
+        (error-message nil))
+    
+    ;; Mock message function to capture error
+    (cl-letf (((symbol-function 'message)
+               (lambda (format-string &rest args)
+                 (setq error-message (apply #'format format-string args))))
+              ((symbol-function 'file-directory-p)
+               (lambda (dir) nil)))  ; No directories exist
+      
+      (with-temp-buffer
+        (let ((buffer-file-name "/tmp/center.org"))
+          (insert ":invalid command")
+          
+          ;; Should show error message
+          (enkan-repl--send-buffer-content 1 (point-max) "Line" t)
+          
+          ;; Verify error message was shown
+          (should (string-match-p "Project.*not found" error-message)))))))
+
 (ert-deftest enkan-repl-test--send-line-with-prefix-no-buffer-fallback ()
   "Test sending line with prefix falls back to current directory when target buffer doesn't exist."
   (let ((enkan-repl-project-aliases '(("pt" . "pt-tools") ("er" . "enkan-repl")))

@@ -223,6 +223,10 @@ nilの場合、複数セッション機能は無効."
 (defvar enkan-repl--session-counter 0
   "セッション開始カウンター（自動番号付与用）.")
 
+(defvar enkan-repl--current-multi-project-layout nil
+  "現在選択されているmulti-project-layout名.
+nil の場合、通常のsetup動作を実行.")
+
 ;;;; Core Functions
 
 ;;;; File Naming and Path Management
@@ -578,6 +582,41 @@ For other buffers, use current `default-directory'."
   (or (cdr (assoc alias enkan-repl-project-aliases))
       alias))
 
+(defun enkan-repl--get-project-directory-from-registry (alias)
+  "プロジェクトレジストリからディレクトリパスを取得.
+Returns: ディレクトリパスまたはnil"
+  (let ((project-info (cdr (assoc alias enkan-repl-center-project-registry))))
+    (when project-info
+      (cdr project-info))))  ; project-path part
+
+(defun enkan-repl--handle-prefix-target-not-found (prefix-target command content-description)
+  "プレフィックス対象が見つからない場合の処理.
+1. プロジェクトレジストリからディレクトリパスを取得
+2. ディレクトリが存在するならセッション起動
+3. 存在しないならエラーメッセージ"
+  (let ((project-dir (enkan-repl--get-project-directory-from-registry prefix-target)))
+    (cond
+     ;; プロジェクトレジストリにディレクトリがあり、実際に存在する場合
+     ((and project-dir (file-directory-p project-dir))
+      (let ((default-directory project-dir))
+        (enkan-repl-start-eat)
+        (message "Started session for %s at %s" prefix-target project-dir)
+        ;; セッション起動後、少し待ってからコマンド送信
+        (run-at-time 0.5 nil
+                     (lambda (cmd dir desc target)
+                       (when (enkan-repl--send-text cmd dir)
+                         (message "%s sent to %s (%d characters)"
+                                  desc target (length cmd))))
+                     command project-dir content-description prefix-target)))
+     ;; プロジェクトレジストリにあるが、ディレクトリが存在しない場合
+     (project-dir
+      (message "❌ Project '%s' directory not found: %s. Check enkan-repl-center-project-registry."
+               prefix-target project-dir))
+     ;; プロジェクトレジストリにない場合
+     (t
+      (message "❌ Project '%s' not found. Check enkan-repl-project-aliases and enkan-repl-center-project-registry."
+               prefix-target)))))
+
 (defun enkan-repl--get-session-by-user-number (user-number)
   "ユーザー番号からプロジェクト名を取得.
 user-number: 1-4の整数（eatセッションの左から何番目か）
@@ -673,8 +712,9 @@ user-number: 1-4の整数（eatセッションの左から何番目か）"
               (enkan-repl--send-text command directory)
               ;; バッファ内容は変更しない（:pt部分を保持）
               )
-          ;; Fallback to current directory when target not found
-          (enkan-repl--send-text command default-directory))))
+          ;; Handle target not found properly
+          (enkan-repl--handle-prefix-target-not-found
+           prefix-target command "Region"))))
      ;; プレフィックス記法がない場合は、ユーザー番号を使用
      (t
       (let ((project-name (enkan-repl--get-session-by-user-number user-number)))
@@ -856,11 +896,9 @@ If SKIP-EMPTY-CHECK is non-nil, send content even if empty."
                             ;; バッファ内容は変更しない（:pt部分を保持）
                             (message "%s sent to %s (%d characters)"
                                      content-description prefix-target (length command)))
-                        ;; Fallback to current directory when target not found
-                        (progn
-                          (enkan-repl--send-text command target-dir)
-                          (message "%s sent to current directory (target '%s' not available) (%d characters)"
-                                   content-description prefix-target (length command)))))
+                        ;; Handle target not found properly
+                        (enkan-repl--handle-prefix-target-not-found
+                         prefix-target command content-description)))
                   ;; Center file without prefix - send to current directory
                   (if (enkan-repl--send-text content target-dir)
                       (message "%s sent (%d characters)"
@@ -1043,7 +1081,6 @@ Returns (target-dir existing-buffer can-send) as a list."
       (let ((can-send (enkan-repl--can-send-text target-dir)))
         (list target-dir existing-buffer can-send)))))
 
-
 (defun enkan-repl--handle-dead-session (existing-buffer target-dir prompt-format restart-func)
   "Handle dead session with user confirmation.
 EXISTING-BUFFER is the dead buffer to handle.
@@ -1161,22 +1198,49 @@ Category: Session Controller"
 
 ;;;###autoload
 (defun enkan-repl-setup ()
-  "Set up window layout with org file on left and eat on right.
-This is the author's preference - customize as needed.
+  "Set up window layout based on current multi-project configuration or default layout.
+For multi-project layouts, calls appropriate examples layout function.
+For simple layouts, sets up org file on left and eat on right.
 
 Category: Session Controller"
   (interactive)
-  (let
-      ((target-dir (enkan-repl--get-target-directory-for-buffer)))
-    (delete-other-windows)
-    (split-window-right)
-    (other-window 1)
-    (let ((session-buf (enkan-repl--get-buffer-for-directory target-dir)))
-      (if session-buf
-          (switch-to-buffer session-buf)
-        (message "eat session buffer not found. Run (enkan-repl-start-eat) first.")))
-    (other-window -1)
-    (message "Window layout setup complete")))
+  (if enkan-repl--current-multi-project-layout
+      ;; Multi-project layout is active - call appropriate examples layout function
+      (let* ((alias-list (cdr (assoc enkan-repl--current-multi-project-layout
+                                     enkan-repl-center-multi-project-layouts)))
+             (session-count (length alias-list)))
+        (delete-other-windows)
+        ;; Open center file first
+        (when enkan-repl-center-file
+          (find-file enkan-repl-center-file))
+        ;; Call appropriate layout function from examples
+        (cond
+         ((= session-count 2)
+          (if (fboundp 'enkan-repl-setup-2session-layout)
+              (enkan-repl-setup-2session-layout)
+            (error "enkan-repl-setup-2session-layout not available. Load center-window-navigation.el from examples.")))
+         ((= session-count 3)
+          (if (fboundp 'enkan-repl-setup-3session-layout)
+              (enkan-repl-setup-3session-layout)
+            (error "enkan-repl-setup-3session-layout not available. Load center-window-navigation.el from examples.")))
+         ((= session-count 4)
+          (if (fboundp 'enkan-repl-setup-4session-layout)
+              (enkan-repl-setup-4session-layout)
+            (error "enkan-repl-setup-4session-layout not available. Load center-window-navigation.el from examples.")))
+         (t (error "Invalid session count: %d" session-count)))
+        (message "Multi-project window layout setup complete: %s (%d sessions)"
+                 enkan-repl--current-multi-project-layout session-count))
+    ;; Normal setup behavior
+    (let ((target-dir (enkan-repl--get-target-directory-for-buffer)))
+      (delete-other-windows)
+      (split-window-right)
+      (other-window 1)
+      (let ((session-buf (enkan-repl--get-buffer-for-directory target-dir)))
+        (if session-buf
+            (switch-to-buffer session-buf)
+          (message "eat session buffer not found. Run (enkan-repl-start-eat) first.")))
+      (other-window -1)
+      (message "Window layout setup complete"))))
 
 ;;;###autoload
 (defun enkan-repl-output-template ()
@@ -1431,176 +1495,6 @@ Category: Command Palette"
         (when selected-command
           (call-interactively (intern selected-command)))))))
 
-;;;; Window Variables
-
-(defvar enkan-repl--window-1 nil
-  "Window 1 (center file) for enkan-repl multi-buffer layout.")
-
-(defvar enkan-repl--window-2 nil  
-  "Window 2 (work area) for enkan-repl multi-buffer layout.")
-
-(defvar enkan-repl--window-3 nil
-  "Window 3 (reserve area) for enkan-repl multi-buffer layout.")
-
-(defvar enkan-repl--window-4 nil
-  "Window 4 (session 1) for enkan-repl multi-buffer layout.")
-
-(defvar enkan-repl--window-5 nil
-  "Window 5 (session 2) for enkan-repl multi-buffer layout.")
-
-(defvar enkan-repl--window-6 nil
-  "Window 6 (session 3) for enkan-repl multi-buffer layout.")
-
-(defvar enkan-repl--window-7 nil
-  "Window 7 (session 4) for enkan-repl multi-buffer layout.")
-
-;;;; Window Layout Functions
-
-;;;###autoload
-(defun enkan-repl-setup-2session-layout ()
-  "2セッション管理用のウインドウレイアウトを設定.
-  +----------+---+---+
-  |    1     | 4 | 5 |
-  |  中心    |   |   |
-  |ファイル   |   |   |
-  +-----+----+---+---+
-  | 2   | 3  |
-  |作業 |予備|
-  +-----+----+
-
-  1: 中心ファイル（送信元）
-  2: 作業・調査用（雑多なファイル・バッファ）
-  3: 予備エリア（magitコミット等の一時バッファ用）
-  4, 5: enkan-replセッション
-
-Category: Utilities"
-  (interactive)
-  (delete-other-windows)
-  ;; 右側に2列作成
-  (split-window-right (floor (* (window-width) 0.7)))
-  (other-window 1)
-  (split-window-right)
-  ;; 左下に分割
-  (other-window 1)
-  (split-window-below (floor (* (window-height) 0.6)))
-  (split-window-right (floor (* (window-width) 0.5)))
-  (balance-windows)
-  ;; Set window variables for center file layout
-  (let ((windows (window-list)))
-    (setq enkan-repl--window-1 (nth 0 windows))  ; Center file
-    (setq enkan-repl--window-2 (nth 1 windows))  ; Work area
-    (setq enkan-repl--window-3 (nth 2 windows))  ; Reserve area
-    (setq enkan-repl--window-4 (nth 3 windows))  ; Session 1
-    (setq enkan-repl--window-5 (nth 4 windows))) ; Session 2
-  (select-window (car (window-list))))
-
-;;;###autoload
-(defun enkan-repl-setup-3session-layout ()
-  "3セッション管理用のウインドウレイアウトを設定.
-  +----------+---+---+---+
-  |    1     | 4 | 5 | 6 |
-  |  中心    |   |   |   |
-  |ファイル   |   |   |   |
-  +-----+----+---+---+---+
-  | 2   | 3  |
-  |作業 |予備|
-  +-----+----+
-
-  4, 5, 6: enkan-replセッション
-
-Category: Utilities"
-  (interactive)
-  (delete-other-windows)
-  ;; 右側に3列作成
-  (split-window-right (floor (* (window-width) 0.6)))
-  (other-window 1)
-  (split-window-right)
-  (split-window-right)
-  ;; 左下に分割
-  (other-window 2)
-  (split-window-below (floor (* (window-height) 0.6)))
-  (split-window-right (floor (* (window-width) 0.5)))
-  (balance-windows)
-  ;; Set window variables for center file layout
-  (let ((windows (window-list)))
-    (setq enkan-repl--window-1 (nth 0 windows))  ; Center file
-    (setq enkan-repl--window-2 (nth 1 windows))  ; Work area
-    (setq enkan-repl--window-3 (nth 2 windows))  ; Reserve area
-    (setq enkan-repl--window-4 (nth 3 windows))  ; Session 1
-    (setq enkan-repl--window-5 (nth 4 windows))  ; Session 2
-    (setq enkan-repl--window-6 (nth 5 windows))) ; Session 3
-  (select-window (car (window-list))))
-
-;;;###autoload
-(defun enkan-repl-setup-4session-layout ()
-  "4セッション管理用のウインドウレイアウトを設定.
-  +----------+---+---+---+---+
-  |    1     | 4 | 5 | 6 | 7 |
-  |  中心    |   |   |   |   |
-  |ファイル   |   |   |   |   |
-  +-----+----+---+---+---+---+
-  | 2   | 3  |
-  |作業 |予備|
-  +-----+----+
-
-  4, 5, 6, 7: enkan-replセッション
-
-Category: Utilities"
-  (interactive)
-  (delete-other-windows)
-  ;; 右側に4列作成
-  (split-window-right (floor (* (window-width) 0.5)))
-  (other-window 1)
-  (split-window-right)
-  (split-window-right)
-  (split-window-right)
-  ;; 左下に分割
-  (other-window 3)
-  (split-window-below (floor (* (window-height) 0.6)))
-  (split-window-right (floor (* (window-width) 0.5)))
-  (balance-windows)
-  ;; Set window variables for center file layout
-  (let ((windows (window-list)))
-    (setq enkan-repl--window-1 (nth 0 windows))  ; Center file
-    (setq enkan-repl--window-2 (nth 1 windows))  ; Work area
-    (setq enkan-repl--window-3 (nth 2 windows))  ; Reserve area
-    (setq enkan-repl--window-4 (nth 3 windows))  ; Session 1
-    (setq enkan-repl--window-5 (nth 4 windows))  ; Session 2
-    (setq enkan-repl--window-6 (nth 5 windows))  ; Session 3
-    (setq enkan-repl--window-7 (nth 6 windows))) ; Session 4
-  (select-window (car (window-list))))
-
-;;;###autoload
-(defun enkan-repl-goto-window (window-number)
-  "指定されたウインドウ番号に移動.
-window-number: 1-7の整数
-
-Category: Utilities"
-  (interactive "nWindow number (1-7): ")
-  (unless (<= 1 window-number 7)
-    (user-error "Window number must be 1-7"))
-
-  (let ((target-window (nth (1- window-number) (window-list nil 'no-minibuf))))
-    (if target-window
-        (select-window target-window)
-      (user-error "Window %d does not exist" window-number))))
-
-;; Individual window navigation functions for keybindings
-;;;###autoload
-(defun enkan-repl-goto-window-1 () "Go to window 1" (interactive) (enkan-repl-goto-window 1))
-;;;###autoload
-(defun enkan-repl-goto-window-2 () "Go to window 2" (interactive) (enkan-repl-goto-window 2))
-;;;###autoload
-(defun enkan-repl-goto-window-3 () "Go to window 3" (interactive) (enkan-repl-goto-window 3))
-;;;###autoload
-(defun enkan-repl-goto-window-4 () "Go to window 4" (interactive) (enkan-repl-goto-window 4))
-;;;###autoload
-(defun enkan-repl-goto-window-5 () "Go to window 5" (interactive) (enkan-repl-goto-window 5))
-;;;###autoload
-(defun enkan-repl-goto-window-6 () "Go to window 6" (interactive) (enkan-repl-goto-window 6))
-;;;###autoload
-(defun enkan-repl-goto-window-7 () "Go to window 7" (interactive) (enkan-repl-goto-window 7))
-
 ;;;; Center File Multi-buffer Access Commands
 
 ;;;###autoload
@@ -1609,7 +1503,7 @@ Category: Utilities"
 
 Category: Center File Multi-buffer Access"
   (interactive)
-  (enkan-repl--send-region-with-prefix 
+  (enkan-repl--send-region-with-prefix
    (line-beginning-position) (line-end-position) 1))
 
 ;;;###autoload
@@ -1618,7 +1512,7 @@ Category: Center File Multi-buffer Access"
 
 Category: Center File Multi-buffer Access"
   (interactive)
-  (enkan-repl--send-region-with-prefix 
+  (enkan-repl--send-region-with-prefix
    (line-beginning-position) (line-end-position) 2))
 
 ;;;###autoload
@@ -1627,7 +1521,7 @@ Category: Center File Multi-buffer Access"
 
 Category: Center File Multi-buffer Access"
   (interactive)
-  (enkan-repl--send-region-with-prefix 
+  (enkan-repl--send-region-with-prefix
    (line-beginning-position) (line-end-position) 3))
 
 ;;;###autoload
@@ -1636,7 +1530,7 @@ Category: Center File Multi-buffer Access"
 
 Category: Center File Multi-buffer Access"
   (interactive)
-  (enkan-repl--send-region-with-prefix 
+  (enkan-repl--send-region-with-prefix
    (line-beginning-position) (line-end-position) 4))
 
 ;;;###autoload
@@ -1885,27 +1779,6 @@ Category: Center File Multi-buffer Access"
   (delete-other-windows)
   (message "Center file layout reset"))
 
-(defvar enkan-repl-center--current-window 1
-  "Current window number for center file other-window cycling (1-3).")
-
-;;;###autoload
-(defun enkan-repl-center-other-window ()
-  "Switch between windows 1-3 in center file layout.
-Window 1: Center file, Window 2: Work area, Window 3: Reserve area.
-
-Category: Center File Multi-buffer Access"
-  (interactive)
-  (let* ((window-list (window-list nil 'no-minibuf))
-         (max-window (min 3 (length window-list))))
-    (when (> max-window 0)
-      (setq enkan-repl-center--current-window
-            (1+ (mod enkan-repl-center--current-window max-window)))
-      (when (> enkan-repl-center--current-window max-window)
-        (setq enkan-repl-center--current-window 1))
-      (let ((target-window (nth (1- enkan-repl-center--current-window) window-list)))
-        (when target-window
-          (select-window target-window)
-          (message "Switched to window %d" enkan-repl-center--current-window))))))
 
 ;;;; Auto Setup Functions
 
@@ -1926,11 +1799,15 @@ Implemented as pure function, side effects are handled by upper functions."
 
 ;;;###autoload
 (defun enkan-repl-center-auto-setup (layout-name)
-  "Auto setup sessions using multi-project layout configuration.
-LAYOUT-NAME is the configuration name defined in enkan-repl-center-multi-project-layouts."
+  "Auto start eat sessions using multi-project layout configuration.
+LAYOUT-NAME is the configuration name defined in enkan-repl-center-multi-project-layouts.
+This function only starts eat sessions - use enkan-repl-setup (C-M-l) to arrange windows."
   (interactive
    (list (completing-read "Layout: "
                           (mapcar #'car enkan-repl-center-multi-project-layouts))))
+  ;; Remember the current layout for re-execution with C-M-l
+  (setq enkan-repl--current-multi-project-layout layout-name)
+
   (let ((alias-list (cdr (assoc layout-name enkan-repl-center-multi-project-layouts))))
     (unless alias-list
       (error "Layout '%s' not found" layout-name))
@@ -1943,20 +1820,6 @@ LAYOUT-NAME is the configuration name defined in enkan-repl-center-multi-project
       (setq enkan-repl-session-list nil)
       (setq enkan-repl--session-counter 0)
 
-      ;; Delete existing window configuration
-      (delete-other-windows)
-
-      ;; Open center file first
-      (when enkan-repl-center-file
-        (find-file enkan-repl-center-file))
-
-      ;; Setup appropriate layout
-      (cond
-       ((= session-count 2) (enkan-repl-setup-2session-layout))
-       ((= session-count 3) (enkan-repl-setup-3session-layout))
-       ((= session-count 4) (enkan-repl-setup-4session-layout))
-       (t (error "Invalid session count: %d" session-count)))
-
       ;; Start sessions for each project
       (let ((session-number 4)) ; Internal numbers start from 4
         (dolist (alias alias-list)
@@ -1966,20 +1829,11 @@ LAYOUT-NAME is the configuration name defined in enkan-repl-center-multi-project
                   (default-directory (expand-file-name (cdr project-info))))
               ;; Register session
               (enkan-repl--register-session session-number project-name)
-              ;; Start eat session
-              (select-window (nth (- session-number 4)
-                                  (list enkan-repl--window-4
-                                        enkan-repl--window-5
-                                        enkan-repl--window-6
-                                        enkan-repl--window-7)))
+              ;; Start eat session in current directory
               (enkan-repl-start-eat)
               (setq session-number (1+ session-number)))))
 
-      ;; Return to center file
-      (when (window-live-p enkan-repl--window-1)
-        (select-window enkan-repl--window-1))
-
-      (message "Auto-setup completed for layout: %s (%d sessions)"
+      (message "Eat sessions started for layout: %s (%d sessions). Use C-M-l to arrange windows."
                layout-name session-count)))))
 
 ;;;###autoload
@@ -1991,7 +1845,7 @@ Category: Center File Multi-buffer Access"
   (if (null enkan-repl-session-list)
       (message "No registered sessions to terminate")
     (let ((terminated-count 0))
-      (when (y-or-n-p (format "Terminate all %d registered sessions? " 
+      (when (y-or-n-p (format "Terminate all %d registered sessions? "
                               (length enkan-repl-session-list)))
         (dolist (session enkan-repl-session-list)
           (let* ((session-number (car session))
