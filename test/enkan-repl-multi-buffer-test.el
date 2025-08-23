@@ -46,11 +46,11 @@
     ;; Register new session
     (enkan-repl--register-session 4 "pt-tools")
     (should (equal '((4 . "pt-tools")) enkan-repl-session-list))
-    
+
     ;; Register another session
     (enkan-repl--register-session 5 "enkan-repl")
     (should (equal '((5 . "enkan-repl") (4 . "pt-tools")) enkan-repl-session-list))
-    
+
     ;; Update existing session
     (enkan-repl--register-session 4 "new-project")
     (should (equal '((4 . "new-project") (5 . "enkan-repl")) enkan-repl-session-list))))
@@ -75,13 +75,13 @@
                  (enkan-repl--parse-prefix-notation ":1 ls -la")))
   (should (equal '("project" . "echo hello")
                  (enkan-repl--parse-prefix-notation ":project echo hello")))
-  
+
   ;; Without prefix
   (should (equal '(nil . "npm test")
                  (enkan-repl--parse-prefix-notation "npm test")))
   (should (equal '(nil . "ls -la")
                  (enkan-repl--parse-prefix-notation "ls -la")))
-  
+
   ;; Edge cases
   (should (equal '(nil . ":invalid")
                  (enkan-repl--parse-prefix-notation ":invalid")))
@@ -126,10 +126,10 @@
     (rename-buffer "*enkan:/Users/test/pt-tools/*")
     (should (string= "/Users/test/pt-tools/"
                      (enkan-repl--find-directory-by-project-name "pt-tools"))))
-  
+
   ;; Test with no matching buffer
   (should (null (enkan-repl--find-directory-by-project-name "nonexistent-project")))
-  
+
   ;; Test with complex path
   (with-temp-buffer
     (rename-buffer "*enkan:/complex/path/with spaces/project-name/*")
@@ -144,11 +144,11 @@
                                               ("er" . ("enkan-repl" . "/existing/enkan-repl"))))
         (started-sessions '())
         (sent-commands '()))
-    
+
     ;; Mock auto-start function
     (cl-letf (((symbol-function 'enkan-repl-start-eat)
                (lambda ()
-                 (let ((project-name (file-name-nondirectory 
+                 (let ((project-name (file-name-nondirectory
                                      (directory-file-name default-directory))))
                    (push project-name started-sessions))))
               ((symbol-function 'enkan-repl--send-text)
@@ -158,15 +158,15 @@
               ((symbol-function 'file-directory-p)
                (lambda (dir)
                  (string-match-p "/existing/" dir))))
-      
+
       (with-temp-buffer
         (let ((buffer-file-name "/tmp/center.org")
               (default-directory "/existing/pt-tools/"))
           (insert ":pt ls")
-          
+
           ;; Should auto-start session and then send command
           (enkan-repl--send-buffer-content 1 (point-max) "Line" t)
-          
+
           ;; Verify session was started and command sent
           (should (member "pt-tools" started-sessions))
           (should (equal '(("ls" "/existing/pt-tools/")) sent-commands)))))))
@@ -177,21 +177,21 @@
         (enkan-repl-center-file "/tmp/center.org")
         (enkan-repl-center-project-registry '(("invalid" . ("invalid-project" . "/nonexistent/path"))))
         (error-message nil))
-    
+
     ;; Mock message function to capture error
     (cl-letf (((symbol-function 'message)
                (lambda (format-string &rest args)
                  (setq error-message (apply #'format format-string args))))
               ((symbol-function 'file-directory-p)
                (lambda (dir) nil)))  ; No directories exist
-      
+
       (with-temp-buffer
         (let ((buffer-file-name "/tmp/center.org"))
           (insert ":invalid command")
-          
+
           ;; Should show error message
           (enkan-repl--send-buffer-content 1 (point-max) "Line" t)
-          
+
           ;; Verify error message was shown
           (should (string-match-p "Project.*not found" error-message)))))))
 
@@ -203,22 +203,22 @@
         (default-directory "/fallback/directory/")
         (sent-text nil)
         (sent-directory nil))
-    
+
     ;; Mock enkan-repl--send-text to capture what gets sent
     (cl-letf (((symbol-function 'enkan-repl--send-text)
                (lambda (text directory)
                  (setq sent-text text
                        sent-directory directory)
                  t)))
-      
+
       (with-temp-buffer
         (let ((buffer-file-name "/tmp/center.org")
               (default-directory "/fallback/directory/"))
           (insert ":pt ls")
-          
+
           ;; Should fall back to current directory when target buffer doesn't exist
           (enkan-repl--send-buffer-content 1 (point-max) "Line" t)
-          
+
           ;; Verify command sent (without prefix) to fallback directory
           (should (string= "ls" sent-text))
           (should (string= "/fallback/directory/" sent-directory))))))))
@@ -232,7 +232,7 @@
         (test-called nil)
         (sent-text nil)
         (sent-directory nil))
-    
+
     ;; Mock enkan-repl--send-text to capture what gets sent
     (cl-letf (((symbol-function 'enkan-repl--send-text)
                (lambda (text directory)
@@ -247,19 +247,19 @@
                        (t nil))))
               ((symbol-function 'enkan-repl--get-target-directory-for-buffer)
                (lambda () "/default/directory/")))
-      
+
       (with-temp-buffer
         (let ((buffer-file-name "/tmp/center.org"))
           (insert ":pt ls -la")
-          
+
           ;; Test with prefix notation
           (enkan-repl--send-buffer-content 1 (point-max) "Test" t)
-          
+
           ;; Verify correct text was sent (without :pt prefix)
           (should test-called)
           (should (string= "ls -la" sent-text))
           (should (string= "/path/to/pt-tools/" sent-directory))
-          
+
           ;; Verify buffer content remains unchanged
           (should (string= ":pt ls -la" (buffer-string))))))))
 
@@ -270,22 +270,22 @@
   (let ((enkan-repl-session-list nil)
         (enkan-repl--session-counter 0)
         (enkan-repl-project-aliases '(("pt" . "pt-tools"))))
-    
+
     ;; First registration
     (enkan-repl--auto-register-session "pt-tools")
     (should (equal '((4 . "pt-tools")) enkan-repl-session-list))
     (should (= 1 enkan-repl--session-counter))
-    
+
     ;; Second registration
     (enkan-repl--auto-register-session "enkan-repl")
     (should (equal '((5 . "enkan-repl") (4 . "pt-tools")) enkan-repl-session-list))
     (should (= 2 enkan-repl--session-counter))
-    
+
     ;; Duplicate registration (should not register again)
     (enkan-repl--auto-register-session "pt-tools")
     (should (equal '((5 . "enkan-repl") (4 . "pt-tools")) enkan-repl-session-list))
     (should (= 2 enkan-repl--session-counter))
-    
+
     ;; Registration with alias
     (enkan-repl--auto-register-session "pt")
     (should (equal '((5 . "enkan-repl") (4 . "pt-tools")) enkan-repl-session-list))
@@ -297,15 +297,15 @@
   "Test session lookup by name or alias."
   (let ((enkan-repl-session-list '((4 . "pt-tools") (5 . "enkan-repl")))
         (enkan-repl-project-aliases '(("pt" . "pt-tools") ("er" . "enkan-repl"))))
-    
+
     ;; By project name
     (should (= 4 (enkan-repl--get-session-by-name-or-alias "pt-tools")))
     (should (= 5 (enkan-repl--get-session-by-name-or-alias "enkan-repl")))
-    
+
     ;; By alias
     (should (= 4 (enkan-repl--get-session-by-name-or-alias "pt")))
     (should (= 5 (enkan-repl--get-session-by-name-or-alias "er")))
-    
+
     ;; Non-existent
     (should (null (enkan-repl--get-session-by-name-or-alias "unknown")))))
 
@@ -314,7 +314,7 @@
 (ert-deftest enkan-repl-test--get-project-info-from-registry ()
   "Test project info retrieval from registry."
   (let* ((temp-dir (file-name-as-directory temporary-file-directory))
-         (enkan-repl-center-project-registry 
+         (enkan-repl-center-project-registry
           `(("pt" . ("pt-tools" . ,(concat temp-dir "pt-tools")))
             ("er" . ("enkan-repl" . ,(concat temp-dir "enkan-repl")))
             ("cc" . ("claude-code" . ,(concat temp-dir "claude-code"))))))
@@ -323,14 +323,14 @@
                    (enkan-repl--get-project-info-from-registry "pt")))
     (should (equal `("enkan-repl" . ,(concat temp-dir "enkan-repl"))
                    (enkan-repl--get-project-info-from-registry "er")))
-    
+
     ;; Non-existent alias
     (should (null (enkan-repl--get-project-info-from-registry "unknown")))))
 
 (ert-deftest enkan-repl-test--setup-project-session ()
   "Test project session setup function."
   (let* ((temp-dir (file-name-as-directory temporary-file-directory))
-         (enkan-repl-center-project-registry 
+         (enkan-repl-center-project-registry
           `(("pt" . ("pt-tools" . ,(concat temp-dir "pt-tools")))
             ("er" . ("enkan-repl" . ,(concat temp-dir "enkan-repl"))))))
     ;; Valid setup
@@ -338,11 +338,60 @@
                    (enkan-repl--setup-project-session "pt" 4)))
     (should (equal `("enkan-repl" . ,(concat temp-dir "enkan-repl"))
                    (enkan-repl--setup-project-session "er" 5)))
-    
+
     ;; Invalid alias should signal error
     (should-error (enkan-repl--setup-project-session "unknown" 4)
                   :type 'error)))
 
-(provide 'enkan-repl-multi-buffer-test)
+;;;; Pure function tests for 2-session layout
+
+(ert-deftest enkan-repl-test--get-session-project-name ()
+  "Test getting project name from session number."
+  (let ((session-list '((4 . "pt-tools") (5 . "enkan-repl") (6 . "claude-code"))))
+    (should (string= "pt-tools" (enkan-repl--get-session-project-name 4 session-list)))
+    (should (string= "enkan-repl" (enkan-repl--get-session-project-name 5 session-list)))
+    (should (string= "claude-code" (enkan-repl--get-session-project-name 6 session-list)))
+    (should (null (enkan-repl--get-session-project-name 7 session-list)))
+    (should (null (enkan-repl--get-session-project-name 1 session-list)))))
+
+(ert-deftest enkan-repl-test--get-project-path-from-registry ()
+  "Test getting project path from registry by project name."
+  (let ((project-registry '(("pt" . ("pt-tools" . "/Users/test/pt-tools"))
+                            ("er" . ("enkan-repl" . "/Users/test/enkan-repl"))
+                            ("cc" . ("claude-code" . "/Users/test/claude-code")))))
+    (should (string= "/Users/test/pt-tools"
+                     (enkan-repl--get-project-path-from-registry "pt-tools" project-registry)))
+    (should (string= "/Users/test/enkan-repl"
+                     (enkan-repl--get-project-path-from-registry "enkan-repl" project-registry)))
+    (should (string= "/Users/test/claude-code"
+                     (enkan-repl--get-project-path-from-registry "claude-code" project-registry)))
+    (should (null (enkan-repl--get-project-path-from-registry "nonexistent" project-registry)))
+    (should (null (enkan-repl--get-project-path-from-registry "" project-registry)))))
+
+(ert-deftest enkan-repl-test--get-session-project-paths ()
+  "Test getting multiple session project paths."
+  (let ((session-list '((4 . "pt-tools") (5 . "enkan-repl") (6 . "missing-project")))
+        (project-registry '(("pt" . ("pt-tools" . "/Users/test/pt-tools"))
+                            ("er" . ("enkan-repl" . "/Users/test/enkan-repl"))
+                            ("cc" . ("claude-code" . "/Users/test/claude-code")))))
+    ;; Test with sessions 4 and 5 (both should be found)
+    (let ((result (enkan-repl--get-session-project-paths '(4 5) session-list project-registry)))
+      (should (= 2 (length result)))
+      (should (equal '(4 . "/Users/test/pt-tools") (assoc 4 result)))
+      (should (equal '(5 . "/Users/test/enkan-repl") (assoc 5 result))))
+
+    ;; Test with session 6 (missing-project not in registry)
+    (let ((result (enkan-repl--get-session-project-paths '(6) session-list project-registry)))
+      (should (= 0 (length result))))
+
+    ;; Test with non-existent session
+    (let ((result (enkan-repl--get-session-project-paths '(7) session-list project-registry)))
+      (should (= 0 (length result))))
+
+    ;; Test with mixed valid and invalid sessions
+    (let ((result (enkan-repl--get-session-project-paths '(4 6 7) session-list project-registry)))
+      (should (= 1 (length result)))
+      (should (equal '(4 . "/Users/test/pt-tools") (assoc 4 result))))))
+
 
 ;;; enkan-repl-multi-buffer-test.el ends here

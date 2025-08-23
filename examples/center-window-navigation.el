@@ -13,6 +13,29 @@
 
 ;;; Code:
 
+;;;; Pure Functions for Project Path Resolution
+
+(defun enkan-repl--get-session-project-path-pure (session-number session-list project-registry)
+  "Get project path for SESSION-NUMBER from SESSION-LIST and PROJECT-REGISTRY.
+Pure function that returns project path string or nil.
+SESSION-LIST format: ((session-number . project-name) ...)
+PROJECT-REGISTRY format: ((alias . (project-name . project-path)) ...)"
+  (let* ((session-project (cdr (assoc session-number session-list)))
+         (project-info (when session-project
+                         (cl-find-if (lambda (entry)
+                                       (string= (car (cdr entry)) session-project))
+                                     project-registry)))
+         (project-path (when project-info (cdr (cdr project-info)))))
+    project-path))
+
+(defun enkan-repl--setup-window-dired-pure (window session-number session-list project-registry)
+  "Pure function to determine dired setup for WINDOW and SESSION-NUMBER.
+Returns cons (window . project-path) or nil if invalid."
+  (let ((project-path (enkan-repl--get-session-project-path-pure
+                       session-number session-list project-registry)))
+    (when (and project-path (file-directory-p (expand-file-name project-path)))
+      (cons window project-path))))
+
 ;;;; Window Layout Variables
 
 (defvar enkan-repl--window-1 nil
@@ -40,29 +63,29 @@
 
 ;;;###autoload
 (defun enkan-repl-setup-2session-layout ()
-  "2セッション管理用のウインドウレイアウトを設定.
+  "Setup window layout for 2-session management.
   +----------+---+---+
   |    1     | 4 | 5 |
-  |  中心    |   |   |
-  |ファイル  |   |   |
+  | center   |   |   |
+  |  file    |   |   |
   +-----+----|   |   |
   | 2   | 3  |   |   |
-  |作業 |予備|   |   |
+  |work |rsv |   |   |
   +-----+----+---+---+
 
-  1: 中心ファイル（送信元）
-  2: 作業・調査用（雑多なファイル・バッファ）
-  3: 予備エリア（magitコミット等の一時バッファ用）
-  4, 5: enkan-replセッション
+  1: Center file (command source)
+  2: Work area (misc files/buffers)
+  3: Reserve area (temporary buffers like magit commit)
+  4, 5: enkan-repl sessions
 
 Category: Utilities"
   (interactive)
   (delete-other-windows)
-  ;; 右側に2列作成
+  ;; Create 2 columns on the right
   (split-window-right (floor (* (window-width) 0.6)))
   (other-window 1)
   (split-window-right)
-  ;; 左下に分割
+  ;; Split bottom left
   (other-window 2)
   (split-window-below (floor (* (window-height) 0.65)))
   (other-window 1)
@@ -76,31 +99,64 @@ Category: Utilities"
     (setq enkan-repl--window-3 (nth 2 windows))  ; Reserve area
     (setq enkan-repl--window-4 (nth 3 windows))  ; Session 1
     (setq enkan-repl--window-5 (nth 4 windows))) ; Session 2
+  ;; Open project root dired in work area windows (2 and 3)
+  (cond
+   ((not (and (boundp 'enkan-repl-session-list) (boundp 'enkan-repl-center-project-registry)))
+    (error "❌ enkan-repl-session-list or enkan-repl-center-project-registry is not defined. Run C-M-s first to setup sessions."))
+   ((or (null enkan-repl-session-list) (null enkan-repl-center-project-registry))
+    (error "❌ Session list or project registry is empty. Run C-M-s to setup multi-project layout first."))
+   (t
+    ;; Window 2: Session 1's project dired
+    (let ((dired-setup-2 (enkan-repl--setup-window-dired-pure
+                          enkan-repl--window-2 4
+                          enkan-repl-session-list enkan-repl-center-project-registry)))
+      (if dired-setup-2
+          (progn
+            (select-window (car dired-setup-2))
+            (dired (expand-file-name (cdr dired-setup-2)))
+            (message "✅ Window 2: Opened dired for %s" (cdr dired-setup-2)))
+        (let ((session-name (cdr (assoc 4 enkan-repl-session-list))))
+          (if session-name
+              (message "❌ Window 2: Project directory not found for session '%s'. Check enkan-repl-center-project-registry." session-name)
+            (message "❌ Window 2: No session registered for slot 1 (internal number 4). Run C-M-s to setup sessions.")))))
+    ;; Window 3: Session 2's project dired
+    (let ((dired-setup-3 (enkan-repl--setup-window-dired-pure
+                          enkan-repl--window-3 5
+                          enkan-repl-session-list enkan-repl-center-project-registry)))
+      (if dired-setup-3
+          (progn
+            (select-window (car dired-setup-3))
+            (dired (expand-file-name (cdr dired-setup-3)))
+            (message "✅ Window 3: Opened dired for %s" (cdr dired-setup-3)))
+        (let ((session-name (cdr (assoc 5 enkan-repl-session-list))))
+          (if session-name
+              (message "❌ Window 3: Project directory not found for session '%s'. Check enkan-repl-center-project-registry." session-name)
+            (message "❌ Window 3: No session registered for slot 2 (internal number 5). Run C-M-s to setup sessions.")))))))
   (select-window (car (window-list))))
 
 ;;;###autoload
 (defun enkan-repl-setup-3session-layout ()
-  "3セッション管理用のウインドウレイアウトを設定.
+  "Setup window layout for 3-session management.
   +----------+---+---+---+
   |    1     | 4 | 5 | 6 |
-  |  中心    |   |   |   |
-  |ファイル  |   |   |   |
+  | center   |   |   |   |
+  |  file    |   |   |   |
   +-----+----+   |   |   |
   | 2   | 3  |   |   |   |
-  |作業 |予備|   |   |   |
+  |work |rsv |   |   |   |
   +-----+----+---+---+---+
 
-  4, 5, 6: enkan-replセッション
+  4, 5, 6: enkan-repl sessions
 
 Category: Utilities"
   (interactive)
   (delete-other-windows)
-  ;; 右側に3列作成
+  ;; Create 3 columns on the right
   (split-window-right (floor (* (window-width) 0.6)))
   (other-window 1)
   (split-window-right)
   (split-window-right)
-  ;; 左下に分割
+  ;; Split bottom left
   (other-window 2)
   (split-window-below (floor (* (window-height) 0.6)))
   (split-window-right (floor (* (window-width) 0.5)))
@@ -113,31 +169,47 @@ Category: Utilities"
     (setq enkan-repl--window-4 (nth 3 windows))  ; Session 1
     (setq enkan-repl--window-5 (nth 4 windows))  ; Session 2
     (setq enkan-repl--window-6 (nth 5 windows))) ; Session 3
+  ;; Open project root dired in work area windows (2 and 3)
+  (when (and (boundp 'enkan-repl-session-list) (boundp 'enkan-repl-center-project-registry))
+    ;; Window 2: Session 1's project dired
+    (let ((dired-setup-2 (enkan-repl--setup-window-dired-pure
+                          enkan-repl--window-2 4
+                          enkan-repl-session-list enkan-repl-center-project-registry)))
+      (when dired-setup-2
+        (select-window (car dired-setup-2))
+        (dired (expand-file-name (cdr dired-setup-2)))))
+    ;; Window 3: Session 2's project dired
+    (let ((dired-setup-3 (enkan-repl--setup-window-dired-pure
+                          enkan-repl--window-3 5
+                          enkan-repl-session-list enkan-repl-center-project-registry)))
+      (when dired-setup-3
+        (select-window (car dired-setup-3))
+        (dired (expand-file-name (cdr dired-setup-3))))))
   (select-window (car (window-list))))
 
 ;;;###autoload
 (defun enkan-repl-setup-4session-layout ()
-  "4セッション管理用のウインドウレイアウトを設定.
+  "Setup window layout for 4-session management.
   +----------+---+---+---+---+
   |    1     | 4 | 5 | 6 | 7 |
-  |  中心    |   |   |   |   |
-  |ファイル  |   |   |   |   |
+  | center   |   |   |   |   |
+  |  file    |   |   |   |   |
   +-----+----|   |   |   |   |
   | 2   | 3  |   |   |   |   |
-  |作業 |予備|   |   |   |   |
+  |work |rsv |   |   |   |   |
   +-----+----+---+---+---+---+
 
-  4, 5, 6, 7: enkan-replセッション
+  4, 5, 6, 7: enkan-repl sessions
 
 Category: Utilities"
   (interactive)
   (delete-other-windows)
-  ;; 右側に4列作成
+  ;; Create 4 columns on the right
   (split-window-right (floor (* (window-width) 0.5)))
   (split-window-right)
   (split-window-right)
   (split-window-right)
-  ;; 左下に分割
+  ;; Split bottom left
   (split-window-below (floor (* (window-height) 0.6)))
   (split-window-right (floor (* (window-width) 0.5)))
   (balance-windows)
@@ -150,6 +222,22 @@ Category: Utilities"
     (setq enkan-repl--window-5 (nth 4 windows))  ; Session 2
     (setq enkan-repl--window-6 (nth 5 windows))  ; Session 3
     (setq enkan-repl--window-7 (nth 6 windows))) ; Session 4
+  ;; Open project root dired in work area windows (2 and 3)
+  (when (and (boundp 'enkan-repl-session-list) (boundp 'enkan-repl-center-project-registry))
+    ;; Window 2: Session 1's project dired
+    (let ((dired-setup-2 (enkan-repl--setup-window-dired-pure
+                          enkan-repl--window-2 4
+                          enkan-repl-session-list enkan-repl-center-project-registry)))
+      (when dired-setup-2
+        (select-window (car dired-setup-2))
+        (dired (expand-file-name (cdr dired-setup-2)))))
+    ;; Window 3: Session 2's project dired
+    (let ((dired-setup-3 (enkan-repl--setup-window-dired-pure
+                          enkan-repl--window-3 5
+                          enkan-repl-session-list enkan-repl-center-project-registry)))
+      (when dired-setup-3
+        (select-window (car dired-setup-3))
+        (dired (expand-file-name (cdr dired-setup-3))))))
   (select-window (car (window-list))))
 
 ;;;; Window Navigation Functions

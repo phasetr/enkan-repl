@@ -1783,9 +1783,31 @@ Category: Center File Multi-buffer Access"
 ;;;; Auto Setup Functions
 
 (defun enkan-repl--get-project-info-from-registry (alias)
-  "Get project info from registry for given ALIAS.
+  "Get project info from registry for ALIAS.
 Return (project-name . project-path) or nil if not found."
   (cdr (assoc alias enkan-repl-center-project-registry)))
+
+(defun enkan-repl--get-session-project-name (session-number session-list)
+  "セッション番号からプロジェクト名を取得する純粋関数."
+  (cdr (assoc session-number session-list)))
+
+(defun enkan-repl--get-project-path-from-registry (project-name project-registry)
+  "プロジェクト名からレジストリ内のプロジェクトパスを取得する純粋関数."
+  (let ((project-info (cl-find-if (lambda (entry)
+                                    (string= (car (cdr entry)) project-name))
+                                  project-registry)))
+    (when project-info
+      (cdr (cdr project-info)))))
+
+(defun enkan-repl--get-session-project-paths (session-numbers session-list project-registry)
+  "複数のセッション番号に対応するプロジェクトパスのリストを取得する純粋関数.
+Returns: list of (session-number . project-path) for valid paths"
+  (cl-loop for session-number in session-numbers
+           for project-name = (enkan-repl--get-session-project-name session-number session-list)
+           for project-path = (when project-name
+                                (enkan-repl--get-project-path-from-registry project-name project-registry))
+           when project-path
+           collect (cons session-number project-path)))
 
 (defun enkan-repl--setup-project-session (alias session-number)
   "Setup project session for given ALIAS and SESSION-NUMBER.
@@ -1805,7 +1827,14 @@ This function only starts eat sessions - use enkan-repl-setup (C-M-l) to arrange
   (interactive
    (list (completing-read "Layout: "
                           (mapcar #'car enkan-repl-center-multi-project-layouts))))
-  ;; Remember the current layout for re-execution with C-M-l
+  ;; Display current state before changes
+  (let ((old-layout enkan-repl--current-multi-project-layout)
+        (old-session-list (copy-tree enkan-repl-session-list))
+        (old-counter enkan-repl--session-counter))
+    (message "🔧 C-M-s: Current state - layout:%s, sessions:%s, counter:%d" 
+             (or old-layout "nil") (or old-session-list "nil") old-counter))
+
+  ;; Set the new layout configuration (this overwrites any existing configuration)
   (setq enkan-repl--current-multi-project-layout layout-name)
 
   (let ((alias-list (cdr (assoc layout-name enkan-repl-center-multi-project-layouts))))
@@ -1816,9 +1845,12 @@ This function only starts eat sessions - use enkan-repl-setup (C-M-l) to arrange
       (when (> session-count 4)
         (error "Too many projects: %d (max 4)" session-count))
 
-      ;; Clear session list
+      ;; Clear session list and reset any previous layout configuration
       (setq enkan-repl-session-list nil)
       (setq enkan-repl--session-counter 0)
+      (setq enkan-repl--current-multi-project-layout nil)
+      (message "🧹 C-M-s: Reset - enkan-repl-session-list=%s, enkan-repl--session-counter=%d, enkan-repl--current-multi-project-layout=%s"
+               "nil" 0 "nil")
 
       ;; Start sessions for each project
       (let ((session-number 4)) ; Internal numbers start from 4
@@ -1833,6 +1865,13 @@ This function only starts eat sessions - use enkan-repl-setup (C-M-l) to arrange
               (enkan-repl-start-eat)
               (setq session-number (1+ session-number)))))
 
+      ;; Set final layout configuration
+      (setq enkan-repl--current-multi-project-layout layout-name)
+      
+      ;; Display final state
+      (message "✅ C-M-s: Final state - enkan-repl--current-multi-project-layout='%s', enkan-repl-session-list=%s, enkan-repl--session-counter=%d"
+               layout-name enkan-repl-session-list enkan-repl--session-counter)
+      
       (message "Eat sessions started for layout: %s (%d sessions). Use C-M-l to arrange windows."
                layout-name session-count)))))
 
@@ -1844,6 +1883,12 @@ Category: Center File Multi-buffer Access"
   (interactive)
   (if (null enkan-repl-session-list)
       (message "No registered sessions to terminate")
+    ;; Display current state before termination
+    (message "🔧 C-M-f: Current state - layout:%s, sessions:%s, counter:%d" 
+             (or enkan-repl--current-multi-project-layout "nil") 
+             enkan-repl-session-list 
+             enkan-repl--session-counter)
+    
     (let ((terminated-count 0))
       (when (y-or-n-p (format "Terminate all %d registered sessions? "
                               (length enkan-repl-session-list)))
@@ -1855,10 +1900,16 @@ Category: Center File Multi-buffer Access"
             (when buffer
               (kill-buffer buffer)
               (setq terminated-count (1+ terminated-count)))))
-        ;; Clear session list
+        
+        ;; Clear session list and reset layout configuration
         (setq enkan-repl-session-list nil)
         (setq enkan-repl--session-counter 0)
-        (message "Terminated %d sessions and cleared session list" terminated-count)))))
+        (setq enkan-repl--current-multi-project-layout nil)
+        
+        ;; Display what variables were reset
+        (message "🧹 C-M-f: Reset - enkan-repl-session-list=%s, enkan-repl--session-counter=%d, enkan-repl--current-multi-project-layout=%s"
+                 "nil" 0 "nil")
+        (message "✅ C-M-f: Terminated %d sessions, cleared session list and reset layout configuration" terminated-count)))))
 
 ;;;###autoload
 (defun enkan-repl-center-recenter-bottom ()
