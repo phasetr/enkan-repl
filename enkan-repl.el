@@ -681,6 +681,13 @@ Returns: ディレクトリパスまたはnil"
    ;; その他（プレフィックスなし）
    (t default-directory)))
 
+(defun enkan-repl--extract-directory-from-buffer-name-pure (buffer-name)
+  "Pure function to extract expanded directory path from enkan buffer name.
+Returns expanded directory path or nil if buffer name is not valid enkan format."
+  (when (and (stringp buffer-name) (string-match "^\\*enkan:\\(.*\\)\\*$" buffer-name))
+    (let ((raw-path (match-string 1 buffer-name)))
+      (file-name-as-directory (expand-file-name raw-path)))))
+
 (defun enkan-repl--find-directory-by-project-name (project-name)
   "プロジェクト名から対応するディレクトリを検索.
 既存のenkan-replバッファから該当するディレクトリを探す.
@@ -692,8 +699,7 @@ Returns: ディレクトリパスまたはnil"
                    (string-equal project-name
                                 (enkan-repl--extract-project-name (buffer-name))))
           (cl-return-from search-buffers
-            (file-name-directory
-             (substring (buffer-name) 7 -1))))))))  ; "*enkan:"と"*"を除去
+            (enkan-repl--extract-directory-from-buffer-name-pure (buffer-name))))))))
 
 (defun enkan-repl--send-region-with-prefix (start end user-number)
   "ユニバーサル引数に応じてセッションを選択してリージョンを送信.
@@ -732,6 +738,15 @@ user-number: 1-4の整数（eatセッションの左から何番目か）"
         (enkan-repl--send-text text directory)
       (user-error "Directory for project '%s' not found" project-name))))
 
+(defun enkan-repl--buffer-matches-directory-pure (buffer-name target-directory)
+  "Pure function to check if buffer name matches target directory.
+Returns t if buffer is enkan buffer for target directory, nil otherwise."
+  (and (stringp buffer-name)
+       (stringp target-directory)
+       (string-match-p "^\\*enkan:" buffer-name)
+       (let ((expanded-target (expand-file-name target-directory)))
+         (string-prefix-p (concat "*enkan:" expanded-target) buffer-name))))
+
 (defun enkan-repl--get-buffer-for-directory (&optional directory)
   "Get the eat buffer for DIRECTORY if it exists and is live.
 If DIRECTORY is nil, use current `default-directory'."
@@ -748,11 +763,8 @@ If DIRECTORY is nil, use current `default-directory'."
           (when
               (and (buffer-live-p buf)
                    name     ; Ensure name is not nil
-                   ;; Check for directory-specific enkan buffer
-                   ;; Check for enkan eat buffers
-                   (and
-                    (string-match-p "^\\*enkan:" name)
-                    (string-prefix-p (concat "*enkan:" target-dir) name)))
+                   ;; Check for directory-specific enkan buffer using pure function
+                   (enkan-repl--buffer-matches-directory-pure name target-dir))
             (setq matching-buffer buf)
             (cl-return-from search-buffers)))))
     matching-buffer))
@@ -1117,7 +1129,7 @@ Category: Session Controller"
          (target-dir (nth 0 session-info))
          (existing-buffer (nth 1 session-info))
          (can-send (nth 2 session-info))
-         (buffer-name (concat "*enkan:" target-dir "*")))
+         (buffer-name (concat "*enkan:" (expand-file-name target-dir) "*")))
     (cond
      ;; Active session already exists
      (can-send
@@ -1285,7 +1297,7 @@ Category: Utilities"
       ((target-dir (enkan-repl--get-target-directory-for-buffer))
        (session-buffer (enkan-repl--get-buffer-for-directory target-dir))
        (can-send (enkan-repl--can-send-text target-dir))
-       (expected-session (concat "*enkan:" target-dir "*"))
+       (expected-session (concat "*enkan:" (expand-file-name target-dir) "*"))
        (all-buffers (buffer-list))
        (enkan-sessions
         (seq-filter

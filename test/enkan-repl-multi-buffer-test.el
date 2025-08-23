@@ -393,5 +393,66 @@
       (should (= 1 (length result)))
       (should (equal '(4 . "/Users/test/pt-tools") (assoc 4 result))))))
 
+(ert-deftest enkan-repl-test--extract-directory-from-buffer-name-pure ()
+  "Test pure function for extracting expanded directory path from buffer name."
+  ;; Valid enkan buffer names with tilde expansion
+  (should (string= (expand-file-name "~/dev/self/enkan-repl/")
+                   (enkan-repl--extract-directory-from-buffer-name-pure "*enkan:~/dev/self/enkan-repl*")))
+
+  (should (string= (expand-file-name "~/pt-tools/")
+                   (enkan-repl--extract-directory-from-buffer-name-pure "*enkan:~/pt-tools*")))
+
+  ;; Absolute paths should also work
+  (should (string= "/Users/test/project/"
+                   (enkan-repl--extract-directory-from-buffer-name-pure "*enkan:/Users/test/project*")))
+
+  ;; Complex paths with spaces
+  (should (string= "/complex/path/with spaces/project/"
+                   (enkan-repl--extract-directory-from-buffer-name-pure "*enkan:/complex/path/with spaces/project*")))
+
+  ;; Invalid buffer names should return nil
+  (should (null (enkan-repl--extract-directory-from-buffer-name-pure "not-enkan-buffer")))
+  (should (null (enkan-repl--extract-directory-from-buffer-name-pure "*eat-something*")))
+  (should (null (enkan-repl--extract-directory-from-buffer-name-pure nil)))
+  (should (null (enkan-repl--extract-directory-from-buffer-name-pure "")))
+
+  ;; Malformed enkan buffer names
+  (should (null (enkan-repl--extract-directory-from-buffer-name-pure "*enkan:no-closing-star")))
+  (should (null (enkan-repl--extract-directory-from-buffer-name-pure "enkan:/path/no-stars"))))
+
+(ert-deftest enkan-repl-test--buffer-matches-directory-pure ()
+  "Test pure function for buffer name and directory matching."
+  ;; Matching cases with tilde expansion
+  (should (enkan-repl--buffer-matches-directory-pure
+           (format "*enkan:%s*" (expand-file-name "~/pt-tools"))
+           "~/pt-tools"))
+  
+  (should (enkan-repl--buffer-matches-directory-pure
+           (format "*enkan:%s*" (expand-file-name "~/dev/self/enkan-repl"))
+           "~/dev/self/enkan-repl"))
+  
+  ;; Absolute paths should match
+  (should (enkan-repl--buffer-matches-directory-pure
+           "*enkan:/Users/test/project*"
+           "/Users/test/project"))
+  
+  ;; Non-matching cases
+  (should (null (enkan-repl--buffer-matches-directory-pure
+                 "*enkan:/Users/test/other-project*"
+                 "~/pt-tools")))
+  
+  ;; Invalid buffer names
+  (should (null (enkan-repl--buffer-matches-directory-pure
+                 "*eat-not-enkan*"
+                 "~/pt-tools")))
+  
+  (should (null (enkan-repl--buffer-matches-directory-pure
+                 "regular-buffer"
+                 "~/pt-tools")))
+  
+  ;; Invalid input types
+  (should (null (enkan-repl--buffer-matches-directory-pure nil "~/pt-tools")))
+  (should (null (enkan-repl--buffer-matches-directory-pure "*enkan:/path*" nil))))
+
 
 ;;; enkan-repl-multi-buffer-test.el ends here

@@ -36,6 +36,17 @@ Returns cons (window . project-path) or nil if invalid."
     (when (and project-path (file-directory-p (expand-file-name project-path)))
       (cons window project-path))))
 
+(defun enkan-repl--setup-window-eat-buffer-pure (window session-number session-list project-registry)
+  "Pure function to determine eat buffer setup for WINDOW and SESSION-NUMBER.
+Returns cons (window . buffer-name) or nil if session not registered."
+  (let ((project-name (cdr (assoc session-number session-list))))
+    (when project-name
+      (let ((project-path (enkan-repl--get-project-path-from-registry project-name project-registry)))
+        (when project-path
+          (let* ((expanded-path (expand-file-name project-path))
+                 (buffer-name (format "*enkan:%s*" expanded-path)))
+            (cons window buffer-name)))))))
+
 ;;;; Window Layout Variables
 
 (defvar enkan-repl--window-1 nil
@@ -132,6 +143,35 @@ Category: Utilities"
           (if session-name
               (message "❌ Window 3: Project directory not found for session '%s'. Check enkan-repl-center-project-registry." session-name)
             (message "❌ Window 3: No session registered for slot 2 (internal number 5). Run C-M-s to setup sessions.")))))))
+
+  ;; Setup eat buffers in session windows (4 and 5)
+  (when (and (boundp 'enkan-repl-session-list) enkan-repl-session-list)
+    ;; Window 4: Session 1's eat buffer
+    (let ((eat-setup-4 (enkan-repl--setup-window-eat-buffer-pure
+                        enkan-repl--window-4 4 enkan-repl-session-list enkan-repl-center-project-registry)))
+      (if eat-setup-4
+          (let ((buffer (get-buffer (cdr eat-setup-4))))
+            (if buffer
+                (progn
+                  (select-window (car eat-setup-4))
+                  (switch-to-buffer buffer)
+                  (message "✅ Window 4: Opened eat buffer %s" (cdr eat-setup-4)))
+              (message "❌ Window 4: Eat buffer %s not found. Run C-M-s to start sessions." (cdr eat-setup-4))))
+        (message "❌ Window 4: No session registered for slot 1 (internal number 4).")))
+
+    ;; Window 5: Session 2's eat buffer
+    (let ((eat-setup-5 (enkan-repl--setup-window-eat-buffer-pure
+                        enkan-repl--window-5 5 enkan-repl-session-list enkan-repl-center-project-registry)))
+      (if eat-setup-5
+          (let ((buffer (get-buffer (cdr eat-setup-5))))
+            (if buffer
+                (progn
+                  (select-window (car eat-setup-5))
+                  (switch-to-buffer buffer)
+                  (message "✅ Window 5: Opened eat buffer %s" (cdr eat-setup-5)))
+              (message "❌ Window 5: Eat buffer %s not found. Run C-M-s to start sessions." (cdr eat-setup-5))))
+        (message "❌ Window 5: No session registered for slot 2 (internal number 5)."))))
+
   (select-window (car (window-list))))
 
 ;;;###autoload

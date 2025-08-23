@@ -65,6 +65,40 @@
       (should (null (enkan-repl--setup-window-dired-pure 
                      mock-window 4 session-list bad-registry))))))
 
+(ert-deftest enkan-repl-test--setup-window-eat-buffer-pure ()
+  "Test pure function for window eat buffer setup."
+  (let* ((temp-dir (file-name-as-directory (make-temp-file "enkan-repl-test-" t)))
+         (session-list '((4 . "pt-tools") (5 . "enkan-repl")))
+         (project-registry `(("pt" . ("pt-tools" . ,(concat temp-dir "pt-tools")))
+                             ("enkan" . ("enkan-repl" . ,(concat temp-dir "enkan-repl")))))
+         (mock-window 'test-window))
+    
+    ;; Valid session number with existing project path
+    (let ((result (enkan-repl--setup-window-eat-buffer-pure
+                   mock-window 4 session-list project-registry)))
+      (should (equal (car result) mock-window))
+      (should (string= (cdr result) (format "*enkan:%s*" (expand-file-name (concat temp-dir "pt-tools"))))))
+    
+    (let ((result (enkan-repl--setup-window-eat-buffer-pure
+                   mock-window 5 session-list project-registry)))
+      (should (equal (car result) mock-window))
+      (should (string= (cdr result) (format "*enkan:%s*" (expand-file-name (concat temp-dir "enkan-repl"))))))
+    
+    ;; Invalid session number
+    (should (null (enkan-repl--setup-window-eat-buffer-pure
+                   mock-window 99 session-list project-registry)))
+    
+    ;; Empty session list
+    (should (null (enkan-repl--setup-window-eat-buffer-pure
+                   mock-window 4 '() project-registry)))
+    
+    ;; Project not found in registry
+    (let ((missing-project-session-list '((4 . "nonexistent-project"))))
+      (should (null (enkan-repl--setup-window-eat-buffer-pure
+                     mock-window 4 missing-project-session-list project-registry))))
+    
+    (delete-directory temp-dir t)))
+
 ;;;; Error handling tests
 
 (ert-deftest enkan-repl-test--2session-layout-error-handling ()
