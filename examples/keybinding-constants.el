@@ -109,6 +109,7 @@ Each entry is (COMMAND DESCRIPTION).")
 
 (defconst enkan-center-file-keybinding-overrides
   '(("C-M-t" enkan-repl-center-other-window "Switch between center/work/reserve windows" window-navigation)
+    ("C-M-b" enkan-repl-center-recenter-bottom "Recenter at bottom (center)" quick-actions)
     ("C-M-s" enkan-repl-center-auto-setup "Auto setup sessions using multi-project layout" session-management)
     ("C-M-f" enkan-repl-center-finish-all-sessions "Terminate all registered center sessions" session-management))
   "Keybinding overrides for center file multi-buffer mode.
