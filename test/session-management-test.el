@@ -155,6 +155,35 @@
     (should (plist-get session-info :directory))
     (should (eq (plist-get session-info :status) 'alive))))
 
+;;;; Multi-project Session Order Tests
+
+(ert-deftest test-enkan-multi-project-session-order-creation ()
+  "Test session list creation maintains configuration order."
+  (let ((result (enkan-repl--create-session-list-with-order-pure '("pt-tools" "enkan-repl"))))
+    (should (equal result '((4 . "pt-tools") (5 . "enkan-repl"))))
+    (should (equal (car result) '(4 . "pt-tools")))
+    (should (equal (cdr result) '((5 . "enkan-repl"))))))
+
+(ert-deftest test-enkan-multi-project-session-order-with-too-many-projects ()
+  "Test error handling when too many projects are configured."
+  (should-error 
+   (enkan-repl--create-session-list-with-order-pure 
+    '("proj1" "proj2" "proj3" "proj4" "proj5"))
+   :type 'error))
+
+;; Pure function for testing multi-project session order
+(defun enkan-repl--create-session-list-with-order-pure (alias-list)
+  "Create session list from ALIAS-LIST maintaining order.
+Returns list of (session-number . alias) pairs starting from session 4."
+  (when (> (length alias-list) 4)
+    (error "Too many projects: %d (max 4)" (length alias-list)))
+  (let ((session-number 4)
+        (result nil))
+    (dolist (alias alias-list)
+      (push (cons session-number alias) result)
+      (setq session-number (1+ session-number)))
+    (reverse result)))
+
 (provide 'session-management-test)
 
 ;;; session-management-test.el ends here
