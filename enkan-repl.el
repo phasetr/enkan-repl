@@ -2023,26 +2023,6 @@ Returns plist with :buffer, :name, :live-p, :has-process, :process."
             :has-process (and process-info (plist-get process-info :bound) (plist-get process-info :process))
             :process (when process-info (plist-get process-info :process))))))
 
-(defun enkan-repl--send-escape-to-buffer-pure (buffer)
-  "Pure function to determine if ESC can be sent to BUFFER.
-Returns plist with :success and :message keys."
-  (let ((info (enkan-repl--get-buffer-process-info-pure buffer)))
-    (if (and (plist-get info :live-p)
-             (plist-get info :has-process))
-        (list :success t :message "ESC can be sent")
-      (list :success nil :message "Buffer has no active process"))))
-
-(defun enkan-repl--send-escape-to-buffer (buffer)
-  "Actually send ESC to BUFFER.
-Returns plist with :success and :message keys."
-  (let ((info (enkan-repl--get-buffer-process-info-pure buffer)))
-    (if (and (plist-get info :live-p)
-             (plist-get info :has-process))
-        (progn
-          (with-current-buffer buffer
-            (eat--send-string (plist-get info :process) "\e"))
-          (list :success t :message "ESC sent successfully"))
-      (list :success nil :message "Buffer has no active process"))))
 
 (defun enkan-repl--build-buffer-selection-choices-pure (buffers)
   "Pure function to build selection choices from BUFFERS.
@@ -2055,10 +2035,6 @@ Returns list of cons cells (display-name . buffer) for selection UI."
                     buffer)))
           buffers))
 
-(defun enkan-repl--filter-valid-buffers-pure (buffers)
-  "Pure function to filter BUFFERS to only those that can receive ESC.
-Returns list of buffers that have active processes."
-  (seq-filter #'enkan-repl--send-escape-to-buffer-pure buffers))
 
 (defun enkan-repl--get-buffer-by-index-pure (buffers index)
   "Pure function to get buffer from BUFFERS by INDEX (1-based).
@@ -2523,7 +2499,12 @@ Category: Center File Multi-buffer Access"
   (interactive "r\nsAction (or empty for selection): ")
   (let* ((region-text (buffer-substring-no-properties start end))
          (enkan-buffers (enkan-repl--collect-enkan-buffers-pure (buffer-list)))
-         (valid-buffers (enkan-repl--filter-valid-buffers-pure enkan-buffers)))
+         (valid-buffers (seq-filter (lambda (buffer)
+                                     (with-current-buffer buffer
+                                       (and (boundp 'eat--process)
+                                            eat--process
+                                            (process-live-p eat--process))))
+                                   enkan-buffers)))
 
     (if (string-empty-p action-string)
         ;; No action specified - use selection UI

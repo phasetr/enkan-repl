@@ -2113,19 +2113,6 @@ Does not modify global state."
             (should (equal (plist-get info :process) 'mock-process))))
       (kill-buffer test-buffer))))
 
-(ert-deftest test-enkan-repl--send-escape-to-buffer-pure ()
-  "Test determining if ESC can be sent to buffer."
-  (let ((test-buffer (generate-new-buffer "*enkan:/test*")))
-    (unwind-protect
-        (progn
-          ;; Should return nil without eat--process
-          (should (null (enkan-repl--send-escape-to-buffer-pure test-buffer)))
-
-          ;; Should return t with eat--process
-          (with-current-buffer test-buffer
-            (setq-local eat--process 'mock-process))
-          (should (enkan-repl--send-escape-to-buffer-pure test-buffer)))
-      (kill-buffer test-buffer))))
 
 (ert-deftest test-enkan-repl--collect-enkan-buffers-pure-empty-list ()
   "Test collecting enkan buffers from empty list."
