@@ -1792,6 +1792,35 @@ Category: Center File Multi-buffer Access"
   (message "Center file layout reset"))
 
 
+;;;; Global Minor Mode for Center File Operations
+
+(defvar enkan-center-file-global-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "<escape>") 'enkan-repl-send-escape)
+    (define-key map (kbd "C-M-t") 'enkan-repl-center-other-window)
+    (define-key map (kbd "C-M-b") 'enkan-repl-center-recenter-bottom)
+    (define-key map (kbd "C-M-s") 'enkan-repl-center-auto-setup)
+    (define-key map (kbd "C-M-f") 'enkan-repl-center-finish-all-sessions)
+    map)
+  "Global keymap for center file operations.")
+
+(define-minor-mode enkan-center-file-global-mode
+  "Global minor mode for center file operations.
+When enabled, center file keybindings are available across all buffers."
+  :init-value nil
+  :global t
+  :lighter " ECF"
+  :keymap enkan-center-file-global-mode-map
+  (if enkan-center-file-global-mode
+      (message "✅ Center file global mode enabled - C-M-t/b/s/f available globally")
+    (message "❌ Center file global mode disabled")))
+
+;;;###autoload
+(defun enkan-toggle-center-file-global-mode ()
+  "Toggle center file global mode on/off."
+  (interactive)
+  (enkan-center-file-global-mode 'toggle))
+
 ;;;; Auto Setup Functions
 
 (defun enkan-repl--get-project-info-from-registry (alias)
@@ -1839,6 +1868,10 @@ This function only starts eat sessions - use enkan-repl-setup (C-M-l) to arrange
   (interactive
    (list (completing-read "Layout: "
                           (mapcar #'car enkan-repl-center-multi-project-layouts))))
+  ;; Enable global center file mode automatically
+  (unless enkan-center-file-global-mode
+    (enkan-center-file-global-mode 1)
+    (message "🚀 Auto-enabled center file global mode for multi-project workflow"))
   ;; Display current state before changes
   (let ((old-layout enkan-repl--current-multi-project-layout)
         (old-session-list (copy-tree enkan-repl-session-list))
@@ -1935,6 +1968,121 @@ Category: Center File Multi-buffer Access"
     (if (> recentered-count 0)
         (message "Recentered %d enkan session(s) at bottom" recentered-count)
       (message "No enkan sessions found to recenter"))))
+
+(defun enkan-repl--collect-enkan-buffers-pure (buffer-list)
+  "Pure function to collect enkan buffers from BUFFER-LIST.
+Returns list of buffers whose names match enkan pattern."
+  (seq-filter (lambda (buf)
+                (and (bufferp buf)
+                     (buffer-name buf)
+                     (string-match-p "^\\*enkan:" (buffer-name buf))))
+              buffer-list))
+
+(defun enkan-repl--get-buffer-process-info-pure (buffer)
+  "Pure function to get process info for BUFFER.
+Returns plist with :buffer, :name, :live-p, :has-process, :process."
+  (when (bufferp buffer)
+    (let* ((name (buffer-name buffer))
+           (live-p (buffer-live-p buffer))
+           (process-info (when live-p
+                          (with-current-buffer buffer
+                            (list :bound (boundp 'eat--process)
+                                  :process (if (boundp 'eat--process) eat--process nil))))))
+      (list :buffer buffer
+            :name name 
+            :live-p live-p
+            :has-process (and process-info (plist-get process-info :bound) (plist-get process-info :process))
+            :process (when process-info (plist-get process-info :process))))))
+
+(defun enkan-repl--send-escape-to-buffer-pure (buffer)
+  "Pure function to determine if ESC can be sent to BUFFER.
+Returns t if escape can be sent, nil otherwise."
+  (let ((info (enkan-repl--get-buffer-process-info-pure buffer)))
+    (and (plist-get info :live-p)
+         (plist-get info :has-process))))
+
+(defun enkan-repl--build-buffer-selection-choices-pure (buffers)
+  "Pure function to build selection choices from BUFFERS.
+Returns list of cons cells (display-name . buffer) for selection UI."
+  (mapcar (lambda (buffer)
+            (let ((info (enkan-repl--get-buffer-process-info-pure buffer)))
+              (cons (format "%s%s" 
+                           (plist-get info :name)
+                           (if (plist-get info :has-process) " [ACTIVE]" " [INACTIVE]"))
+                    buffer)))
+          buffers))
+
+(defun enkan-repl--filter-valid-buffers-pure (buffers)
+  "Pure function to filter BUFFERS to only those that can receive ESC.
+Returns list of buffers that have active processes."
+  (seq-filter #'enkan-repl--send-escape-to-buffer-pure buffers))
+
+(defun enkan-repl--get-buffer-by-index-pure (buffers index)
+  "Pure function to get buffer from BUFFERS by INDEX (1-based).
+Returns buffer if valid index, nil otherwise."
+  (when (and (integerp index)
+             (> index 0)
+             (<= index (length buffers)))
+    (nth (1- index) buffers)))
+
+(defun enkan-repl--parse-prefix-arg-pure (prefix-arg)
+  "Pure function to parse PREFIX-ARG into action type.
+Returns plist with :action and :index."
+  (cond
+   ((null prefix-arg)
+    (list :action 'select :index nil))
+   ((integerp prefix-arg)
+    (list :action 'index :index prefix-arg))
+   (t
+    (list :action 'invalid :index nil))))
+
+(defun enkan-repl--should-show-buffer-selection-pure (action-type valid-buffers)
+  "Pure function to determine if buffer selection should be shown.
+Returns t if selection UI needed, nil for direct index access."
+  (and (eq action-type 'select)
+       (> (length valid-buffers) 0)))
+
+;;;###autoload
+(defun enkan-repl-center-send-escape (&optional prefix-arg)
+  "Send ESC key to eat session buffer from center file.
+Always requires buffer specification:
+- Without prefix: Select from available enkan buffers
+- With numeric prefix: Send to buffer at that index (1-based)
+
+Category: Center File Multi-buffer Access"
+  (interactive "P")
+  (message "Starting enkan-repl-center-send-escape with prefix-arg: %s" prefix-arg)
+  (let* ((enkan-buffers (enkan-repl--collect-enkan-buffers-pure (buffer-list)))
+         (valid-buffers (enkan-repl--filter-valid-buffers-pure enkan-buffers))
+         (parsed-arg (enkan-repl--parse-prefix-arg-pure prefix-arg)))
+    (message "Found %d enkan buffers, %d valid" 
+             (length enkan-buffers) (length valid-buffers))
+    (cond
+     ((= (length valid-buffers) 0)
+      (message "No active enkan sessions found"))
+     ((eq 'invalid (plist-get parsed-arg :action))
+      (message "Invalid prefix argument"))
+     ((eq 'index (plist-get parsed-arg :action))
+      (let* ((index (plist-get parsed-arg :index))
+             (target-buffer (enkan-repl--get-buffer-by-index-pure valid-buffers index)))
+        (message "Attempting to send ESC to buffer index %d" index)
+        (if target-buffer
+            (let ((info (enkan-repl--get-buffer-process-info-pure target-buffer)))
+              (with-current-buffer target-buffer
+                (eat--send-string (plist-get info :process) "\e"))
+              (message "Sent ESC to buffer %d: %s" index (plist-get info :name)))
+          (message "Invalid buffer index %d (valid range: 1-%d)" index (length valid-buffers)))))
+     ((enkan-repl--should-show-buffer-selection-pure (plist-get parsed-arg :action) valid-buffers)
+      (let* ((choices (enkan-repl--build-buffer-selection-choices-pure valid-buffers))
+             (selected-display (completing-read "Select buffer to send ESC: " choices nil t))
+             (selected-buffer (cdr (assoc selected-display choices))))
+        (message "User selected buffer: %s" (buffer-name selected-buffer))
+        (let ((info (enkan-repl--get-buffer-process-info-pure selected-buffer)))
+          (with-current-buffer selected-buffer
+            (eat--send-string (plist-get info :process) "\e"))
+          (message "Sent ESC to selected buffer: %s" (plist-get info :name)))))
+     (t
+      (message "No valid action determined")))))
 
 (provide 'enkan-repl)
 

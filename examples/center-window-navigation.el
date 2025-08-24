@@ -91,6 +91,10 @@ Returns cons (window . buffer-name) or nil if session not registered."
 
 Category: Utilities"
   (interactive)
+  (message "Starting enkan-repl-setup-2session-layout")
+  (message "enkan-repl-center-file: %s" enkan-repl-center-file)
+  (message "enkan-repl-session-list: %s" (if (boundp 'enkan-repl-session-list) enkan-repl-session-list 'unbound))
+  (message "enkan-repl-center-project-registry: %s" (if (boundp 'enkan-repl-center-project-registry) enkan-repl-center-project-registry 'unbound))
   (delete-other-windows)
   ;; Create 2 columns on the right
   (split-window-right (floor (* (window-width) 0.6)))

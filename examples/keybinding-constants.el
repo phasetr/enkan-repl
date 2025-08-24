@@ -108,10 +108,12 @@ Each entry is (KEY COMMAND DESCRIPTION CATEGORY).")
 Each entry is (COMMAND DESCRIPTION).")
 
 (defconst enkan-center-file-keybinding-overrides
-  '(("C-M-t" enkan-repl-center-other-window "Switch between center/work/reserve windows" window-navigation)
+  '(("<escape>" enkan-repl-center-send-escape "Send ESC to REPL (center)" quick-actions)
+    ("C-M-t" enkan-repl-center-other-window "Switch between center/work/reserve windows" window-navigation)
     ("C-M-b" enkan-repl-center-recenter-bottom "Recenter at bottom (center)" quick-actions)
     ("C-M-s" enkan-repl-center-auto-setup "Auto setup sessions using multi-project layout" session-management)
-    ("C-M-f" enkan-repl-center-finish-all-sessions "Terminate all registered center sessions" session-management))
+    ("C-M-f" enkan-repl-center-finish-all-sessions "Terminate all registered center sessions" session-management)
+    ("C-c C-f" enkan-toggle-center-file-global-mode "Toggle center file global mode" global-mode))
   "Keybinding overrides for center file multi-buffer mode.
 Each entry is (KEY COMMAND DESCRIPTION CATEGORY).")
 

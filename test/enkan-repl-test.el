@@ -2067,6 +2067,115 @@ Does not modify global state."
     (should (string-prefix-p "#+TITLE:" template))
     (should (string-suffix-p "\n" template))))
 
+;;; Tests for center-send-escape pure functions
+
+(ert-deftest test-enkan-repl--collect-enkan-buffers-pure ()
+  "Test collecting enkan buffers from buffer list."
+  (let ((mock-buffers
+         (list
+          ;; Mock enkan buffers
+          (let ((buf (generate-new-buffer "*enkan:/test/project*")))
+            buf)
+          (let ((buf (generate-new-buffer "*enkan:/another/project*")))
+            buf)
+          ;; Mock non-enkan buffers
+          (let ((buf (generate-new-buffer "*scratch*")))
+            buf)
+          (let ((buf (generate-new-buffer "*Messages*")))
+            buf))))
+    (unwind-protect
+        (let ((result (enkan-repl--collect-enkan-buffers-pure mock-buffers)))
+          (should (= 2 (length result)))
+          (should (string-match-p "^\\*enkan:" (buffer-name (nth 0 result))))
+          (should (string-match-p "^\\*enkan:" (buffer-name (nth 1 result)))))
+      ;; Cleanup
+      (dolist (buf mock-buffers)
+        (when (buffer-live-p buf)
+          (kill-buffer buf))))))
+
+(ert-deftest test-enkan-repl--get-buffer-process-info-pure ()
+  "Test getting buffer process info."
+  (let ((test-buffer (generate-new-buffer "*enkan:/test*")))
+    (unwind-protect
+        (progn
+          ;; Test with no eat--process
+          (let ((info (enkan-repl--get-buffer-process-info-pure test-buffer)))
+            (should (equal (plist-get info :buffer) test-buffer))
+            (should (string= (plist-get info :name) "*enkan:/test*"))
+            (should (plist-get info :live-p))
+            (should (null (plist-get info :has-process))))
+
+          ;; Test with mock eat--process
+          (with-current-buffer test-buffer
+            (setq-local eat--process 'mock-process))
+          (let ((info (enkan-repl--get-buffer-process-info-pure test-buffer)))
+            (should (plist-get info :has-process))
+            (should (equal (plist-get info :process) 'mock-process))))
+      (kill-buffer test-buffer))))
+
+(ert-deftest test-enkan-repl--send-escape-to-buffer-pure ()
+  "Test determining if ESC can be sent to buffer."
+  (let ((test-buffer (generate-new-buffer "*enkan:/test*")))
+    (unwind-protect
+        (progn
+          ;; Should return nil without eat--process
+          (should (null (enkan-repl--send-escape-to-buffer-pure test-buffer)))
+
+          ;; Should return t with eat--process
+          (with-current-buffer test-buffer
+            (setq-local eat--process 'mock-process))
+          (should (enkan-repl--send-escape-to-buffer-pure test-buffer)))
+      (kill-buffer test-buffer))))
+
+(ert-deftest test-enkan-repl--collect-enkan-buffers-pure-empty-list ()
+  "Test collecting enkan buffers from empty list."
+  (let ((result (enkan-repl--collect-enkan-buffers-pure '())))
+    (should (null result))))
+
+(ert-deftest test-enkan-repl--get-buffer-process-info-pure-nil-buffer ()
+  "Test getting process info for nil buffer."
+  (let ((result (enkan-repl--get-buffer-process-info-pure nil)))
+    (should (null result))))
+
+(ert-deftest test-enkan-repl--get-buffer-by-index-pure ()
+  "Test getting buffer by 1-based index."
+  (let ((buffers (list (get-buffer-create "*test1*") (get-buffer-create "*test2*") (get-buffer-create "*test3*"))))
+    (should (eq (car buffers) (enkan-repl--get-buffer-by-index-pure buffers 1)))
+    (should (eq (nth 1 buffers) (enkan-repl--get-buffer-by-index-pure buffers 2)))
+    (should (eq (nth 2 buffers) (enkan-repl--get-buffer-by-index-pure buffers 3)))
+    (should (null (enkan-repl--get-buffer-by-index-pure buffers 0)))
+    (should (null (enkan-repl--get-buffer-by-index-pure buffers 4)))
+    (should (null (enkan-repl--get-buffer-by-index-pure buffers -1)))))
+
+(ert-deftest test-enkan-repl--parse-prefix-arg-pure ()
+  "Test parsing prefix arguments for different action types."
+  (let ((result-nil (enkan-repl--parse-prefix-arg-pure nil))
+        (result-int (enkan-repl--parse-prefix-arg-pure 2))
+        (result-invalid (enkan-repl--parse-prefix-arg-pure '(4))))
+    (should (eq 'select (plist-get result-nil :action)))
+    (should (null (plist-get result-nil :index)))
+    (should (eq 'index (plist-get result-int :action)))
+    (should (eq 2 (plist-get result-int :index)))
+    (should (eq 'invalid (plist-get result-invalid :action)))))
+
+(ert-deftest test-enkan-repl--should-show-buffer-selection-pure ()
+  "Test buffer selection UI display logic."
+  (let ((valid-buffers (list (get-buffer-create "*test1*"))))
+    (should (eq t (enkan-repl--should-show-buffer-selection-pure 'select valid-buffers)))
+    (should (eq nil (enkan-repl--should-show-buffer-selection-pure 'index valid-buffers)))
+    (should (eq nil (enkan-repl--should-show-buffer-selection-pure 'select nil)))))
+
+(ert-deftest test-enkan-repl--build-buffer-selection-choices-pure ()
+  "Test building buffer selection choices."
+  (with-temp-buffer
+    (let* ((buffer1 (current-buffer))
+           (buffer2 (get-buffer-create "*enkan:test*"))
+           (buffers (list buffer1 buffer2))
+           (choices (enkan-repl--build-buffer-selection-choices-pure buffers)))
+      (should (= 2 (length choices)))
+      (should (consp (car choices)))
+      (should (bufferp (cdr (car choices)))))))
+
 ;;; Test Runner
 
 (defun enkan-repl-run-all-tests ()
