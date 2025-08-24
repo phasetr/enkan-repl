@@ -596,23 +596,23 @@ Returns: ディレクトリパスまたはnil"
 3. 存在しないならエラーメッセージ"
   (let ((project-dir (enkan-repl--get-project-directory-from-registry prefix-target)))
     (cond
-     ;; プロジェクトレジストリにディレクトリがあり、実際に存在する場合
+     ;; Project directory exists in registry and is accessible
      ((and project-dir (file-directory-p project-dir))
       (let ((default-directory project-dir))
         (enkan-repl-start-eat)
         (message "Started session for %s at %s" prefix-target project-dir)
-        ;; セッション起動後、少し待ってからコマンド送信
+        ;; Send command after brief delay following session startup
         (run-at-time 0.5 nil
                      (lambda (cmd dir desc target)
                        (when (enkan-repl--send-text cmd dir)
                          (message "%s sent to %s (%d characters)"
                                   desc target (length cmd))))
                      command project-dir content-description prefix-target)))
-     ;; プロジェクトレジストリにあるが、ディレクトリが存在しない場合
+     ;; Project exists in registry but directory not found
      (project-dir
       (message "❌ Project '%s' directory not found: %s. Check enkan-repl-center-project-registry."
                prefix-target project-dir))
-     ;; プロジェクトレジストリにない場合
+     ;; Project not found in registry
      (t
       (message "❌ Project '%s' not found. Check enkan-repl-project-aliases and enkan-repl-center-project-registry."
                prefix-target)))))
@@ -671,17 +671,17 @@ Returns: (target . command) のcons
 target: プロジェクト名、エイリアス、または1-4の番号
 Returns: ディレクトリパスまたはnil"
   (cond
-   ;; 数字の場合（1-4）
+   ;; Numeric case (1-4)
    ((and (stringp target) (string-match "^[1-4]$" target))
     (let* ((user-number (string-to-number target))
            (project-name (enkan-repl--get-session-by-user-number user-number)))
       (when project-name
         (enkan-repl--find-directory-by-project-name project-name))))
-   ;; プロジェクト名またはエイリアス
+   ;; Project name or alias
    ((stringp target)
     (let ((resolved-name (enkan-repl--center-resolve-project-name target)))
       (enkan-repl--find-directory-by-project-name resolved-name)))
-   ;; その他（プレフィックスなし）
+   ;; Other (no prefix)
    (t default-directory)))
 
 (defun enkan-repl--extract-directory-from-buffer-name-pure (buffer-name)
@@ -712,19 +712,19 @@ user-number: 1-4の整数（eatセッションの左から何番目か）"
          (prefix-target (car parsed))
          (command (cdr parsed)))
     (cond
-     ;; プレフィックス記法がある場合は、それを優先
+     ;; Prefix notation takes precedence when present
      (prefix-target
       (let ((directory (enkan-repl--resolve-target-to-directory prefix-target)))
         (if directory
             (progn
               ;; Send command to target session
               (enkan-repl--send-text command directory)
-              ;; バッファ内容は変更しない（:pt部分を保持）
+              ;; Buffer content unchanged (preserve :pt part)
               )
           ;; Handle target not found properly
           (enkan-repl--handle-prefix-target-not-found
            prefix-target command "Region"))))
-     ;; プレフィックス記法がない場合は、ユーザー番号を使用
+     ;; Use user number when no prefix notation
      (t
       (let ((project-name (enkan-repl--get-session-by-user-number user-number)))
         (if project-name
@@ -908,7 +908,7 @@ If SKIP-EMPTY-CHECK is non-nil, send content even if empty."
                           (progn
                             ;; Send command to target session
                             (enkan-repl--send-text command directory)
-                            ;; バッファ内容は変更しない（:pt部分を保持）
+                            ;; Buffer content unchanged (preserve :pt part)
                             (message "%s sent to %s (%d characters)"
                                      content-description prefix-target (length command)))
                         ;; Handle target not found properly
