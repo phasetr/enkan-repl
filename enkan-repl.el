@@ -171,23 +171,23 @@ When set to a file path, uses that file as the template."
 ;;;; Multi-buffer access variables
 
 (defcustom enkan-repl-center-file nil
-  "複数セッション管理用の中心ファイルパス.
-nilの場合、複数セッション機能は無効."
-  :type '(choice (const :tag "複数セッション機能無効" nil)
-                 (file :tag "中心ファイルパス"))
+  "Center file path for multi-session management.
+When nil, multi-session functionality is disabled."
+  :type '(choice (const :tag "Multi-session functionality disabled" nil)
+                 (file :tag "Center file path"))
   :group 'enkan-repl)
 
 (defcustom enkan-repl-project-aliases nil
-  "プロジェクト名のエイリアス定義.
-グローバル設定およびバッファローカル設定可能.
-例: \\='((\"pt\" . \"pt-tools\") (\"er\" . \"enkan-repl\"))"
+  "Project name alias definitions.
+Supports both global and buffer-local configuration.
+Example: \\='((\"pt\" . \"pt-tools\") (\"er\" . \"enkan-repl\"))"
   :type '(alist :key-type string :value-type string)
   :group 'enkan-repl)
 
 (defcustom enkan-repl-center-project-registry nil
-  "中心ファイル用プロジェクト起動候補の辞書.
-各要素は (エイリアス . (プロジェクト名 . プロジェクトパス)) の形式.
-例: \\='((\"pt\" . (\"pt-tools\" . \"/path/to/pt-tools\"))
+  "Project startup registry for center file functionality.
+Each element is in the format (alias . (project-name . project-path)).
+Example: \\='((\"pt\" . (\"pt-tools\" . \"/path/to/pt-tools\"))
       (\"er\" . (\"enkan-repl\" . \"/path/to/enkan-repl\"))
       (\"cc\" . (\"claude-code\" . \"/path/to/claude-code\")))"
   :type '(alist :key-type string
@@ -195,37 +195,37 @@ nilの場合、複数セッション機能は無効."
   :group 'enkan-repl)
 
 (defcustom enkan-repl-center-multi-project-layouts nil
-  "よく使う複数プロジェクト同時起動の設定リスト.
-各要素は (設定名 . エイリアスリスト) の形式.
-エイリアスはウインドウ構成の左から順に指定.
-例: \\='((\"web-dev\" . (\"er\" \"pt\" \"cc\"))
+  "Configuration list for frequently used multi-project simultaneous startup.
+Each element is in the format (configuration-name . alias-list).
+Aliases are specified from left to right according to window layout.
+Example: \\='((\"web-dev\" . (\"er\" \"pt\" \"cc\"))
       (\"data-analysis\" . (\"pt\" \"jupyter\" \"postgres\")))"
   :type '(alist :key-type string
                 :value-type (repeat string))
   :group 'enkan-repl)
 
 (defcustom enkan-repl-session-list nil
-  "管理対象セッションのリスト.
-各要素は (番号 . プロジェクト名) の形式.
-内部的には4-7を使用、ユーザーには1-4で表示.
-例: \\='((4 . \"pt-tools\") (5 . \"enkan-repl\") (6 . \"claude-code\") (7 . \"web-app\"))"
+  "List of managed sessions.
+Each element is in the format (number . project-name).
+Internally uses 4-7, displayed to users as 1-4.
+Example: \\='((4 . \"pt-tools\") (5 . \"enkan-repl\") (6 . \"claude-code\") (7 . \"web-app\"))""
   :type '(alist :key-type integer :value-type string)
   :group 'enkan-repl)
 
 (defcustom enkan-repl-default-session-projects nil
-  "デフォルトで開くセッションプロジェクトのalist.
-例: \\='((4 . \"project1\") (5 . \"project2\") (6 . \"project3\") (7 . \"project4\"))"
+  "Alist of default session projects to open.
+Example: \\='((4 . \"project1\") (5 . \"project2\") (6 . \"project3\") (7 . \"project4\"))"
   :type '(alist :key-type integer :value-type string)
   :group 'enkan-repl)
 
 ;;;; Multi-buffer access variables (continued)
 
 (defvar enkan-repl--session-counter 0
-  "セッション開始カウンター（自動番号付与用）.")
+  "Session startup counter (for automatic numbering).")
 
 (defvar enkan-repl--current-multi-project-layout nil
-  "現在選択されているmulti-project-layout名.
-nil の場合、通常のsetup動作を実行.")
+  "Currently selected multi-project-layout name.
+When nil, executes normal setup behavior.")
 
 ;;;; Core Functions
 
@@ -563,37 +563,37 @@ For other buffers, use current `default-directory'."
 ;;;; Multi-buffer access core functions
 
 (defun enkan-repl--extract-project-name (buffer-name-or-path)
-  "バッファ名またはパスから最終ディレクトリ名を抽出してプロジェクト名として使用.
-例: \\='*enkan:/path/to/pt-tools/*\\=' -> \\='pt-tools\\='"
+  "Extract final directory name from buffer name or path for use as project name.
+Example: \\='*enkan:/path/to/pt-tools/*\\=' -> \\='pt-tools\\='"
   (let ((path (if (string-match "\\*enkan:\\(.+\\)\\*" buffer-name-or-path)
                   (match-string 1 buffer-name-or-path)
                 buffer-name-or-path)))
     (file-name-nondirectory (directory-file-name path))))
 
 (defun enkan-repl--resolve-project-name (name-or-alias)
-  "プロジェクト名またはエイリアスを正規プロジェクト名に解決.
-エイリアス定義を参照し、存在しない場合は元の名前を返す."
+  "Resolve project name or alias to canonical project name.
+References alias definitions, returns original name if not found."
   (or (cdr (assoc name-or-alias enkan-repl-project-aliases))
       name-or-alias))
 
 (defun enkan-repl--center-resolve-project-name (alias)
-  "centerファイル用のエイリアス解決.
-エイリアスをproject aliasesから正規プロジェクト名に解決."
+  "Alias resolution for center file functionality.
+Resolves alias to canonical project name from project aliases."
   (or (cdr (assoc alias enkan-repl-project-aliases))
       alias))
 
 (defun enkan-repl--get-project-directory-from-registry (alias)
-  "プロジェクトレジストリからディレクトリパスを取得.
-Returns: ディレクトリパスまたはnil"
+  "Get directory path from project registry.
+Returns: Directory path or nil"
   (let ((project-info (cdr (assoc alias enkan-repl-center-project-registry))))
     (when project-info
       (cdr project-info))))  ; project-path part
 
 (defun enkan-repl--handle-prefix-target-not-found (prefix-target command content-description)
-  "プレフィックス対象が見つからない場合の処理.
-1. プロジェクトレジストリからディレクトリパスを取得
-2. ディレクトリが存在するならセッション起動
-3. 存在しないならエラーメッセージ"
+  "Handle case when prefix target is not found.
+1. Get directory path from project registry
+2. Start session if directory exists
+3. Show error message if not found"
   (let ((project-dir (enkan-repl--get-project-directory-from-registry prefix-target)))
     (cond
      ;; Project directory exists in registry and is accessible
@@ -618,14 +618,14 @@ Returns: ディレクトリパスまたはnil"
                prefix-target)))))
 
 (defun enkan-repl--get-session-by-user-number (user-number)
-  "ユーザー番号からプロジェクト名を取得.
-user-number: 1-4の整数（eatセッションの左から何番目か）
-Returns: プロジェクト名またはnil"
+  "Get project name from user number.
+user-number: Integer 1-4 (position from left in eat sessions)
+Returns: Project name or nil"
   (let ((internal-number (+ user-number 3)))  ; 1→4, 2→5, 3→6, 4→7
     (cdr (assoc internal-number enkan-repl-session-list))))
 
 (defun enkan-repl--register-session (session-number project-name)
-  "セッション番号にプロジェクトを登録.
+  "Register project to session number.
 Order is maintained by session number (ascending)."
   (let ((updated-list (assq-delete-all session-number enkan-repl-session-list))
         (new-entry (cons session-number project-name)))
@@ -634,9 +634,9 @@ Order is maintained by session number (ascending)."
                 (lambda (a b) (< (car a) (car b)))))))
 
 (defun enkan-repl--auto-register-session (project-name)
-  "セッションを自動的に番号登録.
-既存の番号設定がない場合のみ実行.
-project-name: エイリアス解決済みの正規プロジェクト名"
+  "Automatically register session with number.
+Executes only when no existing number assignment exists.
+project-name: Alias-resolved canonical project name"
   (let ((resolved-name (enkan-repl--resolve-project-name project-name)))
     (unless (rassoc resolved-name enkan-repl-session-list)
       (let ((next-number (+ 4 (mod enkan-repl--session-counter 4))))
@@ -645,31 +645,31 @@ project-name: エイリアス解決済みの正規プロジェクト名"
           (enkan-repl--register-session next-number resolved-name))))))
 
 (defun enkan-repl--get-session-by-name-or-alias (name-or-alias)
-  "プロジェクト名またはエイリアスからセッション番号を取得.
-Returns: セッション番号またはnil"
+  "Get session number from project name or alias.
+Returns: Session number or nil"
   (let ((resolved-name (enkan-repl--resolve-project-name name-or-alias)))
     (car (rassoc resolved-name enkan-repl-session-list))))
 
 (defun enkan-repl--register-session-with-alias-support (session-number name-or-alias)
-  "エイリアス対応セッション登録.
-name-or-alias: プロジェクト名またはエイリアス
-エイリアス解決後の正規名で登録"
+  "Alias-aware session registration.
+name-or-alias: Project name or alias
+Register with canonical name after alias resolution"
   (let ((resolved-name (enkan-repl--resolve-project-name name-or-alias)))
     (enkan-repl--register-session session-number resolved-name)))
 
 (defun enkan-repl--parse-prefix-notation (text)
-  "プレフィックス記法(:記号)をパースする.
-Returns: (target . command) のcons
-  target: プロジェクト名/エイリアス/番号、または nil (プレフィックスなし)
-  command: 実行コマンド部分"
+  "Parse prefix notation (:symbol).
+Returns: (target . command) cons
+  target: Project name/alias/number, or nil (no prefix)
+  command: Command execution part"
   (if (string-match "^:\\([^ \t]+\\)[ \t]+\\(.*\\)" text)
       (cons (match-string 1 text) (match-string 2 text))
     (cons nil text)))
 
 (defun enkan-repl--resolve-target-to-directory (target)
-  "送信対象をディレクトリパスに解決.
-target: プロジェクト名、エイリアス、または1-4の番号
-Returns: ディレクトリパスまたはnil"
+  "Resolve send target to directory path.
+target: Project name, alias, or number 1-4
+Returns: Directory path or nil"
   (cond
    ;; Numeric case (1-4)
    ((and (stringp target) (string-match "^[1-4]$" target))
@@ -692,9 +692,9 @@ Returns expanded directory path or nil if buffer name is not valid enkan format.
       (file-name-as-directory (expand-file-name raw-path)))))
 
 (defun enkan-repl--find-directory-by-project-name (project-name)
-  "プロジェクト名から対応するディレクトリを検索.
-既存のenkan-replバッファから該当するディレクトリを探す.
-Returns: ディレクトリパスまたはnil"
+  "Search for corresponding directory by project name.
+Looks for matching directory from existing enkan-repl buffers.
+Returns: Directory path or nil"
   (cl-block search-buffers
     (dolist (buffer (buffer-list))
       (with-current-buffer buffer
@@ -705,8 +705,8 @@ Returns: ディレクトリパスまたはnil"
             (enkan-repl--extract-directory-from-buffer-name-pure (buffer-name))))))))
 
 (defun enkan-repl--send-region-with-prefix (start end user-number)
-  "ユニバーサル引数に応じてセッションを選択してリージョンを送信.
-user-number: 1-4の整数（eatセッションの左から何番目か）"
+  "Select session according to universal argument and send region.
+user-number: Integer 1-4 (position from left in eat sessions)"
   (let* ((text (buffer-substring-no-properties start end))
          (parsed (enkan-repl--parse-prefix-notation text))
          (prefix-target (car parsed))
@@ -735,7 +735,7 @@ user-number: 1-4の整数（eatセッションの左から何番目か）"
           (user-error "Session %d is not registered" user-number)))))))
 
 (defun enkan-repl--send-text-to-project (text project-name)
-  "指定されたプロジェクト名のセッションにテキストを送信."
+  "Send text to session of specified project name."
   (let ((directory (enkan-repl--find-directory-by-project-name project-name)))
     (if directory
         (enkan-repl--send-text text directory)
@@ -1855,11 +1855,11 @@ Return (project-name . project-path) or nil if not found."
   (cdr (assoc alias enkan-repl-center-project-registry)))
 
 (defun enkan-repl--get-session-project-name (session-number session-list)
-  "セッション番号からプロジェクト名を取得する純粋関数."
+  "Pure function to get project name from session number."
   (cdr (assoc session-number session-list)))
 
 (defun enkan-repl--get-project-path-from-registry (project-name project-registry)
-  "プロジェクト名からレジストリ内のプロジェクトパスを取得する純粋関数."
+  "Pure function to get project path from registry by project name."
   (let ((project-info (cl-find-if (lambda (entry)
                                     (string= (car (cdr entry)) project-name))
                                   project-registry)))
@@ -1867,7 +1867,7 @@ Return (project-name . project-path) or nil if not found."
       (cdr (cdr project-info)))))
 
 (defun enkan-repl--get-session-project-paths (session-numbers session-list project-registry)
-  "複数のセッション番号に対応するプロジェクトパスのリストを取得する純粋関数.
+  "Pure function to get list of project paths for multiple session numbers."
 Returns: list of (session-number . project-path) for valid paths"
   (cl-loop for session-number in session-numbers
            for project-name = (enkan-repl--get-session-project-name session-number session-list)
