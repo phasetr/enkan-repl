@@ -1957,11 +1957,14 @@ Category: Center File Multi-buffer Access"
         (dolist (session enkan-repl-session-list)
           (let* ((session-number (car session))
                  (project-name (cdr session))
-                 (buffer-name (format "*eat-%s*" project-name))
-                 (buffer (get-buffer buffer-name)))
-            (when buffer
-              (kill-buffer buffer)
-              (setq terminated-count (1+ terminated-count)))))
+                 ;; Get project directory from registry using correct function
+                 (project-path (enkan-repl--get-project-path-from-registry project-name enkan-repl-center-project-registry)))
+            (when project-path
+              ;; Use the same buffer discovery method as enkan-repl-finish-eat
+              (let ((buffer (enkan-repl--get-buffer-for-directory project-path)))
+                (when buffer
+                  (kill-buffer buffer)
+                  (setq terminated-count (1+ terminated-count)))))))
         ;; Clear session list and reset layout configuration
         (setq enkan-repl-session-list nil)
         (setq enkan-repl--session-counter 0)
