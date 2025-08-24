@@ -36,12 +36,10 @@
      ("C-c 5" enkan-repl-goto-window-5 "Go to window 5" window-navigation)
      ("C-c 6" enkan-repl-goto-window-6 "Go to window 6" window-navigation)
      ("C-c 7" enkan-repl-goto-window-7 "Go to window 7" window-navigation)
-
      ;; Text Sending
      ("C-M-<return>" enkan-repl-send-region "Send region to REPL" text-sending)
      ("C-M-i" enkan-repl-send-line "Send current line to REPL" text-sending)
      ("C-M-e" enkan-repl-send-enter "Send enter to REPL" text-sending)
-
      ;; Quick Actions
      ("<escape>" enkan-repl-send-escape "Send ESC to REPL" quick-actions)
      ("C-M-1" enkan-repl-send-1 "Send 1 to REPL" quick-actions)
@@ -50,25 +48,18 @@
      ("C-M-4" enkan-repl-send-4 "Send 4 to REPL" quick-actions)
      ("C-M-5" enkan-repl-send-5 "Send 5 to REPL" quick-actions)
      ("C-M-b" enkan-repl-recenter-bottom "Recenter at bottom" quick-actions)
-
      ;; Multi-buffer Layout
      ("C-c w 2" enkan-repl-center-setup-2session-layout "Setup 2-session layout" multi-buffer)
      ("C-c w 3" enkan-repl-center-setup-3session-layout "Setup 3-session layout" multi-buffer)
      ("C-c w 4" enkan-repl-center-setup-4session-layout "Setup 4-session layout" multi-buffer)
-
      ;; Center File Multi-buffer Access
      ("M-1" enkan-repl-send-line-to-session-1 "Send line to session 1" center-file)
      ("M-2" enkan-repl-send-line-to-session-2 "Send line to session 2" center-file)
      ("M-3" enkan-repl-send-line-to-session-3 "Send line to session 3" center-file)
      ("M-4" enkan-repl-send-line-to-session-4 "Send line to session 4" center-file)
-     ("C-c s r" enkan-repl-center-register-current-session "Register current session" center-file)
-     ("C-c s l" enkan-repl-center-list-sessions "List registered sessions" center-file)
-     ("C-c s c" enkan-repl-center-clear-sessions "Clear all sessions" center-file)
-
      ;; Project Management
      ("C-M-s" enkan-repl-start-eat "Start eat session" project-management)
      ("C-M-f" enkan-repl-finish-eat "Finish eat session" project-management)
-
      ;; Help and Documentation
      ("C-M-c" enkan-repl-cheat-sheet "Enkan cheat sheet" help))
   "Base keybinding definitions for enkan-repl.

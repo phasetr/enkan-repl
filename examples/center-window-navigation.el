@@ -143,7 +143,6 @@ Category: Utilities"
           (if session-name
               (message "❌ Window 3: Project directory not found for session '%s'. Check enkan-repl-center-project-registry." session-name)
             (message "❌ Window 3: No session registered for slot 2 (internal number 5). Run C-M-s to setup sessions.")))))))
-
   ;; Setup eat buffers in session windows (4 and 5)
   (when (and (boundp 'enkan-repl-session-list) enkan-repl-session-list)
     ;; Window 4: Session 1's eat buffer
@@ -158,7 +157,6 @@ Category: Utilities"
                   (message "✅ Window 4: Opened eat buffer %s" (cdr eat-setup-4)))
               (message "❌ Window 4: Eat buffer %s not found. Run C-M-s to start sessions." (cdr eat-setup-4))))
         (message "❌ Window 4: No session registered for slot 1 (internal number 4).")))
-
     ;; Window 5: Session 2's eat buffer
     (let ((eat-setup-5 (enkan-repl--setup-window-eat-buffer-pure
                         enkan-repl--window-5 5 enkan-repl-session-list enkan-repl-center-project-registry)))
@@ -171,8 +169,9 @@ Category: Utilities"
                   (message "✅ Window 5: Opened eat buffer %s" (cdr eat-setup-5)))
               (message "❌ Window 5: Eat buffer %s not found. Run C-M-s to start sessions." (cdr eat-setup-5))))
         (message "❌ Window 5: No session registered for slot 2 (internal number 5)."))))
-
-  (select-window (car (window-list))))
+  ;; Always select the center file window (Window 1) at the end
+  (when enkan-repl--window-1
+    (select-window enkan-repl--window-1)))
 
 ;;;###autoload
 (defun enkan-repl-setup-3session-layout ()
@@ -225,7 +224,9 @@ Category: Utilities"
       (when dired-setup-3
         (select-window (car dired-setup-3))
         (dired (expand-file-name (cdr dired-setup-3))))))
-  (select-window (car (window-list))))
+  ;; Always select the center file window (Window 1) at the end
+  (when enkan-repl--window-1
+    (select-window enkan-repl--window-1)))
 
 ;;;###autoload
 (defun enkan-repl-setup-4session-layout ()
@@ -278,7 +279,9 @@ Category: Utilities"
       (when dired-setup-3
         (select-window (car dired-setup-3))
         (dired (expand-file-name (cdr dired-setup-3))))))
-  (select-window (car (window-list))))
+  ;; Always select the center file window (Window 1) at the end
+  (when enkan-repl--window-1
+    (select-window enkan-repl--window-1)))
 
 ;;;; Window Navigation Functions
 

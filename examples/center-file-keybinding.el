@@ -97,10 +97,6 @@
           ;; Override base keybindings for center file mode
           (define-key map (kbd "C-M-t") 'enkan-repl-center-other-window)
           (define-key map (kbd "C-M-b") 'enkan-repl-center-recenter-bottom)
-          ;; Additional center file specific bindings
-          (define-key map (kbd "C-c s r") 'enkan-repl-center-register-current-session)
-          (define-key map (kbd "C-c s l") 'enkan-repl-center-list-sessions)
-          (define-key map (kbd "C-c s c") 'enkan-repl-center-clear-sessions)
           map)))
 
 ;;; ========================================
