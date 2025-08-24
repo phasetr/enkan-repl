@@ -2381,6 +2381,52 @@ Category: Center File Multi-buffer Access"
     (enkan-repl--send-buffer-content
      (line-beginning-position) (line-end-position) "Line")))
 
+;; Pure functions for center file operations (used by enkan-repl-center-open-file)
+(defun enkan-center-file-validate-path-pure (file-path)
+  "Validate center FILE-PATH for opening.
+Returns plist with :valid, :message."
+  (cond
+   ((null file-path)
+    (list :valid nil :message "Center file path not configured"))
+   ((not (stringp file-path))
+    (list :valid nil :message "Center file path must be a string"))
+   ((string-empty-p file-path)
+    (list :valid nil :message "Center file path is empty"))
+   (t
+    (list :valid t :message "Valid center file path"))))
+
+(defun enkan-center-file-check-exists-pure (file-path)
+  "Check if center FILE-PATH exists.
+Returns plist with :exists, :action."
+  (if (file-exists-p file-path)
+      (list :exists t :action "open")
+    (list :exists nil :action "create")))
+
+(defun enkan-center-file-determine-action-pure (file-path)
+  "Determine action to take for center FILE-PATH.
+Returns plist with :valid, :action, :message."
+  (let ((validation (enkan-center-file-validate-path-pure file-path)))
+    (if (plist-get validation :valid)
+        (let ((exists-check (enkan-center-file-check-exists-pure file-path)))
+          (list :valid t
+                :action (plist-get exists-check :action)
+                :message (if (plist-get exists-check :exists)
+                            "Opening existing center file"
+                          "Creating new center file")))
+      validation)))
+
+(defun enkan-repl-center-open-file ()
+  "Open or create the center file based on enkan-repl-center-file configuration.
+
+Category: Center File Operations"
+  (interactive)
+  (let ((result (enkan-center-file-determine-action-pure enkan-repl-center-file)))
+    (if (plist-get result :valid)
+        (progn
+          (message "%s" (plist-get result :message))
+          (find-file enkan-repl-center-file))
+      (error "%s" (plist-get result :message)))))
+
 (defun enkan-repl-center-send-region (start end &optional action-string)
   "Send region to center file buffer with action specification.
 ACTION-STRING format:
