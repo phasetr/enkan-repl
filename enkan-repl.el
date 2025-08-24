@@ -1816,6 +1816,7 @@ Category: Center File Multi-buffer Access"
 (defvar enkan-center-file-global-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "<escape>") 'enkan-repl-center-send-escape)
+    (define-key map (kbd "C-x g") 'enkan-repl-center-magit)
     (define-key map (kbd "C-M-e") 'enkan-repl-center-send-enter)
     (define-key map (kbd "C-M-1") 'enkan-repl-center-send-1)
     (define-key map (kbd "C-M-2") 'enkan-repl-center-send-2)
@@ -2429,6 +2430,83 @@ Category: Center File Operations"
           (message "%s" (plist-get result :message))
           (find-file enkan-repl-center-file))
       (error "%s" (plist-get result :message)))))
+
+;; Pure functions for magit project selection (used by enkan-repl-center-magit)
+(defun enkan-repl--get-magit-project-list-pure (project-registry)
+  "Get list of projects for magit selection from PROJECT-REGISTRY.
+Returns list of (project-name . project-path) pairs."
+  (unless project-registry
+    (error "Project registry is empty"))
+  (mapcar (lambda (entry)
+            (let ((project-name (car entry))
+                  (project-path (if (stringp (cdr entry))
+                                    (cdr entry)
+                                  ;; Handle nested cons structure
+                                  (if (consp (cdr entry))
+                                      (cdr (cdr entry))
+                                    (cdr entry)))))
+              (cons project-name (expand-file-name project-path))))
+          project-registry))
+
+(defun enkan-repl--validate-magit-project-path-pure (project-path)
+  "Validate PROJECT-PATH for magit operation.
+Returns plist with :valid, :message."
+  (cond
+   ((null project-path)
+    (list :valid nil :message "Project path is null"))
+   ((not (stringp project-path))
+    (list :valid nil :message "Project path must be a string"))
+   ((not (file-directory-p project-path))
+    (list :valid nil :message "Project path does not exist or is not a directory"))
+   (t
+    (list :valid t :message "Valid project path"))))
+
+(defun enkan-repl--create-magit-completion-list-pure (project-list)
+  "Create completion list for magit project selection from PROJECT-LIST.
+Returns list of strings for completing-read."
+  (unless project-list
+    (error "Project list is empty"))
+  (mapcar (lambda (entry)
+            (format "%s (%s)" (car entry) (cdr entry)))
+          project-list))
+
+(defun enkan-repl--parse-selected-magit-project-pure (selected-string project-list)
+  "Parse SELECTED-STRING to get project info from PROJECT-LIST.
+Returns plist with :project-name, :project-path."
+  (let ((matched-entry (cl-find-if
+                        (lambda (entry)
+                          (string= selected-string
+                                   (format "%s (%s)" (car entry) (cdr entry))))
+                        project-list)))
+    (if matched-entry
+        (list :project-name (car matched-entry)
+              :project-path (cdr matched-entry))
+      (list :project-name nil :project-path nil))))
+
+(defun enkan-repl-center-magit ()
+  "Open magit for selected project from registry with UI selection.
+
+Category: Center File Operations"
+  (interactive)
+  (if (not (boundp 'enkan-repl-center-project-registry))
+      (error "enkan-repl-center-project-registry is not defined")
+    (if (null enkan-repl-center-project-registry)
+        (error "Project registry is empty. Configure enkan-repl-center-project-registry")
+      (let* ((project-list (enkan-repl--get-magit-project-list-pure enkan-repl-center-project-registry))
+             (completion-list (enkan-repl--create-magit-completion-list-pure project-list))
+             (selected (completing-read "Select project for magit: " completion-list nil t))
+             (project-info (enkan-repl--parse-selected-magit-project-pure selected project-list)))
+        (let ((project-path (plist-get project-info :project-path))
+              (project-name (plist-get project-info :project-name)))
+          (if project-path
+              (let ((validation (enkan-repl--validate-magit-project-path-pure project-path)))
+                (if (plist-get validation :valid)
+                    (progn
+                      (let ((default-directory project-path))
+                        (magit-status))
+                      (message "Opened magit for project: %s (%s)" project-name project-path))
+                  (error "Invalid project path: %s" (plist-get validation :message))))
+            (error "Failed to parse selected project")))))))
 
 (defun enkan-repl-center-send-region (start end &optional action-string)
   "Send region to center file buffer with action specification.

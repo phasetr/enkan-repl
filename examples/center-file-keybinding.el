@@ -95,6 +95,7 @@
         ;; Fallback to manual definition
         (let ((map (make-sparse-keymap)))
           ;; Override base keybindings for center file mode
+          (define-key map (kbd "C-x g") 'enkan-repl-center-magit)
           (define-key map (kbd "M-<return>") 'enkan-repl-center-send-region)
           (define-key map (kbd "C-M-e") 'enkan-repl-center-send-enter)
           (define-key map (kbd "C-M-i") 'enkan-repl-center-send-line)
@@ -115,7 +116,7 @@
       (progn
         ;; Ensure keymap has higher priority by setting it as minor mode keymap
         (when (current-local-map)
-          (use-local-map (make-composed-keymap enkan-center-file-mode-map 
+          (use-local-map (make-composed-keymap enkan-center-file-mode-map
                                                (current-local-map))))
         (enkan-center-file-setup-cheat-sheet-advice)
         (message "enkan-center-file-mode enabled. C-M-t to switch windows, M-1-4 for session access."))
