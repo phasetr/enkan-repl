@@ -175,56 +175,44 @@ Category: Utilities"
 ;;;###autoload
 (defun enkan-repl-setup-3session-layout ()
   "Setup window layout for 3-session management.
-  +----------+---+---+---+
-  |    1     | 4 | 5 | 6 |
-  | center   |   |   |   |
-  |  file    |   |   |   |
-  +-----+----+   |   |   |
-  | 2   | 3  |   |   |   |
-  |work |rsv |   |   |   |
-  +-----+----+---+---+---+
+  +--------+---+---+---+
+  |    1   | 2 | 3 | 4 |
+  | center |   |   |   |
+  |  file  |   |   |   |
+  +--------+---+---+---+
 
   4, 5, 6: enkan-repl sessions
 
 Category: Utilities"
   (interactive)
   (delete-other-windows)
-  ;; Create 3 columns on the right
-  (split-window-right (floor (* (window-width) 0.6)))
+  ;; Create left column for center file (30%) and right section (70%)
+  (split-window-right (floor (* (window-width) 0.3)))
+  ;; Move to right section and split into 3 equal columns
   (other-window 1)
-  (split-window-right)
-  (other-window 1)
-  (split-window-right)
-  ;; Split bottom left
-  (other-window 3) ; Move back 3 windows to left side
-  (split-window-below (floor (* (window-height) 0.6)))
+  (split-window-right (floor (* (window-width) 0.4)))
   (other-window 1)
   (split-window-right (floor (* (window-width) 0.5)))
-  (balance-windows)
-  ;; Set window variables for center file layout
-  (let ((windows (window-list)))
-    (setq enkan-repl--window-1 (nth 0 windows))  ; Center file
-    (setq enkan-repl--window-2 (nth 1 windows))  ; Work area
-    (setq enkan-repl--window-3 (nth 2 windows))  ; Reserve area
-    (setq enkan-repl--window-4 (nth 3 windows))  ; Session 1
-    (setq enkan-repl--window-5 (nth 4 windows))  ; Session 2
-    (setq enkan-repl--window-6 (nth 5 windows))) ; Session 3
-  ;; Open project root dired in work area windows (2 and 3)
-  (when (and (boundp 'enkan-repl-session-list) (boundp 'enkan-repl-center-project-registry))
-    ;; Window 2: Session 1's project dired
-    (let ((dired-setup-2 (enkan-repl--setup-window-dired-pure
-                          enkan-repl--window-2 4
-                          enkan-repl-session-list enkan-repl-center-project-registry)))
-      (when dired-setup-2
-        (select-window (car dired-setup-2))
-        (dired (expand-file-name (cdr dired-setup-2)))))
-    ;; Window 3: Session 2's project dired
-    (let ((dired-setup-3 (enkan-repl--setup-window-dired-pure
-                          enkan-repl--window-3 5
-                          enkan-repl-session-list enkan-repl-center-project-registry)))
-      (when dired-setup-3
-        (select-window (car dired-setup-3))
-        (dired (expand-file-name (cdr dired-setup-3))))))
+  ;; Set window variables - direct assignment by position
+  ;; Currently at rightmost window, go back to leftmost
+  (other-window 2)
+  (setq enkan-repl--window-1 (selected-window))
+  (other-window 1)
+  (setq enkan-repl--window-2 (selected-window))
+  (other-window 1)
+  (setq enkan-repl--window-3 (selected-window))
+  (other-window 1)
+  (setq enkan-repl--window-4 (selected-window))
+  ;; Open center file in window 1
+  (when (and enkan-repl--window-1 enkan-repl-center-file)
+    (select-window enkan-repl--window-1)
+    (find-file enkan-repl-center-file)
+    (message "✅ Window 1: Opened center file %s" enkan-repl-center-file))
+  ;; Setup eat buffers in session windows (4, 5, 6 in multi-project order)
+  (when (and (boundp 'enkan-repl-session-list) enkan-repl-session-list)
+    (enkan-repl--setup-session-eat-buffer enkan-repl--window-2 4)
+    (enkan-repl--setup-session-eat-buffer enkan-repl--window-3 5)
+    (enkan-repl--setup-session-eat-buffer enkan-repl--window-4 6))
   ;; Always select the center file window (Window 1) at the end
   (when enkan-repl--window-1
     (select-window enkan-repl--window-1)))
@@ -232,14 +220,11 @@ Category: Utilities"
 ;;;###autoload
 (defun enkan-repl-setup-4session-layout ()
   "Setup window layout for 4-session management.
-  +----------+---+---+---+---+
-  |    1     | 4 | 5 | 6 | 7 |
-  | center   |   |   |   |   |
-  |  file    |   |   |   |   |
-  +-----+----|   |   |   |   |
-  | 2   | 3  |   |   |   |   |
-  |work |rsv |   |   |   |   |
-  +-----+----+---+---+---+---+
+  +--------+---+---+---+---+
+  |    1   | 4 | 5 | 6 | 7 |
+  | center |   |   |   |   |
+  |  file  |   |   |   |   |
+  +--------+---+---+---+---+
 
   4, 5, 6, 7: enkan-repl sessions
 
