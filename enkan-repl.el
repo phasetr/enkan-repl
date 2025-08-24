@@ -1004,6 +1004,22 @@ Category: Text Sender"
   (enkan-repl--send-numbered-choice "3"))
 
 ;;;###autoload
+(defun enkan-repl-send-4 ()
+  "Send \\='4\\=' to eat session buffer for numbered choice prompt.
+
+Category: Text Sender"
+  (interactive)
+  (enkan-repl--send-numbered-choice "4"))
+
+;;;###autoload
+(defun enkan-repl-send-5 ()
+  "Send \\='5\\=' to eat session buffer for numbered choice prompt.
+
+Category: Text Sender"
+  (interactive)
+  (enkan-repl--send-numbered-choice "5"))
+
+;;;###autoload
 (defun enkan-repl-send-escape ()
   "Send ESC key to eat session buffer.
 
@@ -1796,7 +1812,13 @@ Category: Center File Multi-buffer Access"
 
 (defvar enkan-center-file-global-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "<escape>") 'enkan-repl-send-escape)
+    (define-key map (kbd "<escape>") 'enkan-repl-center-send-escape)
+    (define-key map (kbd "C-M-e") 'enkan-repl-center-send-enter)
+    (define-key map (kbd "C-M-1") 'enkan-repl-center-send-1)
+    (define-key map (kbd "C-M-2") 'enkan-repl-center-send-2)
+    (define-key map (kbd "C-M-3") 'enkan-repl-center-send-3)
+    (define-key map (kbd "C-M-4") 'enkan-repl-center-send-4)
+    (define-key map (kbd "C-M-5") 'enkan-repl-center-send-5)
     (define-key map (kbd "C-M-t") 'enkan-repl-center-other-window)
     (define-key map (kbd "C-M-b") 'enkan-repl-center-recenter-bottom)
     (define-key map (kbd "C-M-s") 'enkan-repl-center-auto-setup)
@@ -1989,7 +2011,7 @@ Returns plist with :buffer, :name, :live-p, :has-process, :process."
                             (list :bound (boundp 'eat--process)
                                   :process (if (boundp 'eat--process) eat--process nil))))))
       (list :buffer buffer
-            :name name 
+            :name name
             :live-p live-p
             :has-process (and process-info (plist-get process-info :bound) (plist-get process-info :process))
             :process (when process-info (plist-get process-info :process))))))
@@ -2006,7 +2028,7 @@ Returns t if escape can be sent, nil otherwise."
 Returns list of cons cells (display-name . buffer) for selection UI."
   (mapcar (lambda (buffer)
             (let ((info (enkan-repl--get-buffer-process-info-pure buffer)))
-              (cons (format "%s%s" 
+              (cons (format "%s%s"
                            (plist-get info :name)
                            (if (plist-get info :has-process) " [ACTIVE]" " [INACTIVE]"))
                     buffer)))
@@ -2042,6 +2064,53 @@ Returns t if selection UI needed, nil for direct index access."
   (and (eq action-type 'select)
        (> (length valid-buffers) 0)))
 
+(defun enkan-repl--send-number-to-buffer-pure (number buffer)
+  "Pure function to determine parameters for sending NUMBER to BUFFER.
+Returns plist with :can-send, :number, :buffer, :message."
+  (let ((info (enkan-repl--get-buffer-process-info-pure buffer)))
+    (list :can-send (plist-get info :has-process)
+          :number number
+          :buffer buffer
+          :message (if (plist-get info :has-process)
+                      (format "Will send '%s' to %s" number (plist-get info :name))
+                    (format "Cannot send to inactive buffer: %s" (plist-get info :name))))))
+
+(defun enkan-repl--validate-number-input-pure (number)
+  "Pure function to validate NUMBER input for sending.
+Returns plist with :valid, :number, :message."
+  (cond
+   ((null number)
+    (list :valid nil :number nil :message "Number is required"))
+   ((not (stringp number))
+    (list :valid nil :number nil :message "Number must be a string"))
+   ((string-empty-p number)
+    (list :valid nil :number nil :message "Number cannot be empty"))
+   ((not (string-match-p "^[0-9]$" number))
+    (list :valid nil :number nil :message "Number must be a single digit (0-9)"))
+   (t
+    (list :valid t :number number :message (format "Valid number: %s" number)))))
+
+(defun enkan-repl--center-send-text-to-buffer (text buffer)
+  "Center file specific function to send TEXT to BUFFER.
+Sends text followed by carriage return, with cursor positioning."
+  (when (and (bufferp buffer)
+             (buffer-live-p buffer)
+             (with-current-buffer buffer
+               (and (boundp 'eat--process)
+                    eat--process
+                    (process-live-p eat--process))))
+    (with-current-buffer buffer
+      (eat--send-string eat--process text)
+      (eat--send-string eat--process "\r")
+      ;; Move cursor to bottom after eat processes the output
+      (run-at-time 0.01 nil
+                   (lambda (buf)
+                     (when (buffer-live-p buf)
+                       (with-current-buffer buf
+                         (goto-char (point-max)))))
+                   buffer)
+      t)))
+
 ;;;###autoload
 (defun enkan-repl-center-send-escape (&optional prefix-arg)
   "Send ESC key to eat session buffer from center file.
@@ -2055,7 +2124,7 @@ Category: Center File Multi-buffer Access"
   (let* ((enkan-buffers (enkan-repl--collect-enkan-buffers-pure (buffer-list)))
          (valid-buffers (enkan-repl--filter-valid-buffers-pure enkan-buffers))
          (parsed-arg (enkan-repl--parse-prefix-arg-pure prefix-arg)))
-    (message "Found %d enkan buffers, %d valid" 
+    (message "Found %d enkan buffers, %d valid"
              (length enkan-buffers) (length valid-buffers))
     (cond
      ((= (length valid-buffers) 0)
@@ -2083,6 +2152,157 @@ Category: Center File Multi-buffer Access"
           (message "Sent ESC to selected buffer: %s" (plist-get info :name)))))
      (t
       (message "No valid action determined")))))
+
+;;;###autoload
+(defun enkan-repl-center-send-enter (&optional prefix-arg)
+  "Send enter key to eat session buffer from center file.
+Always requires buffer specification:
+- Without prefix: Select from available enkan buffers
+- With numeric prefix: Send to buffer at that index (1-based)
+
+Category: Center File Multi-buffer Access"
+  (interactive "P")
+  (enkan-repl--center-send-text-with-selection "" prefix-arg))
+
+;;;###autoload
+(defun enkan-repl-center-send-1 (&optional prefix-arg)
+  "Send '1' to eat session buffer from center file.
+Always requires buffer specification:
+- Without prefix: Select from available enkan buffers
+- With numeric prefix: Send to buffer at that index (1-based)
+
+Category: Center File Multi-buffer Access"
+  (interactive "P")
+  (enkan-repl--center-send-number-with-selection "1" prefix-arg))
+
+;;;###autoload
+(defun enkan-repl-center-send-2 (&optional prefix-arg)
+  "Send '2' to eat session buffer from center file.
+Always requires buffer specification:
+- Without prefix: Select from available enkan buffers
+- With numeric prefix: Send to buffer at that index (1-based)
+
+Category: Center File Multi-buffer Access"
+  (interactive "P")
+  (enkan-repl--center-send-number-with-selection "2" prefix-arg))
+
+;;;###autoload
+(defun enkan-repl-center-send-3 (&optional prefix-arg)
+  "Send '3' to eat session buffer from center file.
+Always requires buffer specification:
+- Without prefix: Select from available enkan buffers
+- With numeric prefix: Send to buffer at that index (1-based)
+
+Category: Center File Multi-buffer Access"
+  (interactive "P")
+  (enkan-repl--center-send-number-with-selection "3" prefix-arg))
+
+;;;###autoload
+(defun enkan-repl-center-send-4 (&optional prefix-arg)
+  "Send '4' to eat session buffer from center file.
+Always requires buffer specification:
+- Without prefix: Select from available enkan buffers
+- With numeric prefix: Send to buffer at that index (1-based)
+
+Category: Center File Multi-buffer Access"
+  (interactive "P")
+  (enkan-repl--center-send-number-with-selection "4" prefix-arg))
+
+;;;###autoload
+(defun enkan-repl-center-send-5 (&optional prefix-arg)
+  "Send '5' to eat session buffer from center file.
+Always requires buffer specification:
+- Without prefix: Select from available enkan buffers
+- With numeric prefix: Send to buffer at that index (1-based)
+
+Category: Center File Multi-buffer Access"
+  (interactive "P")
+  (enkan-repl--center-send-number-with-selection "5" prefix-arg))
+
+(defun enkan-repl--center-send-text-with-selection (text prefix-arg)
+  "Internal function to send TEXT with buffer selection logic using PREFIX-ARG."
+  (message "Starting enkan-repl-center-send-text with prefix-arg: %s" prefix-arg)
+  (let* ((enkan-buffers (enkan-repl--collect-enkan-buffers-pure (buffer-list)))
+         (valid-buffers (enkan-repl--filter-valid-buffers-pure enkan-buffers))
+         (parsed-arg (enkan-repl--parse-prefix-arg-pure prefix-arg)))
+    (message "Found %d enkan buffers, %d valid for text sending"
+             (length enkan-buffers) (length valid-buffers))
+    (cond
+     ((= (length valid-buffers) 0)
+      (message "No active enkan sessions found"))
+     ((eq 'invalid (plist-get parsed-arg :action))
+      (message "Invalid prefix argument"))
+     ((eq 'index (plist-get parsed-arg :action))
+      (let* ((index (plist-get parsed-arg :index))
+             (target-buffer (enkan-repl--get-buffer-by-index-pure valid-buffers index)))
+        (message "Attempting to send text '%s' to buffer index %d" text index)
+        (if target-buffer
+            (let ((info (enkan-repl--get-buffer-process-info-pure target-buffer)))
+              (if (plist-get info :has-process)
+                  (progn
+                    (enkan-repl--center-send-text-to-buffer text target-buffer)
+                    (message "Sent '%s' to buffer %d: %s" text index (plist-get info :name)))
+                (message "Cannot send to inactive buffer %d: %s" index (plist-get info :name))))
+          (message "Invalid buffer index %d (valid range: 1-%d)" index (length valid-buffers)))))
+     ((enkan-repl--should-show-buffer-selection-pure (plist-get parsed-arg :action) valid-buffers)
+      (let* ((choices (enkan-repl--build-buffer-selection-choices-pure valid-buffers))
+             (selected-display (completing-read (format "Select buffer to send '%s': "
+                                                        (if (string-empty-p text) "ENTER" text))
+                                               choices nil t))
+             (selected-buffer (cdr (assoc selected-display choices))))
+        (message "User selected buffer for text '%s': %s" text (buffer-name selected-buffer))
+        (let ((info (enkan-repl--get-buffer-process-info-pure selected-buffer)))
+          (if (plist-get info :has-process)
+              (progn
+                (enkan-repl--center-send-text-to-buffer text selected-buffer)
+                (message "Sent '%s' to selected buffer: %s" text (plist-get info :name)))
+            (message "Cannot send to selected buffer: %s" (plist-get info :name))))))
+     (t
+      (message "No valid action determined for text sending")))))
+
+(defun enkan-repl--center-send-number-with-selection (number prefix-arg)
+  "Internal function to send NUMBER with buffer selection logic using PREFIX-ARG."
+  (message "Starting enkan-repl-center-send-%s with prefix-arg: %s" number prefix-arg)
+  (let ((validation (enkan-repl--validate-number-input-pure number)))
+    (if (not (plist-get validation :valid))
+        (message "Invalid number input: %s" (plist-get validation :message))
+      (let* ((enkan-buffers (enkan-repl--collect-enkan-buffers-pure (buffer-list)))
+             (valid-buffers (enkan-repl--filter-valid-buffers-pure enkan-buffers))
+             (parsed-arg (enkan-repl--parse-prefix-arg-pure prefix-arg)))
+        (message "Found %d enkan buffers, %d valid for number sending"
+                 (length enkan-buffers) (length valid-buffers))
+        (cond
+         ((= (length valid-buffers) 0)
+          (message "No active enkan sessions found"))
+         ((eq 'invalid (plist-get parsed-arg :action))
+          (message "Invalid prefix argument"))
+         ((eq 'index (plist-get parsed-arg :action))
+          (let* ((index (plist-get parsed-arg :index))
+                 (target-buffer (enkan-repl--get-buffer-by-index-pure valid-buffers index)))
+            (message "Attempting to send number %s to buffer index %d" number index)
+            (if target-buffer
+                (let* ((send-result (enkan-repl--send-number-to-buffer-pure number target-buffer))
+                       (info (enkan-repl--get-buffer-process-info-pure target-buffer)))
+                  (if (plist-get send-result :can-send)
+                      (progn
+                        (enkan-repl--center-send-text-to-buffer number target-buffer)
+                        (message "Sent '%s' to buffer %d: %s" number index (plist-get info :name)))
+                    (message "Cannot send to buffer %d: %s" index (plist-get send-result :message))))
+              (message "Invalid buffer index %d (valid range: 1-%d)" index (length valid-buffers)))))
+         ((enkan-repl--should-show-buffer-selection-pure (plist-get parsed-arg :action) valid-buffers)
+          (let* ((choices (enkan-repl--build-buffer-selection-choices-pure valid-buffers))
+                 (selected-display (completing-read (format "Select buffer to send '%s': " number) choices nil t))
+                 (selected-buffer (cdr (assoc selected-display choices))))
+            (message "User selected buffer for number %s: %s" number (buffer-name selected-buffer))
+            (let* ((send-result (enkan-repl--send-number-to-buffer-pure number selected-buffer))
+                   (info (enkan-repl--get-buffer-process-info-pure selected-buffer)))
+              (if (plist-get send-result :can-send)
+                  (progn
+                    (enkan-repl--center-send-text-to-buffer number selected-buffer)
+                    (message "Sent '%s' to selected buffer: %s" number (plist-get info :name)))
+                (message "Cannot send to selected buffer: %s" (plist-get send-result :message))))))
+         (t
+          (message "No valid action determined for number sending")))))))
 
 (provide 'enkan-repl)
 

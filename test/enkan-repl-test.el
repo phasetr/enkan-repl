@@ -2176,6 +2176,40 @@ Does not modify global state."
       (should (consp (car choices)))
       (should (bufferp (cdr (car choices)))))))
 
+(ert-deftest test-enkan-repl--validate-number-input-pure ()
+  "Test number input validation."
+  (let ((result-valid (enkan-repl--validate-number-input-pure "1"))
+        (result-invalid-empty (enkan-repl--validate-number-input-pure ""))
+        (result-invalid-multi (enkan-repl--validate-number-input-pure "12"))
+        (result-invalid-nil (enkan-repl--validate-number-input-pure nil))
+        (result-invalid-non-string (enkan-repl--validate-number-input-pure 1)))
+    (should (plist-get result-valid :valid))
+    (should (string= "1" (plist-get result-valid :number)))
+    (should (null (plist-get result-invalid-empty :valid)))
+    (should (null (plist-get result-invalid-multi :valid)))
+    (should (null (plist-get result-invalid-nil :valid)))
+    (should (null (plist-get result-invalid-non-string :valid)))))
+
+(ert-deftest test-enkan-repl--send-number-to-buffer-pure ()
+  "Test sending number to buffer logic."
+  (let ((test-buffer (generate-new-buffer "*enkan:test*")))
+    (unwind-protect
+        (progn
+          ;; Test with inactive buffer
+          (let ((result (enkan-repl--send-number-to-buffer-pure "1" test-buffer)))
+            (should (null (plist-get result :can-send)))
+            (should (string= "1" (plist-get result :number)))
+            (should (eq test-buffer (plist-get result :buffer)))
+            (should (string-match-p "Cannot send to inactive buffer" (plist-get result :message))))
+          ;; Test with active buffer (mock process)
+          (with-current-buffer test-buffer
+            (setq-local eat--process 'mock-process))
+          (let ((result (enkan-repl--send-number-to-buffer-pure "2" test-buffer)))
+            (should (plist-get result :can-send))
+            (should (string= "2" (plist-get result :number)))
+            (should (string-match-p "Will send '2' to" (plist-get result :message)))))
+      (kill-buffer test-buffer))))
+
 ;;; Test Runner
 
 (defun enkan-repl-run-all-tests ()
