@@ -581,7 +581,7 @@
 (ert-deftest test-load-template-pure-special-characters ()
   "Test pure template loading with special characters in content."
   (let ((temp-template (make-temp-file "test-template" nil ".org"))
-        (test-content "* Template with Special Characters\nÑice tëxt with émojis 🎉\n日本語テスト\n"))
+        (test-content "* Template with Special Characters\nÑice tëxt with émojis 🎉\nEnglish test\n"))
     (unwind-protect
         (progn
           (with-temp-file temp-template
@@ -704,7 +704,7 @@
 
 (ert-deftest test-sanitize-content-problematic-string ()
   "Test sanitization with the specific problematic string reported by user."
-  (let ((test-string "画像送信サンプルです.\n以下の画像に何が書いてあるか読めますか？\n~/Downloads/send-sample.png"))
+  (let ((test-string "Image sending sample.\nWhat can you see in the image below?\n~/Downloads/send-sample.png"))
     (let ((sanitized (enkan-repl--sanitize-content test-string)))
       (should sanitized)
       ;; This should now have the marker added to prevent file path interpretation

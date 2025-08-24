@@ -278,8 +278,8 @@ Category: Utilities"
 ;;;; Window Navigation Functions
 
 (defun enkan-repl-goto-window (window-number)
-  "指定されたウインドウ番号に移動.
-window-number: 1-7の整数
+  "Move to the specified window number.
+window-number: Integer 1-7"
 
 Category: Utilities"
   (interactive "nWindow number (1-7): ")
