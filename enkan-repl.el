@@ -2304,6 +2304,225 @@ Category: Center File Multi-buffer Access"
          (t
           (message "No valid action determined for number sending")))))))
 
+;; Alias command parsing functions
+
+(defun enkan-repl-center--parse-alias-command-pure (input-string)
+  "Pure function to parse alias command format: ':er alias :esc'.
+INPUT-STRING is the command string to parse.
+Returns plist with :valid, :alias, :command, :text, :message."
+  (cond
+   ((not (stringp input-string))
+    (list :valid nil :message "Input must be a string"))
+   ((string-empty-p input-string)
+    (list :valid nil :message "Must start with :er prefix"))
+   ((not (string-match-p "^:er " input-string))
+    (list :valid nil :message "Must start with :er prefix"))
+   ((string-match "^:er \\([^ ]+\\)\\(?: \\(.*\\)\\)?$" input-string)
+    (let* ((alias (match-string 1 input-string))
+           (rest (match-string 2 input-string)))
+      (if (string-empty-p alias)
+          (list :valid nil :message "Invalid format. Alias cannot be empty")
+        (cond
+         ((null rest)
+          ;; Only alias specified
+          (list :valid t :alias alias :command :empty :text ""))
+         ((equal rest ":esc")
+          ;; Escape command
+          (list :valid t :alias alias :command :esc :text nil))
+         ((equal rest ":ret")
+          ;; Return command
+          (list :valid t :alias alias :command :ret :text nil))
+         (t
+          ;; Text to send
+          (list :valid t :alias alias :command :text :text rest))))))
+   (t
+    (list :valid nil :message "Invalid format. Use: :er alias [text|:esc|:ret]"))))
+
+(defun enkan-repl-center--resolve-alias-to-buffer-pure (alias enkan-buffers)
+  "Pure function to resolve alias to buffer from ENKAN-BUFFERS.
+ALIAS is the alias string to match against buffer names.
+ENKAN-BUFFERS is list of available enkan buffers.
+Returns buffer object or nil if not found."
+  (let ((matching-buffers (seq-filter
+                          (lambda (buf)
+                            (string-match-p (regexp-quote alias) (buffer-name buf)))
+                          enkan-buffers)))
+    (if matching-buffers
+        ;; Return first match
+        ;; Could be enhanced to show selection UI
+        (car matching-buffers)
+      nil)))
+
+(defun enkan-repl-center-send-line (action-string)
+  "Send current line to center file buffer with action specification.
+ACTION-STRING format:
+- \":er alias\" - Send line to buffer containing alias
+- \":er alias :esc\" - Send esc to buffer containing alias  
+- \":er alias :ret\" - Send return to buffer containing alias
+- Empty or no prefix - Use interactive buffer selection
+
+Category: Center File Multi-buffer Access"
+  (interactive "sAction (or empty for selection): ")
+  (let* ((line-text (string-trim 
+                    (buffer-substring-no-properties
+                     (line-beginning-position) (line-end-position))))
+         (enkan-buffers (enkan-repl--collect-enkan-buffers-pure (buffer-list)))
+         (valid-buffers (enkan-repl--filter-valid-buffers-pure enkan-buffers)))
+    
+    (if (string-empty-p action-string)
+        ;; No action specified - use selection UI
+        (if (> (length valid-buffers) 0)
+            (let* ((choices (enkan-repl--build-buffer-selection-choices-pure valid-buffers))
+                   (selected-display (completing-read "Select buffer for line send: " choices nil t))
+                   (target-buffer (cdr (assoc selected-display choices))))
+              (if (enkan-repl--center-send-text-to-buffer line-text target-buffer)
+                  (message "Line sent to buffer: %s" (buffer-name target-buffer))
+                (message "Failed to send line to buffer: %s" (buffer-name target-buffer))))
+          (message "No active enkan sessions found"))
+      ;; Parse action string
+      (let ((parsed (enkan-repl-center--parse-alias-command-pure action-string)))
+        (if (plist-get parsed :valid)
+            (let* ((alias (plist-get parsed :alias))
+                   (command (plist-get parsed :command))
+                   (resolved-buffer (enkan-repl-center--resolve-alias-to-buffer-pure 
+                                    alias valid-buffers)))
+              (if resolved-buffer
+                  (cond
+                   ((eq command :esc)
+                    (let ((result (enkan-repl--send-escape-to-buffer-pure resolved-buffer)))
+                      (if (plist-get result :success)
+                          (message "ESC sent to buffer: %s" (buffer-name resolved-buffer))
+                        (message "Failed to send ESC: %s" (plist-get result :message)))))
+                   ((eq command :ret)
+                    (if (enkan-repl--center-send-text-to-buffer "\r" resolved-buffer)
+                        (message "Return sent to buffer: %s" (buffer-name resolved-buffer))
+                      (message "Failed to send return to buffer: %s" (buffer-name resolved-buffer))))
+                   ((eq command :empty)
+                    (if (enkan-repl--center-send-text-to-buffer line-text resolved-buffer)
+                        (message "Line sent to buffer: %s" (buffer-name resolved-buffer))
+                      (message "Failed to send line to buffer: %s" (buffer-name resolved-buffer))))
+                   ((eq command :text)
+                    (let ((combined-text (concat line-text " " (plist-get parsed :text))))
+                      (if (enkan-repl--center-send-text-to-buffer combined-text resolved-buffer)
+                          (message "Combined text sent to buffer: %s" (buffer-name resolved-buffer))
+                        (message "Failed to send combined text to buffer: %s" (buffer-name resolved-buffer)))))
+                   (t
+                    (message "Unknown command: %s" command)))
+                (message "No buffer found matching alias: %s" alias)))
+          (message "Invalid action format: %s" (plist-get parsed :message)))))))
+
+(defun enkan-repl-center-send-region (start end &optional action-string)
+  "Send region to center file buffer with action specification.
+ACTION-STRING format:
+- \":er alias\" - Send region to buffer containing alias
+- \":er alias :esc\" - Send esc to buffer containing alias  
+- \":er alias :ret\" - Send return to buffer containing alias
+- Empty or no prefix - Use interactive buffer selection
+
+Category: Center File Multi-buffer Access"
+  (interactive "r\nsAction (or empty for selection): ")
+  (let* ((region-text (buffer-substring-no-properties start end))
+         (enkan-buffers (enkan-repl--collect-enkan-buffers-pure (buffer-list)))
+         (valid-buffers (enkan-repl--filter-valid-buffers-pure enkan-buffers)))
+    
+    (if (string-empty-p action-string)
+        ;; No action specified - use selection UI
+        (if (> (length valid-buffers) 0)
+            (let* ((choices (enkan-repl--build-buffer-selection-choices-pure valid-buffers))
+                   (selected-display (completing-read "Select buffer for region send: " choices nil t))
+                   (target-buffer (cdr (assoc selected-display choices))))
+              (if (enkan-repl--center-send-text-to-buffer region-text target-buffer)
+                  (message "Region sent to buffer: %s" (buffer-name target-buffer))
+                (message "Failed to send region to buffer: %s" (buffer-name target-buffer))))
+          (message "No active enkan sessions found"))
+      ;; Parse action string
+      (let ((parsed (enkan-repl-center--parse-alias-command-pure action-string)))
+        (if (plist-get parsed :valid)
+            (let* ((alias (plist-get parsed :alias))
+                   (command (plist-get parsed :command))
+                   (resolved-buffer (enkan-repl-center--resolve-alias-to-buffer-pure 
+                                    alias valid-buffers)))
+              (if resolved-buffer
+                  (cond
+                   ((eq command :esc)
+                    (let ((result (enkan-repl--send-escape-to-buffer-pure resolved-buffer)))
+                      (if (plist-get result :success)
+                          (message "ESC sent to buffer: %s" (buffer-name resolved-buffer))
+                        (message "Failed to send ESC: %s" (plist-get result :message)))))
+                   ((eq command :ret)
+                    (if (enkan-repl--center-send-text-to-buffer "\r" resolved-buffer)
+                        (message "Return sent to buffer: %s" (buffer-name resolved-buffer))
+                      (message "Failed to send return to buffer: %s" (buffer-name resolved-buffer))))
+                   ((eq command :empty)
+                    (if (enkan-repl--center-send-text-to-buffer region-text resolved-buffer)
+                        (message "Region sent to buffer: %s" (buffer-name resolved-buffer))
+                      (message "Failed to send region to buffer: %s" (buffer-name resolved-buffer))))
+                   ((eq command :text)
+                    (let ((combined-text (concat region-text " " (plist-get parsed :text))))
+                      (if (enkan-repl--center-send-text-to-buffer combined-text resolved-buffer)
+                          (message "Combined text sent to buffer: %s" (buffer-name resolved-buffer))
+                        (message "Failed to send combined text to buffer: %s" (buffer-name resolved-buffer)))))
+                   (t
+                    (message "Unknown command: %s" command)))
+                (message "No buffer found matching alias: %s" alias)))
+          (message "Invalid action format: %s" (plist-get parsed :message)))))))
+
+(defun enkan-repl-center-send-buffer (&optional action-string)
+  "Send entire buffer to center file buffer with action specification.
+ACTION-STRING format:
+- \":er alias\" - Send buffer to buffer containing alias
+- \":er alias :esc\" - Send esc to buffer containing alias  
+- \":er alias :ret\" - Send return to buffer containing alias
+- Empty or no prefix - Use interactive buffer selection
+
+Category: Center File Multi-buffer Access"
+  (interactive "sAction (or empty for selection): ")
+  (let* ((buffer-text (buffer-substring-no-properties (point-min) (point-max)))
+         (enkan-buffers (enkan-repl--collect-enkan-buffers-pure (buffer-list)))
+         (valid-buffers (enkan-repl--filter-valid-buffers-pure enkan-buffers)))
+    
+    (if (string-empty-p action-string)
+        ;; No action specified - use selection UI
+        (if (> (length valid-buffers) 0)
+            (let* ((choices (enkan-repl--build-buffer-selection-choices-pure valid-buffers))
+                   (selected-display (completing-read "Select buffer for buffer send: " choices nil t))
+                   (target-buffer (cdr (assoc selected-display choices))))
+              (if (enkan-repl--center-send-text-to-buffer buffer-text target-buffer)
+                  (message "Buffer sent to buffer: %s" (buffer-name target-buffer))
+                (message "Failed to send buffer to buffer: %s" (buffer-name target-buffer))))
+          (message "No active enkan sessions found"))
+      ;; Parse action string
+      (let ((parsed (enkan-repl-center--parse-alias-command-pure action-string)))
+        (if (plist-get parsed :valid)
+            (let* ((alias (plist-get parsed :alias))
+                   (command (plist-get parsed :command))
+                   (resolved-buffer (enkan-repl-center--resolve-alias-to-buffer-pure 
+                                    alias valid-buffers)))
+              (if resolved-buffer
+                  (cond
+                   ((eq command :esc)
+                    (let ((result (enkan-repl--send-escape-to-buffer-pure resolved-buffer)))
+                      (if (plist-get result :success)
+                          (message "ESC sent to buffer: %s" (buffer-name resolved-buffer))
+                        (message "Failed to send ESC: %s" (plist-get result :message)))))
+                   ((eq command :ret)
+                    (if (enkan-repl--center-send-text-to-buffer "\r" resolved-buffer)
+                        (message "Return sent to buffer: %s" (buffer-name resolved-buffer))
+                      (message "Failed to send return to buffer: %s" (buffer-name resolved-buffer))))
+                   ((eq command :empty)
+                    (if (enkan-repl--center-send-text-to-buffer buffer-text resolved-buffer)
+                        (message "Buffer sent to buffer: %s" (buffer-name resolved-buffer))
+                      (message "Failed to send buffer to buffer: %s" (buffer-name resolved-buffer))))
+                   ((eq command :text)
+                    (let ((combined-text (concat buffer-text " " (plist-get parsed :text))))
+                      (if (enkan-repl--center-send-text-to-buffer combined-text resolved-buffer)
+                          (message "Combined text sent to buffer: %s" (buffer-name resolved-buffer))
+                        (message "Failed to send combined text to buffer: %s" (buffer-name resolved-buffer)))))
+                   (t
+                    (message "Unknown command: %s" command)))
+                (message "No buffer found matching alias: %s" alias)))
+          (message "Invalid action format: %s" (plist-get parsed :message)))))))
+
 (provide 'enkan-repl)
 
 ;;; enkan-repl.el ends here
