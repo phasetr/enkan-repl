@@ -33,7 +33,7 @@
         ;; Mock functions
         (cl-letf (((symbol-function 'buffer-list)
                    (lambda () (list test-buffer)))
-                  ((symbol-function 'enkan-repl--send-escape-to-buffer-pure)
+                  ((symbol-function 'enkan-repl--send-escape-to-buffer)
                    (lambda (buffer)
                      (setq escape-sent buffer)
                      (list :success t)))
