@@ -525,11 +525,11 @@ interpretation issues and Mac region selection problems."
        (if (string-match-p "~/[^[:space:]]*\\.[a-zA-Z0-9]+\\'" sanitized) "YES" "NO"))
       (enkan-repl--debug-message
        "Punctuation pattern match: %s"
-       (if (string-match-p "[.!?。！？]\\'" sanitized) "YES" "NO"))
+       (if (string-match-p "[.!?]\\'" sanitized) "YES" "NO"))
       (when
           (and
            (string-match-p "~/[^[:space:]]*\\.[a-zA-Z0-9]+\\'" sanitized)
-           (not (string-match-p "[.!?。！？]\\'" sanitized)))
+           (not (string-match-p "[.!?]\\'" sanitized)))
         (enkan-repl--debug-message "Adding end marker to prevent file path interpretation")
         (setq sanitized (concat sanitized "\n(This text is added by enkan-repl as a workaround for Claude Code's special interpretation of file paths)")))
       ;; Only remove trailing whitespace/newlines
