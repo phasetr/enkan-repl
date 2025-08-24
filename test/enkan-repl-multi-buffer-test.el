@@ -49,7 +49,7 @@
 
     ;; Register another session
     (enkan-repl--register-session 5 "enkan-repl")
-    (should (equal '((5 . "enkan-repl") (4 . "pt-tools")) enkan-repl-session-list))
+    (should (equal '((4 . "pt-tools") (5 . "enkan-repl")) enkan-repl-session-list))
 
     ;; Update existing session
     (enkan-repl--register-session 4 "new-project")

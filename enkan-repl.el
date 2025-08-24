@@ -625,10 +625,13 @@ Returns: プロジェクト名またはnil"
     (cdr (assoc internal-number enkan-repl-session-list))))
 
 (defun enkan-repl--register-session (session-number project-name)
-  "セッション番号にプロジェクトを登録."
-  (setq enkan-repl-session-list
-        (cons (cons session-number project-name)
-              (assq-delete-all session-number enkan-repl-session-list))))
+  "セッション番号にプロジェクトを登録.
+Order is maintained by session number (ascending)."
+  (let ((updated-list (assq-delete-all session-number enkan-repl-session-list))
+        (new-entry (cons session-number project-name)))
+    (setq enkan-repl-session-list
+          (sort (cons new-entry updated-list)
+                (lambda (a b) (< (car a) (car b)))))))
 
 (defun enkan-repl--auto-register-session (project-name)
   "セッションを自動的に番号登録.
