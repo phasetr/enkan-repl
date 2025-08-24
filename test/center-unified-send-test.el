@@ -7,8 +7,10 @@
 
 ;;; Commentary:
 
-;; Tests for unified center file send command functionality.
-;; These tests verify the input parsing and buffer resolution for the new unified command.
+;; Unified tests for center send functionality including:
+;; - Send input parsing and dispatching
+;; - Text sending to buffers  
+;; - Center send command integration
 
 ;;; Code:
 
@@ -158,6 +160,97 @@
   (let ((result (enkan-repl-center--perform-send-action-pure nil '(:string . "test"))))
     (should-not (plist-get result :valid))
     (should (string-match-p "Invalid buffer" (plist-get result :message)))))
+
+;;;; Text Sending Tests
+
+(ert-deftest test-center-send-text-to-buffer-with-valid-buffer ()
+  "Test center text sending with valid buffer and process."
+  (let ((test-buffer (generate-new-buffer "*test-enkan*"))
+        (text-sent nil)
+        (process-obj nil))
+    (with-current-buffer test-buffer
+      ;; Mock eat--process
+      (setq-local eat--process (start-process "test-process" nil "echo" "test"))
+      (setq process-obj eat--process)
+      
+      ;; Mock eat--send-string to capture what's sent
+      (cl-letf (((symbol-function 'eat--send-string)
+                 (lambda (proc text)
+                   (setq text-sent (cons text text-sent))))
+                ((symbol-function 'process-live-p) 
+                 (lambda (proc) t))
+                ((symbol-function 'run-at-time)
+                 (lambda (time repeat func &rest args)
+                   ;; Execute immediately for testing
+                   (apply func args))))
+        
+        ;; Test the function
+        (let ((result (enkan-repl--center-send-text-to-buffer "test123" test-buffer)))
+          (should (eq result t))
+          (should (equal text-sent '("\r" "test123"))))))
+    
+    ;; Clean up
+    (when (and process-obj (process-live-p process-obj))
+      (delete-process process-obj))
+    (kill-buffer test-buffer)))
+
+(ert-deftest test-center-send-text-to-buffer-with-invalid-buffer ()
+  "Test center text sending with invalid buffer."
+  (let ((invalid-buffer (generate-new-buffer "*invalid*")))
+    (unwind-protect
+        ;; No eat--process set up in buffer
+        (let ((result (enkan-repl--center-send-text-to-buffer "test" invalid-buffer)))
+          (should (null result)))
+      (kill-buffer invalid-buffer))))
+
+(ert-deftest test-center-send-text-to-buffer-with-dead-process ()
+  "Test center text sending with dead process."
+  (let ((test-buffer (generate-new-buffer "*dead-process*"))
+        (dead-process nil))
+    (with-current-buffer test-buffer
+      ;; Create and kill a process
+      (setq dead-process (start-process "dead-test" nil "echo" "test"))
+      (delete-process dead-process)
+      (setq-local eat--process dead-process)
+      
+      ;; Test with dead process
+      (let ((result (enkan-repl--center-send-text-to-buffer "test" test-buffer)))
+        (should (null result))))
+    
+    (kill-buffer test-buffer)))
+
+(ert-deftest test-center-send-text-to-buffer-integration ()
+  "Test integration of center text sending functionality."
+  (let ((test-buffer (generate-new-buffer "*integration-test*"))
+        (sent-texts '())
+        (process-obj nil))
+    (with-current-buffer test-buffer
+      (setq-local eat--process (start-process "integration-test" nil "echo" "test"))
+      (setq process-obj eat--process)
+      
+      ;; Mock to capture all sent text
+      (cl-letf (((symbol-function 'eat--send-string)
+                 (lambda (proc text)
+                   (push text sent-texts)))
+                ((symbol-function 'process-live-p) 
+                 (lambda (proc) t))
+                ((symbol-function 'run-at-time)
+                 (lambda (time repeat func &rest args)
+                   (apply func args))))
+        
+        ;; Send multiple texts
+        (enkan-repl--center-send-text-to-buffer "first" test-buffer)
+        (enkan-repl--center-send-text-to-buffer "second" test-buffer)
+        
+        ;; Verify all texts were sent
+        (should (member "first" sent-texts))
+        (should (member "second" sent-texts))
+        (should (member "\r" sent-texts))))
+    
+    ;; Clean up
+    (when (and process-obj (process-live-p process-obj))
+      (delete-process process-obj))
+    (kill-buffer test-buffer)))
 
 (provide 'center-unified-send-test)
 
