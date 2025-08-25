@@ -279,7 +279,7 @@ Category: Utilities"
 
 (defun enkan-repl-goto-window (window-number)
   "Move to the specified window number.
-window-number: Integer 1-7"
+window-number: Integer 1-7
 
 Category: Utilities"
   (interactive "nWindow number (1-7): ")

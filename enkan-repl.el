@@ -2304,17 +2304,17 @@ Category: Center File Multi-buffer Access"
 ;; Alias command parsing functions
 
 (defun enkan-repl-center--parse-alias-command-pure (input-string)
-  "Pure function to parse alias command format: ':er alias :esc'.
+  "Pure function to parse alias command format: ':alias esc' or ':alias :ret'.
 INPUT-STRING is the command string to parse.
 Returns plist with :valid, :alias, :command, :text, :message."
   (cond
    ((not (stringp input-string))
     (list :valid nil :message "Input must be a string"))
    ((string-empty-p input-string)
-    (list :valid nil :message "Must start with :er prefix"))
-   ((not (string-match-p "^:er " input-string))
-    (list :valid nil :message "Must start with :er prefix"))
-   ((string-match "^:er \\([^ ]+\\)\\(?: \\(.*\\)\\)?$" input-string)
+    (list :valid nil :message "Must start with : prefix"))
+   ((not (string-match-p "^:" input-string))
+    (list :valid nil :message "Must start with : prefix"))
+   ((string-match "^:\\([^ ]+\\)\\(?: \\(.*\\)\\)?$" input-string)
     (let* ((alias (match-string 1 input-string))
            (rest (match-string 2 input-string)))
       (if (string-empty-p alias)
@@ -2323,7 +2323,7 @@ Returns plist with :valid, :alias, :command, :text, :message."
          ((null rest)
           ;; Only alias specified
           (list :valid t :alias alias :command :empty :text ""))
-         ((equal rest ":esc")
+         ((equal rest "esc")
           ;; Escape command
           (list :valid t :alias alias :command :esc :text nil))
          ((equal rest ":ret")
@@ -2333,36 +2333,67 @@ Returns plist with :valid, :alias, :command, :text, :message."
           ;; Text to send
           (list :valid t :alias alias :command :text :text rest))))))
    (t
-    (list :valid nil :message "Invalid format. Use: :er alias [text|:esc|:ret]"))))
+    (list :valid nil :message "Invalid format. Use: :alias [text|esc|:ret]"))))
 
 (defun enkan-repl-center--resolve-alias-to-buffer-pure (alias enkan-buffers)
   "Pure function to resolve alias to buffer from ENKAN-BUFFERS.
 ALIAS is the alias string to match against buffer names.
 ENKAN-BUFFERS is list of available enkan buffers.
 Returns buffer object or nil if not found."
-  (let ((matching-buffers (seq-filter
-                          (lambda (buf)
-                            (string-match-p (regexp-quote alias) (buffer-name buf)))
-                          enkan-buffers)))
+  ;; First resolve alias to project name using project aliases
+  (let* ((resolved-project (enkan-repl--center-resolve-project-name alias))
+         (matching-buffers (seq-filter
+                           (lambda (buf)
+                             (string-match-p (regexp-quote resolved-project) (buffer-name buf)))
+                           enkan-buffers)))
     (if matching-buffers
         ;; Return first match
         ;; Could be enhanced to show selection UI
         (car matching-buffers)
       nil)))
 
+(defun enkan-repl--send-escape-directly ()
+  "Send escape key to the buffer corresponding to a project alias, like \":pr\".
+Looks for a project alias in enkan-repl-project-aliases and sends ESC to corresponding buffer."
+  (let* ((pr-project (cdr (assoc "pr" enkan-repl-project-aliases)))
+         (target-buffer (when pr-project
+                          (enkan-repl--get-buffer-for-directory
+                           (enkan-repl--get-project-directory-from-registry pr-project)))))
+    (if target-buffer
+        (let ((info (enkan-repl--get-buffer-process-info-pure target-buffer)))
+          (when (plist-get info :has-process)
+            (with-current-buffer target-buffer
+              (eat--send-string (plist-get info :process) "\e"))
+            (message "Sent ESC to a project buffer: %s" (plist-get info :name))))
+      (message "No project alias configured or buffer not found"))))
+
 (defun enkan-repl-center-send-line (&optional arg)
   "Send current line to center file session.
 With prefix argument ARG (1-4), send to specific session number.
 Line starting with ':er alias' sends to buffer containing alias.
-Without prefix argument or :er, use interactive selection UI.
+Line containing only ':esc' sends escape to a project buffer.
+Without prefix argument, like \":er\", use interactive selection UI.
 
 Category: Center File Multi-buffer Access"
   (interactive "P")
-  (if (and (numberp arg) (<= 1 arg 4))
+  (let ((line-text (buffer-substring-no-properties
+                    (line-beginning-position) (line-end-position))))
+    (cond
+     ;; Numeric prefix argument takes priority
+     ((and (numberp arg) (<= 1 arg 4))
       (enkan-repl--send-region-with-prefix
-       (line-beginning-position) (line-end-position) arg)
-    (enkan-repl--send-buffer-content
-     (line-beginning-position) (line-end-position) "Line")))
+       (line-beginning-position) (line-end-position) arg))
+     ;; Check if line contains only :esc (with optional whitespace)
+     ((string-match-p "^[[:space:]]*:esc[[:space:]]*$" line-text)
+      (enkan-repl--send-escape-directly))
+     ;; Check if line starts with :alias esc or :alias :ret pattern
+     ((string-match-p "^[[:space:]]*:[a-zA-Z0-9_.-]+\\s-+\\(:ret\\|esc\\)\\s-*$" line-text)
+      (enkan-repl-center-send-region
+       (line-beginning-position) (line-end-position) (string-trim line-text)))
+     ;; Default behavior
+     (t
+      (enkan-repl--send-buffer-content
+       (line-beginning-position) (line-end-position) "Line")))))
 
 ;; Pure functions for center file operations (used by enkan-repl-center-open-file)
 (defun enkan-center-file-validate-path-pure (file-path)
@@ -2491,7 +2522,7 @@ Category: Center File Operations"
   "Send region to center file buffer with action specification.
 ACTION-STRING format:
 - \":er alias\" - Send region to buffer containing alias
-- \":er alias :esc\" - Send esc to buffer containing alias
+- \":er alias esc\" - Send esc to buffer containing alias
 - \":er alias :ret\" - Send return to buffer containing alias
 - Empty or no prefix - Use interactive buffer selection
 
@@ -2567,7 +2598,7 @@ Category: Center File Multi-buffer Access"
   "Send entire buffer to center file buffer with action specification.
 ACTION-STRING format:
 - \":er alias\" - Send buffer to buffer containing alias
-- \":er alias :esc\" - Send esc to buffer containing alias
+- \":er alias esc\" - Send esc to buffer containing alias
 - \":er alias :ret\" - Send return to buffer containing alias
 - Empty or no prefix - Use interactive buffer selection
 

@@ -41,7 +41,7 @@
                    (lambda (proc) t)))
           
           ;; Test the function
-          (enkan-repl-center-send-region start end ":er test :esc")
+          (enkan-repl-center-send-region start end ":test esc")
           (should (eq escape-sent test-buffer)))))
     
     ;; Clean up
