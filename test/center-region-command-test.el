@@ -39,10 +39,10 @@
                        (setq escape-sent test-buffer))))
                   ((symbol-function 'process-live-p) 
                    (lambda (proc) t)))
-          
-          ;; Test the function
-          (enkan-repl-center-send-region start end ":test esc")
-          (should (eq escape-sent test-buffer)))))
+          (let ((enkan-repl-project-aliases '(("test" . "test"))))
+            ;; Test the function
+            (enkan-repl-center-send-region start end ":test esc")
+            (should (eq escape-sent test-buffer))))))
     
     ;; Clean up
     (when (and process-obj (process-live-p process-obj))
@@ -73,10 +73,10 @@
                      t))
                   ((symbol-function 'process-live-p) 
                    (lambda (proc) t)))
-          
-          ;; Test the function
-          (enkan-repl-center-send-region start end ":er test")
-          (should (equal text-sent region-text)))))
+          (let ((enkan-repl-project-aliases '(("er" . "test"))))
+            ;; Test the function
+            (enkan-repl-center-send-region start end ":er")
+            (should (equal text-sent region-text))))))
     
     ;; Clean up
     (when (and process-obj (process-live-p process-obj))
@@ -107,10 +107,10 @@
                      t))
                   ((symbol-function 'process-live-p) 
                    (lambda (proc) t)))
-          
-          ;; Test the function
-          (enkan-repl-center-send-region start end ":er test :ret")
-          (should (equal return-sent "\r")))))
+          (let ((enkan-repl-project-aliases '(("er" . "test"))))
+            ;; Test the function
+            (enkan-repl-center-send-region start end ":er :ret")
+            (should (equal return-sent "\r"))))))
     
     ;; Clean up
     (when (and process-obj (process-live-p process-obj))
