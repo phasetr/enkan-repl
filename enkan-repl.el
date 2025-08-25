@@ -2023,6 +2023,16 @@ Returns plist with :buffer, :name, :live-p, :has-process, :process."
             :has-process (and process-info (plist-get process-info :bound) (plist-get process-info :process))
             :process (when process-info (plist-get process-info :process))))))
 
+(defun enkan-repl--filter-valid-buffers-pure (enkan-buffers)
+  "Pure function to filter buffers that have active eat processes.
+ENKAN-BUFFERS is a list of buffer objects.
+Returns list of buffers that have live eat processes."
+  (seq-filter (lambda (buffer)
+                (with-current-buffer buffer
+                  (and (boundp 'eat--process)
+                       eat--process
+                       (process-live-p eat--process))))
+              enkan-buffers))
 
 (defun enkan-repl--build-buffer-selection-choices-pure (buffers)
   "Pure function to build selection choices from BUFFERS.
