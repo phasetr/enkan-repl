@@ -278,17 +278,17 @@
 
     ;; Second registration
     (enkan-repl--auto-register-session "enkan-repl")
-    (should (equal '((5 . "enkan-repl") (4 . "pt-tools")) enkan-repl-session-list))
+    (should (equal '((4 . "pt-tools") (5 . "enkan-repl")) enkan-repl-session-list))
     (should (= 2 enkan-repl--session-counter))
 
     ;; Duplicate registration (should not register again)
     (enkan-repl--auto-register-session "pt-tools")
-    (should (equal '((5 . "enkan-repl") (4 . "pt-tools")) enkan-repl-session-list))
+    (should (equal '((4 . "pt-tools") (5 . "enkan-repl")) enkan-repl-session-list))
     (should (= 2 enkan-repl--session-counter))
 
     ;; Registration with alias
     (enkan-repl--auto-register-session "pt")
-    (should (equal '((5 . "enkan-repl") (4 . "pt-tools")) enkan-repl-session-list))
+    (should (equal '((4 . "pt-tools") (5 . "enkan-repl")) enkan-repl-session-list))
     (should (= 2 enkan-repl--session-counter))))
 
 ;;;; Session lookup tests

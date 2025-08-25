@@ -208,13 +208,13 @@ Example: \\='((\"web-dev\" . (\"er\" \"pt\" \"cc\"))
   "List of managed sessions.
 Each element is in the format (number . project-name).
 Internally uses 4-7, displayed to users as 1-4.
-Example: \\='((4 . \"pt-tools\") (5 . \"enkan-repl\") (6 . \"claude-code\") (7 . \"web-app\"))""
+Example: \\='((4 . \"pt-tools\") (5 . \"enkan-repl\") (6 . \"claude-code\") (7 . \"web-app\"))"
   :type '(alist :key-type integer :value-type string)
   :group 'enkan-repl)
 
 (defcustom enkan-repl-default-session-projects nil
   "Alist of default session projects to open.
-Example: \\='((4 . \"project1\") (5 . \"project2\") (6 . \"project3\") (7 . \"project4\"))"
+Example: \\='((4 . \"project1\") (5 . \"project2\") (6 . \"project3\") (7 . \"project4\"))."
   :type '(alist :key-type integer :value-type string)
   :group 'enkan-repl)
 
@@ -1867,7 +1867,7 @@ Return (project-name . project-path) or nil if not found."
       (cdr (cdr project-info)))))
 
 (defun enkan-repl--get-session-project-paths (session-numbers session-list project-registry)
-  "Pure function to get list of project paths for multiple session numbers."
+  "Pure function to get list of project paths for multiple session numbers.
 Returns: list of (session-number . project-path) for valid paths"
   (cl-loop for session-number in session-numbers
            for project-name = (enkan-repl--get-session-project-name session-number session-list)
@@ -1935,7 +1935,7 @@ This function only starts eat sessions - use enkan-repl-setup (C-M-l) to arrange
       ;; Display final state
       (message "✅ C-M-s: Final state - enkan-repl--current-multi-project-layout='%s', enkan-repl-session-list=%s, enkan-repl--session-counter=%d"
                layout-name enkan-repl-session-list enkan-repl--session-counter)
-      (message "Eat sessions started for layout: %s (%d sessions). Use C-M-l to arrange windows."
+      (message "Eat sessions started for layout: %s (%d sessions). Use \\C-\\M-l to arrange windows."
                layout-name session-count)))))
 
 ;;;###autoload
