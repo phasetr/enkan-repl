@@ -85,12 +85,12 @@ Returns cons (window . buffer-name) or nil if session not registered."
             (select-window (car eat-setup))
             ;; Set correct default-directory before switching buffer
             (when project-name
-              (let ((project-path (enkan-repl--get-project-path-from-registry 
+              (let ((project-path (enkan-repl--get-project-path-from-registry
                                   project-name enkan-repl-center-project-registry)))
                 (when project-path
                   (setq default-directory (expand-file-name project-path)))))
             (switch-to-buffer buffer)
-            (message "✅ Window %d: Opened eat buffer %s in %s" 
+            (message "✅ Window %d: Opened eat buffer %s in %s"
                     session-number (cdr eat-setup) default-directory))
           (message "❌ Window %d: Eat buffer %s not found. Run C-M-s to start sessions."
             session-number (cdr eat-setup))))
@@ -100,82 +100,40 @@ Returns cons (window . buffer-name) or nil if session not registered."
 ;;;###autoload
 (defun enkan-repl-setup-2session-layout ()
   "Setup window layout for 2-session management.
-  +----------+---+---+
-  |    1     | 4 | 5 |
-  | center   |   |   |
-  |  file    |   |   |
-  +-----+----|   |   |
-  | 2   | 3  |   |   |
-  |work |rsv |   |   |
-  +-----+----+---+---+
+  +--------+---+---+
+  |    1   | 4 | 5 |
+  | center |   |   |
+  |  file  |   |   |
+  +-----+--+---+---+
 
   1: Center file (command source)
-  2: Work area (misc files/buffers)
-  3: Reserve area (temporary buffers like magit commit)
   4, 5: enkan-repl sessions
 
 Category: Utilities"
   (interactive)
-  (message "Starting enkan-repl-setup-2session-layout")
-  (message "enkan-repl-center-file: %s" enkan-repl-center-file)
-  (message "enkan-repl-session-list: %s" (if (boundp 'enkan-repl-session-list) enkan-repl-session-list 'unbound))
-  (message "enkan-repl-center-project-registry: %s" (if (boundp 'enkan-repl-center-project-registry) enkan-repl-center-project-registry 'unbound))
   (delete-other-windows)
-  ;; Create 2 columns on the right
+  ;; Create left column for center file (30%) and right section (70%)
+  (split-window-right (floor (* (window-width) 0.4)))
+  ;; Move to right section and split into 3 columns
+  (other-window 1)
   (split-window-right (floor (* (window-width) 0.6)))
-  (other-window 1)
-  (split-window-right)
-  ;; Split bottom left
+  ;; Set window variables - direct assignment by position
+  ;; Currently at rightmost window, go back to leftmost
   (other-window 2)
-  (split-window-below (floor (* (window-height) 0.65)))
+  (setq enkan-repl--window-1 (selected-window))
   (other-window 1)
-  (split-window-right (floor (* (window-width) 0.5)))
-  (other-window 4)
-  (balance-windows)
-  ;; Set window variables for center file layout
-  (let ((windows (window-list)))
-    (setq enkan-repl--window-1 (nth 0 windows))  ; Center file
-    (setq enkan-repl--window-2 (nth 1 windows))  ; Work area
-    (setq enkan-repl--window-3 (nth 2 windows))  ; Reserve area
-    (setq enkan-repl--window-4 (nth 3 windows))  ; Session 1
-    (setq enkan-repl--window-5 (nth 4 windows))) ; Session 2
-  ;; Open project root dired in work area windows (2 and 3)
-  (cond
-    ((not (and (boundp 'enkan-repl-session-list) (boundp 'enkan-repl-center-project-registry)))
-      (error "❌ enkan-repl-session-list or enkan-repl-center-project-registry is not defined. Run C-M-s first to setup sessions."))
-    ((or (null enkan-repl-session-list) (null enkan-repl-center-project-registry))
-      (error "❌ Session list or project registry is empty. Run C-M-s to setup multi-project layout first."))
-    (t
-      ;; Window 2: Session 1's project dired
-      (let ((dired-setup-2 (enkan-repl--setup-window-dired-pure
-                             enkan-repl--window-2 4
-                             enkan-repl-session-list enkan-repl-center-project-registry)))
-        (if dired-setup-2
-          (progn
-            (select-window (car dired-setup-2))
-            (dired (expand-file-name (cdr dired-setup-2)))
-            (message "✅ Window 2: Opened dired for %s" (cdr dired-setup-2)))
-          (let ((session-name (cdr (assoc 4 enkan-repl-session-list))))
-            (if session-name
-              (message "❌ Window 2: Project directory not found for session '%s'. Check enkan-repl-center-project-registry." session-name)
-              (message "❌ Window 2: No session registered for slot 1 (internal number 4). Run C-M-s to setup sessions.")))))
-      ;; Window 3: Session 2's project dired
-      (let ((dired-setup-3 (enkan-repl--setup-window-dired-pure
-                             enkan-repl--window-3 5
-                             enkan-repl-session-list enkan-repl-center-project-registry)))
-        (if dired-setup-3
-          (progn
-            (select-window (car dired-setup-3))
-            (dired (expand-file-name (cdr dired-setup-3)))
-            (message "✅ Window 3: Opened dired for %s" (cdr dired-setup-3)))
-          (let ((session-name (cdr (assoc 5 enkan-repl-session-list))))
-            (if session-name
-              (message "❌ Window 3: Project directory not found for session '%s'. Check enkan-repl-center-project-registry." session-name)
-              (message "❌ Window 3: No session registered for slot 2 (internal number 5). Run C-M-s to setup sessions.")))))))
-  ;; Setup eat buffers in session windows (4 and 5)
+  (setq enkan-repl--window-2 (selected-window))
+  (other-window 1)
+  (setq enkan-repl--window-3 (selected-window))
+  ;; Open center file in window 1
+  (when (and enkan-repl--window-1 enkan-repl-center-file)
+    (select-window enkan-repl--window-1)
+    (find-file enkan-repl-center-file)
+    (message "✅ Window 1: Opened center file %s" enkan-repl-center-file))
+  ;; Setup eat buffers in session windows (4, 5, 6 in multi-project order)
   (when (and (boundp 'enkan-repl-session-list) enkan-repl-session-list)
-    (enkan-repl--setup-session-eat-buffer enkan-repl--window-4 4)
-    (enkan-repl--setup-session-eat-buffer enkan-repl--window-5 5))
+    (enkan-repl--setup-session-eat-buffer enkan-repl--window-2 4)
+    (enkan-repl--setup-session-eat-buffer enkan-repl--window-3 5))
   ;; Always select the center file window (Window 1) at the end
   (when enkan-repl--window-1
     (select-window enkan-repl--window-1)))
