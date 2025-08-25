@@ -1818,6 +1818,7 @@ Category: Center File Multi-buffer Access"
     (define-key map (kbd "<escape>") 'enkan-repl-center-send-escape)
     (define-key map (kbd "C-x g") 'enkan-repl-center-magit)
     (define-key map (kbd "C-M-e") 'enkan-repl-center-send-enter)
+    (define-key map (kbd "C-M-i") 'enkan-repl-center-send-line)
     (define-key map (kbd "C-M-1") 'enkan-repl-center-send-1)
     (define-key map (kbd "C-M-2") 'enkan-repl-center-send-2)
     (define-key map (kbd "C-M-3") 'enkan-repl-center-send-3)
@@ -1830,6 +1831,10 @@ Category: Center File Multi-buffer Access"
     map)
   "Global keymap for center file operations.")
 
+;; Store original keybindings for safe restoration
+(defvar enkan-center-file-original-keybindings nil
+  "Stores original keybindings before center file mode overrides them.")
+
 (define-minor-mode enkan-center-file-global-mode
   "Global minor mode for center file operations.
 When enabled, center file keybindings are available across all buffers."
@@ -1838,8 +1843,30 @@ When enabled, center file keybindings are available across all buffers."
   :lighter " ECF"
   :keymap enkan-center-file-global-mode-map
   (if enkan-center-file-global-mode
-      (message "✅ Center file global mode enabled - C-M-t/b/s/f available globally")
-    (message "❌ Center file global mode disabled")))
+      (progn
+        ;; Save original keybindings before overriding
+        (unless enkan-center-file-original-keybindings
+          (setq enkan-center-file-original-keybindings '())
+          (map-keymap
+           (lambda (key command)
+             (when command
+               (let ((original-binding (lookup-key (current-global-map) (vector key))))
+                 (push (cons (vector key) original-binding) enkan-center-file-original-keybindings))))
+           enkan-center-file-global-mode-map))
+        ;; Copy all bindings from enkan-center-file-global-mode-map to global map
+        (map-keymap
+         (lambda (key command)
+           (when command
+             (define-key (current-global-map) (vector key) command)))
+         enkan-center-file-global-mode-map)
+        (message "✅ Center file global mode enabled - all keybindings overridden globally"))
+    (progn
+      ;; Restore original keybindings from saved state
+      (when enkan-center-file-original-keybindings
+        (dolist (binding enkan-center-file-original-keybindings)
+          (define-key (current-global-map) (car binding) (cdr binding)))
+        (setq enkan-center-file-original-keybindings nil))
+      (message "❌ Center file global mode disabled - original keybindings restored"))))
 
 ;;;###autoload
 (defun enkan-toggle-center-file-global-mode ()
@@ -2311,6 +2338,25 @@ Category: Center File Multi-buffer Access"
          (t
           (message "No valid action determined for number sending")))))))
 
+(defun enkan-repl--analyze-center-send-content-pure (content prefix-arg)
+  "Pure function to analyze center-send content and determine action.
+CONTENT is the text content to analyze.
+PREFIX-ARG is the numeric prefix argument.
+Returns plist with :action and :data."
+  (cond
+   ;; Numeric prefix argument takes priority
+   ((and (numberp prefix-arg) (<= 1 prefix-arg 4))
+    (list :action 'prefix-number :data prefix-arg))
+   ;; Check if content contains only :esc (with optional whitespace)
+   ((string-match-p "^[[:space:]]*:esc[[:space:]]*$" content)
+    (list :action 'escape-directly))
+   ;; Check if content starts with :alias esc or :alias :ret pattern
+   ((string-match-p "^[[:space:]]*:[a-zA-Z0-9_.-]+\\s-+\\(esc\\|:ret\\)\\s-*$" content)
+    (list :action 'alias-command :data (string-trim content)))
+   ;; Default behavior
+   (t
+    (list :action 'default-send :data content))))
+
 ;; Alias command parsing functions
 
 (defun enkan-repl-center--parse-alias-command-pure (input-string)
@@ -2380,30 +2426,33 @@ Looks for a project alias in enkan-repl-project-aliases and sends ESC to corresp
 (defun enkan-repl-center-send-line (&optional arg)
   "Send current line to center file session.
 With prefix argument ARG (1-4), send to specific session number.
-Line starting with ':er alias' sends to buffer containing alias.
-Line containing only ':esc' sends escape to a project buffer.
-Without prefix argument, like \":er\", use interactive selection UI.
+Line starting with ':alias esc' sends ESC key to buffer containing alias.
+Line containing only ':esc' sends ESC key to a project buffer.
+Without prefix argument, send line to selected buffer.
 
 Category: Center File Multi-buffer Access"
   (interactive "P")
-  (let ((line-text (buffer-substring-no-properties
-                    (line-beginning-position) (line-end-position))))
-    (cond
-     ;; Numeric prefix argument takes priority
-     ((and (numberp arg) (<= 1 arg 4))
-      (enkan-repl--send-region-with-prefix
-       (line-beginning-position) (line-end-position) arg))
-     ;; Check if line contains only :esc (with optional whitespace)
-     ((string-match-p "^[[:space:]]*:esc[[:space:]]*$" line-text)
-      (enkan-repl--send-escape-directly))
-     ;; Check if line starts with :alias esc or :alias :ret pattern
-     ((string-match-p "^[[:space:]]*:[a-zA-Z0-9_.-]+\\s-+\\(:ret\\|esc\\)\\s-*$" line-text)
-      (enkan-repl-center-send-region
-       (line-beginning-position) (line-end-position) (string-trim line-text)))
-     ;; Default behavior
-     (t
-      (enkan-repl--send-buffer-content
-       (line-beginning-position) (line-end-position) "Line")))))
+  (let* ((line-text (buffer-substring-no-properties
+                     (line-beginning-position) (line-end-position)))
+         (analysis (enkan-repl--analyze-center-send-content-pure line-text arg)))
+    (message "center-send-line analysis - content: '%s', action: %s, data: %s"
+             line-text (plist-get analysis :action) (plist-get analysis :data))
+    (pcase (plist-get analysis :action)
+      ('prefix-number
+       (message "Executing prefix-number action with data: %s" (plist-get analysis :data))
+       (enkan-repl--send-region-with-prefix
+        (line-beginning-position) (line-end-position) (plist-get analysis :data)))
+      ('escape-directly
+       (message "Executing escape-directly action")
+       (enkan-repl--send-escape-directly))
+      ('alias-command
+       (message "Executing alias-command action with data: '%s'" (plist-get analysis :data))
+       (enkan-repl-center-send-region
+        (line-beginning-position) (line-end-position) (plist-get analysis :data)))
+      ('default-send
+       (message "Executing default-send action")
+       (enkan-repl--send-buffer-content
+        (line-beginning-position) (line-end-position) "Line")))))
 
 ;; Pure functions for center file operations (used by enkan-repl-center-open-file)
 (defun enkan-center-file-validate-path-pure (file-path)
