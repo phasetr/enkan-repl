@@ -2343,19 +2343,21 @@ Category: Center File Multi-buffer Access"
 CONTENT is the text content to analyze.
 PREFIX-ARG is the numeric prefix argument.
 Returns plist with :action and :data."
-  (cond
-   ;; Numeric prefix argument takes priority
-   ((and (numberp prefix-arg) (<= 1 prefix-arg 4))
-    (list :action 'prefix-number :data prefix-arg))
-   ;; Check if content contains only :esc (with optional whitespace)
-   ((string-match-p "^[[:space:]]*:esc[[:space:]]*$" content)
-    (list :action 'escape-directly))
-   ;; Check if content starts with :alias esc or :alias :ret pattern
-   ((string-match-p "^[[:space:]]*:[a-zA-Z0-9_.-]+\\s-+\\(esc\\|:ret\\)\\s-*$" content)
-    (list :action 'alias-command :data (string-trim content)))
-   ;; Default behavior
-   (t
-    (list :action 'default-send :data content))))
+  (let ((trimmed-content (string-trim content)))
+    (cond
+     ;; Numeric prefix argument takes priority
+     ((and (numberp prefix-arg) (<= 1 prefix-arg 4))
+      (list :action 'prefix-number :data prefix-arg))
+     ;; Check if content contains only :esc
+     ((string= trimmed-content ":esc")
+      (list :action 'escape-directly))
+     ;; Check if content starts with :alias (colon + word + space)
+     ((string-match "^:\\([a-zA-Z0-9_.-]+\\) \\(.*\\)$" trimmed-content)
+      ;; This is :alias something format - always use alias-command
+      (list :action 'alias-command :data trimmed-content))
+     ;; Default behavior
+     (t
+      (list :action 'default-send :data content)))))
 
 ;; Alias command parsing functions
 
@@ -2396,16 +2398,21 @@ Returns plist with :valid, :alias, :command, :text, :message."
 ALIAS is the alias string to match against buffer names.
 ENKAN-BUFFERS is list of available enkan buffers.
 Returns buffer object or nil if not found."
-  ;; First resolve alias to project name using project aliases
-  (let* ((resolved-project (enkan-repl--center-resolve-project-name alias))
-         (matching-buffers (seq-filter
-                           (lambda (buf)
-                             (string-match-p (regexp-quote resolved-project) (buffer-name buf)))
-                           enkan-buffers)))
-    (if matching-buffers
-        ;; Return first match
-        ;; Could be enhanced to show selection UI
-        (car matching-buffers)
+  ;; First check if alias exists in project aliases
+  (let ((alias-entry (assoc alias enkan-repl-project-aliases)))
+    (if alias-entry
+        ;; Alias found, resolve to project name and search buffers
+        (let* ((resolved-project (cdr alias-entry))
+               (matching-buffers (seq-filter
+                                 (lambda (buf)
+                                   (string-match-p (regexp-quote resolved-project) (buffer-name buf)))
+                                 enkan-buffers)))
+          (if matching-buffers
+              ;; Return first match
+              ;; Could be enhanced to show selection UI
+              (car matching-buffers)
+            nil))
+      ;; Alias not found in project aliases
       nil)))
 
 (defun enkan-repl--send-escape-directly ()
