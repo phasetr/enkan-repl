@@ -1127,10 +1127,12 @@ RESTART-FUNC is a zero-argument function to call for restart.
       (message "Removed dead eat session buffer in: %s" target-dir))))
 
 ;;;###autoload
-(defun enkan-repl-start-eat ()
+(defun enkan-repl-start-eat (&optional force)
   "Start eat terminal emulator session.
 Determines directory from current buffer filename if it's a persistent file.
 Checks for existing sessions to prevent double startup.
+
+When FORCE is non-nil, automatically restart dead sessions without user confirmation.
 
 Category: Session Controller"
   (interactive)
@@ -1156,10 +1158,16 @@ Category: Session Controller"
                target-dir (buffer-name existing-buffer)))
      ;; Dead session exists - offer to restart
      (existing-buffer
-      (enkan-repl--handle-dead-session
-       existing-buffer target-dir
-       "Dead eat session found in %s. Restart? "
-       #'enkan-repl-start-eat))
+      (if force
+          ;; Force restart without user confirmation
+          (progn
+            (kill-buffer existing-buffer)
+            (enkan-repl-start-eat))
+        ;; Ask user for confirmation
+        (enkan-repl--handle-dead-session
+         existing-buffer target-dir
+         "Dead eat session found in %s. Restart? "
+         #'enkan-repl-start-eat)))
      ;; No existing session - start new one
      (t
       (let ((default-directory target-dir)
@@ -1225,6 +1233,19 @@ Category: Session Controller"
                 (y-or-n-p (format "Terminate eat session in %s? " target-dir)))
         (kill-buffer existing-buffer)
         (message "Terminated eat session in: %s" target-dir))))))
+
+;;;###autoload
+(defun enkan-repl-revive-current-buffer ()
+  "Revive the current enkan buffer by restarting its eat process.
+This function can restore functionality to dead enkan buffers."
+  (interactive)
+  (let ((buffer-name (buffer-name)))
+    ;; Check if this is an enkan buffer
+    (unless (string-match "^\\*enkan:" buffer-name)
+      (error "Not an enkan buffer: %s" buffer-name))
+    ;; Simply force restart the eat session
+    (enkan-repl-start-eat t)
+    (message "Revived enkan buffer: %s" buffer-name)))
 
 
 ;;;###autoload
@@ -1842,31 +1863,11 @@ When enabled, center file keybindings are available across all buffers."
   :global t
   :lighter " ECF"
   :keymap enkan-center-file-global-mode-map
-  (if enkan-center-file-global-mode
-      (progn
-        ;; Save original keybindings before overriding
-        (unless enkan-center-file-original-keybindings
-          (setq enkan-center-file-original-keybindings '())
-          (map-keymap
-           (lambda (key command)
-             (when command
-               (let ((original-binding (lookup-key (current-global-map) (vector key))))
-                 (push (cons (vector key) original-binding) enkan-center-file-original-keybindings))))
-           enkan-center-file-global-mode-map))
-        ;; Copy all bindings from enkan-center-file-global-mode-map to global map
-        (map-keymap
-         (lambda (key command)
-           (when command
-             (define-key (current-global-map) (vector key) command)))
-         enkan-center-file-global-mode-map)
-        (message "✅ Center file global mode enabled - all keybindings overridden globally"))
-    (progn
-      ;; Restore original keybindings from saved state
-      (when enkan-center-file-original-keybindings
-        (dolist (binding enkan-center-file-original-keybindings)
-          (define-key (current-global-map) (car binding) (cdr binding)))
-        (setq enkan-center-file-original-keybindings nil))
-      (message "❌ Center file global mode disabled - original keybindings restored"))))
+  ;; Do nothing dangerous to global keymap - let minor mode keymap handle it
+  ;; This avoids overriding critical keybindings like M-x
+  (message (if enkan-center-file-global-mode
+               "✅ Center file global mode enabled"
+             "❌ Center file global mode disabled")))
 
 ;;;###autoload
 (defun enkan-toggle-center-file-global-mode ()
@@ -1954,8 +1955,8 @@ This function only starts eat sessions - use enkan-repl-setup (C-M-l) to arrange
                   (default-directory (expand-file-name (cdr project-info))))
               ;; Register session
               (enkan-repl--register-session session-number project-name)
-              ;; Start eat session in current directory
-              (enkan-repl-start-eat)
+              ;; Start eat session in current directory (force restart if needed)
+              (enkan-repl-start-eat t)
               (setq session-number (1+ session-number)))))
       ;; Set final layout configuration
       (setq enkan-repl--current-multi-project-layout layout-name)
@@ -2651,14 +2652,20 @@ Category: Center File Multi-buffer Access"
                         (message "Region sent to buffer: %s" (buffer-name resolved-buffer))
                       (message "Failed to send region to buffer: %s" (buffer-name resolved-buffer))))
                    ((eq command :text)
-                    (let ((combined-text (concat region-text " " (plist-get parsed :text))))
-                      (if (enkan-repl--center-send-text-to-buffer combined-text resolved-buffer)
-                          (message "Combined text sent to buffer: %s" (buffer-name resolved-buffer))
-                        (message "Failed to send combined text to buffer: %s" (buffer-name resolved-buffer)))))
+                    (let ((text-to-send (plist-get parsed :text)))
+                      (if (enkan-repl--center-send-text-to-buffer text-to-send resolved-buffer)
+                          (message "Text sent to buffer: %s" (buffer-name resolved-buffer))
+                        (message "Failed to send text to buffer: %s" (buffer-name resolved-buffer)))))
                    (t
                     (message "Unknown command: %s" command)))
-                (message "No buffer found matching alias: %s" alias)))
-          (message "Invalid action format: %s" (plist-get parsed :message)))))))
+                ;; Try auto-recovery if buffer is not found
+                (if (and (string-match "^\\*enkan:" (buffer-name))
+                         (y-or-n-p (format "No buffer found for alias '%s'. Try auto-recovery? " alias)))
+                    (progn
+                      (enkan-repl-revive-current-buffer)
+                      (message "Auto-recovery attempted. Try the command again."))
+                  (message "No buffer found matching alias: %s" alias)))
+          (message "Invalid action format: %s" (plist-get parsed :message))))))))
 
 (defun enkan-repl-center-send-buffer (&optional action-string)
   "Send entire buffer to center file buffer with action specification.
@@ -2722,14 +2729,20 @@ Category: Center File Multi-buffer Access"
                         (message "Buffer sent to buffer: %s" (buffer-name resolved-buffer))
                       (message "Failed to send buffer to buffer: %s" (buffer-name resolved-buffer))))
                    ((eq command :text)
-                    (let ((combined-text (concat buffer-text " " (plist-get parsed :text))))
-                      (if (enkan-repl--center-send-text-to-buffer combined-text resolved-buffer)
-                          (message "Combined text sent to buffer: %s" (buffer-name resolved-buffer))
-                        (message "Failed to send combined text to buffer: %s" (buffer-name resolved-buffer)))))
+                    (let ((text-to-send (plist-get parsed :text)))
+                      (if (enkan-repl--center-send-text-to-buffer text-to-send resolved-buffer)
+                          (message "Text sent to buffer: %s" (buffer-name resolved-buffer))
+                        (message "Failed to send text to buffer: %s" (buffer-name resolved-buffer)))))
                    (t
                     (message "Unknown command: %s" command)))
-                (message "No buffer found matching alias: %s" alias)))
-          (message "Invalid action format: %s" (plist-get parsed :message)))))))
+                ;; Try auto-recovery if buffer is not found
+                (if (and (string-match "^\\*enkan:" (buffer-name))
+                         (y-or-n-p (format "No buffer found for alias '%s'. Try auto-recovery? " alias)))
+                    (progn
+                      (enkan-repl-revive-current-buffer)
+                      (message "Auto-recovery attempted. Try the command again."))
+                  (message "No buffer found matching alias: %s" alias)))
+          (message "Invalid action format: %s" (plist-get parsed :message))))))))
 
 (provide 'enkan-repl)
 
