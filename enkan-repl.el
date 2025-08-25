@@ -1735,44 +1735,6 @@ Category: Center File Multi-buffer Access"
     (message "No project aliases configured")))
 
 ;;;###autoload
-(defun enkan-repl-center-send-to-all-sessions (text)
-  "Send TEXT to all registered sessions.
-
-Category: Center File Multi-buffer Access"
-  (interactive "sText to send to all sessions: ")
-  (if enkan-repl-session-list
-      (progn
-        (dolist (session enkan-repl-session-list)
-          (let* ((internal-num (car session))
-                 (project (cdr session))
-                 (user-num (- internal-num 3)))
-            (when (<= 1 user-num 4)
-              (let ((directory (enkan-repl--find-directory-by-project-name project)))
-                (when directory
-                  (enkan-repl--send-text text directory))))))
-        (message "Sent to all sessions: %s" text))
-    (message "No sessions registered")))
-
-;;;###autoload
-(defun enkan-repl-center-send-line-to-all-sessions ()
-  "Send current line to all registered sessions.
-
-Category: Center File Multi-buffer Access"
-  (interactive)
-  (let ((text (buffer-substring-no-properties
-               (line-beginning-position) (line-end-position))))
-    (enkan-repl-center-send-to-all-sessions text)))
-
-;;;###autoload
-(defun enkan-repl-center-send-region-to-all-sessions (start end)
-  "Send region to all registered sessions.
-
-Category: Center File Multi-buffer Access"
-  (interactive "r")
-  (let ((text (buffer-substring-no-properties start end)))
-    (enkan-repl-center-send-to-all-sessions text)))
-
-;;;###autoload
 (defun enkan-repl-center-file-help ()
   "Show help for center file multi-buffer access.
 
@@ -1798,9 +1760,6 @@ Category: Center File Multi-buffer Access"
     (princ "  enkan-repl-center-clear-sessions - Clear all sessions\n")
     (princ "  enkan-repl-center-show-session-aliases - Show aliases\n\n")
     (princ "BROADCAST:\n")
-    (princ "  enkan-repl-center-send-to-all-sessions - Send text to all\n")
-    (princ "  enkan-repl-center-send-line-to-all-sessions - Send line to all\n")
-    (princ "  enkan-repl-center-send-region-to-all-sessions - Send region to all\n\n")
     (princ "LAYOUT MANAGEMENT:\n")
     (princ "  enkan-repl-center-setup - Setup center file layout\n")
     (princ "  enkan-repl-center-reset - Reset center file layout\n")
