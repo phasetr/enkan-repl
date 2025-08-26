@@ -1723,11 +1723,6 @@ Category: Center File Multi-buffer Access"
     (define-key map (kbd "C-x g") 'enkan-repl-center-magit)
     (define-key map (kbd "C-M-e") 'enkan-repl-center-send-enter)
     (define-key map (kbd "C-M-i") 'enkan-repl-center-send-line)
-    (define-key map (kbd "C-M-1") 'enkan-repl-center-send-1)
-    (define-key map (kbd "C-M-2") 'enkan-repl-center-send-2)
-    (define-key map (kbd "C-M-3") 'enkan-repl-center-send-3)
-    (define-key map (kbd "C-M-4") 'enkan-repl-center-send-4)
-    (define-key map (kbd "C-M-5") 'enkan-repl-center-send-5)
     (define-key map (kbd "C-M-t") 'other-window)
     (define-key map (kbd "C-M-b") 'enkan-repl-center-recenter-bottom)
     (define-key map (kbd "C-M-s") 'enkan-repl-center-auto-setup)
@@ -2082,51 +2077,6 @@ Category: Center File Multi-buffer Access"
   (interactive "P")
   (enkan-repl--center-send-text-with-selection "" prefix-arg))
 
-;;;###autoload
-(defun enkan-repl-center-send-1 (&optional prefix-arg)
-  "Send '1' to eat session buffer from center file.
-Always requires buffer specification:
-- Without prefix: Select from available enkan buffers
-- With numeric prefix: Send to buffer at that index (1-based)
-
-Category: Center File Multi-buffer Access"
-  (interactive "P")
-  (enkan-repl--center-send-number-with-selection "1" prefix-arg))
-
-;;;###autoload
-(defun enkan-repl-center-send-2 (&optional prefix-arg)
-  "Send '2' to eat session buffer from center file.
-Always requires buffer specification:
-- Without prefix: Select from available enkan buffers
-- With numeric prefix: Send to buffer at that index (1-based)
-
-Category: Center File Multi-buffer Access"
-  (interactive "P")
-  (enkan-repl--center-send-number-with-selection "2" prefix-arg))
-
-;;;###autoload
-(defun enkan-repl-center-send-3 (&optional prefix-arg)
-  "Send '3' to eat session buffer from center file.
-Always requires buffer specification:
-- Without prefix: Select from available enkan buffers
-- With numeric prefix: Send to buffer at that index (1-based)
-
-Category: Center File Multi-buffer Access"
-  (interactive "P")
-  (enkan-repl--center-send-number-with-selection "3" prefix-arg))
-
-;;;###autoload
-(defun enkan-repl-center-send-4 (&optional prefix-arg)
-  "Send '4' to eat session buffer from center file.
-Always requires buffer specification:
-- Without prefix: Select from available enkan buffers
-- With numeric prefix: Send to buffer at that index (1-based)
-
-Category: Center File Multi-buffer Access"
-  (interactive "P")
-  (enkan-repl--center-send-number-with-selection "4" prefix-arg))
-
-;;;###autoload
 (defun enkan-repl-center-send-5 (&optional prefix-arg)
   "Send '5' to eat session buffer from center file.
 Always requires buffer specification:
