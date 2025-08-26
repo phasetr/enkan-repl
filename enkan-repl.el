@@ -1822,8 +1822,17 @@ This function only starts eat sessions - use enkan-repl-setup (C-M-l) to arrange
       (setq enkan-repl-session-list nil)
       (setq enkan-repl--session-counter 0)
       (setq enkan-repl--current-multi-project-layout nil)
-      (message "🧹 C-M-s: Reset - enkan-repl-session-list=%s, enkan-repl--session-counter=%d, enkan-repl--current-multi-project-layout=%s"
-               "nil" 0 "nil")
+      (message "🧹 C-M-s: Reset - enkan-repl-session-list=%s, enkan-repl--session-counter=%d, enkan-repl--current-multi-project-layout=%s, enkan-repl-project-aliases=%s"
+               "nil" 0 "nil" "nil")
+      ;; Setup project aliases based on layout configuration
+      (let ((project-aliases '()))
+        (dolist (alias alias-list)
+          (let ((project-info (enkan-repl--get-project-info-from-registry alias)))
+            (when project-info
+              (let ((project-name (car project-info)))
+                (push (cons alias project-name) project-aliases)))))
+        (setq enkan-repl-project-aliases (nreverse project-aliases)))
+      (message "🔧 C-M-s: Setup aliases - enkan-repl-project-aliases=%s" enkan-repl-project-aliases)
       ;; Start sessions for each project
       (let ((session-number 1)) ; Session numbers start from 1
         (dolist (alias alias-list)
@@ -1875,10 +1884,14 @@ Category: Center File Multi-buffer Access"
         (setq enkan-repl-session-list nil)
         (setq enkan-repl--session-counter 0)
         (setq enkan-repl--current-multi-project-layout nil)
-        (enkan-center-file-global-mode nil)
+        (setq enkan-repl-project-aliases nil)
+        ;; Auto-disable global center file mode
+        (when enkan-center-file-global-mode
+          (enkan-center-file-global-mode -1)
+          (message "🔄 Auto-disabled center file global mode"))
         ;; Display what variables were reset
-        (message "🧹 C-M-f: Reset - enkan-repl-session-list=%s, enkan-repl--session-counter=%d, enkan-repl--current-multi-project-layout=%s"
-          "nil" 0 "nil")
+        (message "🧹 C-M-f: Reset - enkan-repl-session-list=%s, enkan-repl--session-counter=%d, enkan-repl--current-multi-project-layout=%s, enkan-repl-project-aliases=%s"
+                 "nil" 0 "nil" "nil")
         (message "✅ C-M-f: Terminated %d sessions, cleared session list and reset layout configuration" terminated-count)))))
 
 ;;;###autoload
