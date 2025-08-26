@@ -619,10 +619,9 @@ Returns: Directory path or nil"
 
 (defun enkan-repl--get-session-by-user-number (user-number)
   "Get project name from user number.
-user-number: Integer 1-2 (position from left in eat sessions)
+user-number: Integer 1-2 (direct session number)
 Returns: Project name or nil"
-  (let ((internal-number (+ user-number 3)))  ; 1→4, 2→5, 3→6, 4→7
-    (cdr (assoc internal-number enkan-repl-session-list))))
+  (cdr (assoc user-number enkan-repl-session-list)))
 
 (defun enkan-repl--register-session (session-number project-name)
   "Register project to session number.
@@ -1689,8 +1688,7 @@ Category: Center File Multi-buffer Access"
     (princ "BROADCAST:\n")
     (princ "LAYOUT MANAGEMENT:\n")
     (princ "  enkan-repl-center-setup - Setup center file layout\n")
-    (princ "  enkan-repl-center-reset - Reset center file layout\n")
-    (princ "  enkan-repl-center-other-window - Switch between windows 1-3\n")))
+    (princ "  enkan-repl-center-reset - Reset center file layout\n")))
 
 ;;;; Center File Window Layout Management
 
@@ -1730,7 +1728,7 @@ Category: Center File Multi-buffer Access"
     (define-key map (kbd "C-M-3") 'enkan-repl-center-send-3)
     (define-key map (kbd "C-M-4") 'enkan-repl-center-send-4)
     (define-key map (kbd "C-M-5") 'enkan-repl-center-send-5)
-    (define-key map (kbd "C-M-t") 'enkan-repl-center-other-window)
+    (define-key map (kbd "C-M-t") 'other-window)
     (define-key map (kbd "C-M-b") 'enkan-repl-center-recenter-bottom)
     (define-key map (kbd "C-M-s") 'enkan-repl-center-auto-setup)
     (define-key map (kbd "C-M-f") 'enkan-repl-center-finish-all-sessions)
@@ -2489,7 +2487,7 @@ Category: Center File Multi-buffer Access"
                                             (process-live-p eat--process))))
                                    enkan-buffers)))
 
-    (if (string-empty-p action-string)
+    (if (or (null action-string) (string-empty-p action-string))
         ;; No action specified - use selection UI
         (if (> (length valid-buffers) 0)
             (let* ((choices (enkan-repl--build-buffer-selection-choices-pure valid-buffers))
@@ -2566,7 +2564,7 @@ Category: Center File Multi-buffer Access"
          (enkan-buffers (enkan-repl--collect-enkan-buffers-pure (buffer-list)))
          (valid-buffers (enkan-repl--filter-valid-buffers-pure enkan-buffers)))
 
-    (if (string-empty-p action-string)
+    (if (or (null action-string) (string-empty-p action-string))
         ;; No action specified - use selection UI
         (if (> (length valid-buffers) 0)
             (let* ((choices (enkan-repl--build-buffer-selection-choices-pure valid-buffers))

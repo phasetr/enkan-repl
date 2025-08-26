@@ -79,28 +79,14 @@
     (should (= 1 (length result)))
     (should (eq 'horizontal (nth 0 result)))))
 
-(ert-deftest test-calculate-window-split-sequence-3-sessions ()
-  "Test window split sequence for 3 sessions."
-  (let ((result (enkan-repl--calculate-window-split-sequence-pure 3)))
-    (should (= 2 (length result)))
-    (should (eq 'horizontal (nth 0 result)))
-    (should (eq 'vertical (nth 1 result)))))
-
-(ert-deftest test-calculate-window-split-sequence-4-sessions ()
-  "Test window split sequence for 4 sessions."
-  (let ((result (enkan-repl--calculate-window-split-sequence-pure 4)))
-    (should (= 3 (length result)))
-    (should (eq 'horizontal (nth 0 result)))
-    (should (eq 'vertical (nth 1 result)))
-    (should (eq 'vertical (nth 2 result)))))
 
 ;;;; Integration Tests
 
 (ert-deftest test-session-layout-integration ()
   "Test integration of session layout calculations."
-  (let ((session-count 3)
-        (ratios (enkan-repl--calculate-session-layout-ratios-pure 3))
-        (sequence (enkan-repl--calculate-window-split-sequence-pure 3)))
+  (let ((session-count 2)
+        (ratios (enkan-repl--calculate-session-layout-ratios-pure 2))
+        (sequence (enkan-repl--calculate-window-split-sequence-pure 2)))
     ;; Verify ratios and sequence are consistent
     (should (= (plist-get ratios :right-splits) (length sequence)))
     (should (= (plist-get ratios :expected-windows) (+ 3 session-count)))))

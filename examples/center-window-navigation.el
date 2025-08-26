@@ -170,24 +170,5 @@ Category: Utilities"
 (defvar enkan-repl-center--current-window 1
   "Current window number for center file layout cycling.")
 
-;;;###autoload
-(defun enkan-repl-center-other-window ()
-  "Switch between windows 1-3 in center file layout.
-Window 1: Center file, Window 2: Work area, Window 3: Reserve area.
-
-Category: Center File Multi-buffer Access"
-  (interactive)
-  (let* ((window-list (window-list nil 'no-minibuf))
-         (max-window (min 3 (length window-list))))
-    (when (> max-window 0)
-      (setq enkan-repl-center--current-window
-            (1+ (mod enkan-repl-center--current-window max-window)))
-      (when (> enkan-repl-center--current-window max-window)
-        (setq enkan-repl-center--current-window 1))
-      (let ((target-window (nth (1- enkan-repl-center--current-window) window-list)))
-        (when target-window
-          (select-window target-window)
-          (message "Switched to window %d" enkan-repl-center--current-window))))))
-
 (provide 'center-window-navigation)
 ;;; center-window-navigation.el ends here

@@ -77,11 +77,10 @@
               enkan-center-file-command-definitions)
     ;; Fallback definitions
     '(("enkan-repl-center-setup" . "Setup center file window layout")
-      ("enkan-repl-center-reset" . "Reset center file layout")
-      ("enkan-repl-center-other-window" . "Switch between center/work/reserve windows (C-M-t)")
-      ("enkan-repl-center-file-help" . "Show center file help")
-      ("enkan-repl-center-list-sessions" . "List registered sessions")
-      ("enkan-repl-center-clear-sessions" . "Clear all sessions")))
+       ("enkan-repl-center-reset" . "Reset center file layout")
+       ("enkan-repl-center-file-help" . "Show center file help")
+       ("enkan-repl-center-list-sessions" . "List registered sessions")
+       ("enkan-repl-center-clear-sessions" . "Clear all sessions")))
   "Additional commands for center file mode to add to cheat sheet.")
 
 ;;; ========================================
@@ -99,7 +98,7 @@
           (define-key map (kbd "M-<return>") 'enkan-repl-center-send-region)
           (define-key map (kbd "C-M-e") 'enkan-repl-center-send-enter)
           (define-key map (kbd "C-M-i") 'enkan-repl-center-send-line)
-          (define-key map (kbd "C-M-t") 'enkan-repl-center-other-window)
+          (define-key map (kbd "C-M-t") 'other-window)
           (define-key map (kbd "C-M-b") 'enkan-repl-center-recenter-bottom)
           map)))
 

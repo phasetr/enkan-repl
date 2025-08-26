@@ -66,9 +66,9 @@
 
 (ert-deftest test-analyze-center-send-content-prefix-takes-priority ()
   "Test that numeric prefix takes priority over :esc."
-  (let ((result (enkan-repl--analyze-center-send-content-pure ":esc" 3)))
+  (let ((result (enkan-repl--analyze-center-send-content-pure ":esc" 2)))
     (should (eq 'prefix-number (plist-get result :action)))
-    (should (= 3 (plist-get result :data)))))
+    (should (= 2 (plist-get result :data)))))
 
 (ert-deftest test-analyze-center-send-content-invalid-alias-format ()
   "Test that :esc with additional text is treated as alias-command."

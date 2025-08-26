@@ -152,9 +152,9 @@
 (ert-deftest test-enkan-multi-project-session-order-creation ()
   "Test session list creation maintains configuration order."
   (let ((result (enkan-repl--create-session-list-with-order-pure '("pt-tools" "enkan-repl"))))
-    (should (equal result '((4 . "pt-tools") (5 . "enkan-repl"))))
-    (should (equal (car result) '(4 . "pt-tools")))
-    (should (equal (cdr result) '((5 . "enkan-repl"))))))
+    (should (equal result '((1 . "pt-tools") (2 . "enkan-repl"))))
+    (should (equal (car result) '(1 . "pt-tools")))
+    (should (equal (cdr result) '((2 . "enkan-repl"))))))
 
 (ert-deftest test-enkan-multi-project-session-order-with-too-many-projects ()
   "Test error handling when too many projects are configured."
