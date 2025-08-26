@@ -888,7 +888,7 @@ If SKIP-EMPTY-CHECK is non-nil, send content even if empty."
 Category: Text Sender"
   (interactive "r")
   (when (use-region-p)
-    (enkan-repl--send-buffer-content start end "Region")))
+    (enkan-repl--send-buffer-content start end)))
 
 ;;;###autoload
 (defun enkan-repl-send-buffer (&optional arg)
