@@ -798,29 +798,23 @@ Otherwise, use current `default-directory'."
 If DIRECTORY is provided, send to eat session in that directory.
 Otherwise, use current `default-directory'."
   (let
-      ((session-buffer
-        (enkan-repl--get-buffer-for-directory directory)))
-    (enkan-repl--debug-message
-     "send-text called with text length: %d, buffer: %s"
-     (length text) (if session-buffer (buffer-name session-buffer) "nil"))
+    ((session-buffer
+       (enkan-repl--get-buffer-for-directory directory)))
     (when
         (and session-buffer
-             (with-current-buffer session-buffer
-               (and (boundp 'eat--process)
-                    eat--process
-                    (process-live-p eat--process))))
-      (enkan-repl--debug-message
-       "Sending text to session buffer: %S"
-       (substring text 0 (min 50 (length text))))
+          (with-current-buffer session-buffer
+            (and (boundp 'eat--process)
+              eat--process
+              (process-live-p eat--process))))
       (with-current-buffer session-buffer
         (eat--send-string eat--process text)
         (eat--send-string eat--process "\r")
         ;; Move cursor to bottom after eat processes the output
         (run-at-time 0.01 nil
-                     (lambda (buf)
-                       (with-current-buffer buf
-                         (goto-char (point-max))))
-                     session-buffer)
+          (lambda (buf)
+            (with-current-buffer buf
+              (goto-char (point-max))))
+          session-buffer)
         (enkan-repl--debug-message "Text sent successfully")
         t))))
 
@@ -877,21 +871,11 @@ If SKIP-EMPTY-CHECK is non-nil, send content even if empty."
         (enkan-repl--sanitize-content raw-content))
        (target-dir
         (enkan-repl--get-target-directory-for-buffer)))
-    (enkan-repl--debug-message
-     "Raw content length: %d, trimmed: %d"
-     (length raw-content)
-     (length content))
-    (enkan-repl--debug-message
-     "Content empty?: %s, target-dir: %s"
-     (= (length content) 0)
-     target-dir)
     (if
         (or skip-empty-check (and content (not (= (length content) 0))))
         (progn
-          (enkan-repl--debug-message "Attempting to send content")
           (if (enkan-repl--send-text content target-dir)
-              (message "%s sent (%d characters)"
-                       content-description (length content))
+            (message "%s sent (%d characters)" content-description (length content))
             (message "❌ Cannot send - no matching eat session found for this directory")))
       (message "No content to send (empty or whitespace only)"))))
 
@@ -928,17 +912,13 @@ Category: Text Sender"
   (enkan-repl--send-buffer-content (point) (point-max) "Rest of buffer"))
 
 ;;;###autoload
-(defun enkan-repl-send-line (&optional arg)
+(defun enkan-repl-send-line ()
   "Send the current line to eat session.
-With prefix argument ARG (1-2), send to specific session number.
 
 Category: Text Sender"
-  (interactive "P")
-  (if (and (numberp arg) (<= 1 arg 2))
-      (enkan-repl--send-region-with-prefix
-       (line-beginning-position) (line-end-position) arg)
-    (enkan-repl--send-buffer-content
-     (line-beginning-position) (line-end-position) "Line")))
+  (interactive)
+  (enkan-repl--send-buffer-content
+   (line-beginning-position) (line-end-position) "Line"))
 
 ;;;###autoload
 (defun enkan-repl-send-enter ()
@@ -2423,26 +2403,36 @@ Category: Center File Multi-buffer Access"
                   (message "Sent ESC to alias '%s' buffer" alias))
               ;; non-esc case: send string with enkan-repl-send-region
               (progn
-                (with-temp-buffer
-                  (insert remaining-part)
-                  (with-current-buffer resolved-buffer
-                    (let ((default-directory (file-name-directory (buffer-file-name))))
-                      (enkan-repl-send-region (point-min) (point-max)))))
+                (with-current-buffer resolved-buffer
+                  (let ((process-buffer resolved-buffer))
+                    (with-temp-buffer
+                      (insert remaining-part)
+                      (let ((enkan-repl-session-list '((1 . "enkan-repl")))
+                            (default-directory (expand-file-name default-directory)))
+                        (cl-letf (((symbol-function 'enkan-repl--get-buffer-for-directory)
+                                   (lambda (dir) process-buffer)))
+                          (enkan-repl-send-region (point-min) (point-max)))))))
                 (message "Sent string '%s' to alias '%s' buffer" remaining-part alias)))
           (message "No buffer found for alias '%s'" alias)))
     ;; No alias: select buffer and send
     (let* ((region-text (buffer-substring-no-properties start end))
            (enkan-buffers (enkan-repl--collect-enkan-buffers-pure (buffer-list)))
-           (valid-buffers (enkan-repl--filter-valid-buffers-pure enkan-buffers))
-           (choices (enkan-repl--build-buffer-selection-choices-pure valid-buffers))
-           (selected-display (completing-read "Select buffer for region send: " choices nil t))
-           (target-buffer (cdr (assoc selected-display choices))))
-      (with-temp-buffer
-        (insert region-text)
-        (with-current-buffer target-buffer
-          (let ((default-directory (file-name-directory (buffer-file-name))))
-            (enkan-repl-send-region (point-min) (point-max)))))
-      (message "Region sent to buffer: %s" (buffer-name target-buffer)))))
+           (valid-buffers (enkan-repl--filter-valid-buffers-pure enkan-buffers)))
+      (if (= (length valid-buffers) 0)
+          (message "No active enkan sessions found")
+        (let* ((choices (enkan-repl--build-buffer-selection-choices-pure valid-buffers))
+               (selected-display (completing-read "Select buffer for region send: " choices nil t))
+               (target-buffer (cdr (assoc selected-display choices))))
+          (with-current-buffer target-buffer
+            (let ((process-buffer target-buffer))
+              (with-temp-buffer
+                (insert region-text)
+                (let ((enkan-repl-session-list '((1 . "enkan-repl")))
+                      (default-directory (expand-file-name default-directory)))
+                  (cl-letf (((symbol-function 'enkan-repl--get-buffer-for-directory)
+                             (lambda (dir) process-buffer)))
+                    (enkan-repl-send-region (point-min) (point-max)))))))
+          (message "Region sent to buffer: %s" (buffer-name target-buffer)))))))
 
 (defun enkan-repl-center-send-buffer (&optional action-string)
   "Send entire buffer to center file buffer with action specification.
