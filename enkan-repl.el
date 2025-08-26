@@ -875,11 +875,6 @@ If SKIP-EMPTY-CHECK is non-nil, send content even if empty."
         (buffer-substring-no-properties start end))
        (content
         (enkan-repl--sanitize-content raw-content))
-       (is-center-file
-        (and buffer-file-name
-             enkan-repl-center-file
-             (string= (expand-file-name buffer-file-name)
-                      (expand-file-name enkan-repl-center-file))))
        (target-dir
         (enkan-repl--get-target-directory-for-buffer)))
     (enkan-repl--debug-message
@@ -887,55 +882,29 @@ If SKIP-EMPTY-CHECK is non-nil, send content even if empty."
      (length raw-content)
      (length content))
     (enkan-repl--debug-message
-     "Content empty?: %s, target-dir: %s, is-center-file: %s"
+     "Content empty?: %s, target-dir: %s"
      (= (length content) 0)
-     target-dir
-     is-center-file)
+     target-dir)
     (if
         (or skip-empty-check (and content (not (= (length content) 0))))
         (progn
           (enkan-repl--debug-message "Attempting to send content")
-          ;; Handle prefix notation for center files
-          (if is-center-file
-              (let* ((parsed (enkan-repl--parse-prefix-notation content))
-                     (prefix-target (car parsed))
-                     (command (cdr parsed)))
-                (if prefix-target
-                    ;; Center file with prefix notation
-                    (let ((directory (enkan-repl--resolve-target-to-directory prefix-target)))
-                      (if directory
-                          (progn
-                            ;; Send command to target session
-                            (enkan-repl--send-text command directory)
-                            ;; Buffer content unchanged (preserve :pt part)
-                            (message "%s sent to %s (%d characters)"
-                                     content-description prefix-target (length command)))
-                        ;; Handle target not found properly
-                        (enkan-repl--handle-prefix-target-not-found
-                         prefix-target command content-description)))
-                  ;; Center file without prefix - send to current directory
-                  (if (enkan-repl--send-text content target-dir)
-                      (message "%s sent (%d characters)"
-                               content-description (length content))
-                    (message "❌ Cannot send - no matching eat session found for this directory"))))
-            ;; Non-center file - regular behavior
-            (if (enkan-repl--send-text content target-dir)
-                (message "%s sent (%d characters)"
-                         content-description (length content))
-              (message "❌ Cannot send - no matching eat session found for this directory"))))
+          (if (enkan-repl--send-text content target-dir)
+              (message "%s sent (%d characters)"
+                       content-description (length content))
+            (message "❌ Cannot send - no matching eat session found for this directory")))
       (message "No content to send (empty or whitespace only)"))))
 
 ;;;; Public API - Send Functions
 
 ;;;###autoload
-(defun enkan-repl-send-region (start end &optional arg)
+(defun enkan-repl-send-region (start end)
   "Send the text in region from START to END to eat session.
 
 Category: Text Sender"
-  (interactive "r\nP")
+  (interactive "r")
   (when (use-region-p)
-    (if (and (numberp arg) (<= 1 arg 2))
-      (enkan-repl--send-buffer-content start end "Region"))))
+    (enkan-repl--send-buffer-content start end "Region")))
 
 ;;;###autoload
 (defun enkan-repl-send-buffer (&optional arg)
@@ -1718,6 +1687,7 @@ Category: Center File Multi-buffer Access"
 (defvar enkan-center-file-global-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "<escape>") 'enkan-repl-center-send-escape)
+    (define-key map (kbd "C-c C-f") 'enkan-toggle-center-file-global-mode)
     (define-key map (kbd "C-x g") 'enkan-repl-center-magit)
     (define-key map (kbd "C-M-e") 'enkan-repl-center-send-enter)
     (define-key map (kbd "C-M-i") 'enkan-repl-center-send-line)
@@ -2455,9 +2425,14 @@ Category: Center File Multi-buffer Access"
             (let* ((choices (enkan-repl--build-buffer-selection-choices-pure valid-buffers))
                    (selected-display (completing-read "Select buffer for region send: " choices nil t))
                    (target-buffer (cdr (assoc selected-display choices))))
-              (if (enkan-repl--center-send-text-to-buffer region-text target-buffer)
-                  (message "Region sent to buffer: %s" (buffer-name target-buffer))
-                (message "Failed to send region to buffer: %s" (buffer-name target-buffer))))
+              (with-temp-buffer
+                (insert region-text)
+                (let ((enkan-repl-session-list '((1 . "enkan-repl")))
+                      (default-directory (expand-file-name default-directory)))
+                  (cl-letf (((symbol-function 'enkan-repl--get-buffer-for-directory)
+                             (lambda (dir) target-buffer)))
+                    (enkan-repl-send-region (point-min) (point-max))))
+                (message "Region sent to buffer: %s" (buffer-name target-buffer))))
           (message "No active enkan sessions found"))
       ;; Parse action string
       (let ((parsed (enkan-repl-center--parse-alias-command-pure action-string)))
@@ -2493,9 +2468,14 @@ Category: Center File Multi-buffer Access"
                         (message "Return sent to buffer: %s" (buffer-name resolved-buffer))
                       (message "Failed to send return to buffer: %s" (buffer-name resolved-buffer))))
                    ((eq command :empty)
-                    (if (enkan-repl--center-send-text-to-buffer region-text resolved-buffer)
-                        (message "Region sent to buffer: %s" (buffer-name resolved-buffer))
-                      (message "Failed to send region to buffer: %s" (buffer-name resolved-buffer))))
+                    (with-temp-buffer
+                      (insert region-text)
+                      (let ((enkan-repl-session-list '((1 . "enkan-repl")))
+                            (default-directory (expand-file-name default-directory)))
+                        (cl-letf (((symbol-function 'enkan-repl--get-buffer-for-directory)
+                                   (lambda (dir) resolved-buffer)))
+                          (enkan-repl-send-region (point-min) (point-max))))
+                      (message "Region sent to buffer: %s" (buffer-name resolved-buffer))))
                    ((eq command :text)
                     (let ((text-to-send (plist-get parsed :text)))
                       (if (enkan-repl--center-send-text-to-buffer text-to-send resolved-buffer)
