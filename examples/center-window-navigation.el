@@ -108,10 +108,10 @@ Category: Utilities"
   (interactive)
   (delete-other-windows)
   ;; Create left column for center file (30%) and right section (70%)
-  (split-window-right (floor (* (window-width) 0.4)))
+  (split-window-right (floor (* (window-width) 0.35)))
   ;; Move to right section and split into 3 columns
   (other-window 1)
-  (split-window-right (floor (* (window-width) 0.6)))
+  (split-window-right (floor (* (window-width) 0.55)))
   ;; Set window variables - direct assignment by position
   ;; Currently at rightmost window, go back to leftmost
   (other-window 2)

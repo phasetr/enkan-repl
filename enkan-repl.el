@@ -2221,7 +2221,9 @@ Returns buffer object or nil if not found."
         (let* ((resolved-project (cdr alias-entry))
                (matching-buffers (seq-filter
                                  (lambda (buf)
-                                   (string-match-p (regexp-quote resolved-project) (buffer-name buf)))
+                                   ;; Extract project name from buffer name and do exact match
+                                   (let ((buffer-project (enkan-repl--extract-project-name (buffer-name buf))))
+                                     (string= resolved-project buffer-project)))
                                  enkan-buffers)))
           (if matching-buffers
               ;; Return first match
