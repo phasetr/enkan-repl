@@ -54,19 +54,6 @@
     (should (= 5 (plist-get result :expected-windows)))
     (should (= 1 (plist-get result :right-splits)))))
 
-(ert-deftest test-calculate-session-layout-ratios-3-sessions ()
-  "Test window ratio calculations for 3 sessions."
-  (let ((result (enkan-repl--calculate-session-layout-ratios-pure 3)))
-    (should (= 0.6 (plist-get result :left-ratio)))
-    (should (= 6 (plist-get result :expected-windows)))
-    (should (= 2 (plist-get result :right-splits)))))
-
-(ert-deftest test-calculate-session-layout-ratios-4-sessions ()
-  "Test window ratio calculations for 4 sessions."
-  (let ((result (enkan-repl--calculate-session-layout-ratios-pure 4)))
-    (should (= 0.6 (plist-get result :left-ratio)))
-    (should (= 7 (plist-get result :expected-windows)))
-    (should (= 3 (plist-get result :right-splits)))))
 
 ;;;; Window Split Logic Tests
 
@@ -139,10 +126,6 @@ Returns plist with :left-ratio and :expected-windows."
   (cond
    ((= session-count 2)
     (list :left-ratio 0.6 :expected-windows 5 :right-splits 1))
-   ((= session-count 3)
-    (list :left-ratio 0.6 :expected-windows 6 :right-splits 2))
-   ((= session-count 4)
-    (list :left-ratio 0.6 :expected-windows 7 :right-splits 3))
    (t (error "Invalid session count: %d" session-count))))
 
 ;; Pure function to validate window split logic
@@ -163,8 +146,6 @@ Returns plist with :valid and :message."
 Returns list of split directions ('horizontal or 'vertical)."
   (cond
    ((= session-count 2) '(horizontal))
-   ((= session-count 3) '(horizontal vertical))
-   ((= session-count 4) '(horizontal vertical vertical))
    (t (error "Invalid session count: %d" session-count))))
 
 (provide 'window-management-test)

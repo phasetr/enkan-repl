@@ -44,25 +44,23 @@
   "Test session registration functionality."
   (let ((enkan-repl-session-list nil))
     ;; Register new session
-    (enkan-repl--register-session 4 "pt-tools")
-    (should (equal '((4 . "pt-tools")) enkan-repl-session-list))
+    (enkan-repl--register-session 1 "pt-tools")
+    (should (equal '((1 . "pt-tools")) enkan-repl-session-list))
 
     ;; Register another session
-    (enkan-repl--register-session 5 "enkan-repl")
-    (should (equal '((4 . "pt-tools") (5 . "enkan-repl")) enkan-repl-session-list))
+    (enkan-repl--register-session 2 "enkan-repl")
+    (should (equal '((1 . "pt-tools") (2 . "enkan-repl")) enkan-repl-session-list))
 
     ;; Update existing session
-    (enkan-repl--register-session 4 "new-project")
-    (should (equal '((4 . "new-project") (5 . "enkan-repl")) enkan-repl-session-list))))
+    (enkan-repl--register-session 1 "new-project")
+    (should (equal '((1 . "new-project") (2 . "enkan-repl")) enkan-repl-session-list))))
 
 (ert-deftest enkan-repl-test--get-session-by-user-number ()
-  "Test getting session by user number (1-4)."
-  (let ((enkan-repl-session-list '((4 . "pt-tools") (5 . "enkan-repl") (6 . "claude-code") (7 . "web-app"))))
+  "Test getting session by user number (1-2)."
+  (let ((enkan-repl-session-list '((1 . "pt-tools") (2 . "enkan-repl"))))
     (should (string= "pt-tools" (enkan-repl--get-session-by-user-number 1)))
     (should (string= "enkan-repl" (enkan-repl--get-session-by-user-number 2)))
-    (should (string= "claude-code" (enkan-repl--get-session-by-user-number 3)))
-    (should (string= "web-app" (enkan-repl--get-session-by-user-number 4)))
-    (should (null (enkan-repl--get-session-by-user-number 5)))))
+    (should (null (enkan-repl--get-session-by-user-number 3)))))
 
 ;;;; Prefix notation parsing tests
 
@@ -295,16 +293,16 @@
 
 (ert-deftest enkan-repl-test--get-session-by-name-or-alias ()
   "Test session lookup by name or alias."
-  (let ((enkan-repl-session-list '((4 . "pt-tools") (5 . "enkan-repl")))
+  (let ((enkan-repl-session-list '((1 . "pt-tools") (2 . "enkan-repl")))
         (enkan-repl-project-aliases '(("pt" . "pt-tools") ("er" . "enkan-repl"))))
 
     ;; By project name
-    (should (= 4 (enkan-repl--get-session-by-name-or-alias "pt-tools")))
-    (should (= 5 (enkan-repl--get-session-by-name-or-alias "enkan-repl")))
+    (should (= 1 (enkan-repl--get-session-by-name-or-alias "pt-tools")))
+    (should (= 2 (enkan-repl--get-session-by-name-or-alias "enkan-repl")))
 
     ;; By alias
-    (should (= 4 (enkan-repl--get-session-by-name-or-alias "pt")))
-    (should (= 5 (enkan-repl--get-session-by-name-or-alias "er")))
+    (should (= 1 (enkan-repl--get-session-by-name-or-alias "pt")))
+    (should (= 2 (enkan-repl--get-session-by-name-or-alias "er")))
 
     ;; Non-existent
     (should (null (enkan-repl--get-session-by-name-or-alias "unknown")))))
@@ -335,24 +333,22 @@
             ("er" . ("enkan-repl" . ,(concat temp-dir "enkan-repl"))))))
     ;; Valid setup
     (should (equal `("pt-tools" . ,(concat temp-dir "pt-tools"))
-                   (enkan-repl--setup-project-session "pt" 4)))
+                   (enkan-repl--setup-project-session "pt" 1)))
     (should (equal `("enkan-repl" . ,(concat temp-dir "enkan-repl"))
-                   (enkan-repl--setup-project-session "er" 5)))
+                   (enkan-repl--setup-project-session "er" 2)))
 
     ;; Invalid alias should signal error
-    (should-error (enkan-repl--setup-project-session "unknown" 4)
+    (should-error (enkan-repl--setup-project-session "unknown" 1)
                   :type 'error)))
 
 ;;;; Pure function tests for 2-session layout
 
 (ert-deftest enkan-repl-test--get-session-project-name ()
   "Test getting project name from session number."
-  (let ((session-list '((4 . "pt-tools") (5 . "enkan-repl") (6 . "claude-code"))))
-    (should (string= "pt-tools" (enkan-repl--get-session-project-name 4 session-list)))
-    (should (string= "enkan-repl" (enkan-repl--get-session-project-name 5 session-list)))
-    (should (string= "claude-code" (enkan-repl--get-session-project-name 6 session-list)))
-    (should (null (enkan-repl--get-session-project-name 7 session-list)))
-    (should (null (enkan-repl--get-session-project-name 1 session-list)))))
+  (let ((session-list '((1 . "pt-tools") (2 . "enkan-repl"))))
+    (should (string= "pt-tools" (enkan-repl--get-session-project-name 1 session-list)))
+    (should (string= "enkan-repl" (enkan-repl--get-session-project-name 2 session-list)))
+    (should (null (enkan-repl--get-session-project-name 3 session-list)))))
 
 (ert-deftest enkan-repl-test--get-project-path-from-registry ()
   "Test getting project path from registry by project name."
@@ -370,28 +366,24 @@
 
 (ert-deftest enkan-repl-test--get-session-project-paths ()
   "Test getting multiple session project paths."
-  (let ((session-list '((4 . "pt-tools") (5 . "enkan-repl") (6 . "missing-project")))
+  (let ((session-list '((1 . "pt-tools") (2 . "enkan-repl")))
         (project-registry '(("pt" . ("pt-tools" . "/Users/test/pt-tools"))
                             ("er" . ("enkan-repl" . "/Users/test/enkan-repl"))
                             ("cc" . ("claude-code" . "/Users/test/claude-code")))))
-    ;; Test with sessions 4 and 5 (both should be found)
-    (let ((result (enkan-repl--get-session-project-paths '(4 5) session-list project-registry)))
+    ;; Test with sessions 1 and 2 (both should be found)
+    (let ((result (enkan-repl--get-session-project-paths '(1 2) session-list project-registry)))
       (should (= 2 (length result)))
-      (should (equal '(4 . "/Users/test/pt-tools") (assoc 4 result)))
-      (should (equal '(5 . "/Users/test/enkan-repl") (assoc 5 result))))
-
-    ;; Test with session 6 (missing-project not in registry)
-    (let ((result (enkan-repl--get-session-project-paths '(6) session-list project-registry)))
-      (should (= 0 (length result))))
+      (should (equal '(1 . "/Users/test/pt-tools") (assoc 1 result)))
+      (should (equal '(2 . "/Users/test/enkan-repl") (assoc 2 result))))
 
     ;; Test with non-existent session
-    (let ((result (enkan-repl--get-session-project-paths '(7) session-list project-registry)))
+    (let ((result (enkan-repl--get-session-project-paths '(3) session-list project-registry)))
       (should (= 0 (length result))))
 
     ;; Test with mixed valid and invalid sessions
-    (let ((result (enkan-repl--get-session-project-paths '(4 6 7) session-list project-registry)))
+    (let ((result (enkan-repl--get-session-project-paths '(1 3) session-list project-registry)))
       (should (= 1 (length result)))
-      (should (equal '(4 . "/Users/test/pt-tools") (assoc 4 result))))))
+      (should (equal '(1 . "/Users/test/pt-tools") (assoc 1 result))))))
 
 (ert-deftest enkan-repl-test--extract-directory-from-buffer-name-pure ()
   "Test pure function for extracting expanded directory path from buffer name."

@@ -50,13 +50,9 @@
      ("C-M-b" enkan-repl-recenter-bottom "Recenter at bottom" quick-actions)
      ;; Multi-buffer Layout
      ("C-c w 2" enkan-repl-center-setup-2session-layout "Setup 2-session layout" multi-buffer)
-     ("C-c w 3" enkan-repl-center-setup-3session-layout "Setup 3-session layout" multi-buffer)
-     ("C-c w 4" enkan-repl-center-setup-4session-layout "Setup 4-session layout" multi-buffer)
      ;; Center File Multi-buffer Access
      ("M-1" enkan-repl-send-line-to-session-1 "Send line to session 1" center-file)
      ("M-2" enkan-repl-send-line-to-session-2 "Send line to session 2" center-file)
-     ("M-3" enkan-repl-send-line-to-session-3 "Send line to session 3" center-file)
-     ("M-4" enkan-repl-send-line-to-session-4 "Send line to session 4" center-file)
      ;; Project Management
      ("C-M-s" enkan-repl-start-eat "Start eat session" project-management)
      ("C-M-f" enkan-repl-finish-eat "Finish eat session" project-management)
@@ -79,33 +75,6 @@ Each entry is (KEY COMMAND DESCRIPTION CATEGORY).")
 ;;; Mode-specific Override Definitions
 ;;; ========================================
 
-(defconst enkan-simple-3pane-keybinding-overrides
-  '(("C-M-t" enkan-simple-3pane-other-window "Switch between input/misc windows" window-navigation))
-  "Keybinding overrides for 3pane mode.
-Each entry is (KEY COMMAND DESCRIPTION CATEGORY).")
-
-(defconst enkan-simple-3pane-command-definitions
-  '((enkan-simple-3pane-setup "Setup 3-pane window layout")
-    (enkan-simple-3pane-reset "Reset 3-pane layout")
-    (enkan-simple-3pane-describe-keybindings "Show 3pane keybindings")
-    (enkan-simple-3pane-other-window "Switch between input/misc windows")
-    (enkan-simple-3pane-lock-windows "Lock input and eat windows")
-    (enkan-simple-3pane-unlock-windows "Unlock input and eat windows"))
-  "Command definitions for 3pane mode cheat sheet.
-Each entry is (COMMAND DESCRIPTION).")
-
-(defconst enkan-dual-task-keybinding-overrides
-  '(("C-M-t" enkan-dual-task-other-window "Switch between input windows" window-navigation))
-  "Keybinding overrides for dual task mode.
-Each entry is (KEY COMMAND DESCRIPTION CATEGORY).")
-
-(defconst enkan-dual-task-command-definitions
-  '((enkan-dual-task-setup "Setup dual task window layout")
-    (enkan-dual-task-reset "Reset dual task layout")
-    (enkan-dual-task-describe-layout "Show dual task layout status")
-    (enkan-dual-task-other-window "Switch between input windows"))
-  "Command definitions for dual task mode.
-Each entry is (COMMAND DESCRIPTION).")
 
 (defconst enkan-center-file-keybinding-overrides
   '(("<escape>" enkan-repl-center-send-escape "Send ESC to REPL (center)" quick-actions)
@@ -132,26 +101,15 @@ Each entry is (KEY COMMAND DESCRIPTION CATEGORY).")
     (enkan-repl-center-send-enter "Send enter to REPL (center)")
     (enkan-repl-center-other-window "Switch between center/work/reserve windows")
     (enkan-repl-center-setup-2session-layout "Setup 2-session layout")
-    (enkan-repl-center-setup-3session-layout "Setup 3-session layout")
-    (enkan-repl-center-setup-4session-layout "Setup 4-session layout")
     (enkan-repl-center-send-escape "Send ESC to REPL (center)")
     (enkan-repl-center-send-1 "Send 1 to REPL (center)")
     (enkan-repl-center-send-2 "Send 2 to REPL (center)")
-    (enkan-repl-center-send-3 "Send 3 to REPL (center)")
-    (enkan-repl-center-send-4 "Send 4 to REPL (center)")
-    (enkan-repl-center-send-5 "Send 5 to REPL (center)")
     (enkan-repl-center-send-line-to-session-1 "Send line to session 1 (center)")
     (enkan-repl-center-send-line-to-session-2 "Send line to session 2 (center)")
-    (enkan-repl-center-send-line-to-session-3 "Send line to session 3 (center)")
-    (enkan-repl-center-send-line-to-session-4 "Send line to session 4 (center)")
     (enkan-repl-center-send-region-to-session-1 "Send region to session 1 (center)")
     (enkan-repl-center-send-region-to-session-2 "Send region to session 2 (center)")
-    (enkan-repl-center-send-region-to-session-3 "Send region to session 3 (center)")
-    (enkan-repl-center-send-region-to-session-4 "Send region to session 4 (center)")
     (enkan-repl-center-send-buffer-to-session-1 "Send buffer to session 1 (center)")
     (enkan-repl-center-send-buffer-to-session-2 "Send buffer to session 2 (center)")
-    (enkan-repl-center-send-buffer-to-session-3 "Send buffer to session 3 (center)")
-    (enkan-repl-center-send-buffer-to-session-4 "Send buffer to session 4 (center)")
     (enkan-repl-center-register-current-session "Register current session")
     (enkan-repl-center-list-sessions "List registered sessions")
     (enkan-repl-center-clear-sessions "Clear all sessions"))
@@ -159,9 +117,7 @@ Each entry is (KEY COMMAND DESCRIPTION CATEGORY).")
 Each entry is (COMMAND DESCRIPTION).")
 
 (defconst enkan-mode-keybinding-overrides
-  `((enkan-simple-3pane-mode . ,enkan-simple-3pane-keybinding-overrides)
-    (enkan-dual-task-mode . ,enkan-dual-task-keybinding-overrides)
-    (enkan-center-file-mode . ,enkan-center-file-keybinding-overrides))
+  `((enkan-center-file-mode . ,enkan-center-file-keybinding-overrides))
   "Alist of modes to their keybinding override definitions.")
 
 ;;; ========================================

@@ -166,10 +166,10 @@
 ;; Pure function for testing multi-project session order
 (defun enkan-repl--create-session-list-with-order-pure (alias-list)
   "Create session list from ALIAS-LIST maintaining order.
-Returns list of (session-number . alias) pairs starting from session 4."
-  (when (> (length alias-list) 4)
-    (error "Too many projects: %d (max 4)" (length alias-list)))
-  (let ((session-number 4)
+Returns list of (session-number . alias) pairs starting from session 1."
+  (when (> (length alias-list) 2)
+    (error "Too many projects: %d (max 2)" (length alias-list)))
+  (let ((session-number 1)
         (result nil))
     (dolist (alias alias-list)
       (push (cons session-number alias) result)

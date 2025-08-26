@@ -188,12 +188,8 @@
     (princ "-------------------------------\n")
     (princ "  M-1         - Send line to session 1\n")
     (princ "  M-2         - Send line to session 2\n")
-    (princ "  M-3         - Send line to session 3\n")
-    (princ "  M-4         - Send line to session 4\n")
     (princ "  C-M-b       - Recenter all enkan sessions at bottom\n")
     (princ "  C-c w 2     - Setup 2-session layout\n")
-    (princ "  C-c w 3     - Setup 3-session layout\n")
-    (princ "  C-c w 4     - Setup 4-session layout\n")
     (princ "\nNote: Center file mode activates automatically when opening the designated center file.\n")))
 
 ;;; ========================================

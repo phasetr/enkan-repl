@@ -66,7 +66,7 @@ This provides a consistent set of keybindings for enkan-repl development."
     (princ "============================\n\n")
     (princ (enkan-keybinding-format-description enkan-keybinding-definitions))
     (princ "Note: These are base keybindings that apply globally.\n")
-    (princ "      Window layout modes (3pane, etc.) may override some bindings\n")
+    (princ "      Center file mode may override some bindings\n")
     (princ "      to provide mode-specific functionality.\n")))
 
 ;;; ========================================

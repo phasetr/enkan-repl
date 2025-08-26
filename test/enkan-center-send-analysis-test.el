@@ -71,15 +71,21 @@
     (should (= 3 (plist-get result :data)))))
 
 (ert-deftest test-analyze-center-send-content-invalid-alias-format ()
-  "Test that invalid alias format falls back to default-send."
+  "Test that :esc with additional text is treated as alias-command."
   (let ((result (enkan-repl--analyze-center-send-content-pure ":esc some other text" nil)))
-    (should (eq 'default-send (plist-get result :action)))))
+    (should (eq 'alias-command (plist-get result :action)))))
 
 (ert-deftest test-analyze-center-send-content-complex-alias ()
   "Test analysis with complex alias names."
   (let ((result (enkan-repl--analyze-center-send-content-pure ":my-complex.alias_123 esc" nil)))
     (should (eq 'alias-command (plist-get result :action)))
     (should (equal ":my-complex.alias_123 esc" (plist-get result :data)))))
+
+(ert-deftest test-analyze-center-send-content-alias-with-number ()
+  "Test analysis of :alias number command."
+  (let ((result (enkan-repl--analyze-center-send-content-pure ":er 1" nil)))
+    (should (eq 'alias-command (plist-get result :action)))
+    (should (equal ":er 1" (plist-get result :data)))))
 
 (ert-deftest test-analyze-center-send-content-function-exists ()
   "Test that enkan-repl--analyze-center-send-content-pure function exists."

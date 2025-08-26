@@ -207,8 +207,8 @@ Example: \\='((\"web-dev\" . (\"er\" \"pt\" \"cc\"))
 (defcustom enkan-repl-session-list nil
   "List of managed sessions.
 Each element is in the format (number . project-name).
-Internally uses 4-7, displayed to users as 1-4.
-Example: \\='((4 . \"pt-tools\") (5 . \"enkan-repl\") (6 . \"claude-code\") (7 . \"web-app\"))"
+Uses session numbers 1,2 directly.
+Example: \\='((1 . \"pt-tools\") (2 . \"enkan-repl\"))"
   :type '(alist :key-type integer :value-type string)
   :group 'enkan-repl)
 
@@ -619,7 +619,7 @@ Returns: Directory path or nil"
 
 (defun enkan-repl--get-session-by-user-number (user-number)
   "Get project name from user number.
-user-number: Integer 1-4 (position from left in eat sessions)
+user-number: Integer 1-2 (position from left in eat sessions)
 Returns: Project name or nil"
   (let ((internal-number (+ user-number 3)))  ; 1→4, 2→5, 3→6, 4→7
     (cdr (assoc internal-number enkan-repl-session-list))))
@@ -639,9 +639,9 @@ Executes only when no existing number assignment exists.
 project-name: Alias-resolved canonical project name"
   (let ((resolved-name (enkan-repl--resolve-project-name project-name)))
     (unless (rassoc resolved-name enkan-repl-session-list)
-      (let ((next-number (+ 4 (mod enkan-repl--session-counter 4))))
+      (let ((next-number (+ 1 (mod enkan-repl--session-counter 2))))
         (setq enkan-repl--session-counter (1+ enkan-repl--session-counter))
-        (when (<= next-number 7)
+        (when (<= next-number 2)
           (enkan-repl--register-session next-number resolved-name))))))
 
 (defun enkan-repl--get-session-by-name-or-alias (name-or-alias)
@@ -668,11 +668,11 @@ Returns: (target . command) cons
 
 (defun enkan-repl--resolve-target-to-directory (target)
   "Resolve send target to directory path.
-target: Project name, alias, or number 1-4
+target: Project name, alias, or number 1-2
 Returns: Directory path or nil"
   (cond
-   ;; Numeric case (1-4)
-   ((and (stringp target) (string-match "^[1-4]$" target))
+   ;; Numeric case (1-2)
+   ((and (stringp target) (string-match "^[1-2]$" target))
     (let* ((user-number (string-to-number target))
            (project-name (enkan-repl--get-session-by-user-number user-number)))
       (when project-name
@@ -706,7 +706,7 @@ Returns: Directory path or nil"
 
 (defun enkan-repl--send-region-with-prefix (start end user-number)
   "Select session according to universal argument and send region.
-user-number: Integer 1-4 (position from left in eat sessions)"
+user-number: Integer 1-2 (position from left in eat sessions)"
   (let* ((text (buffer-substring-no-properties start end))
          (parsed (enkan-repl--parse-prefix-notation text))
          (prefix-target (car parsed))
@@ -931,23 +931,23 @@ If SKIP-EMPTY-CHECK is non-nil, send content even if empty."
 ;;;###autoload
 (defun enkan-repl-send-region (start end &optional arg)
   "Send the text in region from START to END to eat session.
-With prefix argument ARG (1-4), send to specific session number.
+With prefix argument ARG (1-2), send to specific session number.
 
 Category: Text Sender"
   (interactive "r\nP")
   (when (use-region-p)
-    (if (and (numberp arg) (<= 1 arg 4))
+    (if (and (numberp arg) (<= 1 arg 2))
         (enkan-repl--send-region-with-prefix start end arg)
       (enkan-repl--send-buffer-content start end "Region"))))
 
 ;;;###autoload
 (defun enkan-repl-send-buffer (&optional arg)
   "Send the entire current buffer to eat session.
-With prefix argument ARG (1-4), send to specific session number.
+With prefix argument ARG (1-2), send to specific session number.
 
 Category: Text Sender"
   (interactive "P")
-  (if (and (numberp arg) (<= 1 arg 4))
+  (if (and (numberp arg) (<= 1 arg 2))
       (enkan-repl--send-region-with-prefix (point-min) (point-max) arg)
     (enkan-repl--send-buffer-content
      (point-min) (point-max)
@@ -964,11 +964,11 @@ Category: Text Sender"
 ;;;###autoload
 (defun enkan-repl-send-line (&optional arg)
   "Send the current line to eat session.
-With prefix argument ARG (1-4), send to specific session number.
+With prefix argument ARG (1-2), send to specific session number.
 
 Category: Text Sender"
   (interactive "P")
-  (if (and (numberp arg) (<= 1 arg 4))
+  (if (and (numberp arg) (<= 1 arg 2))
       (enkan-repl--send-region-with-prefix
        (line-beginning-position) (line-end-position) arg)
     (enkan-repl--send-buffer-content
@@ -1267,18 +1267,12 @@ Category: Session Controller"
           (find-file enkan-repl-center-file))
         ;; Call appropriate layout function from examples
         (cond
+         ((= session-count 1)
+          (delete-other-windows))
          ((= session-count 2)
           (if (fboundp 'enkan-repl-setup-2session-layout)
               (enkan-repl-setup-2session-layout)
             (error "enkan-repl-setup-2session-layout not available. Load center-window-navigation.el from examples.")))
-         ((= session-count 3)
-          (if (fboundp 'enkan-repl-setup-3session-layout)
-              (enkan-repl-setup-3session-layout)
-            (error "enkan-repl-setup-3session-layout not available. Load center-window-navigation.el from examples.")))
-         ((= session-count 4)
-          (if (fboundp 'enkan-repl-setup-4session-layout)
-              (enkan-repl-setup-4session-layout)
-            (error "enkan-repl-setup-4session-layout not available. Load center-window-navigation.el from examples.")))
          (t (error "Invalid session count: %d" session-count)))
         (message "Multi-project window layout setup complete: %s (%d sessions)"
                  enkan-repl--current-multi-project-layout session-count))
@@ -1568,24 +1562,6 @@ Category: Center File Multi-buffer Access"
    (line-beginning-position) (line-end-position) 2))
 
 ;;;###autoload
-(defun enkan-repl-center-send-line-to-session-3 ()
-  "Send current line to session 3.
-
-Category: Center File Multi-buffer Access"
-  (interactive)
-  (enkan-repl--send-region-with-prefix
-   (line-beginning-position) (line-end-position) 3))
-
-;;;###autoload
-(defun enkan-repl-center-send-line-to-session-4 ()
-  "Send current line to session 4.
-
-Category: Center File Multi-buffer Access"
-  (interactive)
-  (enkan-repl--send-region-with-prefix
-   (line-beginning-position) (line-end-position) 4))
-
-;;;###autoload
 (defun enkan-repl-center-send-region-to-session-1 (start end)
   "Send region to session 1.
 
@@ -1600,22 +1576,6 @@ Category: Center File Multi-buffer Access"
 Category: Center File Multi-buffer Access"
   (interactive "r")
   (enkan-repl--send-region-with-prefix start end 2))
-
-;;;###autoload
-(defun enkan-repl-center-send-region-to-session-3 (start end)
-  "Send region to session 3.
-
-Category: Center File Multi-buffer Access"
-  (interactive "r")
-  (enkan-repl--send-region-with-prefix start end 3))
-
-;;;###autoload
-(defun enkan-repl-center-send-region-to-session-4 (start end)
-  "Send region to session 4.
-
-Category: Center File Multi-buffer Access"
-  (interactive "r")
-  (enkan-repl--send-region-with-prefix start end 4))
 
 ;;;###autoload
 (defun enkan-repl-center-send-buffer-to-session-1 ()
@@ -1634,32 +1594,15 @@ Category: Center File Multi-buffer Access"
   (enkan-repl--send-region-with-prefix (point-min) (point-max) 2))
 
 ;;;###autoload
-(defun enkan-repl-center-send-buffer-to-session-3 ()
-  "Send entire buffer to session 3.
-
-Category: Center File Multi-buffer Access"
-  (interactive)
-  (enkan-repl--send-region-with-prefix (point-min) (point-max) 3))
-
-;;;###autoload
-(defun enkan-repl-center-send-buffer-to-session-4 ()
-  "Send entire buffer to session 4.
-
-Category: Center File Multi-buffer Access"
-  (interactive)
-  (enkan-repl--send-region-with-prefix (point-min) (point-max) 4))
-
-;;;###autoload
 (defun enkan-repl-center-register-current-session (session-number)
-  "Register current directory's project as SESSION-NUMBER (1-4).
+  "Register current directory's project as SESSION-NUMBER (1-2).
 
 Category: Center File Multi-buffer Access"
-  (interactive "nSession number (1-4): ")
-  (unless (<= 1 session-number 4)
-    (user-error "Session number must be 1-4"))
-  (let* ((project-name (enkan-repl--extract-project-name default-directory))
-         (internal-number (+ session-number 3)))
-    (enkan-repl--register-session internal-number project-name)
+  (interactive "nSession number (1-2): ")
+  (unless (<= 1 session-number 2)
+    (user-error "Session number must be 1-2"))
+  (let* ((project-name (enkan-repl--extract-project-name default-directory)))
+    (enkan-repl--register-session session-number project-name)
     (message "Registered session %d: %s" session-number project-name)))
 
 ;;;###autoload
@@ -1679,22 +1622,6 @@ Category: Center File Multi-buffer Access"
   (enkan-repl-center-register-current-session 2))
 
 ;;;###autoload
-(defun enkan-repl-center-register-session-3 ()
-  "Register current project as session 3.
-
-Category: Center File Multi-buffer Access"
-  (interactive)
-  (enkan-repl-center-register-current-session 3))
-
-;;;###autoload
-(defun enkan-repl-center-register-session-4 ()
-  "Register current project as session 4.
-
-Category: Center File Multi-buffer Access"
-  (interactive)
-  (enkan-repl-center-register-current-session 4))
-
-;;;###autoload
 (defun enkan-repl-center-list-sessions ()
   "Display currently registered sessions.
 
@@ -1706,7 +1633,7 @@ Category: Center File Multi-buffer Access"
           (let* ((internal-num (car session))
                  (user-num (- internal-num 3))
                  (project (cdr session)))
-            (when (<= 1 user-num 4)
+            (when (<= 1 user-num 2)
               (setq msg (concat msg (format "  %d: %s\n" user-num project))))))
         (message "%s" msg))
     (message "No sessions registered")))
@@ -1747,7 +1674,7 @@ Category: Center File Multi-buffer Access"
     (princ "  Prefix notation: :project-name command\n")
     (princ "    Example: :pt-tools npm test\n")
     (princ "    Example: :1 ls -la  (to session 1)\n\n")
-    (princ "  Universal arguments: C-u 1-4 <send-command>\n")
+    (princ "  Universal arguments: C-u 1-2 <send-command>\n")
     (princ "    C-u 1 enkan-repl-send-line  - Send line to session 1\n")
     (princ "    C-u 2 enkan-repl-send-region  - Send region to session 2\n\n")
     (princ "DIRECT COMMANDS:\n")
@@ -1775,9 +1702,8 @@ Category: Center File Multi-buffer Access"
   (interactive)
   (let ((session-count (length enkan-repl-session-list)))
     (cond
-     ((<= session-count 2) (enkan-repl-setup-2session-layout))
-     ((= session-count 3)  (enkan-repl-setup-3session-layout))
-     ((>= session-count 4) (enkan-repl-setup-4session-layout))
+     ((= session-count 1) (delete-other-windows))
+     ((= session-count 2) (enkan-repl-setup-2session-layout))
      (t (enkan-repl-setup-2session-layout))))
   (message "Center file layout setup completed"))
 
@@ -1897,8 +1823,8 @@ This function only starts eat sessions - use enkan-repl-setup (C-M-l) to arrange
     (unless alias-list
       (error "Layout '%s' not found" layout-name))
     (let ((session-count (length alias-list)))
-      (when (> session-count 4)
-        (error "Too many projects: %d (max 4)" session-count))
+      (when (> session-count 2)
+        (error "Too many projects: %d (max 2)" session-count))
       ;; Clear session list and reset any previous layout configuration
       (setq enkan-repl-session-list nil)
       (setq enkan-repl--session-counter 0)
@@ -1906,7 +1832,7 @@ This function only starts eat sessions - use enkan-repl-setup (C-M-l) to arrange
       (message "🧹 C-M-s: Reset - enkan-repl-session-list=%s, enkan-repl--session-counter=%d, enkan-repl--current-multi-project-layout=%s"
                "nil" 0 "nil")
       ;; Start sessions for each project
-      (let ((session-number 4)) ; Internal numbers start from 4
+      (let ((session-number 1)) ; Session numbers start from 1
         (dolist (alias alias-list)
           (let ((project-info (enkan-repl--setup-project-session alias session-number)))
             (let ((project-name (car project-info))
@@ -2306,7 +2232,7 @@ Returns plist with :action and :data."
   (let ((trimmed-content (string-trim content)))
     (cond
      ;; Numeric prefix argument takes priority
-     ((and (numberp prefix-arg) (<= 1 prefix-arg 4))
+     ((and (numberp prefix-arg) (<= 1 prefix-arg 2))
       (list :action 'prefix-number :data prefix-arg))
      ;; Check if content contains only :esc
      ((string= trimmed-content ":esc")
@@ -2392,7 +2318,7 @@ Looks for a project alias in enkan-repl-project-aliases and sends ESC to corresp
 
 (defun enkan-repl-center-send-line (&optional arg)
   "Send current line to center file session.
-With prefix argument ARG (1-4), send to specific session number.
+With prefix argument ARG (1-2), send to specific session number.
 Line starting with ':alias esc' sends ESC key to buffer containing alias.
 Line containing only ':esc' sends ESC key to a project buffer.
 Without prefix argument, send line to selected buffer.
