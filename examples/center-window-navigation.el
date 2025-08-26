@@ -73,20 +73,13 @@ Returns cons (window . buffer-name) or nil if session not registered."
   (let ((eat-setup (enkan-repl--setup-window-eat-buffer-pure
                      window session-number enkan-repl-session-list enkan-repl-center-project-registry)))
     (if eat-setup
-      (let ((buffer (get-buffer (cdr eat-setup)))
-            (project-name (cdr (assoc session-number enkan-repl-session-list))))
+      (let ((buffer (get-buffer (cdr eat-setup))))
         (if buffer
           (progn
             (select-window (car eat-setup))
-            ;; Set correct default-directory before switching buffer
-            (when project-name
-              (let ((project-path (enkan-repl--get-project-path-from-registry
-                                  project-name enkan-repl-center-project-registry)))
-                (when project-path
-                  (setq default-directory (expand-file-name project-path)))))
             (switch-to-buffer buffer)
-            (message "✅ Window %d: Opened eat buffer %s in %s"
-                    session-number (cdr eat-setup) default-directory))
+            (message "✅ Window %d: Opened eat buffer %s"
+                    session-number (cdr eat-setup)))
           (message "❌ Window %d: Eat buffer %s not found. Run C-M-s to start sessions."
             session-number (cdr eat-setup))))
       (message "❌ Window %d: No session registered for slot %d (internal number %d)."
@@ -96,7 +89,7 @@ Returns cons (window . buffer-name) or nil if session not registered."
 (defun enkan-repl-setup-2session-layout ()
   "Setup window layout for 2-session management.
   +--------+---+---+
-  |    1   | 4 | 5 |
+  |    1   | 2 | 3 |
   | center |   |   |
   |  file  |   |   |
   +-----+--+---+---+
@@ -129,6 +122,101 @@ Category: Utilities"
   (when (and (boundp 'enkan-repl-session-list) enkan-repl-session-list)
     (enkan-repl--setup-session-eat-buffer enkan-repl--window-2 1)
     (enkan-repl--setup-session-eat-buffer enkan-repl--window-3 2))
+  ;; Always select the center file window (Window 1) at the end
+  (when enkan-repl--window-1
+    (select-window enkan-repl--window-1)))
+
+;;;###autoload
+(defun enkan-repl-setup-3session-layout ()
+  "Setup window layout for 3-session management.
+  +--------+---+---+---+
+  |    1   | 2 | 3 | 4 |
+  | center |   |   |   |
+  |  file  |   |   |   |
+  +--------+---+---+---+
+
+  4, 5, 6: enkan-repl sessions
+
+Category: Utilities"
+  (interactive)
+  (delete-other-windows)
+  ;; Create left column for center file (30%) and right section (70%)
+  (split-window-right (floor (* (window-width) 0.3)))
+  ;; Move to right section and split into 3 columns
+  (other-window 1)
+  (split-window-right (floor (* (window-width) 0.4)))
+  (other-window 1)
+  (split-window-right (floor (* (window-width) 0.5)))
+  ;; Set window variables - direct assignment by position
+  ;; Currently at rightmost window, go back to leftmost
+  (other-window 2)
+  (setq enkan-repl--window-1 (selected-window))
+  (other-window 1)
+  (setq enkan-repl--window-2 (selected-window))
+  (other-window 1)
+  (setq enkan-repl--window-3 (selected-window))
+  (other-window 1)
+  (setq enkan-repl--window-4 (selected-window))
+  ;; Open center file in window 1
+  (when (and enkan-repl--window-1 enkan-repl-center-file)
+    (select-window enkan-repl--window-1)
+    (find-file enkan-repl-center-file)
+    (message "✅ Window 1: Opened center file %s" enkan-repl-center-file))
+  ;; Setup eat buffers in session windows (4, 5, 6 in multi-project order)
+  (when (and (boundp 'enkan-repl-session-list) enkan-repl-session-list)
+    (enkan-repl--setup-session-eat-buffer enkan-repl--window-2 1)
+    (enkan-repl--setup-session-eat-buffer enkan-repl--window-3 2)
+    (enkan-repl--setup-session-eat-buffer enkan-repl--window-4 3))
+  ;; Always select the center file window (Window 1) at the end
+  (when enkan-repl--window-1
+    (select-window enkan-repl--window-1)))
+
+;;;###autoload
+(defun enkan-repl-setup-4session-layout ()
+  "Setup window layout for 4-session management.
+  +--------+---+---+---+---+
+  |    1   | 2 | 3 | 4 | 5 |
+  | center |   |   |   |   |
+  |  file  |   |   |   |   |
+  +--------+---+---+---+---+
+
+  4, 5, 6, 7: enkan-repl sessions
+
+Category: Utilities"
+  (interactive)
+  (delete-other-windows)
+  ;; Create left column for center file (30%) and right section (70%)
+  (split-window-right (floor (* (window-width) 0.3)))
+  ;; Move to right section and split into 4 columns
+  (other-window 1)
+  (split-window-right (floor (* (window-width) 0.3)))
+  (other-window 1)
+  (split-window-right (floor (* (window-width) 0.4)))
+  (other-window 1)
+  (split-window-right)
+  ;; Set window variables - direct assignment by position
+  ;; Currently at rightmost window, go back to leftmost
+  (other-window 2)
+  (setq enkan-repl--window-1 (selected-window))
+  (other-window 1)
+  (setq enkan-repl--window-2 (selected-window))
+  (other-window 1)
+  (setq enkan-repl--window-3 (selected-window))
+  (other-window 1)
+  (setq enkan-repl--window-4 (selected-window))
+  (other-window 1)
+  (setq enkan-repl--window-5 (selected-window))
+  ;; Open center file in window 1
+  (when (and enkan-repl--window-1 enkan-repl-center-file)
+    (select-window enkan-repl--window-1)
+    (find-file enkan-repl-center-file)
+    (message "✅ Window 1: Opened center file %s" enkan-repl-center-file))
+  ;; Setup eat buffers in session windows (4, 5, 6, 7 in multi-project order)
+  (when (and (boundp 'enkan-repl-session-list) enkan-repl-session-list)
+    (enkan-repl--setup-session-eat-buffer enkan-repl--window-2 1)
+    (enkan-repl--setup-session-eat-buffer enkan-repl--window-3 2)
+    (enkan-repl--setup-session-eat-buffer enkan-repl--window-4 3)
+    (enkan-repl--setup-session-eat-buffer enkan-repl--window-5 4))
   ;; Always select the center file window (Window 1) at the end
   (when enkan-repl--window-1
     (select-window enkan-repl--window-1)))
