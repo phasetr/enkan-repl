@@ -859,20 +859,15 @@ NUMBER should be a string (e.g., \\='1\\=', \\='2\\=', \\='3\\=') or empty strin
           (message "Sent ESC to session"))
       (message "❌ Cannot send - no matching eat session found for this directory"))))
 
-(defun enkan-repl--send-buffer-content (start end content-description &optional skip-empty-check)
+(defun enkan-repl--send-buffer-content (start end content-description &optional target-directory)
   "Send buffer content from START to END with CONTENT-DESCRIPTION.
 START and END define the region to send.
 CONTENT-DESCRIPTION is used in success message.
-If SKIP-EMPTY-CHECK is non-nil, send content even if empty."
-  (let*
-      ((raw-content
-        (buffer-substring-no-properties start end))
-       (content
-        (enkan-repl--sanitize-content raw-content))
-       (target-dir
-        (enkan-repl--get-target-directory-for-buffer)))
-    (if
-        (or skip-empty-check (and content (not (= (length content) 0))))
+TARGET-DIRECTORY specifies target directory for eat session."
+  (let* ((raw-content (buffer-substring-no-properties start end))
+         (content (enkan-repl--sanitize-content raw-content))
+         (target-dir (or target-directory (enkan-repl--get-target-directory-for-buffer))))
+    (if (and content (not (= (length content) 0)))
         (progn
           (if (enkan-repl--send-text content target-dir)
             (message "%s sent (%d characters)" content-description (length content))
@@ -1522,22 +1517,6 @@ Category: Center File Multi-buffer Access"
 Category: Center File Multi-buffer Access"
   (interactive "r")
   (enkan-repl--send-region-with-prefix start end 2))
-
-;;;###autoload
-(defun enkan-repl-center-send-buffer-to-session-1 ()
-  "Send entire buffer to session 1.
-
-Category: Center File Multi-buffer Access"
-  (interactive)
-  (enkan-repl--send-region-with-prefix (point-min) (point-max) 1))
-
-;;;###autoload
-(defun enkan-repl-center-send-buffer-to-session-2 ()
-  "Send entire buffer to session 2.
-
-Category: Center File Multi-buffer Access"
-  (interactive)
-  (enkan-repl--send-region-with-prefix (point-min) (point-max) 2))
 
 ;;;###autoload
 (defun enkan-repl-center-register-current-session (session-number)
@@ -2401,18 +2380,12 @@ Category: Center File Multi-buffer Access"
                   (with-current-buffer resolved-buffer
                     (enkan-repl-center-send-escape))
                   (message "Sent ESC to alias '%s' buffer" alias))
-              ;; non-esc case: send string with enkan-repl-send-region
-              (progn
-                (with-current-buffer resolved-buffer
-                  (let ((process-buffer resolved-buffer))
-                    (with-temp-buffer
-                      (insert remaining-part)
-                      (let ((enkan-repl-session-list '((1 . "enkan-repl")))
-                            (default-directory (expand-file-name default-directory)))
-                        (cl-letf (((symbol-function 'enkan-repl--get-buffer-for-directory)
-                                   (lambda (dir) process-buffer)))
-                          (enkan-repl-send-region (point-min) (point-max)))))))
-                (message "Sent string '%s' to alias '%s' buffer" remaining-part alias)))
+              ;; non-esc case: send string with enkan-repl--send-text
+              (let ((target-directory (enkan-repl--extract-directory-from-buffer-name-pure
+                                       (buffer-name resolved-buffer))))
+                (if (enkan-repl--send-text remaining-part target-directory)
+                    (message "Sent string '%s' to alias '%s' buffer" remaining-part alias)
+                  (message "Failed to send string to alias '%s' buffer" alias))))
           (message "No buffer found for alias '%s'" alias)))
     ;; No alias: select buffer and send
     (let* ((region-text (buffer-substring-no-properties start end))
@@ -2423,93 +2396,11 @@ Category: Center File Multi-buffer Access"
         (let* ((choices (enkan-repl--build-buffer-selection-choices-pure valid-buffers))
                (selected-display (completing-read "Select buffer for region send: " choices nil t))
                (target-buffer (cdr (assoc selected-display choices))))
-          (with-current-buffer target-buffer
-            (let ((process-buffer target-buffer))
-              (with-temp-buffer
-                (insert region-text)
-                (let ((enkan-repl-session-list '((1 . "enkan-repl")))
-                      (default-directory (expand-file-name default-directory)))
-                  (cl-letf (((symbol-function 'enkan-repl--get-buffer-for-directory)
-                             (lambda (dir) process-buffer)))
-                    (enkan-repl-send-region (point-min) (point-max)))))))
-          (message "Region sent to buffer: %s" (buffer-name target-buffer)))))))
-
-(defun enkan-repl-center-send-buffer (&optional action-string)
-  "Send entire buffer to center file buffer with action specification.
-ACTION-STRING format:
-- \":er alias\" - Send buffer to buffer containing alias
-- \":er alias esc\" - Send esc to buffer containing alias
-- \":er alias :ret\" - Send return to buffer containing alias
-- Empty or no prefix - Use interactive buffer selection
-
-Category: Center File Multi-buffer Access"
-  (interactive "sAction (or empty for selection): ")
-  (let* ((buffer-text (buffer-substring-no-properties (point-min) (point-max)))
-         (enkan-buffers (enkan-repl--collect-enkan-buffers-pure (buffer-list)))
-         (valid-buffers (enkan-repl--filter-valid-buffers-pure enkan-buffers)))
-
-    (if (or (null action-string) (string-empty-p action-string))
-        ;; No action specified - use selection UI
-        (if (> (length valid-buffers) 0)
-            (let* ((choices (enkan-repl--build-buffer-selection-choices-pure valid-buffers))
-                   (selected-display (completing-read "Select buffer for buffer send: " choices nil t))
-                   (target-buffer (cdr (assoc selected-display choices))))
-              (if (enkan-repl--center-send-text-to-buffer buffer-text target-buffer)
-                  (message "Buffer sent to buffer: %s" (buffer-name target-buffer))
-                (message "Failed to send buffer to buffer: %s" (buffer-name target-buffer))))
-          (message "No active enkan sessions found"))
-      ;; Parse action string
-      (let ((parsed (enkan-repl-center--parse-alias-command-pure action-string)))
-        (if (plist-get parsed :valid)
-            (let* ((alias (plist-get parsed :alias))
-                   (command (plist-get parsed :command))
-                   (resolved-buffer (enkan-repl-center--resolve-alias-to-buffer-pure
-                                    alias valid-buffers)))
-              (if resolved-buffer
-                  (cond
-                   ((eq command :esc)
-                    ;; Send ESC using exact same logic as enkan-repl--send-escape-directly
-                    (if (and resolved-buffer
-                             (with-current-buffer resolved-buffer
-                               (and (boundp 'eat--process)
-                                    eat--process
-                                    (process-live-p eat--process))))
-                        (progn
-                          (enkan-repl--debug-message "Sending ESC key to session buffer")
-                          (with-current-buffer resolved-buffer
-                            (eat--send-string eat--process "\e")
-                            ;; Move cursor to bottom after eat processes the output
-                            (run-at-time 0.01 nil
-                                         (lambda (buf)
-                                           (with-current-buffer buf
-                                             (goto-char (point-max))))
-                                         resolved-buffer)
-                            (enkan-repl--debug-message "ESC key sent successfully"))
-                          (message "Sent ESC to session"))
-                      (message "❌ Cannot send - buffer has no active eat process")))
-                   ((eq command :ret)
-                    (if (enkan-repl--center-send-text-to-buffer "\r" resolved-buffer)
-                        (message "Return sent to buffer: %s" (buffer-name resolved-buffer))
-                      (message "Failed to send return to buffer: %s" (buffer-name resolved-buffer))))
-                   ((eq command :empty)
-                    (if (enkan-repl--center-send-text-to-buffer buffer-text resolved-buffer)
-                        (message "Buffer sent to buffer: %s" (buffer-name resolved-buffer))
-                      (message "Failed to send buffer to buffer: %s" (buffer-name resolved-buffer))))
-                   ((eq command :text)
-                    (let ((text-to-send (plist-get parsed :text)))
-                      (if (enkan-repl--center-send-text-to-buffer text-to-send resolved-buffer)
-                          (message "Text sent to buffer: %s" (buffer-name resolved-buffer))
-                        (message "Failed to send text to buffer: %s" (buffer-name resolved-buffer)))))
-                   (t
-                    (message "Unknown command: %s" command)))
-                ;; Try auto-recovery if buffer is not found
-                (if (and (string-match "^\\*enkan:" (buffer-name))
-                         (y-or-n-p (format "No buffer found for alias '%s'. Try auto-recovery? " alias)))
-                    (progn
-                      (enkan-repl-revive-current-buffer)
-                      (message "Auto-recovery attempted. Try the command again."))
-                  (message "No buffer found matching alias: %s" alias)))
-          (message "Invalid action format: %s" (plist-get parsed :message))))))))
+          (let ((target-directory (enkan-repl--extract-directory-from-buffer-name-pure
+                                   (buffer-name target-buffer))))
+            (if (enkan-repl--send-text region-text target-directory)
+                (message "Region sent to buffer: %s" (buffer-name target-buffer))
+              (message "Failed to send region to buffer: %s" (buffer-name target-buffer)))))))))
 
 (provide 'enkan-repl)
 
