@@ -1875,9 +1875,10 @@ Category: Center File Multi-buffer Access"
         (setq enkan-repl-session-list nil)
         (setq enkan-repl--session-counter 0)
         (setq enkan-repl--current-multi-project-layout nil)
+        (enkan-center-file-global-mode nil)
         ;; Display what variables were reset
         (message "🧹 C-M-f: Reset - enkan-repl-session-list=%s, enkan-repl--session-counter=%d, enkan-repl--current-multi-project-layout=%s"
-                 "nil" 0 "nil")
+          "nil" 0 "nil")
         (message "✅ C-M-f: Terminated %d sessions, cleared session list and reset layout configuration" terminated-count)))))
 
 ;;;###autoload
