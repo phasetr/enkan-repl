@@ -371,7 +371,7 @@ Returns formatted string."
    (lambda (session)
      (let ((name (plist-get session :name))
            (status (plist-get session :status)))
-       (format "%s [%s]" 
+       (format "%s [%s]"
                (if (string-match "\\*enkan:\\(.*?\\)\\*" name)
                    (match-string 1 name)
                  name)
