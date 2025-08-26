@@ -930,13 +930,11 @@ If SKIP-EMPTY-CHECK is non-nil, send content even if empty."
 ;;;###autoload
 (defun enkan-repl-send-region (start end &optional arg)
   "Send the text in region from START to END to eat session.
-With prefix argument ARG (1-2), send to specific session number.
 
 Category: Text Sender"
   (interactive "r\nP")
   (when (use-region-p)
     (if (and (numberp arg) (<= 1 arg 2))
-        (enkan-repl--send-region-with-prefix start end arg)
       (enkan-repl--send-buffer-content start end "Region"))))
 
 ;;;###autoload
