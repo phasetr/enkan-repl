@@ -885,34 +885,13 @@ Category: Text Sender"
     (enkan-repl--send-buffer-content start end)))
 
 ;;;###autoload
-(defun enkan-repl-send-buffer (&optional arg)
-  "Send the entire current buffer to eat session.
-With prefix argument ARG (1-2), send to specific session number.
-
-Category: Text Sender"
-  (interactive "P")
-  (if (and (numberp arg) (<= 1 arg 2))
-      (enkan-repl--send-region-with-prefix (point-min) (point-max) arg)
-    (enkan-repl--send-buffer-content
-     (point-min) (point-max)
-     (format "File %s" (buffer-name)) t)))
-
-;;;###autoload
-(defun enkan-repl-send-rest-of-buffer ()
-  "Send rest of buffer from cursor position to end to eat session.
-
-Category: Text Sender"
-  (interactive)
-  (enkan-repl--send-buffer-content (point) (point-max) "Rest of buffer"))
-
-;;;###autoload
 (defun enkan-repl-send-line ()
   "Send the current line to eat session.
 
 Category: Text Sender"
   (interactive)
   (enkan-repl--send-buffer-content
-   (line-beginning-position) (line-end-position) "Line"))
+   (line-beginning-position) (line-end-position)))
 
 ;;;###autoload
 (defun enkan-repl-send-enter ()
