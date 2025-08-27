@@ -589,40 +589,6 @@ Returns: Directory path or nil"
     (when project-info
       (cdr project-info))))  ; project-path part
 
-(defun enkan-repl--handle-prefix-target-not-found (prefix-target command content-description)
-  "Handle case when prefix target is not found.
-1. Get directory path from project registry
-2. Start session if directory exists
-3. Show error message if not found"
-  (let ((project-dir (enkan-repl--get-project-directory-from-registry prefix-target)))
-    (cond
-     ;; Project directory exists in registry and is accessible
-     ((and project-dir (file-directory-p project-dir))
-      (let ((default-directory project-dir))
-        (enkan-repl-start-eat)
-        (message "Started session for %s at %s" prefix-target project-dir)
-        ;; Send command after brief delay following session startup
-        (run-at-time 0.5 nil
-                     (lambda (cmd dir desc target)
-                       (when (enkan-repl--send-text cmd dir)
-                         (message "%s sent to %s (%d characters)"
-                                  desc target (length cmd))))
-                     command project-dir content-description prefix-target)))
-     ;; Project exists in registry but directory not found
-     (project-dir
-      (message "❌ Project '%s' directory not found: %s. Check enkan-repl-center-project-registry."
-               prefix-target project-dir))
-     ;; Project not found in registry
-     (t
-      (message "❌ Project '%s' not found. Check enkan-repl-project-aliases and enkan-repl-center-project-registry."
-               prefix-target)))))
-
-(defun enkan-repl--get-session-by-user-number (user-number)
-  "Get project name from user number.
-user-number: Integer 1-2 (direct session number)
-Returns: Project name or nil"
-  (cdr (assoc user-number enkan-repl-session-list)))
-
 (defun enkan-repl--register-session (session-number project-name)
   "Register project to session number.
 Order is maintained by session number (ascending)."
@@ -631,57 +597,6 @@ Order is maintained by session number (ascending)."
     (setq enkan-repl-session-list
           (sort (cons new-entry updated-list)
                 (lambda (a b) (< (car a) (car b)))))))
-
-(defun enkan-repl--auto-register-session (project-name)
-  "Automatically register session with number.
-Executes only when no existing number assignment exists.
-project-name: Alias-resolved canonical project name"
-  (let ((resolved-name (enkan-repl--resolve-project-name project-name)))
-    (unless (rassoc resolved-name enkan-repl-session-list)
-      (let ((next-number (+ 1 (mod enkan-repl--session-counter 2))))
-        (setq enkan-repl--session-counter (1+ enkan-repl--session-counter))
-        (when (<= next-number 2)
-          (enkan-repl--register-session next-number resolved-name))))))
-
-(defun enkan-repl--get-session-by-name-or-alias (name-or-alias)
-  "Get session number from project name or alias.
-Returns: Session number or nil"
-  (let ((resolved-name (enkan-repl--resolve-project-name name-or-alias)))
-    (car (rassoc resolved-name enkan-repl-session-list))))
-
-(defun enkan-repl--register-session-with-alias-support (session-number name-or-alias)
-  "Alias-aware session registration.
-name-or-alias: Project name or alias
-Register with canonical name after alias resolution"
-  (let ((resolved-name (enkan-repl--resolve-project-name name-or-alias)))
-    (enkan-repl--register-session session-number resolved-name)))
-
-(defun enkan-repl--parse-prefix-notation (text)
-  "Parse prefix notation (:symbol).
-Returns: (target . command) cons
-  target: Project name/alias/number, or nil (no prefix)
-  command: Command execution part"
-  (if (string-match "^:\\([^ \t]+\\)[ \t]+\\(.*\\)" text)
-      (cons (match-string 1 text) (match-string 2 text))
-    (cons nil text)))
-
-(defun enkan-repl--resolve-target-to-directory (target)
-  "Resolve send target to directory path.
-target: Project name, alias, or number 1-2
-Returns: Directory path or nil"
-  (cond
-   ;; Numeric case (1-2)
-   ((and (stringp target) (string-match "^[1-2]$" target))
-    (let* ((user-number (string-to-number target))
-           (project-name (enkan-repl--get-session-by-user-number user-number)))
-      (when project-name
-        (enkan-repl--find-directory-by-project-name project-name))))
-   ;; Project name or alias
-   ((stringp target)
-    (let ((resolved-name (enkan-repl--center-resolve-project-name target)))
-      (enkan-repl--find-directory-by-project-name resolved-name)))
-   ;; Other (no prefix)
-   (t default-directory)))
 
 (defun enkan-repl--extract-directory-from-buffer-name-pure (buffer-name)
   "Pure function to extract expanded directory path from enkan buffer name.
@@ -1425,35 +1340,6 @@ Category: Command Palette"
 
 ;;;; Center File Multi-buffer Access Commands
 
-
-;;;###autoload
-(defun enkan-repl-center-register-current-session (session-number)
-  "Register current directory's project as SESSION-NUMBER (1-2).
-
-Category: Center File Multi-buffer Access"
-  (interactive "nSession number (1-2): ")
-  (unless (<= 1 session-number 2)
-    (user-error "Session number must be 1-2"))
-  (let* ((project-name (enkan-repl--extract-project-name default-directory)))
-    (enkan-repl--register-session session-number project-name)
-    (message "Registered session %d: %s" session-number project-name)))
-
-;;;###autoload
-(defun enkan-repl-center-register-session-1 ()
-  "Register current project as session 1.
-
-Category: Center File Multi-buffer Access"
-  (interactive)
-  (enkan-repl-center-register-current-session 1))
-
-;;;###autoload
-(defun enkan-repl-center-register-session-2 ()
-  "Register current project as session 2.
-
-Category: Center File Multi-buffer Access"
-  (interactive)
-  (enkan-repl-center-register-current-session 2))
-
 ;;;###autoload
 (defun enkan-repl-center-list-sessions ()
   "Display currently registered sessions.
@@ -1982,16 +1868,6 @@ Category: Center File Multi-buffer Access"
   (interactive "P")
   (enkan-repl--center-send-text-with-selection "" prefix-arg))
 
-(defun enkan-repl-center-send-5 (&optional prefix-arg)
-  "Send '5' to eat session buffer from center file.
-Always requires buffer specification:
-- Without prefix: Select from available enkan buffers
-- With numeric prefix: Send to buffer at that index (1-based)
-
-Category: Center File Multi-buffer Access"
-  (interactive "P")
-  (enkan-repl--center-send-number-with-selection "5" prefix-arg))
-
 (defun enkan-repl--center-send-text-with-selection (text prefix-arg)
   "Internal function to send TEXT with buffer selection logic using PREFIX-ARG."
   (message "Starting enkan-repl-center-send-text with prefix-arg: %s" prefix-arg)
@@ -2032,50 +1908,6 @@ Category: Center File Multi-buffer Access"
             (message "Cannot send to selected buffer: %s" (plist-get info :name))))))
      (t
       (message "No valid action determined for text sending")))))
-
-(defun enkan-repl--center-send-number-with-selection (number prefix-arg)
-  "Internal function to send NUMBER with buffer selection logic using PREFIX-ARG."
-  (message "Starting enkan-repl-center-send-%s with prefix-arg: %s" number prefix-arg)
-  (let ((validation (enkan-repl--validate-number-input-pure number)))
-    (if (not (plist-get validation :valid))
-        (message "Invalid number input: %s" (plist-get validation :message))
-      (let* ((enkan-buffers (enkan-repl--collect-enkan-buffers-pure (buffer-list)))
-             (valid-buffers (enkan-repl--filter-valid-buffers-pure enkan-buffers))
-             (parsed-arg (enkan-repl--parse-prefix-arg-pure prefix-arg)))
-        (message "Found %d enkan buffers, %d valid for number sending"
-                 (length enkan-buffers) (length valid-buffers))
-        (cond
-         ((= (length valid-buffers) 0)
-          (message "No active enkan sessions found"))
-         ((eq 'invalid (plist-get parsed-arg :action))
-          (message "Invalid prefix argument"))
-         ((eq 'index (plist-get parsed-arg :action))
-          (let* ((index (plist-get parsed-arg :index))
-                 (target-buffer (enkan-repl--get-buffer-by-index-pure valid-buffers index)))
-            (message "Attempting to send number %s to buffer index %d" number index)
-            (if target-buffer
-                (let* ((send-result (enkan-repl--send-number-to-buffer-pure number target-buffer))
-                       (info (enkan-repl--get-buffer-process-info-pure target-buffer)))
-                  (if (plist-get send-result :can-send)
-                      (progn
-                        (enkan-repl--center-send-text-to-buffer number target-buffer)
-                        (message "Sent '%s' to buffer %d: %s" number index (plist-get info :name)))
-                    (message "Cannot send to buffer %d: %s" index (plist-get send-result :message))))
-              (message "Invalid buffer index %d (valid range: 1-%d)" index (length valid-buffers)))))
-         ((enkan-repl--should-show-buffer-selection-pure (plist-get parsed-arg :action) valid-buffers)
-          (let* ((choices (enkan-repl--build-buffer-selection-choices-pure valid-buffers))
-                 (selected-display (completing-read (format "Select buffer to send '%s': " number) choices nil t))
-                 (selected-buffer (cdr (assoc selected-display choices))))
-            (message "User selected buffer for number %s: %s" number (buffer-name selected-buffer))
-            (let* ((send-result (enkan-repl--send-number-to-buffer-pure number selected-buffer))
-                   (info (enkan-repl--get-buffer-process-info-pure selected-buffer)))
-              (if (plist-get send-result :can-send)
-                  (progn
-                    (enkan-repl--center-send-text-to-buffer number selected-buffer)
-                    (message "Sent '%s' to selected buffer: %s" number (plist-get info :name)))
-                (message "Cannot send to selected buffer: %s" (plist-get send-result :message))))))
-         (t
-          (message "No valid action determined for number sending")))))))
 
 (defun enkan-repl--analyze-center-send-content-pure (content prefix-arg)
   "Pure function to analyze center-send content and determine action.
