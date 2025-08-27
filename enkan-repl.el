@@ -187,9 +187,9 @@ Example: \\='((\"pt\" . \"pt-tools\") (\"er\" . \"enkan-repl\"))"
 (defcustom enkan-repl-center-project-registry nil
   "Project startup registry for center file functionality.
 Each element is in the format (alias . (project-name . project-path)).
-Example: \\='((\"pt\" . (\"pt-tools\" . \"/path/to/pt-tools\"))
-      (\"er\" . (\"enkan-repl\" . \"/path/to/enkan-repl\"))
-      (\"eat\" . (\"emacs-eat\" . \"/path/to/emacs-eat\")))"
+Example: \\='((\"pt\" . (\"pt-tools\" . \"/path/to/pt-tools/\"))
+      (\"er\" . (\"enkan-repl\" . \"/path/to/enkan-repl/\"))
+      (\"eat\" . (\"emacs-eat\" . \"/path/to/emacs-eat/\")))"
   :type '(alist :key-type string
                 :value-type (cons string string))
   :group 'enkan-repl)
