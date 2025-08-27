@@ -2357,10 +2357,10 @@ Category: Center File Multi-buffer Access"
                 ;; esc case: send center-send-escape
                 (with-current-buffer resolved-buffer
                   (enkan-repl-center-send-escape))
-                ;; non-esc case: send string with enkan-repl--send-text
+                ;; non-esc case: send string with enkan-repl--send-buffer-content
                 (let ((target-directory (enkan-repl--extract-directory-from-buffer-name-pure
                                          (buffer-name resolved-buffer))))
-                  (if (enkan-repl--send-text remaining-part target-directory)
+                  (if (enkan-repl--send-buffer-content start end target-directory)
                     (message "Sent string to alias '%s' buffer" alias)
                     (message "Failed to send string to alias '%s' buffer" alias))))
             (message "No buffer found for alias '%s'" alias)))
@@ -2374,7 +2374,7 @@ Category: Center File Multi-buffer Access"
                  (target-buffer (cdr (assoc selected-display choices))))
             (let ((target-directory (enkan-repl--extract-directory-from-buffer-name-pure
                                       (buffer-name target-buffer))))
-              (if (enkan-repl--send-text region-text target-directory)
+              (if (enkan-repl--send-buffer-content start end target-directory)
                   (message "Region sent to buffer: %s" (buffer-name target-buffer))
                 (message "Failed to send region to buffer: %s" (buffer-name target-buffer))))))))))
 
