@@ -2331,16 +2331,16 @@ Category: Center File Multi-buffer Access"
                (enkan-buffers (enkan-repl--collect-enkan-buffers-pure (buffer-list)))
                (resolved-buffer (enkan-repl-center--resolve-alias-to-buffer-pure alias enkan-buffers)))
           (if resolved-buffer
-              (if (string= remaining-part "esc")
-                ;; esc case: send center-send-escape
-                (with-current-buffer resolved-buffer
-                  (enkan-repl-center-send-escape))
-                ;; non-esc case: send string with enkan-repl--send-buffer-content
-                (let ((target-directory (enkan-repl--extract-directory-from-buffer-name-pure
-                                         (buffer-name resolved-buffer))))
-                  (if (enkan-repl--send-buffer-content start end target-directory)
-                    (message "Sent string to alias '%s' buffer" alias)
-                    (message "Failed to send string to alias '%s' buffer" alias))))
+            (if (string= remaining-part "esc")
+              ;; esc case: send center-send-escape with skip-ui
+              (enkan-repl--center-send-escape-internal 'skip-ui)
+              ;; non-esc case: send string with enkan-repl--send-buffer-content
+              (let ((target-directory (enkan-repl--extract-directory-from-buffer-name-pure
+                                        (buffer-name resolved-buffer)))
+                     (start-no-alias (+ start (length alias) 2)))
+                (if (enkan-repl--send-buffer-content start-no-alias end target-directory)
+                  (message "Sent string to alias '%s' buffer" alias)
+                  (message "Failed to send string to alias '%s' buffer" alias))))
             (message "No buffer found for alias '%s'" alias)))
       ;; No alias: select buffer and send
       (let* ((enkan-buffers (enkan-repl--collect-enkan-buffers-pure (buffer-list)))
