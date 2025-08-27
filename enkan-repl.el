@@ -703,22 +703,14 @@ Returns: Directory path or nil"
           (cl-return-from search-buffers
             (enkan-repl--extract-directory-from-buffer-name-pure (buffer-name))))))))
 
-
-(defun enkan-repl--send-text-to-project (text project-name)
-  "Send text to session of specified project name."
-  (let ((directory (enkan-repl--find-directory-by-project-name project-name)))
-    (if directory
-        (enkan-repl--send-text text directory)
-      (user-error "Directory for project '%s' not found" project-name))))
-
 (defun enkan-repl--buffer-matches-directory-pure (buffer-name target-directory)
   "Pure function to check if buffer name matches target directory.
 Returns t if buffer is enkan buffer for target directory, nil otherwise."
   (and (stringp buffer-name)
-       (stringp target-directory)
-       (string-match-p "^\\*enkan:" buffer-name)
-       (let ((expanded-target (expand-file-name target-directory)))
-         (string= buffer-name (concat "*enkan:" expanded-target "*")))))
+    (stringp target-directory)
+    (string-match-p "^\\*enkan:" buffer-name)
+    (let ((expanded-target (expand-file-name target-directory)))
+      (string= buffer-name (concat "*enkan:" expanded-target "*")))))
 
 (defun enkan-repl--get-buffer-for-directory (&optional directory)
   "Get the eat buffer for DIRECTORY if it exists and is live.
@@ -2163,21 +2155,6 @@ Returns buffer object or nil if not found."
             nil))
       ;; Alias not found in project aliases
       nil)))
-
-(defun enkan-repl--send-escape-directly ()
-  "Send escape key to the buffer corresponding to a project alias, like \":pr\".
-Looks for a project alias in enkan-repl-project-aliases and sends ESC to corresponding buffer."
-  (let* ((pr-project (cdr (assoc "pr" enkan-repl-project-aliases)))
-         (target-buffer (when pr-project
-                          (enkan-repl--get-buffer-for-directory
-                           (enkan-repl--get-project-directory-from-registry pr-project)))))
-    (if target-buffer
-        (let ((info (enkan-repl--get-buffer-process-info-pure target-buffer)))
-          (when (plist-get info :has-process)
-            (with-current-buffer target-buffer
-              (eat--send-string (plist-get info :process) "\e"))
-            (message "Sent ESC to a project buffer: %s" (plist-get info :name))))
-      (message "No project alias configured or buffer not found"))))
 
 (defun enkan-repl-center-send-line ()
   "Send current line to a suitable eat session.
