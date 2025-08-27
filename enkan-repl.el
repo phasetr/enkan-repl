@@ -747,7 +747,7 @@ Returns t if buffer is enkan buffer for target directory, nil otherwise."
        (stringp target-directory)
        (string-match-p "^\\*enkan:" buffer-name)
        (let ((expanded-target (expand-file-name target-directory)))
-         (string-prefix-p (concat "*enkan:" expanded-target) buffer-name))))
+         (string= buffer-name (concat "*enkan:" expanded-target "*")))))
 
 (defun enkan-repl--get-buffer-for-directory (&optional directory)
   "Get the eat buffer for DIRECTORY if it exists and is live.
@@ -2346,47 +2346,34 @@ Category: Center File Operations"
 Category: Center File Multi-buffer Access"
   (interactive "r")
   (let ((region-text (buffer-substring-no-properties start end)))
-    (message "DEBUG: region-text='%s'" region-text)
     (if (string-match "^:\\([^ ]+\\) " region-text)
         ;; Alias format: ":alias content"
         (let* ((alias (match-string 1 region-text))
                (remaining-part (substring region-text (match-end 0)))
                (enkan-buffers (enkan-repl--collect-enkan-buffers-pure (buffer-list)))
                (resolved-buffer (enkan-repl-center--resolve-alias-to-buffer-pure alias enkan-buffers)))
-          (message "DEBUG: alias='%s', remaining-part='%s'" alias remaining-part)
-          (message "DEBUG: found %d enkan-buffers" (length enkan-buffers))
-          (message "DEBUG: resolved-buffer=%s" (if resolved-buffer (buffer-name resolved-buffer) "nil"))
           (if resolved-buffer
               (if (string= remaining-part "esc")
-                  ;; esc case: send center-send-escape
-                  (progn
-                    (message "DEBUG: sending ESC to buffer")
-                    (with-current-buffer resolved-buffer
-                      (enkan-repl-center-send-escape))
-                    (message "Sent ESC to alias '%s' buffer" alias))
+                ;; esc case: send center-send-escape
+                (with-current-buffer resolved-buffer
+                  (enkan-repl-center-send-escape))
                 ;; non-esc case: send string with enkan-repl--send-text
                 (let ((target-directory (enkan-repl--extract-directory-from-buffer-name-pure
                                          (buffer-name resolved-buffer))))
-                  (message "DEBUG: target-directory='%s'" target-directory)
                   (if (enkan-repl--send-text remaining-part target-directory)
-                      (message "Sent string '%s' to alias '%s' buffer" remaining-part alias)
+                    (message "Sent string to alias '%s' buffer" alias)
                     (message "Failed to send string to alias '%s' buffer" alias))))
             (message "No buffer found for alias '%s'" alias)))
       ;; No alias: select buffer and send
-      (message "DEBUG: No alias detected, entering buffer selection")
       (let* ((enkan-buffers (enkan-repl--collect-enkan-buffers-pure (buffer-list)))
              (valid-buffers (enkan-repl--filter-valid-buffers-pure enkan-buffers)))
-        (message "DEBUG: found %d enkan-buffers, %d valid-buffers" (length enkan-buffers) (length valid-buffers))
         (if (= (length valid-buffers) 0)
             (message "No active enkan sessions found")
           (let* ((choices (enkan-repl--build-buffer-selection-choices-pure valid-buffers))
                  (selected-display (completing-read "Select buffer for region send: " choices nil t))
                  (target-buffer (cdr (assoc selected-display choices))))
-            (message "DEBUG: selected-display='%s', target-buffer=%s" selected-display (if target-buffer (buffer-name target-buffer) "nil"))
             (let ((target-directory (enkan-repl--extract-directory-from-buffer-name-pure
-                                     (buffer-name target-buffer))))
-              (message "DEBUG: target-directory='%s'" target-directory)
-              (message "DEBUG: sending region-text='%s'" region-text)
+                                      (buffer-name target-buffer))))
               (if (enkan-repl--send-text region-text target-directory)
                   (message "Region sent to buffer: %s" (buffer-name target-buffer))
                 (message "Failed to send region to buffer: %s" (buffer-name target-buffer))))))))))
