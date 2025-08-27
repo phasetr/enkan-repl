@@ -1954,37 +1954,63 @@ Always requires buffer specification:
 Category: Center File Multi-buffer Access"
   (interactive "P")
   (message "Starting enkan-repl-center-send-escape with prefix-arg: %s" prefix-arg)
+  (cond
+   ((numberp prefix-arg)
+    ;; C-u numeric for layout index specification
+    (let* ((current-layout (cdr (assoc enkan-repl--current-multi-project-layout enkan-repl-center-multi-project-layouts)))
+           (layout-count (length current-layout)))
+      (if (and (<= 1 prefix-arg) (<= prefix-arg layout-count))
+          (let* ((target-alias (nth (1- prefix-arg) current-layout))
+                 (enkan-buffers (enkan-repl--collect-enkan-buffers-pure (buffer-list)))
+                 (resolved-buffer (enkan-repl-center--resolve-alias-to-buffer-pure target-alias enkan-buffers)))
+            (message "Sending ESC to layout index %d (alias: %s)" prefix-arg target-alias)
+            (if resolved-buffer
+                (enkan-repl--send-escape-to-buffer resolved-buffer nil)
+              (message "No buffer found for alias '%s'" target-alias)))
+        (message "Invalid layout index %d (valid range: 1-%d)" prefix-arg layout-count))))
+   (t
+    ;; No argument case shows buffer selection UI
+    (enkan-repl--center-send-escape-internal nil))))
+
+(defun enkan-repl--center-send-escape-internal (&optional buffer-index-or-skip-ui)
+  "Internal helper to send ESC key to eat session buffer from center file.
+BUFFER-INDEX-OR-SKIP-UI:
+- nil: Show buffer selection UI.
+- integer: Send to buffer at that index (1-based).
+- 'skip-ui: Skip buffer selection UI and send to default/first active buffer."
+  (message "Starting enkan-repl--center-send-escape-internal with arg: %s" buffer-index-or-skip-ui)
   (let* ((enkan-buffers (enkan-repl--collect-enkan-buffers-pure (buffer-list)))
-         (valid-buffers (enkan-repl--filter-valid-buffers-pure enkan-buffers))
-         (parsed-arg (enkan-repl--parse-prefix-arg-pure prefix-arg)))
+         (valid-buffers (enkan-repl--filter-valid-buffers-pure enkan-buffers)))
     (message "Found %d enkan buffers, %d valid"
              (length enkan-buffers) (length valid-buffers))
     (cond
      ((= (length valid-buffers) 0)
       (message "No active enkan sessions found"))
-     ((eq 'invalid (plist-get parsed-arg :action))
-      (message "Invalid prefix argument"))
-     ((eq 'index (plist-get parsed-arg :action))
-      (let* ((index (plist-get parsed-arg :index))
+     ((integerp buffer-index-or-skip-ui)
+      (let* ((index buffer-index-or-skip-ui)
              (target-buffer (enkan-repl--get-buffer-by-index-pure valid-buffers index)))
         (message "Attempting to send ESC to buffer index %d" index)
         (if target-buffer
-            (let ((info (enkan-repl--get-buffer-process-info-pure target-buffer)))
-              (with-current-buffer target-buffer
-                (eat--send-string (plist-get info :process) "\e"))
-              (message "Sent ESC to buffer %d: %s" index (plist-get info :name)))
+            (enkan-repl--send-escape-to-buffer target-buffer index)
           (message "Invalid buffer index %d (valid range: 1-%d)" index (length valid-buffers)))))
-     ((enkan-repl--should-show-buffer-selection-pure (plist-get parsed-arg :action) valid-buffers)
+     ((eq 'skip-ui buffer-index-or-skip-ui)
+      (if valid-buffers
+          (enkan-repl--send-escape-to-buffer (car valid-buffers) 1)
+        (message "No active enkan sessions found to send ESC directly.")))
+     (t
       (let* ((choices (enkan-repl--build-buffer-selection-choices-pure valid-buffers))
              (selected-display (completing-read "Select buffer to send ESC: " choices nil t))
              (selected-buffer (cdr (assoc selected-display choices))))
-        (message "User selected buffer: %s" (buffer-name selected-buffer))
-        (let ((info (enkan-repl--get-buffer-process-info-pure selected-buffer)))
-          (with-current-buffer selected-buffer
-            (eat--send-string (plist-get info :process) "\e"))
-          (message "Sent ESC to selected buffer: %s" (plist-get info :name)))))
-     (t
-      (message "No valid action determined")))))
+        (when selected-buffer
+          (message "User selected buffer: %s" (buffer-name selected-buffer))
+          (enkan-repl--send-escape-to-buffer selected-buffer nil)))))))
+
+(defun enkan-repl--send-escape-to-buffer (buffer &optional index)
+  "Send ESC key to BUFFER. INDEX is for logging purposes."
+  (let ((info (enkan-repl--get-buffer-process-info-pure buffer)))
+    (with-current-buffer buffer
+      (eat--send-string (plist-get info :process) "\e"))
+    (message "Sent ESC to buffer %s: %s" (if index (format "%d" index) "selected") (plist-get info :name))))
 
 ;;;###autoload
 (defun enkan-repl-center-send-enter (&optional prefix-arg)
