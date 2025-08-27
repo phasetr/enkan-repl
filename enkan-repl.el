@@ -859,10 +859,9 @@ NUMBER should be a string (e.g., \\='1\\=', \\='2\\=', \\='3\\=') or empty strin
           (message "Sent ESC to session"))
       (message "❌ Cannot send - no matching eat session found for this directory"))))
 
-(defun enkan-repl--send-buffer-content (start end content-description &optional target-directory)
-  "Send buffer content from START to END with CONTENT-DESCRIPTION.
+(defun enkan-repl--send-buffer-content (start end &optional target-directory)
+  "Send buffer content from START to END.
 START and END define the region to send.
-CONTENT-DESCRIPTION is used in success message.
 TARGET-DIRECTORY specifies target directory for eat session."
   (let* ((raw-content (buffer-substring-no-properties start end))
          (content (enkan-repl--sanitize-content raw-content))
@@ -870,7 +869,7 @@ TARGET-DIRECTORY specifies target directory for eat session."
     (if (and content (not (= (length content) 0)))
         (progn
           (if (enkan-repl--send-text content target-dir)
-            (message "%s sent (%d characters)" content-description (length content))
+            (message "We can send a message!")
             (message "❌ Cannot send - no matching eat session found for this directory")))
       (message "No content to send (empty or whitespace only)"))))
 
@@ -2367,40 +2366,51 @@ Category: Center File Operations"
 
 Category: Center File Multi-buffer Access"
   (interactive "r")
-  (if (and action-string (string-match "^:\\([^ ]+\\) " action-string))
-      ;; Alias format: ":alias content"
-      (let* ((alias (match-string 1 action-string))
-             (remaining-part (substring action-string (match-end 0)))
-             (enkan-buffers (enkan-repl--collect-enkan-buffers-pure (buffer-list)))
-             (resolved-buffer (enkan-repl-center--resolve-alias-to-buffer-pure alias enkan-buffers)))
-        (if resolved-buffer
-            (if (string= remaining-part "esc")
-                ;; esc case: send center-send-escape
-                (progn
-                  (with-current-buffer resolved-buffer
-                    (enkan-repl-center-send-escape))
-                  (message "Sent ESC to alias '%s' buffer" alias))
-              ;; non-esc case: send string with enkan-repl--send-text
-              (let ((target-directory (enkan-repl--extract-directory-from-buffer-name-pure
-                                       (buffer-name resolved-buffer))))
-                (if (enkan-repl--send-text remaining-part target-directory)
-                    (message "Sent string '%s' to alias '%s' buffer" remaining-part alias)
-                  (message "Failed to send string to alias '%s' buffer" alias))))
-          (message "No buffer found for alias '%s'" alias)))
-    ;; No alias: select buffer and send
-    (let* ((region-text (buffer-substring-no-properties start end))
-           (enkan-buffers (enkan-repl--collect-enkan-buffers-pure (buffer-list)))
-           (valid-buffers (enkan-repl--filter-valid-buffers-pure enkan-buffers)))
-      (if (= (length valid-buffers) 0)
-          (message "No active enkan sessions found")
-        (let* ((choices (enkan-repl--build-buffer-selection-choices-pure valid-buffers))
-               (selected-display (completing-read "Select buffer for region send: " choices nil t))
-               (target-buffer (cdr (assoc selected-display choices))))
-          (let ((target-directory (enkan-repl--extract-directory-from-buffer-name-pure
-                                   (buffer-name target-buffer))))
-            (if (enkan-repl--send-text region-text target-directory)
-                (message "Region sent to buffer: %s" (buffer-name target-buffer))
-              (message "Failed to send region to buffer: %s" (buffer-name target-buffer)))))))))
+  (let ((region-text (buffer-substring-no-properties start end)))
+    (message "DEBUG: region-text='%s'" region-text)
+    (if (string-match "^:\\([^ ]+\\) " region-text)
+        ;; Alias format: ":alias content"
+        (let* ((alias (match-string 1 region-text))
+               (remaining-part (substring region-text (match-end 0)))
+               (enkan-buffers (enkan-repl--collect-enkan-buffers-pure (buffer-list)))
+               (resolved-buffer (enkan-repl-center--resolve-alias-to-buffer-pure alias enkan-buffers)))
+          (message "DEBUG: alias='%s', remaining-part='%s'" alias remaining-part)
+          (message "DEBUG: found %d enkan-buffers" (length enkan-buffers))
+          (message "DEBUG: resolved-buffer=%s" (if resolved-buffer (buffer-name resolved-buffer) "nil"))
+          (if resolved-buffer
+              (if (string= remaining-part "esc")
+                  ;; esc case: send center-send-escape
+                  (progn
+                    (message "DEBUG: sending ESC to buffer")
+                    (with-current-buffer resolved-buffer
+                      (enkan-repl-center-send-escape))
+                    (message "Sent ESC to alias '%s' buffer" alias))
+                ;; non-esc case: send string with enkan-repl--send-text
+                (let ((target-directory (enkan-repl--extract-directory-from-buffer-name-pure
+                                         (buffer-name resolved-buffer))))
+                  (message "DEBUG: target-directory='%s'" target-directory)
+                  (if (enkan-repl--send-text remaining-part target-directory)
+                      (message "Sent string '%s' to alias '%s' buffer" remaining-part alias)
+                    (message "Failed to send string to alias '%s' buffer" alias))))
+            (message "No buffer found for alias '%s'" alias)))
+      ;; No alias: select buffer and send
+      (message "DEBUG: No alias detected, entering buffer selection")
+      (let* ((enkan-buffers (enkan-repl--collect-enkan-buffers-pure (buffer-list)))
+             (valid-buffers (enkan-repl--filter-valid-buffers-pure enkan-buffers)))
+        (message "DEBUG: found %d enkan-buffers, %d valid-buffers" (length enkan-buffers) (length valid-buffers))
+        (if (= (length valid-buffers) 0)
+            (message "No active enkan sessions found")
+          (let* ((choices (enkan-repl--build-buffer-selection-choices-pure valid-buffers))
+                 (selected-display (completing-read "Select buffer for region send: " choices nil t))
+                 (target-buffer (cdr (assoc selected-display choices))))
+            (message "DEBUG: selected-display='%s', target-buffer=%s" selected-display (if target-buffer (buffer-name target-buffer) "nil"))
+            (let ((target-directory (enkan-repl--extract-directory-from-buffer-name-pure
+                                     (buffer-name target-buffer))))
+              (message "DEBUG: target-directory='%s'" target-directory)
+              (message "DEBUG: sending region-text='%s'" region-text)
+              (if (enkan-repl--send-text region-text target-directory)
+                  (message "Region sent to buffer: %s" (buffer-name target-buffer))
+                (message "Failed to send region to buffer: %s" (buffer-name target-buffer))))))))))
 
 (provide 'enkan-repl)
 
