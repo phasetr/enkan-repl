@@ -2186,36 +2186,14 @@ Looks for a project alias in enkan-repl-project-aliases and sends ESC to corresp
             (message "Sent ESC to a project buffer: %s" (plist-get info :name))))
       (message "No project alias configured or buffer not found"))))
 
-(defun enkan-repl-center-send-line (&optional arg)
-  "Send current line to center file session.
-With prefix argument ARG (1-2), send to specific session number.
-Line starting with ':alias esc' sends ESC key to buffer containing alias.
-Line containing only ':esc' sends ESC key to a project buffer.
-Without prefix argument, send line to selected buffer.
+(defun enkan-repl-center-send-line ()
+  "Send current line to a suitable eat session.
+See enkan-repl-center-send-region.
 
-Category: Center File Multi-buffer Access"
-  (interactive "P")
-  (let* ((line-text (buffer-substring-no-properties
-                     (line-beginning-position) (line-end-position)))
-         (analysis (enkan-repl--analyze-center-send-content-pure line-text arg)))
-    (message "center-send-line analysis - content: '%s', action: %s, data: %s"
-             line-text (plist-get analysis :action) (plist-get analysis :data))
-    (pcase (plist-get analysis :action)
-      ('prefix-number
-       (message "Executing prefix-number action with data: %s" (plist-get analysis :data))
-       (enkan-repl--send-region-with-prefix
-        (line-beginning-position) (line-end-position) (plist-get analysis :data)))
-      ('escape-directly
-       (message "Executing escape-directly action")
-       (enkan-repl--send-escape-directly))
-      ('alias-command
-       (message "Executing alias-command action with data: '%s'" (plist-get analysis :data))
-       (enkan-repl-center-send-region
-        (line-beginning-position) (line-end-position) (plist-get analysis :data)))
-      ('default-send
-       (message "Executing default-send action")
-       (enkan-repl--send-buffer-content
-        (line-beginning-position) (line-end-position) "Line")))))
+Category: Text Sender"
+  (interactive)
+  (enkan-repl-center-send-region
+    (line-beginning-position) (line-end-position)))
 
 ;; Pure functions for center file operations (used by enkan-repl-center-open-file)
 (defun enkan-center-file-validate-path-pure (file-path)
