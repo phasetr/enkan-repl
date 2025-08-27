@@ -1629,6 +1629,7 @@ Category: Center File Multi-buffer Access"
     (define-key map (kbd "C-M-e") 'enkan-repl-center-send-enter)
     (define-key map (kbd "C-M-i") 'enkan-repl-center-send-line)
     (define-key map (kbd "C-M-<return>") 'enkan-repl-center-send-region)
+    (define-key map (kbd "C-M-@") 'enkan-repl-center-open-project-directory)
     (define-key map (kbd "C-M-t") 'other-window)
     (define-key map (kbd "C-M-b") 'enkan-repl-center-recenter-bottom)
     (define-key map (kbd "C-M-s") 'enkan-repl-center-auto-setup)
@@ -2011,6 +2012,34 @@ BUFFER-INDEX-OR-SKIP-UI:
     (with-current-buffer buffer
       (eat--send-string (plist-get info :process) "\e"))
     (message "Sent ESC to buffer %s: %s" (if index (format "%d" index) "selected") (plist-get info :name))))
+
+;;;###autoload
+(defun enkan-repl-center-open-project-directory ()
+  "Open project directory in dired from current multi-project layout.
+
+Category: Center File Multi-buffer Access"
+  (interactive)
+  (if enkan-repl--current-multi-project-layout
+    (let* ((current-layout (cdr (assoc enkan-repl--current-multi-project-layout enkan-repl-center-multi-project-layouts)))
+            (project-choices '()))
+      (if current-layout
+        (progn
+          ;; Build choices list with alias and directory
+          (dolist (alias current-layout)
+            (let ((project-info (enkan-repl--get-project-info-from-registry alias)))
+              (when project-info
+                (let ((project-name (car project-info))
+                       (project-path (cdr project-info)))
+                  (push (cons (format "%s (%s)" alias project-path) project-path) project-choices)))))
+          (if project-choices
+            (let* ((selected-display (completing-read "Select project directory to open: " project-choices nil t))
+                    (selected-path (cdr (assoc selected-display project-choices))))
+              (if (file-directory-p selected-path)
+                (dired selected-path)
+                (message "Directory does not exist: %s" selected-path)))
+            (message "No valid project directories found in layout")))
+        (message "Current layout '%s' not found in configurations" enkan-repl--current-multi-project-layout)))
+    (message "No multi-project layout is currently active")))
 
 ;;;###autoload
 (defun enkan-repl-center-send-enter (&optional prefix-arg)
