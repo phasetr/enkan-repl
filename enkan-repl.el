@@ -703,35 +703,6 @@ Returns: Directory path or nil"
           (cl-return-from search-buffers
             (enkan-repl--extract-directory-from-buffer-name-pure (buffer-name))))))))
 
-(defun enkan-repl--send-region-with-prefix (start end user-number)
-  "Select session according to universal argument and send region.
-user-number: Integer 1-2 (position from left in eat sessions)"
-  (let* ((text (buffer-substring-no-properties start end))
-         (parsed (enkan-repl--parse-prefix-notation text))
-         (prefix-target (car parsed))
-         (command (cdr parsed)))
-    (cond
-     ;; Prefix notation takes precedence when present
-     (prefix-target
-      (let ((directory (enkan-repl--resolve-target-to-directory prefix-target)))
-        (if directory
-            (progn
-              ;; Send command to target session
-              (enkan-repl--send-text command directory)
-              ;; Buffer content unchanged (preserve :pt part)
-              )
-          ;; Handle target not found properly
-          (enkan-repl--handle-prefix-target-not-found
-           prefix-target command "Region"))))
-     ;; Use user number when no prefix notation
-     (t
-      (let ((project-name (enkan-repl--get-session-by-user-number user-number)))
-        (if project-name
-            (let ((directory (enkan-repl--find-directory-by-project-name project-name)))
-              (if directory
-                  (enkan-repl--send-text text directory)
-                (user-error "Directory for session %d (%s) not found" user-number project-name)))
-          (user-error "Session %d is not registered" user-number)))))))
 
 (defun enkan-repl--send-text-to-project (text project-name)
   "Send text to session of specified project name."
@@ -1462,39 +1433,6 @@ Category: Command Palette"
 
 ;;;; Center File Multi-buffer Access Commands
 
-;;;###autoload
-(defun enkan-repl-center-send-line-to-session-1 ()
-  "Send current line to session 1.
-
-Category: Center File Multi-buffer Access"
-  (interactive)
-  (enkan-repl--send-region-with-prefix
-   (line-beginning-position) (line-end-position) 1))
-
-;;;###autoload
-(defun enkan-repl-center-send-line-to-session-2 ()
-  "Send current line to session 2.
-
-Category: Center File Multi-buffer Access"
-  (interactive)
-  (enkan-repl--send-region-with-prefix
-   (line-beginning-position) (line-end-position) 2))
-
-;;;###autoload
-(defun enkan-repl-center-send-region-to-session-1 (start end)
-  "Send region to session 1.
-
-Category: Center File Multi-buffer Access"
-  (interactive "r")
-  (enkan-repl--send-region-with-prefix start end 1))
-
-;;;###autoload
-(defun enkan-repl-center-send-region-to-session-2 (start end)
-  "Send region to session 2.
-
-Category: Center File Multi-buffer Access"
-  (interactive "r")
-  (enkan-repl--send-region-with-prefix start end 2))
 
 ;;;###autoload
 (defun enkan-repl-center-register-current-session (session-number)
