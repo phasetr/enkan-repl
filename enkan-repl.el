@@ -1379,9 +1379,9 @@ This function only starts eat sessions - use enkan-repl-setup (C-M-l) to arrange
         (princ "🚀 Auto-enabled center file global mode for multi-project workflow\n\n"))
       ;; Display current state before changes
       (princ (format "🔧 Current state before setup:\n"))
-      (princ (format "  Layout: %s\n" (or old-layout "nil")))
-      (princ (format "  Sessions: %s\n" (or old-session-list "nil")))
-      (princ (format "  Counter: %d\n\n" old-counter))
+      (princ (format "  Layout (enkan-repl--current-multi-project-layout): %s\n" (or old-layout "nil")))
+      (princ (format "  Sessions (enkan-repl-session-list): %s\n" (or old-session-list "nil")))
+      (princ (format "  Counter (enkan-repl--session-counter): %d\n\n" old-counter))
       ;; Set the new layout configuration
       (setq enkan-repl--current-multi-project-layout layout-name)
       (let ((alias-list (cdr (assoc layout-name enkan-repl-center-multi-project-layouts))))
@@ -1402,7 +1402,7 @@ This function only starts eat sessions - use enkan-repl-setup (C-M-l) to arrange
                   (let ((project-name (car project-info)))
                     (push (cons alias project-name) project-aliases)))))
             (setq enkan-repl-project-aliases (nreverse project-aliases)))
-          (princ (format "🔧 Setup project aliases: %s\n\n" enkan-repl-project-aliases))
+          (princ (format "🔧 Setup project aliases (enkan-repl-project-aliases): %s\n\n" enkan-repl-project-aliases))
           ;; Start sessions for each project
           (princ "🚀 Starting eat sessions:\n")
           (let ((session-number 1)) ; Session numbers start from 1
@@ -1421,53 +1421,63 @@ This function only starts eat sessions - use enkan-repl-setup (C-M-l) to arrange
           (setq enkan-repl--current-multi-project-layout layout-name)
           ;; Display final state
           (princ (format "\n✅ Setup completed!\n"))
-          (princ (format "  Layout: %s\n" layout-name))
-          (princ (format "  Sessions: %s\n" enkan-repl-session-list))
-          (princ (format "  Counter: %d\n" enkan-repl--session-counter))
+          (princ (format "  Layout (enkan-repl--current-multi-project-layout): %s\n" layout-name))
+          (princ (format "  Sessions (enkan-repl-session-list): %s\n" enkan-repl-session-list))
+          (princ (format "  Counter (enkan-repl--session-counter): %d\n" enkan-repl--session-counter))
           (princ (format "\nEat sessions started for layout: %s (%d sessions).\n" layout-name session-count))
-          (princ "Use C-M-l to arrange windows.\n\n")
+          (princ "Use enkan-repl-setup to arrange windows.\n\n")
           (princ "=== END SETUP ===\n"))))))
 
-;;;###autoload
 (defun enkan-repl-center-finish-all-sessions ()
   "Terminate all registered center file sessions.
 
 Category: Center File Multi-buffer Access"
   (interactive)
-  (if (null enkan-repl-session-list)
+  (let ((buffer-name "*ENKAN-REPL Finish Sessions*"))
+    (if (null enkan-repl-session-list)
       (message "No registered sessions to terminate")
-    ;; Display current state before termination
-    (message "🔧 C-M-f: Current state - layout:%s, sessions:%s, counter:%d"
-             (or enkan-repl--current-multi-project-layout "nil")
-             enkan-repl-session-list
-             enkan-repl--session-counter)
-    (let ((terminated-count 0))
-      (when (y-or-n-p (format "Terminate all %d registered sessions? "
-                              (length enkan-repl-session-list)))
-        (dolist (session enkan-repl-session-list)
-          (let* ((session-number (car session))
-                 (project-name (cdr session))
-                 ;; Get project directory from registry using correct function
-                 (project-path (enkan-repl--get-project-path-from-registry project-name enkan-repl-center-project-registry)))
-            (when project-path
-              ;; Use the same buffer discovery method as enkan-repl-finish-eat
-              (let ((buffer (enkan-repl--get-buffer-for-directory project-path)))
-                (when buffer
-                  (kill-buffer buffer)
-                  (setq terminated-count (1+ terminated-count)))))))
-        ;; Clear session list and reset layout configuration
-        (setq enkan-repl-session-list nil)
-        (setq enkan-repl--session-counter 0)
-        (setq enkan-repl--current-multi-project-layout nil)
-        (setq enkan-repl-project-aliases nil)
-        ;; Auto-disable global center file mode
-        (when enkan-center-file-global-mode
-          (enkan-center-file-global-mode -1)
-          (message "🔄 Auto-disabled center file global mode"))
-        ;; Display what variables were reset
-        (message "🧹 C-M-f: Reset - enkan-repl-session-list=%s, enkan-repl--session-counter=%d, enkan-repl--current-multi-project-layout=%s, enkan-repl-project-aliases=%s"
-                 "nil" 0 "nil" "nil")
-        (message "✅ C-M-f: Terminated %d sessions, cleared session list and reset layout configuration" terminated-count)))))
+      (with-output-to-temp-buffer buffer-name
+        (princ "=== ENKAN-REPL FINISH ALL SESSIONS ===\n\n")
+        ;; Display current state before termination
+        (princ "🔧 Current state before termination:\n")
+        (princ (format "  Layout (enkan-repl--current-multi-project-layout): %s\n" (or enkan-repl--current-multi-project-layout "nil")))
+        (princ (format "  Sessions (enkan-repl-session-list): %s\n" enkan-repl-session-list))
+        (princ (format "  Counter (enkan-repl--session-counter): %d\n\n" enkan-repl--session-counter))
+        (let ((terminated-count 0))
+          (when (y-or-n-p (format "Terminate all %d registered sessions? "
+                            (length enkan-repl-session-list)))
+            (princ "🚫 Terminating sessions:\n")
+            (dolist (session enkan-repl-session-list)
+              (let* ((session-number (car session))
+                      (project-name (cdr session))
+                      ;; Get project directory from registry using correct function
+                      (project-path (enkan-repl--get-project-path-from-registry project-name enkan-repl-center-project-registry)))
+                (when project-path
+                  ;; Use the same buffer discovery method as enkan-repl-finish-eat
+                  (let ((buffer (enkan-repl--get-buffer-for-directory project-path)))
+                    (if buffer
+                      (progn
+                        (kill-buffer buffer)
+                        (setq terminated-count (1+ terminated-count))
+                        (princ (format "  ✅ Session %d: %s (terminated)\n" session-number project-name)))
+                      (princ (format "  ⚠️ Session %d: %s (buffer not found)\n" session-number project-name)))))))
+            ;; Clear session list and reset session counter
+            (setq enkan-repl-session-list nil)
+            (setq enkan-repl--session-counter 0)
+            (setq enkan-repl--current-multi-project-layout nil)
+            (setq enkan-repl-project-aliases nil)
+            ;; Auto-disable global center file mode
+            (when enkan-center-file-global-mode
+              (enkan-center-file-global-mode -1)
+              (princ "\n🔄 Auto-disabled center file global mode\n"))
+            ;; Display final state
+            (princ "\n🧹 Configuration reset:\n")
+            (princ "  Session list (enkan-repl-session-list): nil\n")
+            (princ "  Session counter (enkan-repl--session-counter): 0\n")
+            (princ "  Current layout (enkan-repl--current-multi-project-layout): nil\n")
+            (princ "  Project aliases (enkan-repl-project-aliases): nil\n" (or enkan-repl-project-aliases "nil"))
+            (princ (format "\n✅ Terminated %d sessions, cleared session list and reset layout configuration.\n" terminated-count))
+            (princ "\n=== END FINISH SESSIONS ===\n")))))))
 
 ;;;###autoload
 (defun enkan-repl-center-recenter-bottom ()
@@ -1476,10 +1486,11 @@ Category: Center File Multi-buffer Access"
 Category: Center File Multi-buffer Access"
   (interactive)
   (let ((original-window (selected-window))
-        (enkan-buffers (seq-filter (lambda (buf)
-                                     (string-match-p "^\\*enkan:" (buffer-name buf)))
-                                   (buffer-list)))
-        (recentered-count 0))
+         (enkan-buffers (seq-filter
+                          (lambda (buf)
+                            (string-match-p "^\\*enkan:" (buffer-name buf)))
+                          (buffer-list)))
+         (recentered-count 0))
     (dolist (buffer enkan-buffers)
       (let ((window (get-buffer-window buffer)))
         (when window
@@ -1490,9 +1501,10 @@ Category: Center File Multi-buffer Access"
     ;; Return to original window
     (select-window original-window)
     (if (> recentered-count 0)
-        (message "Recentered %d enkan session(s) at bottom" recentered-count)
+      (message "Recentered %d enkan session(s) at bottom" recentered-count)
       (message "No enkan sessions found to recenter"))))
 
+;;;###autoload
 (defun enkan-repl--collect-enkan-buffers-pure (buffer-list)
   "Pure function to collect enkan buffers from BUFFER-LIST.
 Returns list of buffers whose names match enkan pattern."
