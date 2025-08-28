@@ -1968,9 +1968,14 @@ Category: Center File Operations"
   (let* ((valid-buffers (enkan-repl--get-available-buffers-pure (buffer-list))))
     (if (= (length valid-buffers) 0)
       (message "No active enkan sessions found for magit")
-      (let* ((choices (enkan-repl--build-buffer-selection-choices-pure valid-buffers))
-              (selected-display (completing-read "Select project for magit: " choices nil t))
-              (selected-buffer (cdr (assoc selected-display choices))))
+      (let* ((selected-buffer
+               (if (= 1 (length valid-buffers))
+                 ;; Auto-select single session
+                 (car valid-buffers)
+                 ;; Interactive selection for multiple sessions
+                 (let* ((choices (enkan-repl--build-buffer-selection-choices-pure valid-buffers))
+                         (selected-display (completing-read "Select project for magit: " choices nil t)))
+                   (cdr (assoc selected-display choices))))))
         (when selected-buffer
           (let ((project-path (enkan-repl--extract-directory-from-buffer-name-pure
                                 (buffer-name selected-buffer))))
