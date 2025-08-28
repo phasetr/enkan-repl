@@ -1434,56 +1434,66 @@ This function only starts eat sessions - use enkan-repl-setup (C-M-l) to arrange
   (interactive
    (list (completing-read "Layout: "
                           (mapcar #'car enkan-repl-center-multi-project-layouts))))
-  ;; Enable global center file mode automatically
-  (unless enkan-center-file-global-mode
-    (enkan-center-file-global-mode 1)
-    (message "🚀 Auto-enabled center file global mode for multi-project workflow"))
-  ;; Display current state before changes
-  (let ((old-layout enkan-repl--current-multi-project-layout)
+  (let ((buffer-name "*ENKAN-REPL Auto Setup*")
+        (old-layout enkan-repl--current-multi-project-layout)
         (old-session-list (copy-tree enkan-repl-session-list))
         (old-counter enkan-repl--session-counter))
-    (message "🔧 C-M-s: Current state - layout:%s, sessions:%s, counter:%d"
-             (or old-layout "nil") (or old-session-list "nil") old-counter))
-  ;; Set the new layout configuration (this overwrites any existing configuration)
-  (setq enkan-repl--current-multi-project-layout layout-name)
-  (let ((alias-list (cdr (assoc layout-name enkan-repl-center-multi-project-layouts))))
-    (unless alias-list
-      (error "Layout '%s' not found" layout-name))
-    (let ((session-count (length alias-list)))
-      ;; Clear session list and reset any previous layout configuration
-      (setq enkan-repl-session-list nil)
-      (setq enkan-repl--session-counter 0)
-      (setq enkan-repl--current-multi-project-layout nil)
-      (message "🧹 C-M-s: Reset - enkan-repl-session-list=%s, enkan-repl--session-counter=%d, enkan-repl--current-multi-project-layout=%s, enkan-repl-project-aliases=%s"
-               "nil" 0 "nil" "nil")
-      ;; Setup project aliases based on layout configuration
-      (let ((project-aliases '()))
-        (dolist (alias alias-list)
-          (let ((project-info (enkan-repl--get-project-info-from-registry alias)))
-            (when project-info
-              (let ((project-name (car project-info)))
-                (push (cons alias project-name) project-aliases)))))
-        (setq enkan-repl-project-aliases (nreverse project-aliases)))
-      (message "🔧 C-M-s: Setup aliases - enkan-repl-project-aliases=%s" enkan-repl-project-aliases)
-      ;; Start sessions for each project
-      (let ((session-number 1)) ; Session numbers start from 1
-        (dolist (alias alias-list)
-          (let ((project-info (enkan-repl--setup-project-session alias session-number)))
-            (let ((project-name (car project-info))
-                  (project-path (expand-file-name (cdr project-info)))
-                  (default-directory (expand-file-name (cdr project-info))))
-              ;; Register session
-              (enkan-repl--register-session session-number project-name)
-              ;; Start eat session in current directory (force restart if needed)
-              (enkan-repl-start-eat t)
-              (setq session-number (1+ session-number)))))
-      ;; Set final layout configuration
+    (with-output-to-temp-buffer buffer-name
+      (princ (format "=== ENKAN-REPL AUTO SETUP: %s ===\n\n" layout-name))
+      ;; Enable global center file mode automatically
+      (unless enkan-center-file-global-mode
+        (enkan-center-file-global-mode 1)
+        (princ "🚀 Auto-enabled center file global mode for multi-project workflow\n\n"))
+      ;; Display current state before changes
+      (princ (format "🔧 Current state before setup:\n"))
+      (princ (format "  Layout: %s\n" (or old-layout "nil")))
+      (princ (format "  Sessions: %s\n" (or old-session-list "nil")))
+      (princ (format "  Counter: %d\n\n" old-counter))
+      ;; Set the new layout configuration
       (setq enkan-repl--current-multi-project-layout layout-name)
-      ;; Display final state
-      (message "✅ C-M-s: Final state - enkan-repl--current-multi-project-layout='%s', enkan-repl-session-list=%s, enkan-repl--session-counter=%d"
-               layout-name enkan-repl-session-list enkan-repl--session-counter)
-      (message "Eat sessions started for layout: %s (%d sessions). Use \\C-\\M-l to arrange windows."
-               layout-name session-count)))))
+      (let ((alias-list (cdr (assoc layout-name enkan-repl-center-multi-project-layouts))))
+        (unless alias-list
+          (error "Layout '%s' not found" layout-name))
+        (let ((session-count (length alias-list)))
+          (delete-other-windows)
+          ;; Clear session list and reset any previous layout configuration
+          (setq enkan-repl-session-list nil)
+          (setq enkan-repl--session-counter 0)
+          (setq enkan-repl--current-multi-project-layout nil)
+          (princ "🧹 Reset previous configuration\n\n")
+          ;; Setup project aliases based on layout configuration
+          (let ((project-aliases '()))
+            (dolist (alias alias-list)
+              (let ((project-info (enkan-repl--get-project-info-from-registry alias)))
+                (when project-info
+                  (let ((project-name (car project-info)))
+                    (push (cons alias project-name) project-aliases)))))
+            (setq enkan-repl-project-aliases (nreverse project-aliases)))
+          (princ (format "🔧 Setup project aliases: %s\n\n" enkan-repl-project-aliases))
+          ;; Start sessions for each project
+          (princ "🚀 Starting eat sessions:\n")
+          (let ((session-number 1)) ; Session numbers start from 1
+            (dolist (alias alias-list)
+              (let ((project-info (enkan-repl--setup-project-session alias session-number)))
+                (let ((project-name (car project-info))
+                      (project-path (expand-file-name (cdr project-info)))
+                      (default-directory (expand-file-name (cdr project-info))))
+                  ;; Register session
+                  (enkan-repl--register-session session-number project-name)
+                  (princ (format "  Session %d: %s (%s)\n" session-number alias project-name))
+                  ;; Start eat session in current directory (force restart if needed)
+                  (enkan-repl-start-eat t)
+                  (setq session-number (1+ session-number))))))
+          ;; Set final layout configuration
+          (setq enkan-repl--current-multi-project-layout layout-name)
+          ;; Display final state
+          (princ (format "\n✅ Setup completed!\n"))
+          (princ (format "  Layout: %s\n" layout-name))
+          (princ (format "  Sessions: %s\n" enkan-repl-session-list))
+          (princ (format "  Counter: %d\n" enkan-repl--session-counter))
+          (princ (format "\nEat sessions started for layout: %s (%d sessions).\n" layout-name session-count))
+          (princ "Use C-M-l to arrange windows.\n\n")
+          (princ "=== END SETUP ===\n"))))))
 
 ;;;###autoload
 (defun enkan-repl-center-finish-all-sessions ()
