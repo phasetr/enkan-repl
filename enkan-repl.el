@@ -106,11 +106,6 @@ to maintain compatibility with existing project files.")
 Command Palette is positioned first as the primary interface.
 This structure is used for documentation generation and organization.")
 
-;;;; Internal Variables
-
-(defvar enkan-repl-debug-mode nil
-  "When non-nil, enable debug messages for send operations.")
-
 ;; Declare external variable from constants file
 (defvar enkan-repl-cheat-sheet-candidates nil
   "Precompiled list of cheat-sheet candidates from constants file.")
@@ -330,9 +325,6 @@ Returns the template path to use, or nil to use default template."
                (insert "- ~M-x enkan-repl-setup~ - Set up convenient window layout\n")
                (insert "- ~M-x enkan-repl-output-template~ - Export template for customization\n")
                (insert "- ~M-x enkan-repl-status~ - Show diagnostic information\n")
-               (insert "- ~M-x enkan-repl-toggle-debug-mode~ - Toggle debug mode\n")
-               (insert "- ~M-x enkan-repl-enable-debug-mode~ - Enable debug mode\n")
-               (insert "- ~M-x enkan-repl-disable-debug-mode~ - Disable debug mode\n")
                (insert "\n** Working Notes\n")
                (insert "Write your thoughts and notes here.\n")
                (insert "Send specific parts to a eat buffer using the commands above.\n"))
@@ -425,10 +417,7 @@ Returns categorized functions as string, or falls back to static list."
           "** Utilities\n\n"
           "- ~M-x enkan-repl-open-project-input-file~ - Open or create project input file for current directory.\n"
           "- ~M-x enkan-repl-output-template~ - Output current template content to a new buffer for customization.\n"
-          "- ~M-x enkan-repl-status~ - Show detailed diagnostic information for troubleshooting connection issues.\n"
-          "- ~M-x enkan-repl-toggle-debug-mode~ - Toggle debug mode for enkan-repl operations.\n"
-          "- ~M-x enkan-repl-enable-debug-mode~ - Enable debug mode for enkan-repl operations.\n"
-          "- ~M-x enkan-repl-disable-debug-mode~ - Disable debug mode for enkan-repl operations.\n\n"))
+          "- ~M-x enkan-repl-status~ - Show detailed diagnostic information for troubleshooting connection issues.\n"))
 
 (defun enkan-repl--get-embedded-template ()
   "Return embedded default template content as string."
@@ -478,14 +467,6 @@ Example: \='enkan--Users--project\=' + \='enkan\=' + \='--\=' -> \='/Users/proje
         ((path-part (substring encoded-name (length prefix))))  ; Remove prefix
       (concat (replace-regexp-in-string (regexp-quote separator) "/" path-part) "/"))))
 
-;;;; Debug Functions
-
-(defun enkan-repl--debug-message (format-string &rest args)
-  "Print debug message if debug mode is enabled.
-FORMAT-STRING is the format string.  ARGS are the arguments."
-  (when enkan-repl-debug-mode
-    (apply #'message (concat "[CLAUDEMACS-REPL-DEBUG] " format-string) args)))
-
 (defun enkan-repl--sanitize-content (content)
   "Sanitize CONTENT to ensure it can be safely sent to eat session.
 This function handles edge cases with special characters and ensures
@@ -493,11 +474,8 @@ proper formatting for terminal input.  Also addresses Claude Code
 interpretation issues and Mac region selection problems."
   (when content
     (let ((sanitized content))
-      (enkan-repl--debug-message "Input content: %S" content)
-      (enkan-repl--debug-message "Input content length: %d" (length content))
       ;; Convert all line ending variations to LF
       (setq sanitized (replace-regexp-in-string "\r\n\\|\r" "\n" sanitized))
-      (enkan-repl--debug-message "After newline normalization: %S" sanitized)
       ;; Remove other problematic control characters
       ;; Keep only \n (newline) and \t (tab) among control characters
       (setq
@@ -511,31 +489,19 @@ interpretation issues and Mac region selection problems."
            ;; Remove other control characters
            (t "")))
         sanitized))
-      (enkan-repl--debug-message "After control char cleanup: %S" sanitized);
       ;; Remove Unicode line separators that might cause issues
       ;; U+0085 (NEL), U+2028 (LINE SEPARATOR), U+2029 (PARAGRAPH SEPARATOR)
       (setq sanitized (replace-regexp-in-string "[\u0085\u2028\u2029]" "" sanitized))
-      (enkan-repl--debug-message "After Unicode separator removal: %S" sanitized)
       ;; Final cleanup of any remaining problematic characters at end
       (setq sanitized (replace-regexp-in-string "[\x0B\x0C\x0E-\x1F]+\\'" "" sanitized))
-      (enkan-repl--debug-message "After final cleanup: %S" sanitized)
       ;; File path interpretation workaround
-      (enkan-repl--debug-message
-       "File path pattern match: %s"
-       (if (string-match-p "~/[^[:space:]]*\\.[a-zA-Z0-9]+\\'" sanitized) "YES" "NO"))
-      (enkan-repl--debug-message
-       "Punctuation pattern match: %s"
-       (if (string-match-p "[.!?]\\'" sanitized) "YES" "NO"))
       (when
           (and
            (string-match-p "~/[^[:space:]]*\\.[a-zA-Z0-9]+\\'" sanitized)
            (not (string-match-p "[.!?]\\'" sanitized)))
-        (enkan-repl--debug-message "Adding end marker to prevent file path interpretation")
         (setq sanitized (concat sanitized "\n(This text is added by enkan-repl as a workaround for Claude Code's special interpretation of file paths)")))
       ;; Only remove trailing whitespace/newlines
       (setq sanitized (replace-regexp-in-string "[[:space:]]+\\'" "" sanitized))
-      (enkan-repl--debug-message "Final sanitized content: %S" sanitized)
-      (enkan-repl--debug-message "Final content length: %d" (length sanitized))
       sanitized)))
 
 ;;;; Target Directory Detection Functions
@@ -693,7 +659,6 @@ Otherwise, use current `default-directory'."
             (with-current-buffer buf
               (goto-char (point-max))))
           session-buffer)
-        (enkan-repl--debug-message "Text sent successfully")
         t))))
 
 (defun enkan-repl--send-numbered-choice (number)
@@ -724,7 +689,6 @@ NUMBER should be a string (e.g., \\='1\\=', \\='2\\=', \\='3\\=') or empty strin
                     eat--process
                     (process-live-p eat--process))))
         (progn
-          (enkan-repl--debug-message "Sending ESC key to session buffer")
           (with-current-buffer session-buffer
             (eat--send-string eat--process "\e")
             ;; Move cursor to bottom after eat processes the output
@@ -732,8 +696,7 @@ NUMBER should be a string (e.g., \\='1\\=', \\='2\\=', \\='3\\=') or empty strin
                          (lambda (buf)
                            (with-current-buffer buf
                              (goto-char (point-max))))
-                         session-buffer)
-            (enkan-repl--debug-message "ESC key sent successfully"))
+                         session-buffer))
           (message "Sent ESC to session"))
       (message "❌ Cannot send - no matching eat session found for this directory"))))
 
@@ -1294,38 +1257,6 @@ Category: Session Controller"
                        (message "Session deleted: %s" selected-name)))
                     (?q
                      (message "Cancelled"))))))))))))
-
-
-;;;###autoload
-(defun enkan-repl-toggle-debug-mode ()
-  "Toggle debug mode for enkan-repl operations.
-
-Category: Utilities"
-  (interactive)
-  (setq
-   enkan-repl-debug-mode
-   (not enkan-repl-debug-mode))
-  (message
-   "enkan-repl debug mode: %s"
-   (if enkan-repl-debug-mode "ENABLED" "DISABLED")))
-
-;;;###autoload
-(defun enkan-repl-enable-debug-mode ()
-  "Enable debug mode for enkan-repl operations.
-
-Category: Utilities"
-  (interactive)
-  (setq enkan-repl-debug-mode t)
-  (message "enkan-repl debug mode: ENABLED"))
-
-;;;###autoload
-(defun enkan-repl-disable-debug-mode ()
-  "Disable debug mode for enkan-repl operations.
-
-Category: Utilities"
-  (interactive)
-  (setq enkan-repl-debug-mode nil)
-  (message "enkan-repl debug mode: DISABLED"))
 
 ;;; Interactive Cheat-sheet Feature
 
