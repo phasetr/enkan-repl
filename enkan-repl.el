@@ -1684,15 +1684,18 @@ Sends text followed by carriage return, with cursor positioning."
 
 ;;;###autoload
 (defun enkan-repl-center-send-escape (&optional prefix-arg)
-  "Send ESC key to eat session buffer from center file.
-Always requires buffer specification:
-- Without prefix: Select from available enkan buffers
+  "Send ESC key to eat session buffer from center file or current enkan buffer.
+- If called from enkan buffer: Send ESC to current buffer
+- If called from center file without prefix: Select from available enkan buffers
 - With numeric prefix: Send to buffer at that index (1-based)
 
 Category: Center File Multi-buffer Access"
   (interactive "P")
-  (message "Starting enkan-repl-center-send-escape with prefix-arg: %s" prefix-arg)
   (cond
+   ;; Check if current buffer is an enkan buffer
+   ((string-match-p "^\\*enkan:" (buffer-name))
+    ;; Send ESC to current enkan buffer directly
+    (enkan-repl--send-escape-to-buffer (current-buffer) nil))
    ((numberp prefix-arg)
     ;; C-u numeric for layout index specification
     (let* ((current-layout (cdr (assoc enkan-repl--current-multi-project-layout enkan-repl-center-multi-project-layouts)))
