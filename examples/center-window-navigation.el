@@ -86,6 +86,39 @@ Returns cons (window . buffer-name) or nil if session not registered."
         session-number session-number session-number))))
 
 ;;;###autoload
+(defun enkan-repl-setup-1session-layout ()
+  "Setup window layout for 1-session management.
+  +--------+---+
+  |    1   | 2 |
+  | center |   |
+  |  file  |   |
+  +-----+--+---+
+
+  1: Center file (command source)
+  2: enkan-repl sessions
+
+Category: Utilities"
+  (interactive)
+  (delete-other-windows)
+  (split-window-right)
+  ;; Set window variables - direct assignment by position
+  ;; Currently at rightmost window, go back to leftmost
+  (setq enkan-repl--window-1 (selected-window))
+  (other-window 1)
+  (setq enkan-repl--window-2 (selected-window))
+  ;; Open center file in window 1
+  (when (and enkan-repl--window-1 enkan-repl-center-file)
+    (select-window enkan-repl--window-1)
+    (find-file enkan-repl-center-file)
+    (message "✅ Window 1: Opened center file %s" enkan-repl-center-file))
+  ;; Setup eat buffers in session windows (1, 2 for multi-project order)
+  (when (and (boundp 'enkan-repl-session-list) enkan-repl-session-list)
+    (enkan-repl--setup-session-eat-buffer enkan-repl--window-2 1))
+  ;; Always select the center file window (Window 1) at the end
+  (when enkan-repl--window-1
+    (select-window enkan-repl--window-1)))
+
+;;;###autoload
 (defun enkan-repl-setup-2session-layout ()
   "Setup window layout for 2-session management.
   +--------+---+---+
@@ -95,7 +128,7 @@ Returns cons (window . buffer-name) or nil if session not registered."
   +-----+--+---+---+
 
   1: Center file (command source)
-  4, 5: enkan-repl sessions
+  2,3: enkan-repl sessions
 
 Category: Utilities"
   (interactive)
@@ -135,7 +168,7 @@ Category: Utilities"
   |  file  |   |   |   |
   +--------+---+---+---+
 
-  4, 5, 6: enkan-repl sessions
+  2,3,4: enkan-repl sessions
 
 Category: Utilities"
   (interactive)
@@ -180,7 +213,7 @@ Category: Utilities"
   |  file  |   |   |   |   |
   +--------+---+---+---+---+
 
-  4, 5, 6, 7: enkan-repl sessions
+  2,3,4,5: enkan-repl sessions
 
 Category: Utilities"
   (interactive)

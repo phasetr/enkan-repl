@@ -1054,33 +1054,35 @@ For simple layouts, sets up org file on left and eat on right.
 Category: Session Controller"
   (interactive)
   (if enkan-repl--current-multi-project-layout
-      ;; Multi-project layout is active - call appropriate examples layout function
-      (let* ((alias-list (cdr (assoc enkan-repl--current-multi-project-layout
-                                     enkan-repl-center-multi-project-layouts)))
-             (session-count (length alias-list)))
-        (delete-other-windows)
-        ;; Open center file first
-        (when enkan-repl-center-file
-          (find-file enkan-repl-center-file))
-        ;; Call appropriate layout function from examples
-        (cond
-         ((= session-count 1)
-          (delete-other-windows))
-         ((= session-count 2)
+    ;; Multi-project layout is active - call appropriate examples layout function
+    (let* ((alias-list (cdr (assoc enkan-repl--current-multi-project-layout
+                              enkan-repl-center-multi-project-layouts)))
+            (session-count (length alias-list)))
+      (delete-other-windows)
+      ;; Open center file first
+      (when enkan-repl-center-file
+        (find-file enkan-repl-center-file))
+      ;; Call appropriate layout function from examples
+      (cond
+        ((= session-count 1)
+          (if (fboundp 'enkan-repl-setup-1session-layout)
+            (enkan-repl-setup-1session-layout)
+            (error "enkan-repl-setup-1session-layout not available. Load center-window-navigation.el from examples.")))
+        ((= session-count 2)
           (if (fboundp 'enkan-repl-setup-2session-layout)
-              (enkan-repl-setup-2session-layout)
+            (enkan-repl-setup-2session-layout)
             (error "enkan-repl-setup-2session-layout not available. Load center-window-navigation.el from examples.")))
-         ((= session-count 3)
+        ((= session-count 3)
           (if (fboundp 'enkan-repl-setup-3session-layout)
-              (enkan-repl-setup-3session-layout)
+            (enkan-repl-setup-3session-layout)
             (error "enkan-repl-setup-3session-layout not available. Load center-window-navigation.el from examples.")))
-         ((= session-count 4)
+        ((= session-count 4)
           (if (fboundp 'enkan-repl-setup-4session-layout)
-              (enkan-repl-setup-4session-layout)
+            (enkan-repl-setup-4session-layout)
             (error "enkan-repl-setup-4session-layout not available. Load center-window-navigation.el from examples.")))
-         (t (error "No layout function available for %d sessions. Consider implementing enkan-repl-setup-%dsession-layout." session-count session-count)))
-        (message "Multi-project window layout setup complete: %s (%d sessions)"
-                 enkan-repl--current-multi-project-layout session-count))
+        (t (error "No layout function available for %d sessions. Consider implementing enkan-repl-setup-%dsession-layout." session-count session-count)))
+      (message "Multi-project window layout setup complete: %s (%d sessions)"
+        enkan-repl--current-multi-project-layout session-count))
     ;; Normal setup behavior
     (let ((target-dir (enkan-repl--get-target-directory-for-buffer)))
       (delete-other-windows)
@@ -1088,7 +1090,7 @@ Category: Session Controller"
       (other-window 1)
       (let ((session-buf (enkan-repl--get-buffer-for-directory target-dir)))
         (if session-buf
-            (switch-to-buffer session-buf)
+          (switch-to-buffer session-buf)
           (message "eat session buffer not found. Run (enkan-repl-start-eat) first.")))
       (other-window -1)
       (message "Window layout setup complete"))))

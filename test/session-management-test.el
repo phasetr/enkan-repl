@@ -156,19 +156,18 @@
     (should (equal (car result) '(1 . "pt-tools")))
     (should (equal (cdr result) '((2 . "enkan-repl"))))))
 
-(ert-deftest test-enkan-multi-project-session-order-with-too-many-projects ()
-  "Test error handling when too many projects are configured."
-  (should-error 
-   (enkan-repl--create-session-list-with-order-pure 
-    '("proj1" "proj2" "proj3" "proj4" "proj5"))
-   :type 'error))
+(ert-deftest test-enkan-multi-project-session-order-with-many-projects ()
+  "Test that many projects are now supported without restriction."
+  (let ((result (enkan-repl--create-session-list-with-order-pure 
+                 '("proj1" "proj2" "proj3" "proj4" "proj5"))))
+    (should (equal (length result) 5))
+    (should (equal (car result) '(1 . "proj1")))
+    (should (equal (nth 4 result) '(5 . "proj5")))))
 
 ;; Pure function for testing multi-project session order
 (defun enkan-repl--create-session-list-with-order-pure (alias-list)
   "Create session list from ALIAS-LIST maintaining order.
 Returns list of (session-number . alias) pairs starting from session 1."
-  (when (> (length alias-list) 2)
-    (error "Too many projects: %d (max 2)" (length alias-list)))
   (let ((session-number 1)
         (result nil))
     (dolist (alias alias-list)
