@@ -77,10 +77,7 @@
               enkan-center-file-command-definitions)
     ;; Fallback definitions
     '(("enkan-repl-center-setup" . "Setup center file window layout")
-       ("enkan-repl-center-reset" . "Reset center file layout")
-       ("enkan-repl-center-file-help" . "Show center file help")
-       ("enkan-repl-center-list-sessions" . "List registered sessions")
-       ("enkan-repl-center-clear-sessions" . "Clear all sessions")))
+       ("enkan-repl-center-reset" . "Reset center file layout")))
   "Additional commands for center file mode to add to cheat sheet.")
 
 ;;; ========================================

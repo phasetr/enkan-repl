@@ -102,9 +102,7 @@ Each entry is (KEY COMMAND DESCRIPTION CATEGORY).")
     (enkan-repl-center-send-line-to-session-2 "Send line to session 2 (center)")
     (enkan-repl-center-send-region-to-session-1 "Send region to session 1 (center)")
     (enkan-repl-center-send-region-to-session-2 "Send region to session 2 (center)")
-    (enkan-repl-center-register-current-session "Register current session")
-    (enkan-repl-center-list-sessions "List registered sessions")
-    (enkan-repl-center-clear-sessions "Clear all sessions"))
+    (enkan-repl-center-register-current-session "Register current session"))
   "Command definitions for center file multi-buffer mode.
 Each entry is (COMMAND DESCRIPTION).")
 

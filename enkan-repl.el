@@ -1070,7 +1070,15 @@ Category: Session Controller"
           (if (fboundp 'enkan-repl-setup-2session-layout)
               (enkan-repl-setup-2session-layout)
             (error "enkan-repl-setup-2session-layout not available. Load center-window-navigation.el from examples.")))
-         (t (error "Invalid session count: %d" session-count)))
+         ((= session-count 3)
+          (if (fboundp 'enkan-repl-setup-3session-layout)
+              (enkan-repl-setup-3session-layout)
+            (error "enkan-repl-setup-3session-layout not available. Load center-window-navigation.el from examples.")))
+         ((= session-count 4)
+          (if (fboundp 'enkan-repl-setup-4session-layout)
+              (enkan-repl-setup-4session-layout)
+            (error "enkan-repl-setup-4session-layout not available. Load center-window-navigation.el from examples.")))
+         (t (error "No layout function available for %d sessions. Consider implementing enkan-repl-setup-%dsession-layout." session-count session-count)))
         (message "Multi-project window layout setup complete: %s (%d sessions)"
                  enkan-repl--current-multi-project-layout session-count))
     ;; Normal setup behavior
@@ -1338,35 +1346,6 @@ Category: Command Palette"
         (when selected-command
           (call-interactively (intern selected-command)))))))
 
-;;;; Center File Multi-buffer Access Commands
-
-;;;###autoload
-(defun enkan-repl-center-list-sessions ()
-  "Display currently registered sessions.
-
-Category: Center File Multi-buffer Access"
-  (interactive)
-  (if enkan-repl-session-list
-      (let ((msg "Registered sessions:\n"))
-        (dolist (session enkan-repl-session-list)
-          (let* ((internal-num (car session))
-                 (user-num (- internal-num 3))
-                 (project (cdr session)))
-            (when (<= 1 user-num 2)
-              (setq msg (concat msg (format "  %d: %s\n" user-num project))))))
-        (message "%s" msg))
-    (message "No sessions registered")))
-
-;;;###autoload
-(defun enkan-repl-center-clear-sessions ()
-  "Clear all registered sessions.
-
-Category: Center File Multi-buffer Access"
-  (interactive)
-  (when (yes-or-no-p "Clear all registered sessions? ")
-    (setq enkan-repl-session-list nil)
-    (message "All sessions cleared")))
-
 ;;;; Global Minor Mode for Center File Operations
 
 (defvar enkan-center-file-global-mode-map
@@ -1471,8 +1450,6 @@ This function only starts eat sessions - use enkan-repl-setup (C-M-l) to arrange
     (unless alias-list
       (error "Layout '%s' not found" layout-name))
     (let ((session-count (length alias-list)))
-      (when (> session-count 2)
-        (error "Too many projects: %d (max 2)" session-count))
       ;; Clear session list and reset any previous layout configuration
       (setq enkan-repl-session-list nil)
       (setq enkan-repl--session-counter 0)
@@ -2089,6 +2066,41 @@ Category: Center File Multi-buffer Access"
               (if (enkan-repl--send-buffer-content start end target-directory)
                   (message "Region sent to buffer: %s" (buffer-name target-buffer))
                 (message "Failed to send region to buffer: %s" (buffer-name target-buffer))))))))))
+
+;;;###autoload
+(defun enkan-repl-center-print-setup-to-buffer ()
+  "Print current setup variables for debugging.
+Displays enkan-repl-center-multi-project-layouts, enkan-repl-center-project-registry,
+enkan-repl-project-aliases, and current session state.
+
+Category: Debugging"
+  (interactive)
+  (let ((buffer-name "*ENKAN-REPL Setup Debug*"))
+    (with-output-to-temp-buffer buffer-name
+      (princ "=== ENKAN-REPL CENTER SETUP DEBUG ===\n\n")
+      (princ "Multi-project layouts:\n")
+      (if enkan-repl-center-multi-project-layouts
+          (dolist (layout enkan-repl-center-multi-project-layouts)
+            (princ (format "  %s: %s\n" (car layout) (cdr layout))))
+        (princ "  <empty>\n"))
+      (princ "\nProject registry:\n")
+      (if enkan-repl-center-project-registry
+          (dolist (entry enkan-repl-center-project-registry)
+            (princ (format "  %s: project=%s, path=%s\n"
+                           (car entry)
+                           (car (cdr entry))
+                           (cdr (cdr entry)))))
+        (princ "  <empty>\n"))
+      (princ "\nProject aliases:\n")
+      (if enkan-repl-project-aliases
+          (dolist (alias enkan-repl-project-aliases)
+            (princ (format "  %s -> %s\n" (car alias) (cdr alias))))
+        (princ "  <empty>\n"))
+      (princ "\nCurrent session state:\n")
+      (princ (format "  Current layout: %s\n" (or enkan-repl--current-multi-project-layout "<none>")))
+      (princ (format "  Session list: %s\n" (or enkan-repl-session-list "<empty>")))
+      (princ (format "  Session counter: %d\n" enkan-repl--session-counter))
+      (princ "\n=== END DEBUG ===\n"))))
 
 (provide 'enkan-repl)
 
