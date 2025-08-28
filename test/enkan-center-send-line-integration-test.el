@@ -136,7 +136,7 @@
     ;; Test buffer resolution directly
     (cl-letf (((symbol-function 'process-live-p) (lambda (proc) t)))
       (let* ((enkan-buffers (list test-buffer-er test-buffer-pt))
-             (resolved-buffer (enkan-repl-center--resolve-alias-to-buffer-pure "er" enkan-buffers)))
+             (resolved-buffer (enkan-repl--resolve-target-buffer-pure nil "er" enkan-buffers)))
         (should (eq resolved-buffer test-buffer-er))
         (should-not (eq resolved-buffer test-buffer-pt))))
     
