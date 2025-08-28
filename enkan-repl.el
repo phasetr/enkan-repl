@@ -1963,29 +1963,29 @@ Returns plist with :project-name, :project-path."
       (list :project-name nil :project-path nil))))
 
 (defun enkan-repl-center-magit ()
-  "Open magit for selected project from registry with UI selection.
+  "Open magit for selected project from active sessions only.
 
 Category: Center File Operations"
   (interactive)
-  (if (not (boundp 'enkan-repl-center-project-registry))
-      (error "enkan-repl-center-project-registry is not defined")
-    (if (null enkan-repl-center-project-registry)
-        (error "Project registry is empty. Configure enkan-repl-center-project-registry")
-      (let* ((project-list (enkan-repl--get-magit-project-list-pure enkan-repl-center-project-registry))
-             (completion-list (enkan-repl--create-magit-completion-list-pure project-list))
-             (selected (completing-read "Select project for magit: " completion-list nil t))
-             (project-info (enkan-repl--parse-selected-magit-project-pure selected project-list)))
-        (let ((project-path (plist-get project-info :project-path))
-              (project-name (plist-get project-info :project-name)))
-          (if project-path
+  (let* ((enkan-buffers (enkan-repl--collect-enkan-buffers-pure (buffer-list)))
+          (valid-buffers (enkan-repl--filter-valid-buffers-pure enkan-buffers)))
+    (if (= (length valid-buffers) 0)
+      (message "No active enkan sessions found for magit")
+      (let* ((choices (enkan-repl--build-buffer-selection-choices-pure valid-buffers))
+              (selected-display (completing-read "Select project for magit: " choices nil t))
+              (selected-buffer (cdr (assoc selected-display choices))))
+        (when selected-buffer
+          (let ((project-path (enkan-repl--extract-directory-from-buffer-name-pure
+                                (buffer-name selected-buffer))))
+            (if project-path
               (let ((validation (enkan-repl--validate-magit-project-path-pure project-path)))
                 (if (plist-get validation :valid)
-                    (progn
-                      (let ((default-directory project-path))
-                        (magit-status))
-                      (message "Opened magit for project: %s (%s)" project-name project-path))
+                  (progn
+                    (let ((default-directory project-path))
+                      (magit-status))
+                    (message "Opened magit for project: %s" project-path))
                   (error "Invalid project path: %s" (plist-get validation :message))))
-            (error "Failed to parse selected project")))))))
+              (error "Failed to extract project path from buffer: %s" (buffer-name selected-buffer)))))))))
 
 (defun enkan-repl-center-send-region (start end &optional action-string)
   "Send region to center file buffer with action specification.
