@@ -1505,14 +1505,6 @@ Category: Center File Multi-buffer Access"
       (message "No enkan sessions found to recenter"))))
 
 ;;;###autoload
-(defun enkan-repl--collect-enkan-buffers-pure (buffer-list)
-  "Pure function to collect enkan buffers from BUFFER-LIST.
-Returns list of buffers whose names match enkan pattern."
-  (seq-filter (lambda (buf)
-                (and (bufferp buf)
-                     (buffer-name buf)
-                     (string-match-p "^\\*enkan:" (buffer-name buf))))
-              buffer-list))
 
 (defun enkan-repl--get-buffer-process-info-pure (buffer)
   "Pure function to get process info for BUFFER.
@@ -1530,16 +1522,143 @@ Returns plist with :buffer, :name, :live-p, :has-process, :process."
             :has-process (and process-info (plist-get process-info :bound) (plist-get process-info :process))
             :process (when process-info (plist-get process-info :process))))))
 
-(defun enkan-repl--filter-valid-buffers-pure (enkan-buffers)
-  "Pure function to filter buffers that have active eat processes.
-ENKAN-BUFFERS is a list of buffer objects.
-Returns list of buffers that have live eat processes."
+
+(defun enkan-repl--get-available-buffers-pure (buffer-list)
+  "Pure function to get available enkan buffers from BUFFER-LIST.
+Consolidates buffer collection and filtering into single function.
+Returns list of valid enkan buffers with active eat processes."
   (seq-filter (lambda (buffer)
-                (with-current-buffer buffer
-                  (and (boundp 'eat--process)
-                       eat--process
-                       (process-live-p eat--process))))
-              enkan-buffers))
+                (and (bufferp buffer)
+                     (buffer-name buffer)
+                     (string-match-p "^\\*enkan:" (buffer-name buffer))
+                     (with-current-buffer buffer
+                       (and (boundp 'eat--process)
+                            eat--process
+                            (process-live-p eat--process)))))
+              buffer-list))
+
+(defun enkan-repl--resolve-target-buffer-pure (prefix-arg alias buffers)
+  "Pure function to resolve target buffer from multiple inputs.
+PREFIX-ARG: numeric prefix for index-based selection
+ALIAS: alias string for alias-based selection
+BUFFERS: list of available buffers
+Returns resolved buffer or nil if no match.
+Resolution priority: prefix-arg → alias → nil (for interactive selection)."
+  (cond
+   ;; Priority 1: prefix-arg based selection
+   ((and prefix-arg (numberp prefix-arg) (> prefix-arg 0))
+    (when (and (<= prefix-arg (length buffers)))
+      (nth (1- prefix-arg) buffers)))
+   ;; Priority 2: alias based selection
+   ((and alias (stringp alias) (not (string-empty-p alias)))
+    (let ((alias-entry (assoc alias enkan-repl-project-aliases)))
+      (when alias-entry
+        (let* ((resolved-project (cdr alias-entry))
+               (matching-buffers (seq-filter
+                                 (lambda (buf)
+                                   (let ((buffer-project (enkan-repl--extract-project-name (buffer-name buf))))
+                                     (string= resolved-project buffer-project)))
+                                 buffers)))
+          (car matching-buffers)))))
+   ;; Priority 3: return nil for interactive selection
+   (t nil)))
+
+(defun enkan-repl--send-primitive-pure (text special-key-type)
+  "Pure function to prepare send content from TEXT and SPECIAL-KEY-TYPE.
+TEXT: original text content
+SPECIAL-KEY-TYPE: :enter, :escape, number 1-9, or nil
+Returns plist with :content (string to send) and :action (action type)."
+  (cond
+   ((eq special-key-type :enter)
+    (list :content "\r" :action 'key))
+   ((eq special-key-type :escape)
+    (list :content "\e" :action 'key))
+   ((and (numberp special-key-type)
+         (>= special-key-type 1)
+         (<= special-key-type 9))
+    (list :content (number-to-string special-key-type) :action 'number))
+   ((null special-key-type)
+    (list :content text :action 'text))
+   (t
+    (error "Invalid special-key-type: %s" special-key-type))))
+
+(defun enkan-repl--send-primitive-action (buffer send-data)
+  "Side-effect function to execute send action to BUFFER.
+BUFFER: target buffer with eat process
+SEND-DATA: plist from enkan-repl--send-primitive-pure
+Returns t on success, nil on failure."
+  (when (and buffer (buffer-live-p buffer))
+    (with-current-buffer buffer
+      (when (and (boundp 'eat--process)
+                 eat--process
+                 (process-live-p eat--process))
+        (let ((content (plist-get send-data :content)))
+          (when content
+            (eat--send-string eat--process content)
+            ;; For text content, also send carriage return
+            (when (eq (plist-get send-data :action) 'text)
+              (eat--send-string eat--process "\r"))
+            t))))))
+
+(defun enkan-repl--center-send-unified (text &optional prefix-arg special-key-type)
+  "Unified backend for all center-send commands.
+TEXT: text content to send
+PREFIX-ARG: numeric prefix for buffer selection (optional)
+SPECIAL-KEY-TYPE: :enter, :escape, 1-9, or nil for normal text (optional)
+
+Resolution priority: prefix-arg → alias parsing → interactive selection
+Returns t on success, nil on failure."
+  (let* ((available-buffers (enkan-repl--get-available-buffers-pure (buffer-list)))
+         (parsed-command nil)
+         (resolved-alias nil)
+         (target-buffer nil)
+         (final-text text))
+    ;; Early return if no available buffers
+    (if (null available-buffers)
+        (progn
+          (message "No active enkan sessions found. Start one with M-x enkan-repl-start-eat")
+          nil)
+      ;; Parse alias from text if no special-key-type
+      (when (null special-key-type)
+        (setq parsed-command (enkan-repl-center--parse-alias-command-pure text))
+        (when (plist-get parsed-command :valid)
+          (setq resolved-alias (plist-get parsed-command :alias))
+          (setq final-text (plist-get parsed-command :text))
+          ;; Handle special commands within alias
+          (let ((command (plist-get parsed-command :command)))
+            (cond
+             ((eq command :esc)
+              (setq special-key-type :escape)
+              (setq final-text ""))
+             ((eq command :ret)
+              (setq special-key-type :enter)
+              (setq final-text ""))
+             ((and (stringp command) (string-match-p "^[1-9]$" command))
+              (setq special-key-type (string-to-number command))
+              (setq final-text ""))))))
+      ;; Resolve target buffer
+      (setq target-buffer (enkan-repl--resolve-target-buffer-pure
+                          prefix-arg resolved-alias available-buffers))
+      ;; Handle alias resolution failure
+      (if (and resolved-alias (null target-buffer))
+          ;; Explicit alias specified but not found - show error and return
+          (progn
+            (message "No buffer found for alias '%s'" resolved-alias)
+            nil)
+        ;; Interactive selection if no target resolved and no explicit alias
+        (unless target-buffer
+          (if (= 1 (length available-buffers))
+              (setq target-buffer (car available-buffers))
+            (let* ((choices (enkan-repl--build-buffer-selection-choices-pure available-buffers))
+                   (selection (completing-read "Select buffer for send: " choices nil t)))
+              (setq target-buffer (cdr (assoc selection choices))))))
+        ;; Execute send
+        (when target-buffer
+          (let* ((send-data (enkan-repl--send-primitive-pure final-text special-key-type))
+                 (success (enkan-repl--send-primitive-action target-buffer send-data)))
+            (when success
+              (message "Sent to buffer: %s" (buffer-name target-buffer)))
+            success))))))
 
 (defun enkan-repl--build-buffer-selection-choices-pure (buffers)
   "Pure function to build selection choices from BUFFERS.
@@ -1553,13 +1672,6 @@ Returns list of cons cells (display-name . buffer) for selection UI."
           buffers))
 
 
-(defun enkan-repl--get-buffer-by-index-pure (buffers index)
-  "Pure function to get buffer from BUFFERS by INDEX (1-based).
-Returns buffer if valid index, nil otherwise."
-  (when (and (integerp index)
-             (> index 0)
-             (<= index (length buffers)))
-    (nth (1- index) buffers)))
 
 (defun enkan-repl--parse-prefix-arg-pure (prefix-arg)
   "Pure function to parse PREFIX-ARG into action type.
@@ -1635,66 +1747,13 @@ Sends text followed by carriage return, with cursor positioning."
 Category: Center File Multi-buffer Access"
   (interactive "P")
   (cond
-   ;; Check if current buffer is an enkan buffer
+   ;; Special case: if current buffer is enkan buffer, send ESC directly
    ((string-match-p "^\\*enkan:" (buffer-name))
-    ;; Send ESC to current enkan buffer directly
-    (enkan-repl--send-escape-to-buffer (current-buffer) nil))
-   ((numberp prefix-arg)
-    ;; C-u numeric for layout index specification
-    (let* ((current-layout (cdr (assoc enkan-repl--current-multi-project-layout enkan-repl-center-multi-project-layouts)))
-           (layout-count (length current-layout)))
-      (if (and (<= 1 prefix-arg) (<= prefix-arg layout-count))
-          (let* ((target-alias (nth (1- prefix-arg) current-layout))
-                 (enkan-buffers (enkan-repl--collect-enkan-buffers-pure (buffer-list)))
-                 (resolved-buffer (enkan-repl-center--resolve-alias-to-buffer-pure target-alias enkan-buffers)))
-            (message "Sending ESC to layout index %d (alias: %s)" prefix-arg target-alias)
-            (if resolved-buffer
-                (enkan-repl--send-escape-to-buffer resolved-buffer nil)
-              (message "No buffer found for alias '%s'" target-alias)))
-        (message "Invalid layout index %d (valid range: 1-%d)" prefix-arg layout-count))))
+    (let ((send-data (enkan-repl--send-primitive-pure "" :escape)))
+      (enkan-repl--send-primitive-action (current-buffer) send-data)))
+   ;; Otherwise use unified backend
    (t
-    ;; No argument case shows buffer selection UI
-    (enkan-repl--center-send-escape-internal nil))))
-
-(defun enkan-repl--center-send-escape-internal (&optional buffer-index-or-skip-ui)
-  "Internal helper to send ESC key to eat session buffer from center file.
-BUFFER-INDEX-OR-SKIP-UI:
-- nil: Show buffer selection UI.
-- integer: Send to buffer at that index (1-based).
-- 'skip-ui: Skip buffer selection UI and send to default/first active buffer."
-  (message "Starting enkan-repl--center-send-escape-internal with arg: %s" buffer-index-or-skip-ui)
-  (let* ((enkan-buffers (enkan-repl--collect-enkan-buffers-pure (buffer-list)))
-         (valid-buffers (enkan-repl--filter-valid-buffers-pure enkan-buffers)))
-    (message "Found %d enkan buffers, %d valid"
-             (length enkan-buffers) (length valid-buffers))
-    (cond
-     ((= (length valid-buffers) 0)
-      (message "No active enkan sessions found"))
-     ((integerp buffer-index-or-skip-ui)
-      (let* ((index buffer-index-or-skip-ui)
-             (target-buffer (enkan-repl--get-buffer-by-index-pure valid-buffers index)))
-        (message "Attempting to send ESC to buffer index %d" index)
-        (if target-buffer
-            (enkan-repl--send-escape-to-buffer target-buffer index)
-          (message "Invalid buffer index %d (valid range: 1-%d)" index (length valid-buffers)))))
-     ((eq 'skip-ui buffer-index-or-skip-ui)
-      (if valid-buffers
-          (enkan-repl--send-escape-to-buffer (car valid-buffers) 1)
-        (message "No active enkan sessions found to send ESC directly.")))
-     (t
-      (let* ((choices (enkan-repl--build-buffer-selection-choices-pure valid-buffers))
-             (selected-display (completing-read "Select buffer to send ESC: " choices nil t))
-             (selected-buffer (cdr (assoc selected-display choices))))
-        (when selected-buffer
-          (message "User selected buffer: %s" (buffer-name selected-buffer))
-          (enkan-repl--send-escape-to-buffer selected-buffer nil)))))))
-
-(defun enkan-repl--send-escape-to-buffer (buffer &optional index)
-  "Send ESC key to BUFFER. INDEX is for logging purposes."
-  (let ((info (enkan-repl--get-buffer-process-info-pure buffer)))
-    (with-current-buffer buffer
-      (eat--send-string (plist-get info :process) "\e"))
-    (message "Sent ESC to buffer %s: %s" (if index (format "%d" index) "selected") (plist-get info :name))))
+    (enkan-repl--center-send-unified "" prefix-arg :escape))))
 
 ;;;###autoload
 (defun enkan-repl-center-open-project-directory ()
@@ -1733,48 +1792,8 @@ Always requires buffer specification:
 
 Category: Center File Multi-buffer Access"
   (interactive "P")
-  (enkan-repl--center-send-text-with-selection "" prefix-arg))
+  (enkan-repl--center-send-unified "" prefix-arg :enter))
 
-(defun enkan-repl--center-send-text-with-selection (text prefix-arg)
-  "Internal function to send TEXT with buffer selection logic using PREFIX-ARG."
-  (message "Starting enkan-repl-center-send-text with prefix-arg: %s" prefix-arg)
-  (let* ((enkan-buffers (enkan-repl--collect-enkan-buffers-pure (buffer-list)))
-         (valid-buffers (enkan-repl--filter-valid-buffers-pure enkan-buffers))
-         (parsed-arg (enkan-repl--parse-prefix-arg-pure prefix-arg)))
-    (message "Found %d enkan buffers, %d valid for text sending"
-             (length enkan-buffers) (length valid-buffers))
-    (cond
-     ((= (length valid-buffers) 0)
-      (message "No active enkan sessions found"))
-     ((eq 'invalid (plist-get parsed-arg :action))
-      (message "Invalid prefix argument"))
-     ((eq 'index (plist-get parsed-arg :action))
-      (let* ((index (plist-get parsed-arg :index))
-             (target-buffer (enkan-repl--get-buffer-by-index-pure valid-buffers index)))
-        (message "Attempting to send text '%s' to buffer index %d" text index)
-        (if target-buffer
-            (let ((info (enkan-repl--get-buffer-process-info-pure target-buffer)))
-              (if (plist-get info :has-process)
-                  (progn
-                    (enkan-repl--center-send-text-to-buffer text target-buffer)
-                    (message "Sent '%s' to buffer %d: %s" text index (plist-get info :name)))
-                (message "Cannot send to inactive buffer %d: %s" index (plist-get info :name))))
-          (message "Invalid buffer index %d (valid range: 1-%d)" index (length valid-buffers)))))
-     ((enkan-repl--should-show-buffer-selection-pure (plist-get parsed-arg :action) valid-buffers)
-      (let* ((choices (enkan-repl--build-buffer-selection-choices-pure valid-buffers))
-             (selected-display (completing-read (format "Select buffer to send '%s': "
-                                                        (if (string-empty-p text) "ENTER" text))
-                                               choices nil t))
-             (selected-buffer (cdr (assoc selected-display choices))))
-        (message "User selected buffer for text '%s': %s" text (buffer-name selected-buffer))
-        (let ((info (enkan-repl--get-buffer-process-info-pure selected-buffer)))
-          (if (plist-get info :has-process)
-              (progn
-                (enkan-repl--center-send-text-to-buffer text selected-buffer)
-                (message "Sent '%s' to selected buffer: %s" text (plist-get info :name)))
-            (message "Cannot send to selected buffer: %s" (plist-get info :name))))))
-     (t
-      (message "No valid action determined for text sending")))))
 
 (defun enkan-repl--analyze-center-send-content-pure (content prefix-arg)
   "Pure function to analyze center-send content and determine action.
@@ -1810,15 +1829,13 @@ Returns plist with :valid, :alias, :command, :text, :message."
     (list :valid nil :message "Must start with : prefix"))
    ((not (string-match-p "^:" input-string))
     (list :valid nil :message "Must start with : prefix"))
-   ((string-match "^:\\([^ ]+\\)\\(?: \\(.*\\)\\)?$" input-string)
+   ((string-match "^:\\([a-zA-Z0-9]+\\) \\(.*\\)" input-string)
+    ;; Manual multiline extraction for alias with space and content
     (let* ((alias (match-string 1 input-string))
-           (rest (match-string 2 input-string)))
+           (rest (substring input-string (+ 1 (length alias) 1))))  ; Skip :alias + space
       (if (string-empty-p alias)
           (list :valid nil :message "Invalid format. Alias cannot be empty")
         (cond
-         ((null rest)
-          ;; Only alias specified
-          (list :valid t :alias alias :command :empty :text ""))
          ((equal rest "esc")
           ;; Escape command
           (list :valid t :alias alias :command :esc :text nil))
@@ -1828,41 +1845,22 @@ Returns plist with :valid, :alias, :command, :text, :message."
          (t
           ;; Text to send
           (list :valid t :alias alias :command :text :text rest))))))
+   ((string-match "^:\\([a-zA-Z0-9]+\\)$" input-string)
+    ;; Only alias specified
+    (let ((alias (match-string 1 input-string)))
+      (list :valid t :alias alias :command :empty :text "")))
    (t
     (list :valid nil :message "Invalid format. Use: :alias [text|esc|:ret]"))))
 
-(defun enkan-repl-center--resolve-alias-to-buffer-pure (alias enkan-buffers)
-  "Pure function to resolve alias to buffer from ENKAN-BUFFERS.
-ALIAS is the alias string to match against buffer names.
-ENKAN-BUFFERS is list of available enkan buffers.
-Returns buffer object or nil if not found."
-  ;; First check if alias exists in project aliases
-  (let ((alias-entry (assoc alias enkan-repl-project-aliases)))
-    (if alias-entry
-        ;; Alias found, resolve to project name and search buffers
-        (let* ((resolved-project (cdr alias-entry))
-               (matching-buffers (seq-filter
-                                 (lambda (buf)
-                                   ;; Extract project name from buffer name and do exact match
-                                   (let ((buffer-project (enkan-repl--extract-project-name (buffer-name buf))))
-                                     (string= resolved-project buffer-project)))
-                                 enkan-buffers)))
-          (if matching-buffers
-              ;; Return first match
-              ;; Could be enhanced to show selection UI
-              (car matching-buffers)
-            nil))
-      ;; Alias not found in project aliases
-      nil)))
 
-(defun enkan-repl-center-send-line ()
+(defun enkan-repl-center-send-line (&optional prefix-arg)
   "Send current line to a suitable eat session.
 See enkan-repl-center-send-region.
 
 Category: Text Sender"
-  (interactive)
-  (enkan-repl-center-send-region
-    (line-beginning-position) (line-end-position)))
+  (interactive "P")
+  (enkan-repl--center-send-unified
+    (buffer-substring-no-properties (line-beginning-position) (line-end-position)) prefix-arg nil))
 
 ;; Pure functions for center file operations (used by enkan-repl-center-open-file)
 (defun enkan-center-file-validate-path-pure (file-path)
@@ -1967,8 +1965,7 @@ Returns plist with :project-name, :project-path."
 
 Category: Center File Operations"
   (interactive)
-  (let* ((enkan-buffers (enkan-repl--collect-enkan-buffers-pure (buffer-list)))
-          (valid-buffers (enkan-repl--filter-valid-buffers-pure enkan-buffers)))
+  (let* ((valid-buffers (enkan-repl--get-available-buffers-pure (buffer-list))))
     (if (= (length valid-buffers) 0)
       (message "No active enkan sessions found for magit")
       (let* ((choices (enkan-repl--build-buffer-selection-choices-pure valid-buffers))
@@ -1987,43 +1984,13 @@ Category: Center File Operations"
                   (error "Invalid project path: %s" (plist-get validation :message))))
               (error "Failed to extract project path from buffer: %s" (buffer-name selected-buffer)))))))))
 
-(defun enkan-repl-center-send-region (start end &optional action-string)
+(defun enkan-repl-center-send-region (start end &optional prefix-arg)
   "Send region to center file buffer with action specification.
 
 Category: Center File Multi-buffer Access"
-  (interactive "r")
-  (let ((region-text (buffer-substring-no-properties start end)))
-    (if (string-match "^:\\([^ ]+\\) " region-text)
-        ;; Alias format: ":alias content"
-        (let* ((alias (match-string 1 region-text))
-               (remaining-part (substring region-text (match-end 0)))
-               (enkan-buffers (enkan-repl--collect-enkan-buffers-pure (buffer-list)))
-               (resolved-buffer (enkan-repl-center--resolve-alias-to-buffer-pure alias enkan-buffers)))
-          (if resolved-buffer
-            (if (string= remaining-part "esc")
-              ;; esc case: send center-send-escape with skip-ui
-              (enkan-repl--center-send-escape-internal 'skip-ui)
-              ;; non-esc case: send string with enkan-repl--send-buffer-content
-              (let ((target-directory (enkan-repl--extract-directory-from-buffer-name-pure
-                                        (buffer-name resolved-buffer)))
-                     (start-no-alias (+ start (length alias) 2)))
-                (if (enkan-repl--send-buffer-content start-no-alias end target-directory)
-                  (message "Sent string to alias '%s' buffer" alias)
-                  (message "Failed to send string to alias '%s' buffer" alias))))
-            (message "No buffer found for alias '%s'" alias)))
-      ;; No alias: select buffer and send
-      (let* ((enkan-buffers (enkan-repl--collect-enkan-buffers-pure (buffer-list)))
-             (valid-buffers (enkan-repl--filter-valid-buffers-pure enkan-buffers)))
-        (if (= (length valid-buffers) 0)
-            (message "No active enkan sessions found")
-          (let* ((choices (enkan-repl--build-buffer-selection-choices-pure valid-buffers))
-                 (selected-display (completing-read "Select buffer for region send: " choices nil t))
-                 (target-buffer (cdr (assoc selected-display choices))))
-            (let ((target-directory (enkan-repl--extract-directory-from-buffer-name-pure
-                                      (buffer-name target-buffer))))
-              (if (enkan-repl--send-buffer-content start end target-directory)
-                  (message "Region sent to buffer: %s" (buffer-name target-buffer))
-                (message "Failed to send region to buffer: %s" (buffer-name target-buffer))))))))))
+  (interactive "r\nP")
+  (enkan-repl--center-send-unified
+    (buffer-substring-no-properties start end) prefix-arg nil))
 
 ;;;###autoload
 (defun enkan-repl-center-print-setup-to-buffer ()
