@@ -1475,7 +1475,7 @@ Category: Center File Multi-buffer Access"
             (princ "  Session list (enkan-repl-session-list): nil\n")
             (princ "  Session counter (enkan-repl--session-counter): 0\n")
             (princ "  Current layout (enkan-repl--current-multi-project-layout): nil\n")
-            (princ "  Project aliases (enkan-repl-project-aliases): nil\n" (or enkan-repl-project-aliases "nil"))
+            (princ (format "  Permanent aliases (enkan-repl-project-aliases): %s\n" (or enkan-repl-project-aliases "nil")))
             (princ (format "\n✅ Terminated %d sessions, cleared session list and reset layout configuration.\n" terminated-count))
             (princ "\n=== END FINISH SESSIONS ===\n")))))))
 

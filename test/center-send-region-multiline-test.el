@@ -70,8 +70,11 @@
     ;; Mock functions at global level
     (cl-letf (((symbol-function 'enkan-repl--collect-enkan-buffers-pure)
                (lambda (buffer-list) (list test-buffer)))
-              ((symbol-function 'enkan-repl-send-region)
-               (lambda (start end)
+              ((symbol-function 'completing-read)
+               (lambda (prompt choices &rest args) 
+                 (car choices)))  ; Select first choice
+              ((symbol-function 'enkan-repl--send-buffer-content)
+               (lambda (start end target-directory)
                  (setq sent-content (buffer-substring-no-properties start end))
                  t))
               ((symbol-function 'process-live-p) (lambda (proc) t))
@@ -113,8 +116,8 @@
               ((symbol-function 'completing-read)
                (lambda (prompt choices &rest args) 
                  (car choices)))  ; Select first choice
-              ((symbol-function 'enkan-repl-send-region)
-               (lambda (start end)
+              ((symbol-function 'enkan-repl--send-buffer-content)
+               (lambda (start end target-directory)
                  (setq sent-content (buffer-substring-no-properties start end))
                  t))
               ((symbol-function 'process-live-p) (lambda (proc) t))

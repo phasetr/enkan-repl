@@ -3,7 +3,7 @@
 ;;; Code:
 
 (require 'ert)
-(load "../enkan-repl.el")
+(load "./enkan-repl.el")
 
 (ert-deftest test-get-target-directory-center-file-issue ()
   "Test that center file current buffer doesn't affect target directory determination."

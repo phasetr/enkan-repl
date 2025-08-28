@@ -106,7 +106,7 @@
         
         ;; Test the function - should fail to find buffer
         (enkan-repl-center-send-line)
-        (should (string-match-p "Invalid action format" message-shown))))
+        (should (string-match-p "No buffer found for alias 'er'" message-shown))))
     
     ;; Clean up
     (when (and process-obj-er (process-live-p process-obj-er))

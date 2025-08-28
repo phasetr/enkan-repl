@@ -33,7 +33,7 @@
 Each element is a cons cell (FUNCTION-NAME . DESCRIPTION).")
 
 (defconst enkan-repl-cheat-sheet-function-count
-  21
+  18
   "Number of functions in cheat-sheet.")
 
 (provide 'enkan-repl-constants)

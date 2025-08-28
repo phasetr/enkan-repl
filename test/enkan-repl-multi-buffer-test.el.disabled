@@ -263,7 +263,8 @@
 
 ;;;; Auto registration tests
 
-(ert-deftest enkan-repl-test--auto-register-session ()
+;; DISABLED: Function enkan-repl--auto-register-session was removed
+;;(ert-deftest enkan-repl-test--auto-register-session ()
   "Test automatic session registration."
   (let ((enkan-repl-session-list nil)
         (enkan-repl--session-counter 0)

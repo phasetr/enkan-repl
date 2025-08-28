@@ -3,7 +3,7 @@
 ;;; Code:
 
 (require 'ert)
-(load "../enkan-repl.el")
+(load "./enkan-repl.el")
 
 (ert-deftest test-alias-resolution-exact-match ()
   "Test that alias resolution uses exact match instead of partial match."
