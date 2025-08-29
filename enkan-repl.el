@@ -640,30 +640,6 @@ Otherwise, use current `default-directory'."
          eat--process
          (process-live-p eat--process))))))
 
-(defun enkan-repl--send-text (text &optional directory)
-  "Send TEXT to eat session buffer.
-If DIRECTORY is provided, send to eat session in that directory.
-Otherwise, use current `default-directory'."
-  (let
-    ((session-buffer
-       (enkan-repl--get-buffer-for-directory directory)))
-    (when
-        (and session-buffer
-          (with-current-buffer session-buffer
-            (and (boundp 'eat--process)
-              eat--process
-              (process-live-p eat--process))))
-      (with-current-buffer session-buffer
-        (eat--send-string eat--process text)
-        (eat--send-string eat--process "\r")
-        ;; Move cursor to bottom after eat processes the output
-        (run-at-time 0.01 nil
-          (lambda (buf)
-            (with-current-buffer buf
-              (goto-char (point-max))))
-          session-buffer)
-        t))))
-
 (defun enkan-repl--send-escape-directly ()
   "Send ESC key to eat session buffer directly."
   (let
@@ -687,20 +663,6 @@ Otherwise, use current `default-directory'."
                          session-buffer))
           (message "Sent ESC to session"))
       (message "❌ Cannot send - no matching eat session found for this directory"))))
-
-(defun enkan-repl--send-buffer-content (start end &optional target-directory)
-  "Send buffer content from START to END.
-START and END define the region to send.
-TARGET-DIRECTORY specifies target directory for eat session."
-  (let* ((raw-content (buffer-substring-no-properties start end))
-         (content (enkan-repl--sanitize-content raw-content))
-         (target-dir (or target-directory (enkan-repl--get-target-directory-for-buffer))))
-    (if (and content (not (= (length content) 0)))
-        (progn
-          (if (enkan-repl--send-text content target-dir)
-            (message "We can send a message!")
-            (message "❌ Cannot send - no matching eat session found for this directory")))
-      (message "No content to send (empty or whitespace only)"))))
 
 ;;;; Public API - Send Functions
 
