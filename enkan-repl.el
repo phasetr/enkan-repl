@@ -644,9 +644,12 @@ Otherwise, use current `default-directory'."
 
 ;;;###autoload
 (defun enkan-repl-send-region (start end &optional prefix-arg)
-  "Send the text in region from START to END to eat session
-with some action specification.
-With PREFIX-ARG, select specific buffer by number.
+  "Send region text (from START to END) to enkan session buffer.
+- From enkan buffer: Send to current buffer
+- From other buffer without prefix: Interactive buffer selection
+- With numeric prefix: Send to buffer at index (1-based)
+
+Uses unified backend with smart buffer detection.
 
 Category: Text Sender"
   (interactive "r\nP")
@@ -655,8 +658,12 @@ Category: Text Sender"
 
 ;;;###autoload
 (defun enkan-repl-send-line (&optional prefix-arg)
-  "Send current line to a suitable eat session.
-With PREFIX-ARG, select specific buffer by number.
+  "Send current line to enkan session buffer.
+- From enkan buffer: Send to current buffer
+- From other buffer without prefix: Interactive buffer selection
+- With numeric prefix: Send to buffer at index (1-based)
+
+Uses unified backend with smart buffer detection.
 
 Category: Text Sender"
   (interactive "P")
@@ -665,10 +672,12 @@ Category: Text Sender"
 
 ;;;###autoload
 (defun enkan-repl-send-enter (&optional prefix-arg)
-  "Send enter key to suitable eat session buffer.
-Always requires buffer specification:
-- Without prefix: Select from available enkan buffers
-- With numeric prefix: Send to buffer at that index (1-based)
+  "Send enter key to enkan session buffer.
+- From enkan buffer: Send to current buffer
+- From other buffer without prefix: Interactive buffer selection
+- With numeric prefix: Send to buffer at index (1-based)
+
+Uses unified backend with smart buffer detection.
 
 Category: Text Sender"
   (interactive "P")
@@ -676,52 +685,88 @@ Category: Text Sender"
 
 ;;;###autoload
 (defun enkan-repl-send-1 (&optional prefix-arg)
-  "Send \\='1\\=' to eat session buffer for numbered choice prompt.
-With PREFIX-ARG, select specific buffer by number.
+  "Send \\='1\\=' to enkan session buffer for numbered choice prompt.
+- From enkan buffer: Send to current buffer
+- From other buffer without prefix: Interactive buffer selection
+- With numeric prefix: Send to buffer at index (1-based)
+
+Uses unified backend with smart buffer detection.
 
 Category: Text Sender"
   (interactive "P")
   (enkan-repl--center-send-unified "" prefix-arg 1))
 
 ;;;###autoload
-(defun enkan-repl-send-2 ()
-  "Send \\='2\\=' to eat session buffer for numbered choice prompt.
+(defun enkan-repl-send-2 (&optional prefix-arg)
+  "Send \\='2\\=' to enkan session buffer for numbered choice prompt.
+- From enkan buffer: Send to current buffer
+- From other buffer without prefix: Interactive buffer selection
+- With numeric prefix: Send to buffer at index (1-based)
+
+Uses unified backend with smart buffer detection.
 
 Category: Text Sender"
-  (interactive)
+  (interactive "P")
   (enkan-repl--center-send-unified "" prefix-arg 2))
 
 ;;;###autoload
-(defun enkan-repl-send-3 ()
-  "Send \\='3\\=' to eat session buffer for numbered choice prompt.
+(defun enkan-repl-send-3 (&optional prefix-arg)
+  "Send \\='3\\=' to enkan session buffer for numbered choice prompt.
+- From enkan buffer: Send to current buffer
+- From other buffer without prefix: Interactive buffer selection
+- With numeric prefix: Send to buffer at index (1-based)
+
+Uses unified backend with smart buffer detection.
 
 Category: Text Sender"
-  (interactive)
+  (interactive "P")
   (enkan-repl--center-send-unified "" prefix-arg 3))
 
 ;;;###autoload
-(defun enkan-repl-send-4 ()
-  "Send \\='4\\=' to eat session buffer for numbered choice prompt.
+(defun enkan-repl-send-4 (&optional prefix-arg)
+  "Send \\='4\\=' to enkan session buffer for numbered choice prompt.
+- From enkan buffer: Send to current buffer
+- From other buffer without prefix: Interactive buffer selection
+- With numeric prefix: Send to buffer at index (1-based)
+
+Uses unified backend with smart buffer detection.
 
 Category: Text Sender"
-  (interactive)
+  (interactive "P")
   (enkan-repl--center-send-unified "" prefix-arg 4))
 
 ;;;###autoload
-(defun enkan-repl-send-5 ()
-  "Send \\='5\\=' to eat session buffer for numbered choice prompt.
+(defun enkan-repl-send-5 (&optional prefix-arg)
+  "Send \\='5\\=' to enkan session buffer for numbered choice prompt.
+- From enkan buffer: Send to current buffer
+- From other buffer without prefix: Interactive buffer selection
+- With numeric prefix: Send to buffer at index (1-based)
+
+Uses unified backend with smart buffer detection.
 
 Category: Text Sender"
-  (interactive)
+  (interactive "P")
   (enkan-repl--center-send-unified "" prefix-arg 5))
 
 ;;;###autoload
-(defun enkan-repl-send-escape ()
-  "Send ESC key to eat session buffer.
+(defun enkan-repl-send-escape (&optional prefix-arg)
+  "Send ESC key to enkan session buffer.
+- From enkan buffer: Send to current buffer
+- From other buffer without prefix: Interactive buffer selection
+- With numeric prefix: Send to buffer at index (1-based)
+
+Uses unified backend with smart buffer detection.
 
 Category: Text Sender"
-  (interactive)
-  (enkan-repl--send-escape-directly))
+  (interactive "P")
+  (cond
+   ;; Special case: if current buffer is enkan buffer, send ESC directly
+   ((string-match-p "^\\*enkan:" (buffer-name))
+    (let ((send-data (enkan-repl--send-primitive-pure "" :escape)))
+      (enkan-repl--send-primitive-action (current-buffer) send-data)))
+   ;; Otherwise use unified backend
+   (t
+    (enkan-repl--center-send-unified "" prefix-arg :escape))))
 
 ;;;###autoload
 (defun enkan-repl-recenter-bottom ()
