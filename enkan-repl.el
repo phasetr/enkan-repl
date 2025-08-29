@@ -823,89 +823,23 @@ RESTART-FUNC is a zero-argument function to call for restart.
 
 ;;;###autoload
 (defun enkan-repl-start-eat (&optional force)
-  "Start eat terminal emulator session.
-Determines directory from current buffer filename if it's a persistent file.
-Checks for existing sessions to prevent double startup.
-
-When FORCE is non-nil, automatically restart dead sessions without user confirmation.
+  "Start eat terminal emulator session in current directory.
+Simplified version for use within setup functions only.
+FORCE parameter ignored - always starts new session.
 
 Category: Session Controller"
   (interactive)
-  ;; Try to load eat, checking various package managers
-  (unless (or (require 'eat nil t)
-              (and (fboundp 'straight-use-package)
-                   (progn
-                     (straight-use-package 'eat)
-                     (require 'eat nil t)))
-              (and (fboundp 'package-installed-p)
-                   (package-installed-p 'eat)
-                   (require 'eat nil t)))
-    (error "Eat package is not installed.  Please install it first"))
-  (let* ((session-info (enkan-repl--get-session-info))
-         (target-dir (nth 0 session-info))
-         (existing-buffer (nth 1 session-info))
-         (can-send (nth 2 session-info))
-         (buffer-name (concat "*enkan:" (expand-file-name target-dir) "*")))
-    (cond
-     ;; Active session already exists
-     (can-send
-      (message "Eat session already running in: %s (buffer: %s)"
-               target-dir (buffer-name existing-buffer)))
-     ;; Dead session exists - offer to restart
-     (existing-buffer
-      (if force
-          ;; Force restart without user confirmation
-          (progn
-            (kill-buffer existing-buffer)
-            (enkan-repl-start-eat))
-        ;; Ask user for confirmation
-        (enkan-repl--handle-dead-session
-         existing-buffer target-dir
-         "Dead eat session found in %s. Restart? "
-         #'enkan-repl-start-eat)))
-     ;; No existing session - start new one
-     (t
-      (let ((default-directory target-dir)
-            (window-count (length (window-list)))
-            (new-buffer-name buffer-name)  ; Store buffer-name in a clear local variable
-            (eat-buffer nil)
-            (target-window nil))
-        ;; Determine target window first
-        (cond
-         ;; Single window: will split and use new window
-         ((= window-count 1)
-          (split-window-right)
-          (other-window 1)
-          (setq target-window (selected-window)))
-         ;; Two windows: use the right window (like setup-window-layout)
-         ((= window-count 2)
-          ;; Move to the other window
-          (other-window 1)
-          (setq target-window (selected-window)))
-         ;; Three or more windows: split current window
-         (t
-          (split-window-right)
-          (other-window 1)
-          (setq target-window (selected-window))))
-        ;; Create eat buffer in target window (already selected)
-        (setq eat-buffer (eat))
-        (when eat-buffer
-          ;; Safely rename the eat buffer with the stored name
-          (with-current-buffer eat-buffer
-            (condition-case err
-                (rename-buffer new-buffer-name t)
-              (error
-               (message "Warning: Failed to rename eat buffer: %s" (error-message-string err))
-               nil))
-            ;; Setup bell handler for Claude Code notifications
-            (when (and (eq system-type 'darwin)
-                       (fboundp 'enkan-repl-setup-bell-handler))
-              (run-at-time 0.5 nil #'enkan-repl-setup-bell-handler)))
-          ;; Ensure buffer is displayed in target window
-          (set-window-buffer target-window eat-buffer))
-        ;; Return to original window (input file)
-        (other-window -1)
-        (message "Started eat session in: %s" target-dir))))))
+  ;; Simple eat package loading - fail fast if not available
+  (require 'eat)
+  ;; Always start new eat session in current directory
+  (let* ((target-dir default-directory)
+          (buffer-name (concat "*enkan:" (expand-file-name target-dir) "*"))
+          (eat-buffer (eat)))
+    ;; Simple buffer renaming - no error handling
+    (when eat-buffer
+      (with-current-buffer eat-buffer
+        (rename-buffer buffer-name t))
+      (message "Started eat session in: %s" target-dir))))
 
 ;;;###autoload
 (defun enkan-repl-finish-eat ()
