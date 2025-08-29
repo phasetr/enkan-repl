@@ -326,7 +326,6 @@ Returns the template path to use, or nil to use default template."
                (insert "- ~M-x enkan-repl-open-project-input-file~ - Open or create project input file\n")
                (insert "- ~M-x enkan-repl-start-eat~ - Start eat terminal session\n")
                (insert "- ~M-x enkan-repl-setup~ - Set up convenient window layout\n")
-               (insert "- ~M-x enkan-repl-status~ - Show diagnostic information\n")
                (insert "\n** Working Notes\n")
                (insert "Write your thoughts and notes here.\n")
                (insert "Send specific parts to a eat buffer using the commands above.\n"))
@@ -905,53 +904,6 @@ Category: Session Controller"
              :buffer buf)))
    (buffer-list)))
 
-;;;###autoload
-(defun enkan-repl-list-sessions ()
-  "Display a list of active enkan sessions with interactive selection.
-Users can select a session, then choose action: (s)witch, (d)elete, or (q)uit.
-
-Category: Session Controller"
-  (interactive)
-  (require 'enkan-repl-utils)
-  (let* ((buffer-info-list (enkan-repl--get-buffer-info-list))
-         (sessions (enkan-repl--collect-sessions-pure buffer-info-list)))
-    (if (null sessions)
-        (message "No active sessions found")
-      ;; Prepare candidates for selection interface with annotations
-      (let* ((candidates (mapcar
-                          (lambda (session)
-                            (plist-get session :name))
-                          sessions))
-             (completion-extra-properties
-              `(:annotation-function
-                (lambda (candidate)
-                  (let ((session (cl-find-if
-                                  (lambda (s)
-                                    (string= (plist-get s :name) candidate))
-                                  ',sessions)))
-                    (when session
-                      (format " — Directory: %s, Status: %s"
-                              (plist-get session :directory)
-                              (plist-get session :status))))))))
-        ;; Get session selection using hmenu (horizontal menu)
-        (let ((selected-name (hmenu "Select enkan session:" candidates)))
-          (when (and selected-name (not (string= selected-name "")))
-            (let ((buf (enkan-repl--find-session-buffer-pure selected-name buffer-info-list)))
-              (when buf
-                ;; Ask for action after selection
-                (let ((action (read-char-choice
-                               (format "Session %s - (s)witch, (d)elete, (q)uit: " selected-name)
-                               '(?s ?d ?q))))
-                  (cl-case action
-                    (?s
-                     (switch-to-buffer buf)
-                     (message "Switched to session: %s" selected-name))
-                    (?d
-                     (when (y-or-n-p (format "Delete session %s? " selected-name))
-                       (kill-buffer buf)
-                       (message "Session deleted: %s" selected-name)))
-                    (?q
-                     (message "Cancelled"))))))))))))
 
 ;;; Interactive Cheat-sheet Feature
 
