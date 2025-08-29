@@ -864,20 +864,6 @@ Category: Session Controller"
         (message "Terminated eat session in: %s" target-dir))))))
 
 ;;;###autoload
-(defun enkan-repl-revive-current-buffer ()
-  "Revive the current enkan buffer by restarting its eat process.
-This function can restore functionality to dead enkan buffers."
-  (interactive)
-  (let ((buffer-name (buffer-name)))
-    ;; Check if this is an enkan buffer
-    (unless (string-match "^\\*enkan:" buffer-name)
-      (error "Not an enkan buffer: %s" buffer-name))
-    ;; Simply force restart the eat session
-    (enkan-repl-start-eat t)
-    (message "Revived enkan buffer: %s" buffer-name)))
-
-
-;;;###autoload
 (defun enkan-repl-setup ()
   "Set up basic window layout with project input file on left and eat session on right.
 Simplified version for standard input file processing only.
@@ -1017,7 +1003,6 @@ Category: Utilities"
              :process-live-p (cdr process-info)
              :buffer buf)))
    (buffer-list)))
-
 
 ;;;###autoload
 (defun enkan-repl-list-sessions ()
