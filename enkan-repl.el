@@ -53,6 +53,9 @@
 
 (require 'cl-lib)
 
+;; Load horizontal menu interface
+(require 'hmenu)
+
 ;; Load utility functions (require for template generation and cheat-sheet)
 (when (locate-library "enkan-repl-utils")
   (require 'enkan-repl-utils))
@@ -1222,7 +1225,7 @@ Category: Session Controller"
          (sessions (enkan-repl--collect-sessions-pure buffer-info-list)))
     (if (null sessions)
         (message "No active sessions found")
-      ;; Prepare candidates for completing-read with annotations
+      ;; Prepare candidates for selection interface with annotations
       (let* ((candidates (mapcar
                           (lambda (session)
                             (plist-get session :name))
@@ -1238,8 +1241,8 @@ Category: Session Controller"
                       (format " — Directory: %s, Status: %s"
                               (plist-get session :directory)
                               (plist-get session :status))))))))
-        ;; Get session selection using completing-read (like cheat-sheet)
-        (let ((selected-name (completing-read "Select enkan session: " candidates nil t)))
+        ;; Get session selection using hmenu (horizontal menu)
+        (let ((selected-name (hmenu "Select enkan session:" candidates)))
           (when (and selected-name (not (string= selected-name "")))
             (let ((buf (enkan-repl--find-session-buffer-pure selected-name buffer-info-list)))
               (when buf
@@ -1365,8 +1368,7 @@ Implemented as pure function, side effects are handled by upper functions."
 LAYOUT-NAME is the configuration name defined in enkan-repl-center-multi-project-layouts.
 This function only starts eat sessions - use enkan-repl-setup (C-M-l) to arrange windows."
   (interactive
-   (list (completing-read "Layout: "
-                          (mapcar #'car enkan-repl-center-multi-project-layouts))))
+   (list (hmenu "Layout:" (mapcar #'car enkan-repl-center-multi-project-layouts))))
   (let ((buffer-name "*ENKAN-REPL Auto Setup*")
         (old-layout enkan-repl--current-multi-project-layout)
         (old-session-list (copy-tree enkan-repl-session-list))
@@ -1650,7 +1652,7 @@ Returns t on success, nil on failure."
           (if (= 1 (length available-buffers))
               (setq target-buffer (car available-buffers))
             (let* ((choices (enkan-repl--build-buffer-selection-choices-pure available-buffers))
-                   (selection (completing-read "Select buffer for send: " choices nil t)))
+                   (selection (hmenu "Select buffer for send:" choices)))
               (setq target-buffer (cdr (assoc selection choices))))))
         ;; Execute send
         (when target-buffer
@@ -1774,7 +1776,7 @@ Category: Center File Multi-buffer Access"
                        (project-path (cdr project-info)))
                   (push (cons (format "%s (%s)" alias project-path) project-path) project-choices)))))
           (if project-choices
-            (let* ((selected-display (completing-read "Select project directory to open: " project-choices nil t))
+            (let* ((selected-display (hmenu "Select project directory to open:" project-choices))
                     (selected-path (cdr (assoc selected-display project-choices))))
               (if (file-directory-p selected-path)
                 (dired selected-path)
@@ -1940,7 +1942,7 @@ Returns plist with :valid, :message."
 
 (defun enkan-repl--create-magit-completion-list-pure (project-list)
   "Create completion list for magit project selection from PROJECT-LIST.
-Returns list of strings for completing-read."
+Returns list of strings for selection interface."
   (unless project-list
     (error "Project list is empty"))
   (mapcar (lambda (entry)
@@ -1974,7 +1976,7 @@ Category: Center File Operations"
                  (car valid-buffers)
                  ;; Interactive selection for multiple sessions
                  (let* ((choices (enkan-repl--build-buffer-selection-choices-pure valid-buffers))
-                         (selected-display (completing-read "Select project for magit: " choices nil t)))
+                         (selected-display (hmenu "Select project for magit:" choices)))
                    (cdr (assoc selected-display choices))))))
         (when selected-buffer
           (let ((project-path (enkan-repl--extract-directory-from-buffer-name-pure
