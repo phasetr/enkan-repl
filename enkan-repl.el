@@ -470,43 +470,6 @@ Example: \='enkan--Users--project\=' + \='enkan\=' + \='--\=' -> \='/Users/proje
         ((path-part (substring encoded-name (length prefix))))  ; Remove prefix
       (concat (replace-regexp-in-string (regexp-quote separator) "/" path-part) "/"))))
 
-(defun enkan-repl--sanitize-content (content)
-  "Sanitize CONTENT to ensure it can be safely sent to eat session.
-This function handles edge cases with special characters and ensures
-proper formatting for terminal input.  Also addresses Claude Code
-interpretation issues and Mac region selection problems."
-  (when content
-    (let ((sanitized content))
-      ;; Convert all line ending variations to LF
-      (setq sanitized (replace-regexp-in-string "\r\n\\|\r" "\n" sanitized))
-      ;; Remove other problematic control characters
-      ;; Keep only \n (newline) and \t (tab) among control characters
-      (setq
-       sanitized
-       (replace-regexp-in-string
-        "[[:cntrl:]]"
-        (lambda (match)
-          (cond
-           ;; Keep normal newlines and tabs
-           ((or (string= match "\n") (string= match "\t")) match)
-           ;; Remove other control characters
-           (t "")))
-        sanitized))
-      ;; Remove Unicode line separators that might cause issues
-      ;; U+0085 (NEL), U+2028 (LINE SEPARATOR), U+2029 (PARAGRAPH SEPARATOR)
-      (setq sanitized (replace-regexp-in-string "[\u0085\u2028\u2029]" "" sanitized))
-      ;; Final cleanup of any remaining problematic characters at end
-      (setq sanitized (replace-regexp-in-string "[\x0B\x0C\x0E-\x1F]+\\'" "" sanitized))
-      ;; File path interpretation workaround
-      (when
-          (and
-           (string-match-p "~/[^[:space:]]*\\.[a-zA-Z0-9]+\\'" sanitized)
-           (not (string-match-p "[.!?]\\'" sanitized)))
-        (setq sanitized (concat sanitized "\n(This text is added by enkan-repl as a workaround for Claude Code's special interpretation of file paths)")))
-      ;; Only remove trailing whitespace/newlines
-      (setq sanitized (replace-regexp-in-string "[[:space:]]+\\'" "" sanitized))
-      sanitized)))
-
 ;;;; Target Directory Detection Functions
 
 (defun enkan-repl--get-target-directory-for-buffer ()
