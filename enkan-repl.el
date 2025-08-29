@@ -326,7 +326,6 @@ Returns the template path to use, or nil to use default template."
                (insert "- ~M-x enkan-repl-open-project-input-file~ - Open or create project input file\n")
                (insert "- ~M-x enkan-repl-start-eat~ - Start eat terminal session\n")
                (insert "- ~M-x enkan-repl-setup~ - Set up convenient window layout\n")
-               (insert "- ~M-x enkan-repl-output-template~ - Export template for customization\n")
                (insert "- ~M-x enkan-repl-status~ - Show diagnostic information\n")
                (insert "\n** Working Notes\n")
                (insert "Write your thoughts and notes here.\n")
@@ -419,7 +418,6 @@ Returns categorized functions as string, or falls back to static list."
           "- ~M-x enkan-repl-setup~ - Set up window layout with org file on left and eat on right.\n\n"
           "** Utilities\n\n"
           "- ~M-x enkan-repl-open-project-input-file~ - Open or create project input file for current directory.\n"
-          "- ~M-x enkan-repl-output-template~ - Output current template content to a new buffer for customization.\n"
           "- ~M-x enkan-repl-status~ - Show detailed diagnostic information for troubleshooting connection issues.\n"))
 
 (defun enkan-repl--get-embedded-template ()
@@ -994,34 +992,6 @@ Category: Session Controller"
           (message "eat session buffer not found. Run (enkan-repl-start-eat) first.")))
       (other-window -1)
       (message "Window layout setup complete"))))
-
-;;;###autoload
-(defun enkan-repl-output-template ()
-  "Output current template content to a new buffer for customization.
-
-Category: Utilities"
-  (interactive)
-  (let*
-      ((template-content
-        (enkan-repl--load-template))
-       (template-file
-        (or enkan-repl-template-file "default"))
-       (buffer-name
-        (format "*enkan-repl-template-%s*"
-                (file-name-base template-file))))
-    (if template-content
-        (progn
-          (with-output-to-temp-buffer buffer-name
-            (princ template-content))
-          (with-current-buffer buffer-name
-            (when (fboundp 'org-mode)
-              (let ((org-mode-hook nil))
-                (ignore org-mode-hook)  ; Suppress unused variable warning
-                (org-mode))))
-          (message "Template output to buffer: %s" buffer-name)
-          t)
-      (message "Template not found: %s" template-file)
-      nil)))
 
 ;;; Debug and Utility Functions
 
