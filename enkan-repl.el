@@ -640,30 +640,6 @@ Otherwise, use current `default-directory'."
          eat--process
          (process-live-p eat--process))))))
 
-(defun enkan-repl--send-escape-directly ()
-  "Send ESC key to eat session buffer directly."
-  (let
-      ((session-buffer
-        (enkan-repl--get-buffer-for-directory
-         (enkan-repl--get-target-directory-for-buffer))))
-    (if
-        (and session-buffer
-             (with-current-buffer session-buffer
-               (and (boundp 'eat--process)
-                    eat--process
-                    (process-live-p eat--process))))
-        (progn
-          (with-current-buffer session-buffer
-            (eat--send-string eat--process "\e")
-            ;; Move cursor to bottom after eat processes the output
-            (run-at-time 0.01 nil
-                         (lambda (buf)
-                           (with-current-buffer buf
-                             (goto-char (point-max))))
-                         session-buffer))
-          (message "Sent ESC to session"))
-      (message "❌ Cannot send - no matching eat session found for this directory"))))
-
 ;;;; Public API - Send Functions
 
 ;;;###autoload
