@@ -79,7 +79,7 @@ Each entry is (KEY COMMAND DESCRIPTION CATEGORY).")
 (defconst enkan-center-file-keybinding-overrides
   '(("<escape>" enkan-repl-center-send-escape "Send ESC to REPL (center)" quick-actions)
     ("C-M-e" enkan-repl-center-send-enter "Send enter to REPL (center)" text-sending)
-    ("C-M-i" enkan-repl-center-send-line "Send line for the center file" window-navigation)
+    ("C-M-i" enkan-repl-send-line "Send line for the center file" window-navigation)
     ("C-M-e" enkan-repl-center-send-enter "Send enter for the center file" quick-actions)
     ("C-M-t" other-window "Switch between center/work/reserve windows" window-navigation)
     ("C-M-b" enkan-repl-center-recenter-bottom "Recenter at bottom (center)" quick-actions)

@@ -7,7 +7,7 @@
 
 ;;; Commentary:
 
-;; Integration tests for enkan-repl-center-send-line function with real buffer scenarios.
+;; Integration tests for enkan-repl-send-line function with real buffer scenarios.
 
 ;;; Code:
 
@@ -58,7 +58,7 @@
                  (lambda (&rest args) nil)))
         
         ;; Test the function
-        (enkan-repl-center-send-line)
+        (enkan-repl-send-line)
         ;; Should send ESC to enkan-repl buffer, not pt-tools buffer
         (should escape-sent)
         (should (eq actual-buffer test-buffer-er))
@@ -105,7 +105,7 @@
                    (error "eat--send-string should not be called without valid aliases"))))
         
         ;; Test the function - should fail to find buffer
-        (enkan-repl-center-send-line)
+        (enkan-repl-send-line)
         (should (string-match-p "No buffer found for alias 'er'" message-shown))))
     
     ;; Clean up

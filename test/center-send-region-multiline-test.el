@@ -92,7 +92,7 @@
 ;;;; Tests for unified backend multiline text sending
 
 (ert-deftest test-center-send-region-multiline-with-alias-unified ()
-  "Test enkan-repl-center-send-region with multiline text and alias using unified backend."
+  "Test enkan-repl-send-region with multiline text and alias using unified backend."
   (let ((test-buffer (generate-new-buffer "*enkan:test*"))
         (multiline-text "echo hello\necho world\necho test")
         (sent-strings '())
@@ -120,7 +120,7 @@
 
           (let ((enkan-repl-project-aliases '(("test" . "test"))))
             ;; Test the function
-            (enkan-repl-center-send-region start end)
+            (enkan-repl-send-region start end)
 
             ;; Verify what was sent: text + carriage return
             (should (= 2 (length sent-strings)))
@@ -133,7 +133,7 @@
     (kill-buffer test-buffer)))
 
 (ert-deftest test-center-send-region-multiline-interactive-selection-unified ()
-  "Test enkan-repl-center-send-region with multiline text using interactive selection and unified backend."
+  "Test enkan-repl-send-region with multiline text using interactive selection and unified backend."
   (let ((test-buffer (generate-new-buffer "*enkan:test*"))
         (multiline-text "function test() {\n  console.log('hello');\n  return 42;\n}")
         (sent-strings '())
@@ -161,7 +161,7 @@
               (end (point-max)))
 
           ;; Test the function
-          (enkan-repl-center-send-region start end)
+          (enkan-repl-send-region start end)
 
           ;; Verify what was sent: text + carriage return
           (should (= 2 (length sent-strings)))

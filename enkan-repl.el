@@ -705,22 +705,25 @@ TARGET-DIRECTORY specifies target directory for eat session."
 ;;;; Public API - Send Functions
 
 ;;;###autoload
-(defun enkan-repl-send-region (start end)
-  "Send the text in region from START to END to eat session.
+(defun enkan-repl-send-region (start end &optional prefix-arg)
+  "Send the text in region from START to END to eat session
+with some action specification.
+With PREFIX-ARG, select specific buffer by number.
 
 Category: Text Sender"
-  (interactive "r")
-  (when (use-region-p)
-    (enkan-repl--send-buffer-content start end)))
+  (interactive "r\nP")
+  (enkan-repl--center-send-unified
+    (buffer-substring-no-properties start end) prefix-arg nil))
 
 ;;;###autoload
-(defun enkan-repl-send-line ()
-  "Send the current line to eat session.
+(defun enkan-repl-send-line (&optional prefix-arg)
+  "Send current line to a suitable eat session.
+With PREFIX-ARG, select specific buffer by number.
 
 Category: Text Sender"
-  (interactive)
-  (enkan-repl--send-buffer-content
-   (line-beginning-position) (line-end-position)))
+  (interactive "P")
+  (enkan-repl--center-send-unified
+    (buffer-substring-no-properties (line-beginning-position) (line-end-position)) prefix-arg nil))
 
 ;;;###autoload
 (defun enkan-repl-send-enter ()
@@ -1276,8 +1279,8 @@ Category: Command Palette"
     (define-key map (kbd "C-c C-f") 'enkan-toggle-center-file-global-mode)
     (define-key map (kbd "C-x g") 'enkan-repl-center-magit)
     (define-key map (kbd "C-M-e") 'enkan-repl-center-send-enter)
-    (define-key map (kbd "C-M-i") 'enkan-repl-center-send-line)
-    (define-key map (kbd "C-M-<return>") 'enkan-repl-center-send-region)
+    (define-key map (kbd "C-M-i") 'enkan-repl-send-line)
+    (define-key map (kbd "C-M-<return>") 'enkan-repl-send-region)
     (define-key map (kbd "C-M-@") 'enkan-repl-center-open-project-directory)
     (define-key map (kbd "C-M-t") 'other-window)
     (define-key map (kbd "C-M-b") 'enkan-repl-center-recenter-bottom)
@@ -1844,14 +1847,6 @@ Returns plist with :valid, :alias, :command, :text, :message."
     (list :valid nil :message "Invalid format. Use: :alias [text|esc|:ret]"))))
 
 
-(defun enkan-repl-center-send-line (&optional prefix-arg)
-  "Send current line to a suitable eat session.
-See enkan-repl-center-send-region.
-
-Category: Text Sender"
-  (interactive "P")
-  (enkan-repl--center-send-unified
-    (buffer-substring-no-properties (line-beginning-position) (line-end-position)) prefix-arg nil))
 
 ;; Pure functions for center file operations (used by enkan-repl-center-open-file)
 (defun enkan-center-file-validate-path-pure (file-path)
@@ -1980,13 +1975,6 @@ Category: Center File Operations"
                   (error "Invalid project path: %s" (plist-get validation :message))))
               (error "Failed to extract project path from buffer: %s" (buffer-name selected-buffer)))))))))
 
-(defun enkan-repl-center-send-region (start end &optional prefix-arg)
-  "Send region to center file buffer with action specification.
-
-Category: Center File Multi-buffer Access"
-  (interactive "r\nP")
-  (enkan-repl--center-send-unified
-    (buffer-substring-no-properties start end) prefix-arg nil))
 
 ;;;###autoload
 (defun enkan-repl-center-print-setup-to-buffer ()
