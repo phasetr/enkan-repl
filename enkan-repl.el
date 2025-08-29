@@ -1653,7 +1653,10 @@ Returns t on success, nil on failure."
               (setq target-buffer (car available-buffers))
             (let* ((choices (enkan-repl--build-buffer-selection-choices-pure available-buffers))
                    (selection (hmenu "Select buffer for send:" choices)))
-              (setq target-buffer (cdr (assoc selection choices))))))
+              (message "DEBUG: hmenu returned: %S (type: %s)" selection (type-of selection))
+              (message "DEBUG: choices alist: %S" choices)
+              (setq target-buffer (cdr (assoc selection choices)))
+              (message "DEBUG: resolved target-buffer: %S" target-buffer))))
         ;; Execute send
         (when target-buffer
           (let* ((send-data (enkan-repl--send-primitive-pure final-text special-key-type))

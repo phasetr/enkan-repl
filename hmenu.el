@@ -57,11 +57,11 @@ Returns formatted string for display."
       (propertize hmenu-separator 'face 'hmenu-separator-face))))
 
 (defun hmenu--get-choice-value (choices selected-index)
-  "Get the value for SELECTED-INDEX from CHOICES.
+  "Get the display string for SELECTED-INDEX from CHOICES.
 CHOICES can be list of strings or alist of (display . value) pairs."
   (let ((choice (nth selected-index choices)))
     (if (consp choice)
-      (cdr choice)  ; alist case: return value
+      (car choice)  ; alist case: return display string (car)
       choice)))       ; string list case: return string itself
 
 (defun hmenu (prompt choices)
@@ -107,8 +107,9 @@ Returns selected value or nil if cancelled."
             ((or (eq key 'left) (eq key 2) (eq key 104))   ; left, C-b(2), h(104)
               (setq selected-index (if (<= selected-index 0) max-index (1- selected-index))))
             ;; Confirm selection
-            ((or (eq key 13) (eq key 10) (eq key 32))  ; Enter(13), C-j(10), Space(32)
+            ((or (eq key ?\r) (eq key ?\n) (eq key ?\s))  ; Enter, C-j, Space
               (setq result (hmenu--get-choice-value choices selected-index))
+              (message "DEBUG: hmenu confirming selection: key=%S selected-index=%d result=%S" key selected-index result)
               (setq continue nil))
             ;; Cancel selection
             ((or (eq key 7) (eq key 27) (eq key 113))  ; C-g(7), ESC(27), q(113)
@@ -127,6 +128,7 @@ Returns selected value or nil if cancelled."
               (message "Invalid key. Use arrows/h/l to navigate, Enter to select, C-g to cancel")
               (sit-for 1))))))
     (message "")  ; Clear message line
+    (message "DEBUG: hmenu final result: %S (type: %s)" result (type-of result))
     result))
 
 (defun hmenu-read-string (prompt choices)
