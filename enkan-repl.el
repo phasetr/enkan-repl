@@ -664,12 +664,15 @@ Category: Text Sender"
     (buffer-substring-no-properties (line-beginning-position) (line-end-position)) prefix-arg nil))
 
 ;;;###autoload
-(defun enkan-repl-send-enter ()
-  "Send enter key to eat session buffer.
+(defun enkan-repl-send-enter (&optional prefix-arg)
+  "Send enter key to suitable eat session buffer.
+Always requires buffer specification:
+- Without prefix: Select from available enkan buffers
+- With numeric prefix: Send to buffer at that index (1-based)
 
 Category: Text Sender"
-  (interactive)
-  (enkan-repl--center-send-unified "" nil :enter))
+  (interactive "P")
+  (enkan-repl--center-send-unified "" prefix-arg :enter))
 
 ;;;###autoload
 (defun enkan-repl-send-1 (&optional prefix-arg)
@@ -722,30 +725,26 @@ Category: Text Sender"
 
 ;;;###autoload
 (defun enkan-repl-recenter-bottom ()
-  "Move cursor to bottom of eat buffer for current directory.
+  "Recenter all enkan terminal buffers at bottom.
 
 Category: Utilities"
   (interactive)
-  (let* ((target-dir (enkan-repl--get-target-directory-for-buffer))
-         (session-buffer (enkan-repl--get-buffer-for-directory target-dir))
-         (original-window (selected-window)))
-    (if session-buffer
-        (let ((window (get-buffer-window session-buffer)))
-          (if window
-              ;; If window is visible, switch to it and move cursor
-              (progn
-                (select-window window)
-                (with-current-buffer session-buffer
-                  (goto-char (point-max))
-                  (recenter -1))
-                ;; Return to original window
-                (select-window original-window)
-                (message "Cursor moved to bottom in eat buffer"))
-            ;; If not visible, just move cursor without recenter
-            (with-current-buffer session-buffer
-              (goto-char (point-max))
-              (message "Cursor moved to bottom in eat buffer (not visible)"))))
-      (message "No eat session found for directory: %s" target-dir))))
+  (let ((original-window (selected-window))
+         (enkan-buffers (seq-filter
+                          (lambda (buf)
+                            (string-match-p "^\\*enkan:" (buffer-name buf)))
+                          (buffer-list)))
+         (recentered-count 0))
+    (dolist (buffer enkan-buffers)
+      (let ((window (get-buffer-window buffer)))
+        (when window
+          (with-selected-window window
+            (goto-char (point-max))
+            (recenter -1)
+            (setq recentered-count (1+ recentered-count))))))
+    ;; Return to original window
+    (select-window original-window)
+    (message "Recentered %d enkan session(s) at bottom" recentered-count)))
 
 (defun enkan-repl--create-project-input-file (target-directory)
   "Create project input file for TARGET-DIRECTORY from template.
@@ -1216,12 +1215,12 @@ Category: Command Palette"
     (define-key map (kbd "<escape>") 'enkan-repl-center-send-escape)
     (define-key map (kbd "C-c C-f") 'enkan-toggle-center-file-global-mode)
     (define-key map (kbd "C-x g") 'enkan-repl-center-magit)
-    (define-key map (kbd "C-M-e") 'enkan-repl-center-send-enter)
+    (define-key map (kbd "C-M-e") 'enkan-repl-send-enter)
     (define-key map (kbd "C-M-i") 'enkan-repl-send-line)
     (define-key map (kbd "C-M-<return>") 'enkan-repl-send-region)
     (define-key map (kbd "C-M-@") 'enkan-repl-center-open-project-directory)
     (define-key map (kbd "C-M-t") 'other-window)
-    (define-key map (kbd "C-M-b") 'enkan-repl-center-recenter-bottom)
+    (define-key map (kbd "C-M-b") 'enkan-repl-recenter-bottom)
     (define-key map (kbd "C-M-s") 'enkan-repl-center-auto-setup)
     (define-key map (kbd "C-M-f") 'enkan-repl-center-finish-all-sessions)
     map)
@@ -1409,29 +1408,6 @@ Category: Center File Multi-buffer Access"
             (princ "\n=== END FINISH SESSIONS ===\n")))))))
 
 ;;;###autoload
-(defun enkan-repl-center-recenter-bottom ()
-  "Recenter all enkan terminal buffers at bottom from center file.
-
-Category: Center File Multi-buffer Access"
-  (interactive)
-  (let ((original-window (selected-window))
-         (enkan-buffers (seq-filter
-                          (lambda (buf)
-                            (string-match-p "^\\*enkan:" (buffer-name buf)))
-                          (buffer-list)))
-         (recentered-count 0))
-    (dolist (buffer enkan-buffers)
-      (let ((window (get-buffer-window buffer)))
-        (when window
-          (with-selected-window window
-            (goto-char (point-max))
-            (recenter -1)
-            (setq recentered-count (1+ recentered-count))))))
-    ;; Return to original window
-    (select-window original-window)
-    (if (> recentered-count 0)
-      (message "Recentered %d enkan session(s) at bottom" recentered-count)
-      (message "No enkan sessions found to recenter"))))
 
 ;;;###autoload
 
@@ -1716,15 +1692,6 @@ Category: Center File Multi-buffer Access"
     (message "No multi-project layout is currently active")))
 
 ;;;###autoload
-(defun enkan-repl-center-send-enter (&optional prefix-arg)
-  "Send enter key to eat session buffer from center file.
-Always requires buffer specification:
-- Without prefix: Select from available enkan buffers
-- With numeric prefix: Send to buffer at that index (1-based)
-
-Category: Center File Multi-buffer Access"
-  (interactive "P")
-  (enkan-repl--center-send-unified "" prefix-arg :enter))
 
 
 (defun enkan-repl--analyze-center-send-content-pure (content prefix-arg)

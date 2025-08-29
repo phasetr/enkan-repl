@@ -93,10 +93,10 @@
           ;; Override base keybindings for center file mode
           (define-key map (kbd "C-x g") 'enkan-repl-center-magit)
           (define-key map (kbd "M-<return>") 'enkan-repl-send-region)
-          (define-key map (kbd "C-M-e") 'enkan-repl-center-send-enter)
+          (define-key map (kbd "C-M-e") 'enkan-repl-send-enter)
           (define-key map (kbd "C-M-i") 'enkan-repl-send-line)
           (define-key map (kbd "C-M-t") 'other-window)
-          (define-key map (kbd "C-M-b") 'enkan-repl-center-recenter-bottom)
+          (define-key map (kbd "C-M-b") 'enkan-repl-recenter-bottom)
           map)))
 
 ;;; ========================================
