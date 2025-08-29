@@ -664,21 +664,6 @@ Otherwise, use current `default-directory'."
           session-buffer)
         t))))
 
-(defun enkan-repl--send-numbered-choice (number)
-  "Send NUMBER as string to eat session buffer for numbered choice prompt.
-NUMBER should be a string (e.g., \\='1\\=', \\='2\\=', \\='3\\=') or empty string for enter."
-  (let
-      ((target-dir (enkan-repl--get-target-directory-for-buffer)))
-    (if
-        (enkan-repl--can-send-text target-dir)
-        (progn
-          (enkan-repl--send-text number target-dir)
-          (if
-              (= (length number) 0)
-              (message "Sent enter to session")
-            (message "Sent '%s' to session" number)))
-      (message "❌ Cannot send - no matching eat session found for this directory"))))
-
 (defun enkan-repl--send-escape-directly ()
   "Send ESC key to eat session buffer directly."
   (let
@@ -743,15 +728,16 @@ Category: Text Sender"
 
 Category: Text Sender"
   (interactive)
-  (enkan-repl--send-numbered-choice ""))
+  (enkan-repl--center-send-unified "" nil :enter))
 
 ;;;###autoload
-(defun enkan-repl-send-1 ()
+(defun enkan-repl-send-1 (&optional prefix-arg)
   "Send \\='1\\=' to eat session buffer for numbered choice prompt.
+With PREFIX-ARG, select specific buffer by number.
 
 Category: Text Sender"
-  (interactive)
-  (enkan-repl--send-numbered-choice "1"))
+  (interactive "P")
+  (enkan-repl--center-send-unified "" prefix-arg 1))
 
 ;;;###autoload
 (defun enkan-repl-send-2 ()
@@ -759,7 +745,7 @@ Category: Text Sender"
 
 Category: Text Sender"
   (interactive)
-  (enkan-repl--send-numbered-choice "2"))
+  (enkan-repl--center-send-unified "" prefix-arg 2))
 
 ;;;###autoload
 (defun enkan-repl-send-3 ()
@@ -767,7 +753,7 @@ Category: Text Sender"
 
 Category: Text Sender"
   (interactive)
-  (enkan-repl--send-numbered-choice "3"))
+  (enkan-repl--center-send-unified "" prefix-arg 3))
 
 ;;;###autoload
 (defun enkan-repl-send-4 ()
@@ -775,7 +761,7 @@ Category: Text Sender"
 
 Category: Text Sender"
   (interactive)
-  (enkan-repl--send-numbered-choice "4"))
+  (enkan-repl--center-send-unified "" prefix-arg 4))
 
 ;;;###autoload
 (defun enkan-repl-send-5 ()
@@ -783,7 +769,7 @@ Category: Text Sender"
 
 Category: Text Sender"
   (interactive)
-  (enkan-repl--send-numbered-choice "5"))
+  (enkan-repl--center-send-unified "" prefix-arg 5))
 
 ;;;###autoload
 (defun enkan-repl-send-escape ()
