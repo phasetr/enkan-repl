@@ -229,7 +229,6 @@ The generated project file includes template functions and usage instructions.
 *** Utilities
 - =enkan-repl-recenter-bottom= - Move cursor to bottom of eat buffer for current directory.
 - =enkan-repl-output-template= - Output current template content to a new buffer for customization.
-- =enkan-repl-status= - Show detailed diagnostic information for troubleshooting connection issues.
 - =enkan-repl-toggle-debug-mode= - Toggle debug mode for enkan-repl operations.
 - =enkan-repl-enable-debug-mode= - Enable debug mode for enkan-repl operations.
 - =enkan-repl-disable-debug-mode= - Disable debug mode for enkan-repl operations.

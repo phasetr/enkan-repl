@@ -25,7 +25,6 @@
      ("enkan-repl-start-eat" . "Start eat terminal emulator session. Determines directory from current buffer filename if it's a persistent file. Checks for existing sessions to prevent double startup.  Category: Session Controller")
      ("enkan-repl-finish-eat" . "Terminate eat session and close its buffer. Determines directory from current buffer filename if it's a persistent file.  Category: Session Controller")
      ("enkan-repl-setup" . "Set up window layout with org file on left and eat on right. This is the author's preference - customize as needed.  Category: Session Controller")
-     ("enkan-repl-status" . "Show detailed diagnostic information for troubleshooting connection issues.  Category: Utilities")
      ("enkan-repl-list-sessions" . "Display a list of active enkan sessions with interactive selection. Users can select a session, then choose action: (s)witch, (d)elete, or (q)uit.  Category: Session Controller")
      ("enkan-repl-cheat-sheet" . "Display interactive cheat-sheet for enkan-repl commands.  Category: Command Palette"))
   "Precompiled list of cheat-sheet candidates.
