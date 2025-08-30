@@ -36,6 +36,9 @@
        ("C-M-t"   . enkan-repl-teardown)
        ("C-M-l"   . enkan-repl-setup-current-project-layout))))
 
+;; Refresh keymap after setting bindings
+(enkan-repl--refresh-global-minor-map)
+
 (provide 'keybinding)
 
 ;;; keybinding.el ends here
