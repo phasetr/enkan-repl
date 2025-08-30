@@ -1151,6 +1151,16 @@ Return (project-name . project-path) or nil if not found."
 
 ;;; Helper functions for state management and formatting
 
+(defun enkan-repl--get-project-paths-for-current (current-project projects target-directories)
+  "Get project paths for CURRENT-PROJECT from PROJECTS and TARGET-DIRECTORIES.
+Returns a list of (alias . path) pairs."
+  (let ((alias-list (cdr (assoc current-project projects))))
+    (cl-loop for alias in alias-list
+             for project-info = (enkan-repl--get-project-info-from-directories
+                                 alias target-directories)
+             when project-info
+             collect (cons alias (cdr project-info)))))
+
 (defun enkan-repl--get-current-session-state-info (current-project session-list session-counter project-aliases)
   "Retrieve session state information as an alist.
 CURRENT-PROJECT is the current project list.
@@ -1487,31 +1497,42 @@ Category: Center File Multi-buffer Access"
 
 ;;;###autoload
 (defun enkan-repl-open-project-directory ()
-  "Open project directory in dired from current project.
+  "Open project directory in dired from enkan-repl-projects.
 
 Category: Center File Multi-buffer Access"
   (interactive)
-  (if enkan-repl--current-project
-      (let* ((current-project (cdr (assoc enkan-repl--current-project enkan-repl-projects)))
-             (project-choices '()))
-        (if current-project
-            (progn
-              ;; Build choices list with alias and directory
-              (dolist (alias current-project)
-                (let ((project-info (enkan-repl--get-project-info-from-directories alias enkan-repl-target-directories)))
-                  (when project-info
-                    (let ((project-name (car project-info))
-                          (project-path (cdr project-info)))
-                      (push (cons (format "%s (%s)" alias project-path) project-path) project-choices)))))
-              (if project-choices
-                  (let* ((selected-display (hmenu "Select project directory to open:" project-choices))
-                         (selected-path (cdr (assoc selected-display project-choices))))
-                    (if (file-directory-p selected-path)
-                        (dired selected-path)
-                      (message "Directory does not exist: %s" selected-path)))
-                (message "No valid project directories found in project")))
-          (message "Current project '%s' not found in configurations" enkan-repl--current-project)))
-    (message "No project is currently active")))
+  (if (null enkan-repl--current-project)
+    (message "No current project set. Run enkan-repl-setup first.")
+    ;; Get project paths using the pure function
+    (let* ((project-paths (enkan-repl--get-project-paths-for-current
+                            enkan-repl--current-project
+                            enkan-repl-projects
+                            enkan-repl-target-directories))
+            (num-projects (length project-paths)))
+      (cond
+        ((= num-projects 0)
+          (message "No projects found in enkan-repl-target-directories for project '%s'"
+            enkan-repl--current-project))
+        ((= num-projects 1)
+          ;; Auto-select single project
+          (let* ((project-entry (car project-paths))
+                  (project-path (cdr project-entry)))
+            (if (file-directory-p project-path)
+              (dired project-path)
+              (message "Directory does not exist: %s" project-path))))
+        (t
+          ;; Multiple projects - use hmenu for selection
+          (let* ((choices (mapcar (lambda (entry)
+                                    (format "%s (%s)" (car entry) (cdr entry)))
+                            project-paths))
+                  (selected-display (hmenu "Select project directory to open:" choices)))
+            (when selected-display
+              (let* ((selected-index (cl-position selected-display choices :test 'string=))
+                      (selected-entry (nth selected-index project-paths))
+                      (project-path (cdr selected-entry)))
+                (if (file-directory-p project-path)
+                  (dired project-path)
+                  (message "Directory does not exist: %s" project-path))))))))))
 
 ;;;###autoload
 (defun enkan-repl--analyze-send-content-pure (content prefix-arg)
@@ -1676,20 +1697,16 @@ Category: Center File Operations"
   (interactive)
   (if (null enkan-repl--current-project)
     (message "No current project set. Run enkan-repl-setup first.")
-    ;; Get alias list from enkan-repl-projects using current project name
-    (let* ((alias-list (cdr (assoc enkan-repl--current-project enkan-repl-projects)))
-            (project-paths
-              ;; Get paths for each alias from enkan-repl-target-directories
-              (cl-loop for alias in alias-list
-                for project-info = (enkan-repl--get-project-info-from-directories
-                                     alias enkan-repl-target-directories)
-                when project-info
-                collect (cons alias (cdr project-info))))
+    ;; Get project paths using the pure function
+    (let* ((project-paths (enkan-repl--get-project-paths-for-current
+                            enkan-repl--current-project
+                            enkan-repl-projects
+                            enkan-repl-target-directories))
             (num-projects (length project-paths)))
       (cond
         ((= num-projects 0)
-          (message "No projects found in enkan-repl-target-directories for project '%s' aliases: %s"
-            enkan-repl--current-project alias-list))
+          (message "No projects found in enkan-repl-target-directories for project '%s'"
+            enkan-repl--current-project))
         ((= num-projects 1)
           ;; Auto-select single project
           (let* ((project-entry (car project-paths))
