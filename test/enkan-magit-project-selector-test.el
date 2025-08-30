@@ -9,10 +9,10 @@
 
 ;; Pure function to get project list for magit selection
 (defun enkan-repl--get-magit-project-list-pure (target-directories)
-  "Get list of projects for magit selection from PROJECT-REGISTRY.
+  "Get list of projects for magit selection from TARGET-DIRECTORIES.
 Returns list of (project-name . project-path) pairs."
   (unless target-directories
-    (error "Project registry is empty"))
+    (error "Project directories is empty"))
   (mapcar (lambda (entry)
             (let ((project-name (car entry))
                   (project-path (if (stringp (cdr entry))
@@ -65,14 +65,14 @@ Returns plist with :project-name, :project-path."
 ;; Test project list creation
 (ert-deftest test-enkan-magit-project-list-creation ()
   "Test creation of project list for magit selection."
-  (let ((registry '(("pt-tools" . "/tmp/pt-tools")
-                   ("enkan-repl" . "/tmp/enkan-repl"))))
-    (let ((result (enkan-repl--get-magit-project-list-pure registry)))
+  (let ((directories '(("pt-tools" . "/tmp/pt-tools")
+                       ("enkan-repl" . "/tmp/enkan-repl"))))
+    (let ((result (enkan-repl--get-magit-project-list-pure directories)))
       (should (= (length result) 2))
       (should (equal (car result) (cons "pt-tools" (expand-file-name "/tmp/pt-tools"))))
       (should (equal (cadr result) (cons "enkan-repl" (expand-file-name "/tmp/enkan-repl"))))))
   
-  ;; Test empty registry error
+  ;; Test empty directories error
   (should-error (enkan-repl--get-magit-project-list-pure nil)))
 
 ;; Test project path validation
@@ -125,12 +125,12 @@ Returns plist with :project-name, :project-path."
       (should (null (plist-get result :project-name)))
       (should (null (plist-get result :project-path))))))
 
-;; Test nested registry format handling
-(ert-deftest test-enkan-magit-nested-registry-format ()
-  "Test handling of nested registry format that previously caused cons error."
+;; Test nested directories format handling
+(ert-deftest test-enkan-magit-nested-directories-format ()
+  "Test handling of nested directories format that previously caused cons error."
   ;; Test nested structure handling
-  (let ((nested-registry '(("pt-tools" . ("pt-tools" . "~/pt-tools")))))
-    (let ((project-list (enkan-repl--get-magit-project-list-pure nested-registry)))
+  (let ((nested-directories '(("pt-tools" . ("pt-tools" . "~/pt-tools")))))
+    (let ((project-list (enkan-repl--get-magit-project-list-pure nested-directories)))
       (should (= (length project-list) 1))
       (should (equal (car project-list) (cons "pt-tools" (expand-file-name "~/pt-tools"))))
       ;; Should not error when creating completion list

@@ -16,10 +16,10 @@
 ;;;; Pure Functions for Project Path Resolution
 
 (defun enkan-repl--get-session-project-path-pure (session-number session-list target-directories)
-  "Get project path for SESSION-NUMBER from SESSION-LIST and PROJECT-REGISTRY.
+  "Get project path for SESSION-NUMBER from SESSION-LIST and TARGET-DIRECTORIES.
 Pure function that returns project path string or nil.
 SESSION-LIST format: ((session-number . project-name) ...)
-PROJECT-REGISTRY format: ((alias . (project-name . project-path)) ...)"
+TARGET-DIRECTORIES format: ((alias . (project-name . project-path)) ...)"
   (let* ((session-project (cdr (assoc session-number session-list)))
          (project-info (when session-project
                          (cl-find-if (lambda (entry)

@@ -511,8 +511,8 @@ Resolves alias to canonical project name from project aliases."
   (or (cdr (assoc alias enkan-repl-project-aliases))
       alias))
 
-(defun enkan-repl--get-project-directory-from-registry (alias)
-  "Get directory path from project registry.
+(defun enkan-repl--get-project-directory-from-directories (alias)
+  "Get directory path from project directories.
 Returns: Directory path or nil"
   (let ((project-info (cdr (assoc alias enkan-repl-target-directories))))
     (when project-info
@@ -1017,7 +1017,7 @@ When enabled, center file keybindings are available across all buffers."
 ;;;; Auto Setup Functions
 
 (defun enkan-repl--get-project-info-from-directories (alias)
-  "Get project info from registry for ALIAS.
+  "Get project info from directories for ALIAS.
 Return (project-name . project-path) or nil if not found."
   (cdr (assoc alias enkan-repl-target-directories)))
 
@@ -1026,7 +1026,7 @@ Return (project-name . project-path) or nil if not found."
   (cdr (assoc session-number session-list)))
 
 (defun enkan-repl--get-project-path-from-directories (project-name target-directories)
-  "Pure function to get project path from registry by project name."
+  "Pure function to get project path from directories by project name."
   (let ((project-info (cl-find-if (lambda (entry)
                                     (string= (car (cdr entry)) project-name))
                         target-directories)))
@@ -1051,7 +1051,7 @@ Implemented as pure function, side effects are handled by upper functions."
       (let ((project-name (car project-info))
              (project-path (cdr project-info)))
         (cons project-name project-path))
-      (error "Project alias '%s' not found in registry" alias))))
+      (error "Project alias '%s' not found in directories" alias))))
 
 (defun enkan-repl--center-auto-setup-log-state (buffer-name state-type layout sessions counter)
   "Log current or final state to BUFFER-NAME.
@@ -1144,7 +1144,7 @@ Category: Center File Multi-buffer Access"
             (dolist (session enkan-repl-session-list)
               (let* ((session-number (car session))
                       (project-name (cdr session))
-                      ;; Get project directory from registry using correct function
+                      ;; Get project directory from directories using correct function
                       (project-path (enkan-repl--get-project-path-from-directories project-name enkan-repl-target-directories)))
                 (when project-path
                   ;; Use the same buffer discovery method as enkan-repl-finish-eat
@@ -1567,10 +1567,10 @@ Category: Center File Operations"
 
 ;; Pure functions for magit project selection (used by enkan-repl-center-magit)
 (defun enkan-repl--get-magit-project-list-pure (target-directories)
-  "Get list of projects for magit selection from PROJECT-REGISTRY.
+  "Get list of projects for magit selection from TARGET-DIRECTORIES.
 Returns list of (project-name . project-path) pairs."
   (unless target-directories
-    (error "Project registry is empty"))
+    (error "Project directories is empty"))
   (mapcar (lambda (entry)
             (let ((project-name (car entry))
                   (project-path (if (stringp (cdr entry))
@@ -1663,7 +1663,7 @@ Category: Debugging"
           (dolist (project enkan-repl-projects)
             (princ (format "  %s: %s\n" (car project) (cdr project))))
         (princ "  <empty>\n"))
-      (princ "\nProject registry:\n")
+      (princ "\nProject directories:\n")
       (if enkan-repl-target-directories
           (dolist (entry enkan-repl-target-directories)
             (princ (format "  %s: project=%s, path=%s\n"
