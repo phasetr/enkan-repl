@@ -3,7 +3,7 @@
 ;; Copyright (C) 2025 [phasetr]
 
 ;; Author: [phasetr] <phasetr@gmail.com>
-;; Version: 0.11.0
+;; Version: 0.12.0
 ;; Package-Requires: ((emacs "28.2") (eat "0.9.4"))
 ;; Keywords: enkan ai tools convenience
 ;; URL: https://github.com/phasetr/enkan-repl
@@ -233,9 +233,9 @@ When nil, executes normal setup behavior.")
   "Encode PATH by replacing forward slashes with the configured separator.
 Example: \\='/Users/phasetr/project1/\\=' -> \\='enkan--Users--phasetr--project1\\='"
   (enkan-repl--encode-full-path-pure
-    path
-    enkan-repl-file-prefix
-    enkan-repl-path-separator))
+   path
+   enkan-repl-file-prefix
+   enkan-repl-path-separator))
 
 (defun enkan-repl--decode-full-path (encoded-name)
   "Decode ENCODED-NAME back to original path.
@@ -537,7 +537,7 @@ Returns: Directory path or nil"
       (with-current-buffer buffer
         (when (and (string-match "^\\*enkan:" (buffer-name))
                    (string-equal project-name
-                                (enkan-repl--extract-project-name (buffer-name))))
+                                 (enkan-repl--extract-project-name (buffer-name))))
           (cl-return-from search-buffers
             (enkan-repl--extract-directory-from-buffer-name-pure (buffer-name))))))))
 
@@ -545,10 +545,10 @@ Returns: Directory path or nil"
   "Pure function to check if buffer name matches target directory.
 Returns t if buffer is enkan buffer for target directory, nil otherwise."
   (and (stringp buffer-name)
-    (stringp target-directory)
-    (string-match-p "^\\*enkan:" buffer-name)
-    (let ((expanded-target (expand-file-name target-directory)))
-      (string= buffer-name (concat "*enkan:" expanded-target "*")))))
+       (stringp target-directory)
+       (string-match-p "^\\*enkan:" buffer-name)
+       (let ((expanded-target (expand-file-name target-directory)))
+         (string= buffer-name (concat "*enkan:" expanded-target "*")))))
 
 (defun enkan-repl--get-buffer-for-directory (&optional directory)
   "Get the eat buffer for DIRECTORY if it exists and is live.
@@ -608,7 +608,7 @@ Uses unified backend with smart buffer detection.
 Category: Text Sender"
   (interactive "r\nP")
   (enkan-repl--send-unified
-    (buffer-substring-no-properties start end) prefix-arg nil))
+   (buffer-substring-no-properties start end) prefix-arg nil))
 
 ;;;###autoload
 (defun enkan-repl-send-line (&optional prefix-arg)
@@ -622,7 +622,7 @@ Uses unified backend with smart buffer detection.
 Category: Text Sender"
   (interactive "P")
   (enkan-repl--send-unified
-    (buffer-substring-no-properties (line-beginning-position) (line-end-position)) prefix-arg nil))
+   (buffer-substring-no-properties (line-beginning-position) (line-end-position)) prefix-arg nil))
 
 ;;;###autoload
 (defun enkan-repl-send-enter (&optional prefix-arg)
@@ -729,11 +729,11 @@ Category: Text Sender"
 Category: Utilities"
   (interactive)
   (let ((original-window (selected-window))
-         (enkan-buffers (seq-filter
-                          (lambda (buf)
-                            (string-match-p "^\\*enkan:" (buffer-name buf)))
-                          (buffer-list)))
-         (recentered-count 0))
+        (enkan-buffers (seq-filter
+                        (lambda (buf)
+                          (string-match-p "^\\*enkan:" (buffer-name buf)))
+                        (buffer-list)))
+        (recentered-count 0))
     (dolist (buffer enkan-buffers)
       (let ((window (get-buffer-window buffer)))
         (when window
@@ -826,8 +826,8 @@ Category: Session Controller"
   (require 'eat)
   ;; Always start new eat session in current directory
   (let* ((target-dir default-directory)
-          (buffer-name (concat "*enkan:" (expand-file-name target-dir) "*"))
-          (eat-buffer (eat)))
+         (buffer-name (concat "*enkan:" (expand-file-name target-dir) "*"))
+         (eat-buffer (eat)))
     ;; Simple buffer renaming - no error handling
     (when eat-buffer
       (with-current-buffer eat-buffer
@@ -844,86 +844,86 @@ Category: Session Controller"
   (interactive)
   ;; Check if current buffer filename matches standard input file format
   (let* ((current-file (buffer-file-name))
-          (is-standard-file (enkan-repl--is-standard-file-path-pure current-file default-directory)))
+         (is-standard-file (enkan-repl--is-standard-file-path-pure current-file default-directory)))
     (if is-standard-file
-      ;; Standard input file mode: terminate single session
-      (let* ((session-info (enkan-repl--get-session-info))
-              (target-dir (nth 0 session-info))
-              (existing-buffer (nth 1 session-info))
-              (can-send (nth 2 session-info)))
-        (cond
-          ;; No session found
-          ((not existing-buffer)
+        ;; Standard input file mode: terminate single session
+        (let* ((session-info (enkan-repl--get-session-info))
+               (target-dir (nth 0 session-info))
+               (existing-buffer (nth 1 session-info))
+               (can-send (nth 2 session-info)))
+          (cond
+           ;; No session found
+           ((not existing-buffer)
             (message "No eat session found for directory: %s" target-dir))
-          ;; Active or dead session - terminate
-          (t
+           ;; Active or dead session - terminate
+           (t
             (when (or (not can-send)
-                    (y-or-n-p (format "Terminate eat session in %s? " target-dir)))
+                      (y-or-n-p (format "Terminate eat session in %s? " target-dir)))
               (kill-buffer existing-buffer)
               (message "Terminated eat session in: %s" target-dir)))))
       ;; Center file mode: terminate all sessions
       (if (enkan-repl--is-center-file-path-pure enkan-repl-center-file enkan-repl-projects)
-        ;; Center file mode implementation
-        (let ((buffer-name "*ENKAN-REPL Finish Sessions*"))
-          (if (null enkan-repl-session-list)
-            (message "No registered sessions to terminate")
-            (with-output-to-temp-buffer buffer-name
-              (princ "=== ENKAN-REPL FINISH ALL SESSIONS ===\n\n")
-              ;; Display current state before termination
-              (princ "🔧 Current state before termination:\n")
-              (princ (enkan-repl--format-session-state-display
-                       (enkan-repl--get-current-session-state-info)))
-              (princ "\n")
-              (let ((terminated-count 0)
-                     (original-session-list enkan-repl-session-list)) ; Capture for y-or-n-p
-                (when (y-or-n-p (format "Terminate all %d registered sessions? "
-                                  (length original-session-list)))
-                  (princ "🚫 Terminating sessions:\n")
-                  ;; Terminate all session buffers
-                  (let* ((termination-result (enkan-repl--terminate-all-session-buffers
-                                               original-session-list
-                                               enkan-repl-target-directories))
-                          (actual-terminated-count (car termination-result))
-                          (session-termination-details (cdr termination-result)))
-                    (setq terminated-count actual-terminated-count)
-                    ;; Display termination results
-                    (dolist (detail session-termination-details)
-                      (let ((session-number (cdr (assoc :session-number detail)))
-                             (project-name (cdr (assoc :project-name detail)))
-                             (status (cdr (assoc :status detail))))
-                        (cond
-                          ((eq status 'terminated)
+          ;; Center file mode implementation
+          (let ((buffer-name "*ENKAN-REPL Finish Sessions*"))
+            (if (null enkan-repl-session-list)
+                (message "No registered sessions to terminate")
+              (with-output-to-temp-buffer buffer-name
+                (princ "=== ENKAN-REPL FINISH ALL SESSIONS ===\n\n")
+                ;; Display current state before termination
+                (princ "🔧 Current state before termination:\n")
+                (princ (enkan-repl--format-session-state-display
+                        (enkan-repl--get-current-session-state-info)))
+                (princ "\n")
+                (let ((terminated-count 0)
+                      (original-session-list enkan-repl-session-list)) ; Capture for y-or-n-p
+                  (when (y-or-n-p (format "Terminate all %d registered sessions? "
+                                          (length original-session-list)))
+                    (princ "🚫 Terminating sessions:\n")
+                    ;; Terminate all session buffers
+                    (let* ((termination-result (enkan-repl--terminate-all-session-buffers
+                                                original-session-list
+                                                enkan-repl-target-directories))
+                           (actual-terminated-count (car termination-result))
+                           (session-termination-details (cdr termination-result)))
+                      (setq terminated-count actual-terminated-count)
+                      ;; Display termination results
+                      (dolist (detail session-termination-details)
+                        (let ((session-number (cdr (assoc :session-number detail)))
+                              (project-name (cdr (assoc :project-name detail)))
+                              (status (cdr (assoc :status detail))))
+                          (cond
+                           ((eq status 'terminated)
                             (princ (format "  ✅ Session %d: %s (terminated)\n" session-number project-name)))
-                          ((eq status 'buffer-not-found)
+                           ((eq status 'buffer-not-found)
                             (princ (format "  ⚠️ Session %d: %s (buffer not found)\n" session-number project-name)))
-                          ((eq status 'project-path-not-found)
+                           ((eq status 'project-path-not-found)
                             (princ (format "  ❌ Session %d: %s (project path not found)\n" session-number project-name)))))))
-                  ;; Reset global configuration
-                  (enkan-repl--reset-global-session-variables)
-                  ;; Auto-disable global center file mode
-                  ;; (when (enkan-repl--disable-global-minor-mode-if-active)
-                  ;;   (princ "\n🔄 Auto-disabled center file global mode\n"))
-                  ;; Display final state
-                  (princ "\n🧹 Configuration reset:\n")
-                  (princ (enkan-repl--format-session-state-display
-                           (enkan-repl--get-current-session-state-info)))
-                  (princ (format "\n✅ Terminated %d sessions, cleared session list and reset project configuration.\n" terminated-count))
-                  (princ "\n=== END FINISH SESSIONS ===\n"))))))
+                    ;; Reset global configuration
+                    (enkan-repl--reset-global-session-variables)
+                    ;; Auto-disable global center file mode
+                    ;; (when (enkan-repl--disable-global-minor-mode-if-active)
+                    ;;   (princ "\n🔄 Auto-disabled center file global mode\n"))
+                    ;; Display final state
+                    (princ "\n🧹 Configuration reset:\n")
+                    (princ (enkan-repl--format-session-state-display
+                            (enkan-repl--get-current-session-state-info)))
+                    (princ (format "\n✅ Terminated %d sessions, cleared session list and reset project configuration.\n" terminated-count))
+                    (princ "\n=== END FINISH SESSIONS ===\n"))))))
         (message "Not in standard file or center file mode")))))
 
 (defun enkan-repl--is-standard-file-path-pure (file-path directory-name)
   "Decide the standard input file or not."
   (when file-path
     (let* ((base-name (file-name-sans-extension (file-name-nondirectory file-path)))
-            (decoded-path (enkan-repl--decode-full-path base-name)))
+           (decoded-path (enkan-repl--decode-full-path base-name)))
       (and (not (string= "" decoded-path)) (string= decoded-path directory-name)))))
 
 (defun enkan-repl--is-center-file-path-pure (center-file-path projects)
   "Decide the center file or not."
   (and center-file-path
-    (stringp center-file-path)
-    (not (string= "" center-file-path))
-    projects))
+       (stringp center-file-path)
+       (not (string= "" center-file-path))
+       projects))
 
 (defun enkan-repl--setup-log-state (buffer-name state-type layout sessions counter)
   "Log current or final state to BUFFER-NAME.
@@ -970,25 +970,25 @@ Includes error handling for individual session failures."
   (with-current-buffer buffer-name
     (princ "🚀 Starting eat sessions:\n"))
   (let ((session-number 1)
-         (success-count 0)
-         (failure-count 0))
+        (success-count 0)
+        (failure-count 0))
     (dolist (alias alias-list)
       (condition-case err
-        (let ((project-info (enkan-repl--setup-project-session alias)))
-          (let ((project-name (car project-info))
-                 (project-path (expand-file-name (cdr project-info)))
-                 (default-directory (expand-file-name (cdr project-info))))
-            ;; Register session
-            (enkan-repl--register-session session-number project-name)
-            ;; Start eat session in current directory (force restart if needed)
-            (enkan-repl-start-eat t)
-            (with-current-buffer buffer-name
-              (princ (format "  ✅ Session %d: %s (%s) - SUCCESS\n" session-number alias project-name)))
-            (setq success-count (1+ success-count))))
+          (let ((project-info (enkan-repl--setup-project-session alias)))
+            (let ((project-name (car project-info))
+                  (project-path (expand-file-name (cdr project-info)))
+                  (default-directory (expand-file-name (cdr project-info))))
+              ;; Register session
+              (enkan-repl--register-session session-number project-name)
+              ;; Start eat session in current directory (force restart if needed)
+              (enkan-repl-start-eat t)
+              (with-current-buffer buffer-name
+                (princ (format "  ✅ Session %d: %s (%s) - SUCCESS\n" session-number alias project-name)))
+              (setq success-count (1+ success-count))))
         (error
-          (with-current-buffer buffer-name
-            (princ (format "  ❌ Session %d: %s - FAILED (%s)\n" session-number alias (error-message-string err))))
-          (setq failure-count (1+ failure-count))))
+         (with-current-buffer buffer-name
+           (princ (format "  ❌ Session %d: %s - FAILED (%s)\n" session-number alias (error-message-string err))))
+         (setq failure-count (1+ failure-count))))
       (setq session-number (1+ session-number)))
     (with-current-buffer buffer-name
       (princ (format "\n📊 Session start summary: %d success, %d failed\n\n" success-count failure-count)))))
@@ -998,9 +998,9 @@ Includes error handling for individual session failures."
 Implemented as pure function, side effects are handled by upper functions."
   (let ((project-info (enkan-repl--get-project-info-from-directories alias)))
     (if project-info
-      (let ((project-name (car project-info))
-             (project-path (cdr project-info)))
-        (cons project-name project-path))
+        (let ((project-name (car project-info))
+              (project-path (cdr project-info)))
+          (cons project-name project-path))
       (error "Project alias '%s' not found in registry" alias))))
 
 (defun enkan-repl--setup-log-state (buffer-name state-type layout sessions counter)
@@ -1048,25 +1048,25 @@ Includes error handling for individual session failures."
   (with-current-buffer buffer-name
     (princ "🚀 Starting eat sessions:\n"))
   (let ((session-number 1)
-         (success-count 0)
-         (failure-count 0))
+        (success-count 0)
+        (failure-count 0))
     (dolist (alias alias-list)
       (condition-case err
-        (let ((project-info (enkan-repl--setup-project-session alias)))
-          (let ((project-name (car project-info))
-                 (project-path (expand-file-name (cdr project-info)))
-                 (default-directory (expand-file-name (cdr project-info))))
-            ;; Register session
-            (enkan-repl--register-session session-number project-name)
-            ;; Start eat session in current directory (force restart if needed)
-            (enkan-repl-start-eat t)
-            (with-current-buffer buffer-name
-              (princ (format "  ✅ Session %d: %s (%s) - SUCCESS\n" session-number alias project-name)))
-            (setq success-count (1+ success-count))))
+          (let ((project-info (enkan-repl--setup-project-session alias)))
+            (let ((project-name (car project-info))
+                  (project-path (expand-file-name (cdr project-info)))
+                  (default-directory (expand-file-name (cdr project-info))))
+              ;; Register session
+              (enkan-repl--register-session session-number project-name)
+              ;; Start eat session in current directory (force restart if needed)
+              (enkan-repl-start-eat t)
+              (with-current-buffer buffer-name
+                (princ (format "  ✅ Session %d: %s (%s) - SUCCESS\n" session-number alias project-name)))
+              (setq success-count (1+ success-count))))
         (error
-          (with-current-buffer buffer-name
-            (princ (format "  ❌ Session %d: %s - FAILED (%s)\n" session-number alias (error-message-string err))))
-          (setq failure-count (1+ failure-count))))
+         (with-current-buffer buffer-name
+           (princ (format "  ❌ Session %d: %s - FAILED (%s)\n" session-number alias (error-message-string err))))
+         (setq failure-count (1+ failure-count))))
       (setq session-number (1+ session-number)))
     (with-current-buffer buffer-name
       (princ (format "\n📊 Session start summary: %d success, %d failed\n\n" success-count failure-count)))))
@@ -1081,51 +1081,51 @@ Category: Session Controller"
   (interactive)
   ;; Check if current buffer filename matches standard input file format
   (let* ((current-file (buffer-file-name))
-          (is-standard-file (enkan-repl--is-standard-file-path-pure current-file default-directory)))
+         (is-standard-file (enkan-repl--is-standard-file-path-pure current-file default-directory)))
     (if is-standard-file
-      ;; Standard input file mode: simple window layout
-      (progn
-        (delete-other-windows)
-        (split-window-right)
-        ;; Move to right window and start eat session
-        (other-window 1)
-        (enkan-repl-start-eat)
-        ;; Move back to left window and open project input file
-        (other-window -1)
-        (enkan-repl-open-project-input-file)
-        (message "Basic window layout setup complete"))
+        ;; Standard input file mode: simple window layout
+        (progn
+          (delete-other-windows)
+          (split-window-right)
+          ;; Move to right window and start eat session
+          (other-window 1)
+          (enkan-repl-start-eat)
+          ;; Move back to left window and open project input file
+          (other-window -1)
+          (enkan-repl-open-project-input-file)
+          (message "Basic window layout setup complete"))
       ;; Center file mode: check if center file is specified as non-empty string
       (if (enkan-repl--is-center-file-path-pure enkan-repl-center-file enkan-repl-projects)
-        (let ((project-name (hmenu "Project:" (mapcar #'car enkan-repl-projects)))
-               (buffer-name "*ENKAN-REPL Auto Setup*")
-               (old-state (list enkan-repl--current-project
-                            (copy-tree enkan-repl-session-list)
-                            enkan-repl--session-counter)))
-          (with-output-to-temp-buffer buffer-name
-            (princ (format "=== ENKAN-REPL AUTO SETUP: %s ===\n\n" project-name))
-            (condition-case err
-              (progn
-                ;; Log initial state
-                (enkan-repl--setup-log-state buffer-name "Current"
-                  (nth 0 old-state)
-                  (nth 1 old-state)
-                  (nth 2 old-state))
-                ;; Enable global mode
-                (enkan-repl--setup-enable-global-mode buffer-name)
-                ;; Reset configuration
-                (enkan-repl--setup-reset-config buffer-name)
-                ;; Set project aliases
-                (let ((alias-list (cdr (assoc project-name enkan-repl-projects))))
-                  (unless alias-list
-                    (error "Project '%s' not found" project-name))
-                  (enkan-repl--setup-set-project-aliases project-name alias-list buffer-name)
-                  ;; Start sessions
-                  (enkan-repl--setup-start-sessions alias-list buffer-name))
-                ;; Set final project configuration
-                (setq enkan-repl--current-project project-name)
-                (princ (format "\n✅ Setup completed for project: %s\n" project-name))
-                (princ "Arrange your preferred window configuration!\n\n")
-                (princ "=== END SETUP ===\n")))))
+          (let ((project-name (hmenu "Project:" (mapcar #'car enkan-repl-projects)))
+                (buffer-name "*ENKAN-REPL Auto Setup*")
+                (old-state (list enkan-repl--current-project
+                                 (copy-tree enkan-repl-session-list)
+                                 enkan-repl--session-counter)))
+            (with-output-to-temp-buffer buffer-name
+              (princ (format "=== ENKAN-REPL AUTO SETUP: %s ===\n\n" project-name))
+              (condition-case err
+                  (progn
+                    ;; Log initial state
+                    (enkan-repl--setup-log-state buffer-name "Current"
+                                                 (nth 0 old-state)
+                                                 (nth 1 old-state)
+                                                 (nth 2 old-state))
+                    ;; Enable global mode
+                    (enkan-repl--setup-enable-global-mode buffer-name)
+                    ;; Reset configuration
+                    (enkan-repl--setup-reset-config buffer-name)
+                    ;; Set project aliases
+                    (let ((alias-list (cdr (assoc project-name enkan-repl-projects))))
+                      (unless alias-list
+                        (error "Project '%s' not found" project-name))
+                      (enkan-repl--setup-set-project-aliases project-name alias-list buffer-name)
+                      ;; Start sessions
+                      (enkan-repl--setup-start-sessions alias-list buffer-name))
+                    ;; Set final project configuration
+                    (setq enkan-repl--current-project project-name)
+                    (princ (format "\n✅ Setup completed for project: %s\n" project-name))
+                    (princ "Arrange your preferred window configuration!\n\n")
+                    (princ "=== END SETUP ===\n")))))
         (message "Center file not configured or no projects defined")))))
 
 ;;; Debug and Utility Functions
@@ -1192,7 +1192,7 @@ Category: Command Palette"
 (defcustom enkan-repl-global-minor-bindings nil
   "Keybindings for `enkan-repl-global-minor-mode`."
   :type '(repeat (cons (string :tag "Key")
-                   (function :tag "Command")))
+                       (function :tag "Command")))
   :set (lambda (sym val)
          (set-default sym val)
          (when (fboundp 'enkan-repl--refresh-global-minor-map)
@@ -1217,7 +1217,7 @@ When enabled, some keybindings are available across all buffers."
   ;; Do nothing dangerous to global keymap - let minor mode keymap handle it
   ;; This avoids overriding critical keybindings like M-x
   (message (if enkan-repl-global-minor-mode
-             "✅ global mode enabled"
+               "✅ global mode enabled"
              "❌ global mode disabled")))
 
 ;;;###autoload
@@ -1237,7 +1237,7 @@ Return (project-name . project-path) or nil if not found."
   "Pure function to get project path from directories by project name."
   (let ((project-info (cl-find-if (lambda (entry)
                                     (string= (car (cdr entry)) project-name))
-                        target-directories)))
+                                  target-directories)))
     (when project-info
       (cdr (cdr project-info)))))
 
@@ -1282,8 +1282,8 @@ This function has the side effect of killing buffers."
         (termination-results '()))
     (dolist (session session-list)
       (let* ((session-number (car session))
-              (project-name (cdr session))
-              (project-path (enkan-repl--get-project-path-from-directories project-name target-directories)))
+             (project-name (cdr session))
+             (project-path (enkan-repl--get-project-path-from-directories project-name target-directories)))
         (if project-path
             (let ((buffer (enkan-repl--get-buffer-for-directory project-path)))
               (if buffer
@@ -1330,9 +1330,9 @@ Returns plist with :buffer, :name, :live-p, :has-process, :process."
     (let* ((name (buffer-name buffer))
            (live-p (buffer-live-p buffer))
            (process-info (when live-p
-                          (with-current-buffer buffer
-                            (list :bound (boundp 'eat--process)
-                                  :process (if (boundp 'eat--process) eat--process nil))))))
+                           (with-current-buffer buffer
+                             (list :bound (boundp 'eat--process)
+                                   :process (if (boundp 'eat--process) eat--process nil))))))
       (list :buffer buffer
             :name name
             :live-p live-p
@@ -1372,10 +1372,10 @@ Resolution priority: prefix-arg → alias → nil (for interactive selection)."
       (when alias-entry
         (let* ((resolved-project (cdr alias-entry))
                (matching-buffers (seq-filter
-                                 (lambda (buf)
-                                   (let ((buffer-project (enkan-repl--extract-project-name (buffer-name buf))))
-                                     (string= resolved-project buffer-project)))
-                                 buffers)))
+                                  (lambda (buf)
+                                    (let ((buffer-project (enkan-repl--extract-project-name (buffer-name buf))))
+                                      (string= resolved-project buffer-project)))
+                                  buffers)))
           (car matching-buffers)))))
    ;; Priority 3: return nil for interactive selection
    (t nil)))
@@ -1455,7 +1455,7 @@ Returns t on success, nil on failure."
               (setq final-text ""))))))
       ;; Resolve target buffer
       (setq target-buffer (enkan-repl--resolve-target-buffer-pure
-                          prefix-arg resolved-alias available-buffers))
+                           prefix-arg resolved-alias available-buffers))
       ;; Handle alias resolution failure
       (if (and resolved-alias (null target-buffer))
           ;; Explicit alias specified but not found - show error and return
@@ -1486,8 +1486,8 @@ Returns list of cons cells (display-name . buffer) for selection UI."
   (mapcar (lambda (buffer)
             (let ((info (enkan-repl--get-buffer-process-info-pure buffer)))
               (cons (format "%s%s"
-                           (plist-get info :name)
-                           (if (plist-get info :has-process) " [ACTIVE]" " [INACTIVE]"))
+                            (plist-get info :name)
+                            (if (plist-get info :has-process) " [ACTIVE]" " [INACTIVE]"))
                     buffer)))
           buffers))
 
@@ -1516,8 +1516,8 @@ Returns plist with :can-send, :number, :buffer, :message."
           :number number
           :buffer buffer
           :message (if (plist-get info :has-process)
-                      (format "Will send '%s' to %s" number (plist-get info :name))
-                    (format "Cannot send to inactive buffer: %s" (plist-get info :name))))))
+                       (format "Will send '%s' to %s" number (plist-get info :name))
+                     (format "Cannot send to inactive buffer: %s" (plist-get info :name))))))
 
 (defun enkan-repl--validate-number-input-pure (number)
   "Pure function to validate NUMBER input for sending.
@@ -1580,25 +1580,25 @@ Category: Center File Multi-buffer Access"
 Category: Center File Multi-buffer Access"
   (interactive)
   (if enkan-repl--current-project
-    (let* ((current-project (cdr (assoc enkan-repl--current-project enkan-repl-projects)))
-            (project-choices '()))
-      (if current-project
-        (progn
-          ;; Build choices list with alias and directory
-          (dolist (alias current-project)
-            (let ((project-info (enkan-repl--get-project-info-from-directories alias)))
-              (when project-info
-                (let ((project-name (car project-info))
-                       (project-path (cdr project-info)))
-                  (push (cons (format "%s (%s)" alias project-path) project-path) project-choices)))))
-          (if project-choices
-            (let* ((selected-display (hmenu "Select project directory to open:" project-choices))
-                    (selected-path (cdr (assoc selected-display project-choices))))
-              (if (file-directory-p selected-path)
-                (dired selected-path)
-                (message "Directory does not exist: %s" selected-path)))
-            (message "No valid project directories found in project")))
-        (message "Current project '%s' not found in configurations" enkan-repl--current-project)))
+      (let* ((current-project (cdr (assoc enkan-repl--current-project enkan-repl-projects)))
+             (project-choices '()))
+        (if current-project
+            (progn
+              ;; Build choices list with alias and directory
+              (dolist (alias current-project)
+                (let ((project-info (enkan-repl--get-project-info-from-directories alias)))
+                  (when project-info
+                    (let ((project-name (car project-info))
+                          (project-path (cdr project-info)))
+                      (push (cons (format "%s (%s)" alias project-path) project-path) project-choices)))))
+              (if project-choices
+                  (let* ((selected-display (hmenu "Select project directory to open:" project-choices))
+                         (selected-path (cdr (assoc selected-display project-choices))))
+                    (if (file-directory-p selected-path)
+                        (dired selected-path)
+                      (message "Directory does not exist: %s" selected-path)))
+                (message "No valid project directories found in project")))
+          (message "Current project '%s' not found in configurations" enkan-repl--current-project)))
     (message "No project is currently active")))
 
 ;;;###autoload
@@ -1689,8 +1689,8 @@ Returns plist with :valid, :action, :message."
           (list :valid t
                 :action (plist-get exists-check :action)
                 :message (if (plist-get exists-check :exists)
-                            "Opening existing center file"
-                          "Creating new center file")))
+                             "Opening existing center file"
+                           "Creating new center file")))
       validation)))
 
 (defun enkan-repl-open-center-file ()
@@ -1764,26 +1764,26 @@ Category: Center File Operations"
   (interactive)
   (let* ((valid-buffers (enkan-repl--get-available-buffers-pure (buffer-list))))
     (if (= (length valid-buffers) 0)
-      (message "No active enkan sessions found for magit")
+        (message "No active enkan sessions found for magit")
       (let* ((selected-buffer
-               (if (= 1 (length valid-buffers))
-                 ;; Auto-select single session
-                 (car valid-buffers)
-                 ;; Interactive selection for multiple sessions
-                 (let* ((choices (enkan-repl--build-buffer-selection-choices-pure valid-buffers))
-                         (selected-display (hmenu "Select project for magit:" choices)))
-                   (cdr (assoc selected-display choices))))))
+              (if (= 1 (length valid-buffers))
+                  ;; Auto-select single session
+                  (car valid-buffers)
+                ;; Interactive selection for multiple sessions
+                (let* ((choices (enkan-repl--build-buffer-selection-choices-pure valid-buffers))
+                       (selected-display (hmenu "Select project for magit:" choices)))
+                  (cdr (assoc selected-display choices))))))
         (when selected-buffer
           (let ((project-path (enkan-repl--extract-directory-from-buffer-name-pure
-                                (buffer-name selected-buffer))))
+                               (buffer-name selected-buffer))))
             (if project-path
-              (let ((validation (enkan-repl--validate-magit-project-path-pure project-path)))
-                (if (plist-get validation :valid)
-                  (progn
-                    (let ((default-directory project-path))
-                      (magit-status))
-                    (message "Opened magit for project: %s" project-path))
-                  (error "Invalid project path: %s" (plist-get validation :message))))
+                (let ((validation (enkan-repl--validate-magit-project-path-pure project-path)))
+                  (if (plist-get validation :valid)
+                      (progn
+                        (let ((default-directory project-path))
+                          (magit-status))
+                        (message "Opened magit for project: %s" project-path))
+                    (error "Invalid project path: %s" (plist-get validation :message))))
               (error "Failed to extract project path from buffer: %s" (buffer-name selected-buffer)))))))))
 
 
