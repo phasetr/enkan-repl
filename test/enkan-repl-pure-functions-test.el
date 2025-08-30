@@ -29,31 +29,75 @@
     ;; Test with nil directories
     (should (null (enkan-repl--get-project-info-from-directories "proj1" nil)))))
 
-;; Tests for enkan-repl--handle-project-selection
-(ert-deftest test-enkan-repl--handle-project-selection ()
+;; Tests for enkan-repl--target-directory-info
+(ert-deftest test-enkan-repl--target-directory-info ()
+  "Test unified project selection handling."
+  ;; Test with no current project
+  (let ((result (enkan-repl--target-directory-info 
+                 nil 
+                 '(("proj1" . ("alias1")))
+                 '(("alias1" "Project One" . "/path/to/proj1"))
+                 "Select project:"
+                 nil)))
+    (should (equal (plist-get result :status) 'no-project))
+    (should (string-match-p "No current project" (plist-get result :message))))
+  
+  ;; Test with current project but no paths found
+  (let ((result (enkan-repl--target-directory-info 
+                 "test-project" 
+                 '(("test-project" . ("nonexistent")))
+                 '(("alias1" "Project One" . "/path/to/proj1"))
+                 "Select project:"
+                 nil)))
+    (should (equal (plist-get result :status) 'no-paths))
+    (should (string-match-p "No projects found" (plist-get result :message))))
+  
+  ;; Test with single path found
+  (let ((result (enkan-repl--target-directory-info 
+                 "test-project" 
+                 '(("test-project" . ("alias1")))
+                 '(("alias1" "Project One" . "/path/to/proj1"))
+                 "Select project:"
+                 nil)))
+    (should (equal (plist-get result :status) 'single))
+    (should (equal (plist-get result :path) "/path/to/proj1"))
+    (should (equal (plist-get result :alias) "alias1")))
+  
+  ;; Test with validation failure
+  (let ((result (enkan-repl--target-directory-info 
+                 "test-project" 
+                 '(("test-project" . ("alias1")))
+                 '(("alias1" "Project One" . "/invalid/path"))
+                 "Select project:"
+                 (lambda (path) (string-prefix-p "/valid" path)))))
+    (should (equal (plist-get result :status) 'invalid))
+    (should (equal (plist-get result :path) "/invalid/path"))))
+
+;; Tests for enkan-repl--select-project
+(ert-deftest test-enkan-repl--select-project ()
   "Test project selection handling."
   ;; Test with no projects
-  (let ((result (enkan-repl--handle-project-selection 
-                 '() "test-project" "Select:" 
+  (let ((result (enkan-repl--select-project
+                 '() "test-project" "Select:"
                  nil nil)))
     (should (equal (plist-get result :status) 'no-projects))
     (should (string-match-p "No projects found" (plist-get result :message))))
-  
+
   ;; Test with single project - no validation
-  (let ((result (enkan-repl--handle-project-selection 
-                 '(("alias1" . "/path/to/project1")) 
-                 "test-project" 
-                 "Select:" 
+  (let ((result (enkan-repl--select-project
+                 '(("alias1" . "/path/to/project1"))
+                 "test-project"
+                 "Select:"
                  nil nil)))
     (should (equal (plist-get result :status) 'single))
     (should (equal (plist-get result :path) "/path/to/project1"))
     (should (equal (plist-get result :alias) "alias1")))
-  
+
   ;; Test with single project - validation fails
-  (let ((result (enkan-repl--handle-project-selection 
-                 '(("alias1" . "/invalid/path")) 
-                 "test-project" 
-                 "Select:" 
+  (let ((result (enkan-repl--select-project
+                 '(("alias1" . "/invalid/path"))
+                 "test-project"
+                 "Select:"
                  nil
                  (lambda (path) (string-prefix-p "/valid" path)))))
     (should (equal (plist-get result :status) 'invalid))
@@ -76,14 +120,14 @@
       (should (equal (cdr (assoc 'session-list state-info)) session-list))
       (should (equal (cdr (assoc 'session-counter state-info)) session-counter))
       (should (equal (cdr (assoc 'project-aliases state-info)) project-aliases))))
-  
+
   ;; Test with nil values
   (let ((state-info (enkan-repl--get-current-session-state-info nil nil nil nil)))
     (should (null (cdr (assoc 'current-project state-info))))
     (should (null (cdr (assoc 'session-list state-info))))
     (should (null (cdr (assoc 'session-counter state-info))))
     (should (null (cdr (assoc 'project-aliases state-info)))))
-  
+
   ;; Test with empty lists
   (let ((state-info (enkan-repl--get-current-session-state-info '() '() 0 '())))
     (should (equal (cdr (assoc 'current-project state-info)) '()))

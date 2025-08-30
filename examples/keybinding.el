@@ -30,7 +30,7 @@
        ("C-M-i"   . enkan-repl-send-line)
        ("C-M-<return>" . enkan-repl-send-region)
        ("C-M-@"   . enkan-repl-open-project-directory)
-       ("C-t"     . other-window)
+       ("C-t"     . other-window-or-split)
        ("C-M-b"   . enkan-repl-recenter-bottom)
        ("C-M-s"   . enkan-repl-setup)
        ("C-M-t"   . enkan-repl-teardown)

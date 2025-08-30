@@ -1161,7 +1161,7 @@ Returns a list of (alias . path) pairs."
              when project-info
              collect (cons alias (cdr project-info)))))
 
-(defun enkan-repl--handle-project-selection (project-paths current-project prompt action-fn validation-fn)
+(defun enkan-repl--select-project (project-paths current-project prompt action-fn validation-fn)
   "Handle project selection based on PROJECT-PATHS.
 CURRENT-PROJECT is the current project name.
 PROMPT is the hmenu prompt for multiple projects.
@@ -1204,6 +1204,30 @@ Returns a plist with :status and other relevant keys."
                   :alias (car selected-entry))))
             (list :status 'cancelled)))))))
 
+(defun enkan-repl--target-directory-info (current-project projects target-directories prompt validation-fn)
+  "Get target directory info for CURRENT-PROJECT.
+PROJECTS is the project configuration.
+TARGET-DIRECTORIES is the directory configuration.
+PROMPT is the message for selection.
+VALIDATION-FN is an optional validation function.
+Returns a plist with :status and other relevant keys."
+  (if (not current-project)
+    (list :status 'no-project
+      :message "No current project selected")
+    (let* ((project-paths (enkan-repl--get-project-paths-for-current
+                            current-project projects target-directories))
+            (selection (enkan-repl--select-project
+                         project-paths
+                         current-project
+                         prompt
+                         nil
+                         validation-fn)))
+      (if (zerop (length project-paths))
+        (list :status 'no-paths
+          :message (format "No projects found in enkan-repl-target-directories for project '%s'"
+                     current-project))
+        selection))))
+
 (defun enkan-repl--get-current-session-state-info (current-project session-list session-counter project-aliases)
   "Retrieve session state information as an alist.
 CURRENT-PROJECT is the current project list.
@@ -1212,10 +1236,10 @@ SESSION-COUNTER is the session counter value.
 PROJECT-ALIASES is the list of project aliases.
 This is a pure function."
   (list
-   (cons 'current-project current-project)
-   (cons 'session-list session-list)
-   (cons 'session-counter session-counter)
-   (cons 'project-aliases project-aliases)))
+    (cons 'current-project current-project)
+    (cons 'session-list session-list)
+    (cons 'session-counter session-counter)
+    (cons 'project-aliases project-aliases)))
 
 (defun enkan-repl--format-session-state-display (state-info &optional prefix)
   "Format session state information for display.
@@ -1303,7 +1327,6 @@ Returns plist with :buffer, :name, :live-p, :has-process, :process."
             :live-p live-p
             :has-process (and process-info (plist-get process-info :bound) (plist-get process-info :process))
             :process (when process-info (plist-get process-info :process))))))
-
 
 (defun enkan-repl--get-available-buffers-pure (buffer-list)
   "Pure function to get available enkan buffers from BUFFER-LIST.
@@ -1544,27 +1567,23 @@ Category: Center File Multi-buffer Access"
 
 Category: Center File Multi-buffer Access"
   (interactive)
-  (if (null enkan-repl--current-project)
-    (message "No current project set. Run enkan-repl-setup first.")
-    (let* ((project-paths (enkan-repl--get-project-paths-for-current
-                            enkan-repl--current-project
-                            enkan-repl-projects
-                            enkan-repl-target-directories))
-            (selection (enkan-repl--handle-project-selection
-                         project-paths
-                         enkan-repl--current-project
-                         "Select project directory to open:"
-                         nil
-                         #'file-directory-p)))
-      (pcase (plist-get selection :status)
-        ('no-projects
-          (message (plist-get selection :message)))
-        ('invalid
-          (message "Directory does not exist: %s" (plist-get selection :path)))
-        ((or 'single 'selected)
-          (dired (plist-get selection :path)))
-        ('cancelled
-          (message "Selection cancelled"))))))
+  (let ((result (enkan-repl--target-directory-info
+                  enkan-repl--current-project
+                  enkan-repl-projects
+                  enkan-repl-target-directories
+                  "Select project directory to open:"
+                  #'file-directory-p)))
+    (pcase (plist-get result :status)
+      ('no-project
+        (message (plist-get result :message)))
+      ('no-paths
+        (message (plist-get result :message)))
+      ('invalid
+        (message "Directory does not exist: %s" (plist-get result :path)))
+      ((or 'single 'selected)
+        (dired (plist-get result :path)))
+      ('cancelled
+        (message "Selection cancelled")))))
 
 ;;;###autoload
 (defun enkan-repl--analyze-send-content-pure (content prefix-arg)
@@ -1727,29 +1746,24 @@ Returns plist with :project-name, :project-path."
 
 Category: Center File Operations"
   (interactive)
-  (if (null enkan-repl--current-project)
-    (message "No current project set. Run enkan-repl-setup first.")
-    (let* ((project-paths (enkan-repl--get-project-paths-for-current
-                            enkan-repl--current-project
-                            enkan-repl-projects
-                            enkan-repl-target-directories))
-            (selection (enkan-repl--handle-project-selection
-                         project-paths
-                         enkan-repl--current-project
-                         "Select project for magit:"
-                         nil
-                         #'file-directory-p)))
-      (pcase (plist-get selection :status)
-        ('no-projects
-          (message (plist-get selection :message)))
-        ('invalid
-          (message "Directory does not exist: %s" (plist-get selection :path)))
-        ((or 'single 'selected)
-          (let* ((project-path (plist-get selection :path))
-                  (default-directory project-path))
-            (magit-status)))
-        ('cancelled
-          (message "Selection cancelled"))))))
+  (let ((result (enkan-repl--target-directory-info
+                  enkan-repl--current-project
+                  enkan-repl-projects
+                  enkan-repl-target-directories
+                  "Select project for magit:"
+                  #'file-directory-p)))
+    (pcase (plist-get result :status)
+      ('no-project
+        (message (plist-get result :message)))
+      ('no-paths
+        (message (plist-get result :message)))
+      ('invalid
+        (message "Directory does not exist: %s" (plist-get result :path)))
+      ((or 'single 'selected)
+        (let ((default-directory (plist-get result :path)))
+          (magit-status)))
+      ('cancelled
+        (message "Selection cancelled")))))
 
 ;;;###autoload
 (defun enkan-repl-print-setup-to-buffer ()
