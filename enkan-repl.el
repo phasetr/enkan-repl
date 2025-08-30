@@ -916,13 +916,13 @@ Category: Session Controller"
   (when file-path
     (let* ((base-name (file-name-sans-extension (file-name-nondirectory file-path)))
             (decoded-path (enkan-repl--decode-full-path base-name)))
-      (and (not (string-empty-p decoded-path)) (string= decoded-path directory-name)))))
+      (and (not (string= "" decoded-path)) (string= decoded-path directory-name)))))
 
 (defun enkan-repl--is-center-file-path-pure (center-file-path projects)
   "Decide the center file or not."
   (and center-file-path
     (stringp center-file-path)
-    (not (string-empty-p center-file-path))
+    (not (string= "" center-file-path))
     projects))
 
 (defun enkan-repl--setup-log-state (buffer-name state-type layout sessions counter)
@@ -1367,7 +1367,7 @@ Resolution priority: prefix-arg → alias → nil (for interactive selection)."
     (when (and (<= prefix-arg (length buffers)))
       (nth (1- prefix-arg) buffers)))
    ;; Priority 2: alias based selection
-   ((and alias (stringp alias) (not (string-empty-p alias)))
+   ((and alias (stringp alias) (not (string= "" alias)))
     (let ((alias-entry (assoc alias enkan-repl-project-aliases)))
       (when alias-entry
         (let* ((resolved-project (cdr alias-entry))
@@ -1527,7 +1527,7 @@ Returns plist with :valid, :number, :message."
     (list :valid nil :number nil :message "Number is required"))
    ((not (stringp number))
     (list :valid nil :number nil :message "Number must be a string"))
-   ((string-empty-p number)
+   ((string= "" number)
     (list :valid nil :number nil :message "Number cannot be empty"))
    ((not (string-match-p "^[0-9]$" number))
     (list :valid nil :number nil :message "Number must be a single digit (0-9)"))
@@ -1632,7 +1632,7 @@ Returns plist with :valid, :alias, :command, :text, :message."
   (cond
    ((not (stringp input-string))
     (list :valid nil :message "Input must be a string"))
-   ((string-empty-p input-string)
+   ((string= "" input-string)
     (list :valid nil :message "Must start with : prefix"))
    ((not (string-match-p "^:" input-string))
     (list :valid nil :message "Must start with : prefix"))
@@ -1640,7 +1640,7 @@ Returns plist with :valid, :alias, :command, :text, :message."
     ;; Manual multiline extraction for alias with space and content
     (let* ((alias (match-string 1 input-string))
            (rest (substring input-string (+ 1 (length alias) 1))))  ; Skip :alias + space
-      (if (string-empty-p alias)
+      (if (string= "" alias)
           (list :valid nil :message "Invalid format. Alias cannot be empty")
         (cond
          ((equal rest "esc")
@@ -1668,7 +1668,7 @@ Returns plist with :valid, :message."
     (list :valid nil :message "Center file path not configured"))
    ((not (stringp file-path))
     (list :valid nil :message "Center file path must be a string"))
-   ((string-empty-p file-path)
+   ((string= "" file-path)
     (list :valid nil :message "Center file path is empty"))
    (t
     (list :valid t :message "Valid center file path"))))
