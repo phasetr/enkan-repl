@@ -862,6 +862,20 @@ Category: Session Controller"
         (kill-buffer existing-buffer)
         (message "Terminated eat session in: %s" target-dir))))))
 
+(defun enkan-repl--is-standard-file-path-pure (file-path directory-name)
+  "Decide the standard input file or not."
+  (when file-path
+    (let* ((base-name (file-name-sans-extension (file-name-nondirectory file-path)))
+            (decoded-path (enkan-repl--decode-full-path base-name)))
+      (and (not (string-empty-p decoded-path)) (string= decoded-path directory-name)))))
+
+(defun enkan-repl--is-center-file-path-pure (center-file-path projects)
+  "Decide the center file or not."
+  (and center-file-path
+    (stringp center-file-path)
+    (not (string-empty-p center-file-path))
+    projects))
+
 ;;;###autoload
 (defun enkan-repl-setup ()
   "Set up window layout based on context.
@@ -872,11 +886,7 @@ Category: Session Controller"
   (interactive)
   ;; Check if current buffer filename matches standard input file format
   (let* ((current-file (buffer-file-name))
-          (is-standard-file (when current-file
-                              (let* ((base-name (file-name-sans-extension (file-name-nondirectory current-file)))
-                                      (decoded-path (enkan-repl--decode-full-path base-name)))
-                                (and decoded-path
-                                  (string= decoded-path default-directory))))))
+          (is-standard-file (enkan-repl--is-standard-file-path-pure current-file default-directory)))
     (if is-standard-file
       ;; Standard input file mode: simple window layout
       (progn
@@ -890,10 +900,7 @@ Category: Session Controller"
         (enkan-repl-open-project-input-file)
         (message "Basic window layout setup complete"))
       ;; Center file mode: check if center file is specified as non-empty string
-      (if (and enkan-repl-center-file
-            (stringp enkan-repl-center-file)
-            (not (string-empty-p enkan-repl-center-file))
-            enkan-repl-projects)
+      (if (enkan-repl--is-center-file-path-pure enkan-repl-center-file enkan-repl-projects)
         (let ((project-name (hmenu "Project:" (mapcar #'car enkan-repl-projects)))
                (buffer-name "*ENKAN-REPL Auto Setup*")
                (old-state (list enkan-repl--current-project
