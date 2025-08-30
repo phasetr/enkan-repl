@@ -4,7 +4,7 @@
 
 ;; Author: phasetr <phasetr@gmail.com>
 ;; Version: 0.9.0
-;; Package-Requires: ((emacs "28.1"))
+;; Package-Requires: ((emacs "28.2"))
 ;; Keywords: enkan ai tools convenience macos notification sound
 ;; URL: https://github.com/phasetr/enkan-repl
 ;; License: MIT
