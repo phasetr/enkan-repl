@@ -1,4 +1,4 @@
-;;; keybindings.el --- Keybinding example for enkan-repl center file mode -*- lexical-binding: t -*-
+;;; keybinding.el --- Keybinding example for enkan-repl center file mode -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2025 phasetr
 
@@ -21,8 +21,8 @@
 (setq enkan-repl-center-file "~/enkan-center.org")
 (enkan-repl-global-minor-mode 1)
 
-(setopt enkan-repl-global-bindings
-  (append enkan-repl-global-bindings
+(setopt enkan-repl-global-minor-bindings
+  (append enkan-repl-global-minor-bindings
     '(("<escape>" . enkan-repl-send-escape)
        ("C-c C-f" . enkan-repl-toggle-global-mode)
        ("C-x g"   . enkan-repl-magit)
@@ -30,12 +30,12 @@
        ("C-M-i"   . enkan-repl-send-line)
        ("C-M-<return>" . enkan-repl-send-region)
        ("C-M-@"   . enkan-repl-open-project-directory)
-       ("C-t" '   . other-window)
+       ("C-t"     . other-window)
        ("C-M-b"   . enkan-repl-recenter-bottom)
        ("C-M-s"   . enkan-repl-setup)
        ("C-M-t"   . enkan-repl-teardown)
        ("C-M-l"   . enkan-repl-setup-current-project-layout))))
 
-(provide 'keybindings)
+(provide 'keybinding)
 
-;;; keybindings.el ends here
+;;; keybinding.el ends here

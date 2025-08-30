@@ -34,7 +34,7 @@ PROJECT-REGISTRY format: ((alias . (project-name . project-path)) ...)"
 Returns cons (window . buffer-name) or nil if session not registered."
   (let ((project-name (cdr (assoc session-number session-list))))
     (when project-name
-      (let ((project-path (enkan-repl--get-project-path-from-registry project-name project-registry)))
+      (let ((project-path (enkan-repl--get-project-path-from-directories project-name project-registry)))
         (when project-path
           (let* ((expanded-path (expand-file-name project-path))
                  (buffer-name (format "*enkan:%s*" expanded-path)))

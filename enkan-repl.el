@@ -901,8 +901,8 @@ Category: Session Controller"
                   ;; Reset global configuration
                   (enkan-repl--reset-global-session-variables)
                   ;; Auto-disable global center file mode
-                  (when (enkan-repl--disable-global-minor-mode-if-active)
-                    (princ "\n🔄 Auto-disabled center file global mode\n"))
+                  ;; (when (enkan-repl--disable-global-minor-mode-if-active)
+                  ;;   (princ "\n🔄 Auto-disabled center file global mode\n"))
                   ;; Display final state
                   (princ "\n🧹 Configuration reset:\n")
                   (princ (enkan-repl--format-session-state-display
@@ -924,6 +924,152 @@ Category: Session Controller"
     (stringp center-file-path)
     (not (string-empty-p center-file-path))
     projects))
+
+(defun enkan-repl--setup-log-state (buffer-name state-type layout sessions counter)
+  "Log current or final state to BUFFER-NAME.
+STATE-TYPE: 'Current' or 'Final'
+PROJECT: current project
+SESSIONS: session list
+COUNTER: session counter"
+  (with-current-buffer buffer-name
+    (princ (format "🔧 %s state %s:\n" state-type (if (string= state-type "Current") "before setup" "after setup")))
+    (princ (format "  Layout (enkan-repl--current-project): %s\n" (or layout "nil")))
+    (princ (format "  Sessions (enkan-repl-session-list): %s\n" (or sessions "nil")))
+    (princ (format "  Counter (enkan-repl--session-counter): %d\n\n" counter))))
+
+(defun enkan-repl--setup-enable-global-mode (buffer-name)
+  "Enable global center file mode if not already enabled and log to BUFFER-NAME."
+  (unless enkan-repl-global-minor-mode
+    (enkan-repl-global-minor-mode 1)
+    (with-current-buffer buffer-name
+      (princ "🚀 Auto-enabled center file global mode for project workflow\n\n"))))
+
+(defun enkan-repl--setup-reset-config (buffer-name)
+  "Reset session configuration and log to BUFFER-NAME."
+  (setq enkan-repl-session-list nil)
+  (setq enkan-repl--session-counter 0)
+  (setq enkan-repl--current-project nil)
+  (with-current-buffer buffer-name
+    (princ "🧹 Reset previous configuration\n\n")))
+
+(defun enkan-repl--setup-set-project-aliases (project-name alias-list buffer-name)
+  "Set project aliases from ALIAS-LIST for PROJECT-NAME and log to BUFFER-NAME."
+  (let ((project-aliases '()))
+    (dolist (alias alias-list)
+      (let ((project-info (enkan-repl--get-project-info-from-directories alias)))
+        (when project-info
+          (let ((proj-name (car project-info)))
+            (push (cons alias proj-name) project-aliases)))))
+    (setq enkan-repl-project-aliases (nreverse project-aliases))
+    (with-current-buffer buffer-name
+      (princ (format "🔧 Setup project aliases (enkan-repl-project-aliases): %s\n\n" enkan-repl-project-aliases)))))
+
+(defun enkan-repl--setup-start-sessions (alias-list buffer-name)
+  "Start eat sessions for each alias in ALIAS-LIST and log to BUFFER-NAME.
+Includes error handling for individual session failures."
+  (with-current-buffer buffer-name
+    (princ "🚀 Starting eat sessions:\n"))
+  (let ((session-number 1)
+         (success-count 0)
+         (failure-count 0))
+    (dolist (alias alias-list)
+      (condition-case err
+        (let ((project-info (enkan-repl--setup-project-session alias)))
+          (let ((project-name (car project-info))
+                 (project-path (expand-file-name (cdr project-info)))
+                 (default-directory (expand-file-name (cdr project-info))))
+            ;; Register session
+            (enkan-repl--register-session session-number project-name)
+            ;; Start eat session in current directory (force restart if needed)
+            (enkan-repl-start-eat t)
+            (with-current-buffer buffer-name
+              (princ (format "  ✅ Session %d: %s (%s) - SUCCESS\n" session-number alias project-name)))
+            (setq success-count (1+ success-count))))
+        (error
+          (with-current-buffer buffer-name
+            (princ (format "  ❌ Session %d: %s - FAILED (%s)\n" session-number alias (error-message-string err))))
+          (setq failure-count (1+ failure-count))))
+      (setq session-number (1+ session-number)))
+    (with-current-buffer buffer-name
+      (princ (format "\n📊 Session start summary: %d success, %d failed\n\n" success-count failure-count)))))
+
+(defun enkan-repl--setup-project-session (alias)
+  "Setup project session for given ALIAS.
+Implemented as pure function, side effects are handled by upper functions."
+  (let ((project-info (enkan-repl--get-project-info-from-directories alias)))
+    (if project-info
+      (let ((project-name (car project-info))
+             (project-path (cdr project-info)))
+        (cons project-name project-path))
+      (error "Project alias '%s' not found in registry" alias))))
+
+(defun enkan-repl--setup-log-state (buffer-name state-type layout sessions counter)
+  "Log current or final state to BUFFER-NAME.
+STATE-TYPE: 'Current' or 'Final'
+PROJECT: current project
+SESSIONS: session list
+COUNTER: session counter"
+  (with-current-buffer buffer-name
+    (princ (format "🔧 %s state %s:\n" state-type (if (string= state-type "Current") "before setup" "after setup")))
+    (princ (format "  Layout (enkan-repl--current-project): %s\n" (or layout "nil")))
+    (princ (format "  Sessions (enkan-repl-session-list): %s\n" (or sessions "nil")))
+    (princ (format "  Counter (enkan-repl--session-counter): %d\n\n" counter))))
+
+(defun enkan-repl--setup-enable-global-mode (buffer-name)
+  "Enable global center file mode if not already enabled and log to BUFFER-NAME."
+  (unless enkan-repl-global-minor-mode
+    (enkan-repl-global-minor-mode 1)
+    (with-current-buffer buffer-name
+      (princ "🚀 Auto-enabled center file global mode for project workflow\n\n"))))
+
+(defun enkan-repl--setup-reset-config (buffer-name)
+  "Reset session configuration and log to BUFFER-NAME."
+  (setq enkan-repl-session-list nil)
+  (setq enkan-repl--session-counter 0)
+  (setq enkan-repl--current-project nil)
+  (with-current-buffer buffer-name
+    (princ "🧹 Reset previous configuration\n\n")))
+
+(defun enkan-repl--setup-set-project-aliases (project-name alias-list buffer-name)
+  "Set project aliases from ALIAS-LIST for PROJECT-NAME and log to BUFFER-NAME."
+  (let ((project-aliases '()))
+    (dolist (alias alias-list)
+      (let ((project-info (enkan-repl--get-project-info-from-directories alias)))
+        (when project-info
+          (let ((proj-name (car project-info)))
+            (push (cons alias proj-name) project-aliases)))))
+    (setq enkan-repl-project-aliases (nreverse project-aliases))
+    (with-current-buffer buffer-name
+      (princ (format "🔧 Setup project aliases (enkan-repl-project-aliases): %s\n\n" enkan-repl-project-aliases)))))
+
+(defun enkan-repl--setup-start-sessions (alias-list buffer-name)
+  "Start eat sessions for each alias in ALIAS-LIST and log to BUFFER-NAME.
+Includes error handling for individual session failures."
+  (with-current-buffer buffer-name
+    (princ "🚀 Starting eat sessions:\n"))
+  (let ((session-number 1)
+         (success-count 0)
+         (failure-count 0))
+    (dolist (alias alias-list)
+      (condition-case err
+        (let ((project-info (enkan-repl--setup-project-session alias)))
+          (let ((project-name (car project-info))
+                 (project-path (expand-file-name (cdr project-info)))
+                 (default-directory (expand-file-name (cdr project-info))))
+            ;; Register session
+            (enkan-repl--register-session session-number project-name)
+            ;; Start eat session in current directory (force restart if needed)
+            (enkan-repl-start-eat t)
+            (with-current-buffer buffer-name
+              (princ (format "  ✅ Session %d: %s (%s) - SUCCESS\n" session-number alias project-name)))
+            (setq success-count (1+ success-count))))
+        (error
+          (with-current-buffer buffer-name
+            (princ (format "  ❌ Session %d: %s - FAILED (%s)\n" session-number alias (error-message-string err))))
+          (setq failure-count (1+ failure-count))))
+      (setq session-number (1+ session-number)))
+    (with-current-buffer buffer-name
+      (princ (format "\n📊 Session start summary: %d success, %d failed\n\n" success-count failure-count)))))
 
 ;;;###autoload
 (defun enkan-repl-setup ()
@@ -1004,7 +1150,6 @@ Category: Session Controller"
              :process-live-p (cdr process-info)
              :buffer buf)))
    (buffer-list)))
-
 
 ;;; Interactive Cheat-sheet Feature
 
