@@ -873,8 +873,8 @@ Category: Session Controller"
   ;; Check if current buffer filename matches standard input file format
   (let* ((current-file (buffer-file-name))
           (is-standard-file (when current-file
-                              (let ((base-name (file-name-sans-extension (file-name-nondirectory current-file)))
-                                     (decoded-path (enkan-repl--decode-full-path base-name)))
+                              (let* ((base-name (file-name-sans-extension (file-name-nondirectory current-file)))
+                                      (decoded-path (enkan-repl--decode-full-path base-name)))
                                 (and decoded-path
                                   (string= decoded-path default-directory))))))
     (if is-standard-file
@@ -1212,61 +1212,51 @@ Category: Center File Multi-buffer Access"
   (interactive)
   (let ((buffer-name "*ENKAN-REPL Finish Sessions*"))
     (if (null enkan-repl-session-list)
-        (message "No registered sessions to terminate")
+      (message "No registered sessions to terminate")
       (with-output-to-temp-buffer buffer-name
         (princ "=== ENKAN-REPL FINISH ALL SESSIONS ===\n\n")
-
         ;; Display current state before termination
         (princ "🔧 Current state before termination:\n")
-        (princ (enkan-repl--format-session-state-display 
-                (enkan-repl--get-current-session-state-info)))
+        (princ (enkan-repl--format-session-state-display
+                 (enkan-repl--get-current-session-state-info)))
         (princ "\n")
-
         (let ((terminated-count 0)
-              (original-session-list enkan-repl-session-list)) ; Capture for y-or-n-p
+               (original-session-list enkan-repl-session-list)) ; Capture for y-or-n-p
           (when (y-or-n-p (format "Terminate all %d registered sessions? "
-                                  (length original-session-list)))
+                            (length original-session-list)))
             (princ "🚫 Terminating sessions:\n")
-            
             ;; Terminate all session buffers
             (let* ((termination-result (enkan-repl--terminate-all-session-buffers
-                                        original-session-list
-                                        enkan-repl-target-directories))
-                   (actual-terminated-count (car termination-result))
-                   (session-termination-details (cdr termination-result)))
+                                         original-session-list
+                                         enkan-repl-target-directories))
+                    (actual-terminated-count (car termination-result))
+                    (session-termination-details (cdr termination-result)))
               (setq terminated-count actual-terminated-count)
-
               ;; Display termination results
               (dolist (detail session-termination-details)
                 (let ((session-number (cdr (assoc :session-number detail)))
-                      (project-name (cdr (assoc :project-name detail)))
-                      (status (cdr (assoc :status detail))))
+                       (project-name (cdr (assoc :project-name detail)))
+                       (status (cdr (assoc :status detail))))
                   (cond
-                   ((eq status 'terminated)
-                    (princ (format "  ✅ Session %d: %s (terminated)\n" session-number project-name)))
-                   ((eq status 'buffer-not-found)
-                    (princ (format "  ⚠️ Session %d: %s (buffer not found)\n" session-number project-name)))
-                   ((eq status 'project-path-not-found)
-                    (princ (format "  ❌ Session %d: %s (project path not found)\n" session-number project-name)))))))
-
+                    ((eq status 'terminated)
+                      (princ (format "  ✅ Session %d: %s (terminated)\n" session-number project-name)))
+                    ((eq status 'buffer-not-found)
+                      (princ (format "  ⚠️ Session %d: %s (buffer not found)\n" session-number project-name)))
+                    ((eq status 'project-path-not-found)
+                      (princ (format "  ❌ Session %d: %s (project path not found)\n" session-number project-name)))))))
             ;; Reset global configuration
             (enkan-repl--reset-global-session-variables)
-
             ;; Auto-disable global center file mode
             (when (enkan-repl--disable-center-file-global-mode-if-active)
               (princ "\n🔄 Auto-disabled center file global mode\n"))
-
             ;; Display final state
             (princ "\n🧹 Configuration reset:\n")
-            (princ (enkan-repl--format-session-state-display 
-                    (enkan-repl--get-current-session-state-info)))
+            (princ (enkan-repl--format-session-state-display
+                     (enkan-repl--get-current-session-state-info)))
             (princ (format "\n✅ Terminated %d sessions, cleared session list and reset project configuration.\n" terminated-count))
             (princ "\n=== END FINISH SESSIONS ===\n")))))))
 
 ;;;###autoload
-
-;;;###autoload
-
 (defun enkan-repl--get-buffer-process-info-pure (buffer)
   "Pure function to get process info for BUFFER.
 Returns plist with :buffer, :name, :live-p, :has-process, :process."
