@@ -233,9 +233,9 @@ When nil, executes normal setup behavior.")
   "Encode PATH by replacing forward slashes with the configured separator.
 Example: \\='/Users/phasetr/project1/\\=' -> \\='enkan--Users--phasetr--project1\\='"
   (enkan-repl--encode-full-path-pure
-   path
-   enkan-repl-file-prefix
-   enkan-repl-path-separator))
+    path
+    enkan-repl-file-prefix
+    enkan-repl-path-separator))
 
 (defun enkan-repl--decode-full-path (encoded-name)
   "Decode ENCODED-NAME back to original path.
@@ -864,21 +864,67 @@ Category: Session Controller"
 
 ;;;###autoload
 (defun enkan-repl-setup ()
-  "Set up basic window layout with project input file on left and eat session on right.
-Simplified version for standard input file processing only.
+  "Set up window layout based on context.
+- Standard input file: basic window layout with project input file on left and eat session on right
+- Center file: auto start eat sessions using project configuration
 
 Category: Session Controller"
   (interactive)
-  ;; Simple window layout setup
-  (delete-other-windows)
-  (split-window-right)
-  ;; Move to right window and start eat session
-  (other-window 1)
-  (enkan-repl-start-eat)
-  ;; Move back to left window and open project input file
-  (other-window -1)
-  (enkan-repl-open-project-input-file)
-  (message "Basic window layout setup complete"))
+  ;; Check if current buffer filename matches standard input file format
+  (let* ((current-file (buffer-file-name))
+          (is-standard-file (when current-file
+                              (let ((base-name (file-name-sans-extension (file-name-nondirectory current-file)))
+                                     (decoded-path (enkan-repl--decode-full-path base-name)))
+                                (and decoded-path
+                                  (string= decoded-path default-directory))))))
+    (if is-standard-file
+      ;; Standard input file mode: simple window layout
+      (progn
+        (delete-other-windows)
+        (split-window-right)
+        ;; Move to right window and start eat session
+        (other-window 1)
+        (enkan-repl-start-eat)
+        ;; Move back to left window and open project input file
+        (other-window -1)
+        (enkan-repl-open-project-input-file)
+        (message "Basic window layout setup complete"))
+      ;; Center file mode: check if center file is specified as non-empty string
+      (if (and enkan-repl-center-file
+            (stringp enkan-repl-center-file)
+            (not (string-empty-p enkan-repl-center-file))
+            enkan-repl-projects)
+        (let ((project-name (hmenu "Project:" (mapcar #'car enkan-repl-projects)))
+               (buffer-name "*ENKAN-REPL Auto Setup*")
+               (old-state (list enkan-repl--current-project
+                            (copy-tree enkan-repl-session-list)
+                            enkan-repl--session-counter)))
+          (with-output-to-temp-buffer buffer-name
+            (princ (format "=== ENKAN-REPL AUTO SETUP: %s ===\n\n" project-name))
+            (condition-case err
+              (progn
+                ;; Log initial state
+                (enkan-repl--center-auto-setup-log-state buffer-name "Current"
+                  (nth 0 old-state)
+                  (nth 1 old-state)
+                  (nth 2 old-state))
+                ;; Enable global mode
+                (enkan-repl--center-auto-setup-enable-global-mode buffer-name)
+                ;; Reset configuration
+                (enkan-repl--center-auto-setup-reset-config buffer-name)
+                ;; Set project aliases
+                (let ((alias-list (cdr (assoc project-name enkan-repl-projects))))
+                  (unless alias-list
+                    (error "Project '%s' not found" project-name))
+                  (enkan-repl--center-auto-setup-set-project-aliases project-name alias-list buffer-name)
+                  ;; Start sessions
+                  (enkan-repl--center-auto-setup-start-sessions alias-list buffer-name))
+                ;; Set final project configuration
+                (setq enkan-repl--current-project project-name)
+                (princ (format "\n✅ Setup completed for project: %s\n" project-name))
+                (princ "Arrange your preferred window configuration!\n\n")
+                (princ "=== END SETUP ===\n")))))
+        (message "Center file not configured or no projects defined")))))
 
 ;;; Debug and Utility Functions
 
@@ -928,6 +974,7 @@ Category: Command Palette"
 
 ;;;; Global Minor Mode for Center File Operations
 
+;; Store original keybindings for safe restoration
 (defvar enkan-center-file-global-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "<escape>") 'enkan-repl-center-send-escape)
@@ -939,13 +986,12 @@ Category: Command Palette"
     (define-key map (kbd "C-M-@") 'enkan-repl-center-open-project-directory)
     (define-key map (kbd "C-M-t") 'other-window)
     (define-key map (kbd "C-M-b") 'enkan-repl-recenter-bottom)
-    (define-key map (kbd "C-M-s") 'enkan-repl-center-auto-setup)
+    (define-key map (kbd "C-M-s") 'enkan-repl-setup)
     (define-key map (kbd "C-M-f") 'enkan-repl-center-finish-all-sessions)
     (define-key map (kbd "C-M-l") 'enkan-repl-setup-current-project-layout)
     map)
   "Global keymap for center file operations.")
 
-;; Store original keybindings for safe restoration
 (defvar enkan-center-file-original-keybindings nil
   "Stores original keybindings before center file mode overrides them.")
 
@@ -1075,42 +1121,6 @@ Includes error handling for individual session failures."
     (with-current-buffer buffer-name
       (princ (format "\n📊 Session start summary: %d success, %d failed\n\n" success-count failure-count)))))
 
-;;;###autoload
-(defun enkan-repl-center-auto-setup (project-name)
-  "Auto start eat sessions using project configuration.
-PROJECT-NAME is the configuration name defined in enkan-repl-projects.
-This function only starts eat sessions - use enkan-repl-setup to arrange windows."
-  (interactive
-    (list (hmenu "Project:" (mapcar #'car enkan-repl-projects))))
-  (let ((buffer-name "*ENKAN-REPL Auto Setup*")
-         (old-state (list enkan-repl--current-project
-                      (copy-tree enkan-repl-session-list)
-                      enkan-repl--session-counter)))
-    (with-output-to-temp-buffer buffer-name
-      (princ (format "=== ENKAN-REPL AUTO SETUP: %s ===\n\n" project-name))
-      (condition-case err
-        (progn
-          ;; Log initial state
-          (enkan-repl--center-auto-setup-log-state buffer-name "Current"
-            (nth 0 old-state)
-            (nth 1 old-state)
-            (nth 2 old-state))
-          ;; Enable global mode
-          (enkan-repl--center-auto-setup-enable-global-mode buffer-name)
-          ;; Reset configuration
-          (enkan-repl--center-auto-setup-reset-config buffer-name)
-          ;; Set project aliases
-          (let ((alias-list (cdr (assoc project-name enkan-repl-projects))))
-            (unless alias-list
-              (error "Project '%s' not found" project-name))
-            (enkan-repl--center-auto-setup-set-project-aliases project-name alias-list buffer-name)
-            ;; Start sessions
-            (enkan-repl--center-auto-setup-start-sessions alias-list buffer-name))
-          ;; Set final project configuration
-          (setq enkan-repl--current-project project-name)
-          (princ (format "\n✅ Setup completed for project: %s\n" project-name))
-          (princ "Arrange your preferred window configuration!\n\n")
-          (princ "=== END SETUP ===\n"))))))
 
 (defun enkan-repl-center-finish-all-sessions ()
   "Terminate all registered center file sessions.
