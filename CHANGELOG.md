@@ -1,3 +1,16 @@
+# [0.12.0](https://github.com/phasetr/enkan-repl/compare/v0.11.0...v0.12.0) (2025-08-30)
+
+
+### Bug Fixes
+
+* replace string-empty-p with string= for Emacs 28.2 compatibility ([aa53cca](https://github.com/phasetr/enkan-repl/commit/aa53ccacae01ed622e2be38614144c6968d752e3))
+* update minimum Emacs version to 28.2 for string-empty-p support ([16d0b65](https://github.com/phasetr/enkan-repl/commit/16d0b65df46df9ce9afa0d1a8fb19f58e580eeec))
+
+
+### Features
+
+* multi-buffer access using center file ([#19](https://github.com/phasetr/enkan-repl/issues/19)) ([cdd1e1d](https://github.com/phasetr/enkan-repl/commit/cdd1e1d16927b80ecabc2c7668b07edf6bd9ee53))
+
 # [0.11.0](https://github.com/phasetr/enkan-repl/compare/v0.10.0...v0.11.0) (2025-08-15)
 
 
