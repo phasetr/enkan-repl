@@ -15,7 +15,7 @@
 
 ;;;; Pure Functions for Project Path Resolution
 
-(defun enkan-repl--get-session-project-path-pure (session-number session-list project-registry)
+(defun enkan-repl--get-session-project-path-pure (session-number session-list target-directories)
   "Get project path for SESSION-NUMBER from SESSION-LIST and PROJECT-REGISTRY.
 Pure function that returns project path string or nil.
 SESSION-LIST format: ((session-number . project-name) ...)
@@ -24,24 +24,24 @@ PROJECT-REGISTRY format: ((alias . (project-name . project-path)) ...)"
          (project-info (when session-project
                          (cl-find-if (lambda (entry)
                                        (string= (car (cdr entry)) session-project))
-                                     project-registry)))
+                                     target-directories)))
          (project-path (when project-info (cdr (cdr project-info)))))
     project-path))
 
-(defun enkan-repl--setup-window-dired-pure (window session-number session-list project-registry)
+(defun enkan-repl--setup-window-dired-pure (window session-number session-list target-directories)
   "Pure function to determine dired setup for WINDOW and SESSION-NUMBER.
 Returns cons (window . project-path) or nil if invalid."
   (let ((project-path (enkan-repl--get-session-project-path-pure
-                       session-number session-list project-registry)))
+                       session-number session-list target-directories)))
     (when (and project-path (file-directory-p (expand-file-name project-path)))
       (cons window project-path))))
 
-(defun enkan-repl--setup-window-eat-buffer-pure (window session-number session-list project-registry)
+(defun enkan-repl--setup-window-eat-buffer-pure (window session-number session-list target-directories)
   "Pure function to determine eat buffer setup for WINDOW and SESSION-NUMBER.
 Returns cons (window . buffer-name) or nil if session not registered."
   (let ((project-name (cdr (assoc session-number session-list))))
     (when project-name
-      (let ((project-path (enkan-repl--get-project-path-from-registry project-name project-registry)))
+      (let ((project-path (enkan-repl--get-project-path-from-directories project-name target-directories)))
         (when project-path
           (let* ((expanded-path (expand-file-name project-path))
                  (buffer-name (format "*enkan:%s*" expanded-path)))
@@ -71,7 +71,7 @@ Returns cons (window . buffer-name) or nil if session not registered."
 (defun enkan-repl--setup-session-eat-buffer (window session-number)
   "Setup eat buffer for SESSION-NUMBER in WINDOW."
   (let ((eat-setup (enkan-repl--setup-window-eat-buffer-pure
-                     window session-number enkan-repl-session-list enkan-repl-center-project-registry)))
+                     window session-number enkan-repl-session-list enkan-repl-target-directories)))
     (if eat-setup
       (let ((buffer (get-buffer (cdr eat-setup))))
         (if buffer
@@ -111,7 +111,7 @@ Category: Utilities"
     (select-window enkan-repl--window-1)
     (find-file enkan-repl-center-file)
     (message "✅ Window 1: Opened center file %s" enkan-repl-center-file))
-  ;; Setup eat buffers in session windows (1, 2 for multi-project order)
+  ;; Setup eat buffers in session windows (1, 2 for project order)
   (when (and (boundp 'enkan-repl-session-list) enkan-repl-session-list)
     (enkan-repl--setup-session-eat-buffer enkan-repl--window-2 1))
   ;; Always select the center file window (Window 1) at the end
@@ -151,7 +151,7 @@ Category: Utilities"
     (select-window enkan-repl--window-1)
     (find-file enkan-repl-center-file)
     (message "✅ Window 1: Opened center file %s" enkan-repl-center-file))
-  ;; Setup eat buffers in session windows (1, 2 for multi-project order)
+  ;; Setup eat buffers in session windows (1, 2 for project order)
   (when (and (boundp 'enkan-repl-session-list) enkan-repl-session-list)
     (enkan-repl--setup-session-eat-buffer enkan-repl--window-2 1)
     (enkan-repl--setup-session-eat-buffer enkan-repl--window-3 2))
@@ -195,7 +195,7 @@ Category: Utilities"
     (select-window enkan-repl--window-1)
     (find-file enkan-repl-center-file)
     (message "✅ Window 1: Opened center file %s" enkan-repl-center-file))
-  ;; Setup eat buffers in session windows (4, 5, 6 in multi-project order)
+  ;; Setup eat buffers in session windows (4, 5, 6 in project order)
   (when (and (boundp 'enkan-repl-session-list) enkan-repl-session-list)
     (enkan-repl--setup-session-eat-buffer enkan-repl--window-2 1)
     (enkan-repl--setup-session-eat-buffer enkan-repl--window-3 2)
@@ -244,7 +244,7 @@ Category: Utilities"
     (select-window enkan-repl--window-1)
     (find-file enkan-repl-center-file)
     (message "✅ Window 1: Opened center file %s" enkan-repl-center-file))
-  ;; Setup eat buffers in session windows (4, 5, 6, 7 in multi-project order)
+  ;; Setup eat buffers in session windows (4, 5, 6, 7 in project order)
   (when (and (boundp 'enkan-repl-session-list) enkan-repl-session-list)
     (enkan-repl--setup-session-eat-buffer enkan-repl--window-2 1)
     (enkan-repl--setup-session-eat-buffer enkan-repl--window-3 2)
@@ -254,42 +254,39 @@ Category: Utilities"
   (when enkan-repl--window-1
     (select-window enkan-repl--window-1)))
 
+;;;; Dynamic Window Layout Selection
 
-;;;; Window Navigation Functions
-
-(defun enkan-repl-goto-window (window-number)
-  "Move to the specified window number.
-window-number: Integer 1-7
+;;;###autoload
+(defun enkan-repl-setup-current-project-layout ()
+  "Setup window layout for the currently active project.
+Uses enkan-repl--current-project to determine which layout to apply.
 
 Category: Utilities"
-  (interactive "nWindow number (1-7): ")
-  (unless (<= 1 window-number 7)
-    (user-error "Window number must be 1-7"))
-
-  (let ((target-window (nth (1- window-number) (window-list nil 'no-minibuf))))
-    (if target-window
-        (select-window target-window)
-      (user-error "Window %d does not exist" window-number))))
-
-;; Individual window navigation functions for keybindings
-;;;###autoload
-(defun enkan-repl-goto-window-1 () "Go to window 1" (interactive) (enkan-repl-goto-window 1))
-;;;###autoload
-(defun enkan-repl-goto-window-2 () "Go to window 2" (interactive) (enkan-repl-goto-window 2))
-;;;###autoload
-(defun enkan-repl-goto-window-3 () "Go to window 3" (interactive) (enkan-repl-goto-window 3))
-;;;###autoload
-(defun enkan-repl-goto-window-4 () "Go to window 4" (interactive) (enkan-repl-goto-window 4))
-;;;###autoload
-(defun enkan-repl-goto-window-5 () "Go to window 5" (interactive) (enkan-repl-goto-window 5))
-;;;###autoload
-(defun enkan-repl-goto-window-6 () "Go to window 6" (interactive) (enkan-repl-goto-window 6))
-;;;###autoload
-(defun enkan-repl-goto-window-7 () "Go to window 7" (interactive) (enkan-repl-goto-window 7))
-
-;;;; Center file multi-buffer window navigation
-(defvar enkan-repl-center--current-window 1
-  "Current window number for center file layout cycling.")
+  (interactive)
+  (unless (and (boundp 'enkan-repl--current-project)
+            enkan-repl--current-project)
+    (error "No current project active. Run enkan-repl-center-auto-setup first"))
+  (let ((alias-list (cdr (assoc enkan-repl--current-project enkan-repl-projects))))
+    (unless alias-list
+      (error "Project '%s' not found in enkan-repl-projects" enkan-repl--current-project))
+    (let ((session-count (length alias-list)))
+      (message "Setting up layout for %d sessions from '%s' configuration..."
+        session-count enkan-repl--current-project)
+      (cond
+        ((= session-count 1)
+          (enkan-repl-setup-1session-layout)
+          (message "✅ Applied 1-session layout for '%s'" enkan-repl--current-project))
+        ((= session-count 2)
+          (enkan-repl-setup-2session-layout)
+          (message "✅ Applied 2-session layout for '%s'" enkan-repl--current-project))
+        ((= session-count 3)
+          (enkan-repl-setup-3session-layout)
+          (message "✅ Applied 3-session layout for '%s'" enkan-repl--current-project))
+        ((= session-count 4)
+          (enkan-repl-setup-4session-layout)
+          (message "✅ Applied 4-session layout for '%s'" enkan-repl--current-project))
+        (t
+          (error "Unsupported session count: %d (supported: 1-4 sessions)" session-count))))))
 
 (provide 'center-window-navigation)
 ;;; center-window-navigation.el ends here

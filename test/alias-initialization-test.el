@@ -26,15 +26,15 @@
 (ert-deftest test-alias-setup-in-auto-setup ()
   "Test that enkan-repl-center-auto-setup properly sets up aliases."
   ;; Set global variables directly
-  (setq enkan-repl-center-multi-project-layouts 
+  (setq enkan-repl-projects 
         '(("test-layout" "er" "pt")))
-  (setq enkan-repl-center-project-registry 
+  (setq enkan-repl-target-directories 
         '(("er" . ("enkan-repl" . "/test/enkan-repl"))
           ("pt" . ("pt-tools" . "/test/pt-tools"))))
   (setq enkan-repl-project-aliases nil)
   (setq enkan-repl-session-list nil)
   (setq enkan-repl--session-counter 0)
-  (setq enkan-repl--current-multi-project-layout nil)
+  (setq enkan-repl--current-project nil)
   (setq enkan-center-file-global-mode nil)
     
   ;; Mock functions to avoid actual process creation
@@ -62,9 +62,9 @@
   (setq enkan-repl-project-aliases '(("er" . "enkan-repl") ("pt" . "pt-tools")))
   (setq enkan-repl-session-list '((1 . "enkan-repl") (2 . "pt-tools")))
   (setq enkan-repl--session-counter 2)
-  (setq enkan-repl--current-multi-project-layout "test-layout")
+  (setq enkan-repl--current-project "test-layout")
   (setq enkan-center-file-global-mode t)
-  (setq enkan-repl-center-project-registry 
+  (setq enkan-repl-target-directories 
         '(("er" . ("enkan-repl" . "/test/enkan-repl"))
           ("pt" . ("pt-tools" . "/test/pt-tools"))))
     
@@ -87,7 +87,7 @@
     (should (null enkan-repl-project-aliases))
     (should (null enkan-repl-session-list))
     (should (= 0 enkan-repl--session-counter))
-    (should (null enkan-repl--current-multi-project-layout))
+    (should (null enkan-repl--current-project))
     (should (null enkan-center-file-global-mode))))
 
 (provide 'alias-initialization-test)

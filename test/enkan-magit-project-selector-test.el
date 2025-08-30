@@ -8,10 +8,10 @@
 (require 'ert)
 
 ;; Pure function to get project list for magit selection
-(defun enkan-repl--get-magit-project-list-pure (project-registry)
+(defun enkan-repl--get-magit-project-list-pure (target-directories)
   "Get list of projects for magit selection from PROJECT-REGISTRY.
 Returns list of (project-name . project-path) pairs."
-  (unless project-registry
+  (unless target-directories
     (error "Project registry is empty"))
   (mapcar (lambda (entry)
             (let ((project-name (car entry))
@@ -22,7 +22,7 @@ Returns list of (project-name . project-path) pairs."
                                       (cdr (cdr entry))
                                     (cdr entry)))))
               (cons project-name (expand-file-name project-path))))
-          project-registry))
+          target-directories))
 
 ;; Pure function to validate project path for magit
 (defun enkan-repl--validate-magit-project-path-pure (project-path)
