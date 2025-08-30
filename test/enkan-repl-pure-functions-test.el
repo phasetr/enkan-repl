@@ -29,6 +29,37 @@
     ;; Test with nil directories
     (should (null (enkan-repl--get-project-info-from-directories "proj1" nil)))))
 
+;; Tests for enkan-repl--handle-project-selection
+(ert-deftest test-enkan-repl--handle-project-selection ()
+  "Test project selection handling."
+  ;; Test with no projects
+  (let ((result (enkan-repl--handle-project-selection 
+                 '() "test-project" "Select:" 
+                 nil nil)))
+    (should (equal (plist-get result :status) 'no-projects))
+    (should (string-match-p "No projects found" (plist-get result :message))))
+  
+  ;; Test with single project - no validation
+  (let ((result (enkan-repl--handle-project-selection 
+                 '(("alias1" . "/path/to/project1")) 
+                 "test-project" 
+                 "Select:" 
+                 nil nil)))
+    (should (equal (plist-get result :status) 'single))
+    (should (equal (plist-get result :path) "/path/to/project1"))
+    (should (equal (plist-get result :alias) "alias1")))
+  
+  ;; Test with single project - validation fails
+  (let ((result (enkan-repl--handle-project-selection 
+                 '(("alias1" . "/invalid/path")) 
+                 "test-project" 
+                 "Select:" 
+                 nil
+                 (lambda (path) (string-prefix-p "/valid" path)))))
+    (should (equal (plist-get result :status) 'invalid))
+    (should (equal (plist-get result :path) "/invalid/path"))
+    (should (string-match-p "Invalid path" (plist-get result :message)))))
+
 ;; Tests for enkan-repl--get-current-session-state-info
 (ert-deftest test-enkan-repl--get-current-session-state-info ()
   "Test getting current session state information."

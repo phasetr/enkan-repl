@@ -1161,6 +1161,49 @@ Returns a list of (alias . path) pairs."
              when project-info
              collect (cons alias (cdr project-info)))))
 
+(defun enkan-repl--handle-project-selection (project-paths current-project prompt action-fn validation-fn)
+  "Handle project selection based on PROJECT-PATHS.
+CURRENT-PROJECT is the current project name.
+PROMPT is the hmenu prompt for multiple projects.
+ACTION-FN is a function that takes a path and performs the action.
+VALIDATION-FN is an optional function to validate the path before action.
+Returns a plist with :status and other relevant keys."
+  (let ((num-projects (length project-paths)))
+    (cond
+      ((= num-projects 0)
+        (list :status 'no-projects
+          :message (format "No projects found in enkan-repl-target-directories for project '%s'"
+                     current-project)))
+      ((= num-projects 1)
+        ;; Auto-select single project
+        (let* ((project-entry (car project-paths))
+                (project-path (cdr project-entry)))
+          (if (and validation-fn (not (funcall validation-fn project-path)))
+            (list :status 'invalid
+              :path project-path
+              :message (format "Invalid path: %s" project-path))
+            (list :status 'single
+              :path project-path
+              :alias (car project-entry)))))
+      (t
+        ;; Multiple projects - require selection
+        (let* ((choices (mapcar (lambda (entry)
+                                  (format "%s (%s)" (car entry) (cdr entry)))
+                          project-paths))
+                (selected-display (hmenu prompt choices)))
+          (if selected-display
+            (let* ((selected-index (cl-position selected-display choices :test 'string=))
+                    (selected-entry (nth selected-index project-paths))
+                    (project-path (cdr selected-entry)))
+              (if (and validation-fn (not (funcall validation-fn project-path)))
+                (list :status 'invalid
+                  :path project-path
+                  :message (format "Invalid path: %s" project-path))
+                (list :status 'selected
+                  :path project-path
+                  :alias (car selected-entry))))
+            (list :status 'cancelled)))))))
+
 (defun enkan-repl--get-current-session-state-info (current-project session-list session-counter project-aliases)
   "Retrieve session state information as an alist.
 CURRENT-PROJECT is the current project list.
@@ -1503,36 +1546,25 @@ Category: Center File Multi-buffer Access"
   (interactive)
   (if (null enkan-repl--current-project)
     (message "No current project set. Run enkan-repl-setup first.")
-    ;; Get project paths using the pure function
     (let* ((project-paths (enkan-repl--get-project-paths-for-current
                             enkan-repl--current-project
                             enkan-repl-projects
                             enkan-repl-target-directories))
-            (num-projects (length project-paths)))
-      (cond
-        ((= num-projects 0)
-          (message "No projects found in enkan-repl-target-directories for project '%s'"
-            enkan-repl--current-project))
-        ((= num-projects 1)
-          ;; Auto-select single project
-          (let* ((project-entry (car project-paths))
-                  (project-path (cdr project-entry)))
-            (if (file-directory-p project-path)
-              (dired project-path)
-              (message "Directory does not exist: %s" project-path))))
-        (t
-          ;; Multiple projects - use hmenu for selection
-          (let* ((choices (mapcar (lambda (entry)
-                                    (format "%s (%s)" (car entry) (cdr entry)))
-                            project-paths))
-                  (selected-display (hmenu "Select project directory to open:" choices)))
-            (when selected-display
-              (let* ((selected-index (cl-position selected-display choices :test 'string=))
-                      (selected-entry (nth selected-index project-paths))
-                      (project-path (cdr selected-entry)))
-                (if (file-directory-p project-path)
-                  (dired project-path)
-                  (message "Directory does not exist: %s" project-path))))))))))
+            (selection (enkan-repl--handle-project-selection
+                         project-paths
+                         enkan-repl--current-project
+                         "Select project directory to open:"
+                         nil
+                         #'file-directory-p)))
+      (pcase (plist-get selection :status)
+        ('no-projects
+          (message (plist-get selection :message)))
+        ('invalid
+          (message "Directory does not exist: %s" (plist-get selection :path)))
+        ((or 'single 'selected)
+          (dired (plist-get selection :path)))
+        ('cancelled
+          (message "Selection cancelled"))))))
 
 ;;;###autoload
 (defun enkan-repl--analyze-send-content-pure (content prefix-arg)
@@ -1697,36 +1729,27 @@ Category: Center File Operations"
   (interactive)
   (if (null enkan-repl--current-project)
     (message "No current project set. Run enkan-repl-setup first.")
-    ;; Get project paths using the pure function
     (let* ((project-paths (enkan-repl--get-project-paths-for-current
                             enkan-repl--current-project
                             enkan-repl-projects
                             enkan-repl-target-directories))
-            (num-projects (length project-paths)))
-      (cond
-        ((= num-projects 0)
-          (message "No projects found in enkan-repl-target-directories for project '%s'"
-            enkan-repl--current-project))
-        ((= num-projects 1)
-          ;; Auto-select single project
-          (let* ((project-entry (car project-paths))
-                  (project-path (cdr project-entry))
+            (selection (enkan-repl--handle-project-selection
+                         project-paths
+                         enkan-repl--current-project
+                         "Select project for magit:"
+                         nil
+                         #'file-directory-p)))
+      (pcase (plist-get selection :status)
+        ('no-projects
+          (message (plist-get selection :message)))
+        ('invalid
+          (message "Directory does not exist: %s" (plist-get selection :path)))
+        ((or 'single 'selected)
+          (let* ((project-path (plist-get selection :path))
                   (default-directory project-path))
-            (magit-status)
-            (message "Opened magit for project: %s" project-path)))
-        (t
-          ;; Multiple projects - use hmenu for selection
-          (let* ((choices (mapcar (lambda (entry)
-                                    (format "%s (%s)" (car entry) (cdr entry)))
-                            project-paths))
-                  (selected-display (hmenu "Select project for magit:" choices)))
-            (when selected-display
-              (let* ((selected-index (cl-position selected-display choices :test 'string=))
-                      (selected-entry (nth selected-index project-paths))
-                      (project-path (cdr selected-entry))
-                      (default-directory project-path))
-                (magit-status)
-                (message "Opened magit for project: %s" project-path)))))))))
+            (magit-status)))
+        ('cancelled
+          (message "Selection cancelled"))))))
 
 ;;;###autoload
 (defun enkan-repl-print-setup-to-buffer ()
