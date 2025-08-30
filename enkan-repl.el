@@ -840,7 +840,7 @@ Category: Session Controller"
                 ;; Display current state before termination
                 (princ "🔧 Current state before termination:\n")
                 (princ (enkan-repl--format-session-state-display
-                        (enkan-repl--get-current-session-state-info 
+                        (enkan-repl--get-current-session-state-info
                          enkan-repl--current-project
                          enkan-repl-session-list
                          enkan-repl--session-counter
@@ -1670,33 +1670,46 @@ Returns plist with :project-name, :project-path."
       (list :project-name nil :project-path nil))))
 
 (defun enkan-repl-magit ()
-  "Open magit for selected project from active sessions only.
+  "Open magit for selected project from enkan-repl-projects.
 
 Category: Center File Operations"
   (interactive)
-  (let* ((valid-buffers (enkan-repl--get-available-buffers-pure (buffer-list))))
-    (if (= (length valid-buffers) 0)
-        (message "No active enkan sessions found for magit")
-      (let* ((selected-buffer
-              (if (= 1 (length valid-buffers))
-                  ;; Auto-select single session
-                  (car valid-buffers)
-                ;; Interactive selection for multiple sessions
-                (let* ((choices (enkan-repl--build-buffer-selection-choices-pure valid-buffers))
-                       (selected-display (hmenu "Select project for magit:" choices)))
-                  (cdr (assoc selected-display choices))))))
-        (when selected-buffer
-          (let ((project-path (enkan-repl--extract-directory-from-buffer-name-pure
-                               (buffer-name selected-buffer))))
-            (if project-path
-                (let ((validation (enkan-repl--validate-magit-project-path-pure project-path)))
-                  (if (plist-get validation :valid)
-                      (progn
-                        (let ((default-directory project-path))
-                          (magit-status))
-                        (message "Opened magit for project: %s" project-path))
-                    (error "Invalid project path: %s" (plist-get validation :message))))
-              (error "Failed to extract project path from buffer: %s" (buffer-name selected-buffer)))))))))
+  (if (null enkan-repl--current-project)
+    (message "No current project set. Run enkan-repl-setup first.")
+    ;; Get alias list from enkan-repl-projects using current project name
+    (let* ((alias-list (cdr (assoc enkan-repl--current-project enkan-repl-projects)))
+            (project-paths
+              ;; Get paths for each alias from enkan-repl-target-directories
+              (cl-loop for alias in alias-list
+                for project-info = (enkan-repl--get-project-info-from-directories
+                                     alias enkan-repl-target-directories)
+                when project-info
+                collect (cons alias (cdr project-info))))
+            (num-projects (length project-paths)))
+      (cond
+        ((= num-projects 0)
+          (message "No projects found in enkan-repl-target-directories for project '%s' aliases: %s"
+            enkan-repl--current-project alias-list))
+        ((= num-projects 1)
+          ;; Auto-select single project
+          (let* ((project-entry (car project-paths))
+                  (project-path (cdr project-entry))
+                  (default-directory project-path))
+            (magit-status)
+            (message "Opened magit for project: %s" project-path)))
+        (t
+          ;; Multiple projects - use hmenu for selection
+          (let* ((choices (mapcar (lambda (entry)
+                                    (format "%s (%s)" (car entry) (cdr entry)))
+                            project-paths))
+                  (selected-display (hmenu "Select project for magit:" choices)))
+            (when selected-display
+              (let* ((selected-index (cl-position selected-display choices :test 'string=))
+                      (selected-entry (nth selected-index project-paths))
+                      (project-path (cdr selected-entry))
+                      (default-directory project-path))
+                (magit-status)
+                (message "Opened magit for project: %s" project-path)))))))))
 
 ;;;###autoload
 (defun enkan-repl-print-setup-to-buffer ()
