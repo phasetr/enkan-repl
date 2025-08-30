@@ -901,7 +901,7 @@ Category: Session Controller"
                   ;; Reset global configuration
                   (enkan-repl--reset-global-session-variables)
                   ;; Auto-disable global center file mode
-                  (when (enkan-repl--disable-global-mode-if-active)
+                  (when (enkan-repl--disable-global-minor-mode-if-active)
                     (princ "\n🔄 Auto-disabled center file global mode\n"))
                   ;; Display final state
                   (princ "\n🧹 Configuration reset:\n")
@@ -987,7 +987,6 @@ Category: Session Controller"
 ;; These functions are primarily for debugging and troubleshooting.
 ;; They can be safely removed in production environments if needed.
 
-
 (defun enkan-repl--get-buffer-info-list ()
   "Get buffer info list for all buffers (side-effect: reads `buffer-list')."
   (mapcar
@@ -1030,34 +1029,49 @@ Category: Command Palette"
 
 ;;;; Global Minor Mode
 
-;; Store original keybindings for safe restoration
-(defvar enkan-repl-global-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "<escape>") 'enkan-repl-send-escape)
-    (define-key map (kbd "C-c C-f") 'enkan-repl-toggle-global-mode)
-    (define-key map (kbd "C-x g") 'enkan-repl-magit)
-    (define-key map (kbd "C-M-e") 'enkan-repl-send-enter)
-    (define-key map (kbd "C-M-i") 'enkan-repl-send-line)
-    (define-key map (kbd "C-M-<return>") 'enkan-repl-send-region)
-    (define-key map (kbd "C-M-@") 'enkan-repl-open-project-directory)
-    (define-key map (kbd "C-t") 'other-window)
-    (define-key map (kbd "C-M-b") 'enkan-repl-recenter-bottom)
-    (define-key map (kbd "C-M-s") 'enkan-repl-setup)
-    (define-key map (kbd "C-M-t") 'enkan-repl-teardown)
-    (define-key map (kbd "C-M-l") 'enkan-repl-setup-current-project-layout)
-    map)
-  "Global keymap for file operations.")
+(defgroup enkan-repl nil
+  "enkan-repl customization."
+  :group 'tools)
 
-(define-minor-mode enkan-repl-global-mode
+(defvar enkan-repl-global-minor-mode-map (make-sparse-keymap)
+  "Keymap for `enkan-repl-global-minor-mode'.")
+
+(defun enkan-repl--build-map (bindings)
+  "Build a sparse keymap from BINDINGS of (KEY . COMMAND)."
+  (let ((m (make-sparse-keymap)))
+    (dolist (kv bindings)
+      (keymap-set m (car kv) (cdr kv)))
+    m))
+
+;; Store original keybindings for safe restoration
+(defcustom enkan-repl-global-minor-bindings nil
+  "Keybindings for `enkan-repl-global-minor-mode`."
+  :type '(repeat (cons (string :tag "Key")
+                   (function :tag "Command")))
+  :set (lambda (sym val)
+         (set-default sym val)
+         (when (fboundp 'enkan-repl--refresh-global-minor-map)
+           (enkan-repl--refresh-global-minor-map)))
+  :group 'enkan-repl)
+
+(defun enkan-repl--refresh-global-minor-map ()
+  "Rebuild `enkan-repl-global-minor-mode-map' from `enkan-repl-global-minor-bindings'."
+  (setq enkan-repl-global-minor-mode-map
+        (enkan-repl--build-map enkan-repl-global-minor-bindings)))
+
+;; 初期構築
+(enkan-repl--refresh-global-minor-map)
+
+(define-minor-mode enkan-repl-global-minor-mode
   "Global minor mode for enkan-repl operations.
 When enabled, some keybindings are available across all buffers."
   :init-value nil
   :global t
   :lighter " ECF"
-  :keymap enkan-repl-global-mode-map
+  :keymap enkan-repl-global-minor-mode-map
   ;; Do nothing dangerous to global keymap - let minor mode keymap handle it
   ;; This avoids overriding critical keybindings like M-x
-  (message (if enkan-repl-global-mode
+  (message (if enkan-repl-global-minor-mode
              "✅ global mode enabled"
              "❌ global mode disabled")))
 
@@ -1065,7 +1079,7 @@ When enabled, some keybindings are available across all buffers."
 (defun enkan-repl-toggle-global-mode ()
   "Toggle enkan-repl global mode on/off."
   (interactive)
-  (enkan-repl-global-mode 'toggle))
+  (enkan-repl-global-minor-mode 'toggle))
 
 ;;;; Auto Setup Functions
 
@@ -1155,12 +1169,12 @@ This function has the side effect of modifying global variables:
   (setq enkan-repl--current-project nil)
   (setq enkan-repl-project-aliases nil))
 
-(defun enkan-repl--disable-global-mode-if-active ()
-  "Disable `enkan-repl-global-mode` if it is active.
-This function has the side effect of calling `enkan-repl-global-mode`.
+(defun enkan-repl--disable-global-minor-mode-if-active ()
+  "Disable `enkan-repl-global-minor-mode` if it is active.
+This function has the side effect of calling `enkan-repl-global-minor-mode`.
 Returns t if mode was disabled, nil otherwise."
-  (when enkan-repl-global-mode
-    (enkan-repl-global-mode -1)
+  (when enkan-repl-global-minor-mode
+    (enkan-repl-global-minor-mode -1)
     t))
 
 ;;;###autoload
@@ -1331,8 +1345,6 @@ Returns list of cons cells (display-name . buffer) for selection UI."
                            (if (plist-get info :has-process) " [ACTIVE]" " [INACTIVE]"))
                     buffer)))
           buffers))
-
-
 
 (defun enkan-repl--parse-prefix-arg-pure (prefix-arg)
   "Pure function to parse PREFIX-ARG into action type.

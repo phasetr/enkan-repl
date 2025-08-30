@@ -1,15 +1,16 @@
-;;; center-window-navigation.el --- Center file window layout and navigation for enkan-repl -*- lexical-binding: t -*-
+;;; window-layouts.el --- Window layout examples for enkan-repl center file mode -*- lexical-binding: t -*-
 
-;; Copyright (C) 2024 phasetr
+;; Copyright (C) 2025 phasetr
 
 ;; Author: phasetr <phasetr@gmail.com>
-;; Version: 1.0.0
+;; Keywords: convenience, tools
+
+;; This file is NOT part of GNU Emacs.
 
 ;;; Commentary:
 
-;; Center file window layout and navigation utilities extracted from enkan-repl.el
-;; This file provides complete window layout management and navigation functions
-;; for center file multi-buffer access pattern.
+;; Window layout configuration examples for enkan-repl center file mode.
+;; Shows different layout patterns for managing multiple sessions.
 
 ;;; Code:
 
@@ -28,14 +29,6 @@ PROJECT-REGISTRY format: ((alias . (project-name . project-path)) ...)"
          (project-path (when project-info (cdr (cdr project-info)))))
     project-path))
 
-(defun enkan-repl--setup-window-dired-pure (window session-number session-list project-registry)
-  "Pure function to determine dired setup for WINDOW and SESSION-NUMBER.
-Returns cons (window . project-path) or nil if invalid."
-  (let ((project-path (enkan-repl--get-session-project-path-pure
-                       session-number session-list project-registry)))
-    (when (and project-path (file-directory-p (expand-file-name project-path)))
-      (cons window project-path))))
-
 (defun enkan-repl--setup-window-eat-buffer-pure (window session-number session-list project-registry)
   "Pure function to determine eat buffer setup for WINDOW and SESSION-NUMBER.
 Returns cons (window . buffer-name) or nil if session not registered."
@@ -51,19 +44,14 @@ Returns cons (window . buffer-name) or nil if session not registered."
 
 (defvar enkan-repl--window-1 nil
   "Window 1 (center file) for enkan-repl multi-buffer layout.")
-
 (defvar enkan-repl--window-2 nil
   "Window 2 (work area) for enkan-repl multi-buffer layout.")
-
 (defvar enkan-repl--window-3 nil
   "Window 3 (reserve area) for enkan-repl multi-buffer layout.")
-
 (defvar enkan-repl--window-4 nil
   "Window 4 (session 1) for enkan-repl multi-buffer layout.")
-
 (defvar enkan-repl--window-5 nil
   "Window 5 (session 2) for enkan-repl multi-buffer layout.")
-
 
 ;;;; Window Layout Functions
 
@@ -288,5 +276,5 @@ Category: Utilities"
         (t
           (error "Unsupported session count: %d (supported: 1-4 sessions)" session-count))))))
 
-(provide 'center-window-navigation)
-;;; center-window-navigation.el ends here
+(provide 'window-layouts)
+;;; window-layouts.el ends here
