@@ -213,26 +213,21 @@ The generated project file includes template functions and usage instructions.
 
 *** Text Sending
 - =enkan-repl-send-region= - Send selected text (the author most commonly used)
-- =enkan-repl-send-buffer= - Send entire buffer
-- =enkan-repl-send-rest-of-buffer= - Send from cursor to end
 - =enkan-repl-send-line= - Send current line only
 - =enkan-repl-send-enter= - Send enter key
 - =enkan-repl-send-1/2/3= - Send numbered choices for AI prompts
-- =enkan-repl-send-escape= - Send ESC key to eat session buffer.
+- =enkan-repl-send-4= - Send \\='4\\=' to enkan session buffer for numbered choice prompt. - From enkan buffer: Send to current buffer - From other buffer without prefix: Interactive buffer selection - With numeric prefix: Send to buffer at index (1-based)  Uses unified backend with smart buffer detection.
+- =enkan-repl-send-5= - Send \\='5\\=' to enkan session buffer for numbered choice prompt. - From enkan buffer: Send to current buffer - From other buffer without prefix: Interactive buffer selection - With numeric prefix: Send to buffer at index (1-based)  Uses unified backend with smart buffer detection.
+- =enkan-repl-send-escape= - Send ESC key to enkan session buffer. - From enkan buffer: Send to current buffer - From other buffer without prefix: Interactive buffer selection - With numeric prefix: Send to buffer at index (1-based)  Uses unified backend with smart buffer detection.
 
 *** Session Control
-- =enkan-repl-start-eat= - Start eat terminal emulator session. Determines directory from current buffer filename if it's a persistent file. Checks for existing sessions to prevent double startup.
-- =enkan-repl-finish-eat= - Terminate eat session and close its buffer. Determines directory from current buffer filename if it's a persistent file.
+- =enkan-repl-start-eat= - Start eat terminal emulator session in current directory. Simplified version for use within setup functions only. FORCE parameter ignored - always starts new session.
+- =enkan-repl-teardown= - Terminate eat session(s) based on context. - Standard input file: terminate single eat session for current directory - Center file: terminate all registered sessions
 - =enkan-repl-setup= - Arrange windows for (the author's) optimal workflow
-- =enkan-repl-list-sessions= - Display a list of active enkan sessions with interactive selection. Users can select a session, then choose action: (s)witch, (d)elete, or (q)uit.
 
 *** Utilities
-- =enkan-repl-recenter-bottom= - Move cursor to bottom of eat buffer for current directory.
-- =enkan-repl-output-template= - Output current template content to a new buffer for customization.
-- =enkan-repl-status= - Show detailed diagnostic information for troubleshooting connection issues.
-- =enkan-repl-toggle-debug-mode= - Toggle debug mode for enkan-repl operations.
-- =enkan-repl-enable-debug-mode= - Enable debug mode for enkan-repl operations.
-- =enkan-repl-disable-debug-mode= - Disable debug mode for enkan-repl operations.
+- =enkan-repl-recenter-bottom= - Recenter all enkan terminal buffers at bottom.
+- =enkan-repl-toggle-global-mode= - Toggle enkan-repl global mode on/off.
 
 ** Configuration
 
