@@ -16,7 +16,7 @@ Returns plist with :valid, :message."
     (list :valid nil :message "Center file path not configured"))
    ((not (stringp file-path))
     (list :valid nil :message "Center file path must be a string"))
-   ((string-empty-p file-path)
+   ((string= "" file-path)
     (list :valid nil :message "Center file path is empty"))
    (t
     (list :valid t :message "Valid center file path"))))
