@@ -1045,7 +1045,7 @@ Category: Command Palette"
     (define-key map (kbd "C-M-e") 'enkan-repl-send-enter)
     (define-key map (kbd "C-M-i") 'enkan-repl-send-line)
     (define-key map (kbd "C-M-<return>") 'enkan-repl-send-region)
-    (define-key map (kbd "C-M-@") 'enkan-repl-center-open-project-directory)
+    (define-key map (kbd "C-M-@") 'enkan-repl-open-project-directory)
     (define-key map (kbd "C-t") 'other-window)
     (define-key map (kbd "C-M-b") 'enkan-repl-recenter-bottom)
     (define-key map (kbd "C-M-s") 'enkan-repl-setup)
@@ -1519,7 +1519,7 @@ Category: Center File Multi-buffer Access"
     (enkan-repl--center-send-unified "" prefix-arg :escape))))
 
 ;;;###autoload
-(defun enkan-repl-center-open-project-directory ()
+(defun enkan-repl-open-project-directory ()
   "Open project directory in dired from current project.
 
 Category: Center File Multi-buffer Access"
