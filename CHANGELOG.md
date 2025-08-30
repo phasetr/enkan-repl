@@ -1,3 +1,10 @@
+# [0.13.0](https://github.com/phasetr/enkan-repl/compare/v0.12.0...v0.13.0) (2025-08-30)
+
+
+### Features
+
+* add keymap refresh call in keybinding example ([8f6fc7e](https://github.com/phasetr/enkan-repl/commit/8f6fc7e31066b3c47d27423f3d7461c32d6d844a))
+
 # [0.12.0](https://github.com/phasetr/enkan-repl/compare/v0.11.0...v0.12.0) (2025-08-30)
 
 
