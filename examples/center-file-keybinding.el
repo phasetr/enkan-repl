@@ -76,8 +76,8 @@
                           description))))
               enkan-center-file-command-definitions)
     ;; Fallback definitions
-    '(("enkan-repl-center-setup" . "Setup center file window layout")
-       ("enkan-repl-center-reset" . "Reset center file layout")))
+    '(("enkan-repl-setup" . "Setup center file window layout")
+       ("enkan-repl-reset" . "Reset center file layout")))
   "Additional commands for center file mode to add to cheat sheet.")
 
 ;;; ========================================
@@ -91,7 +91,7 @@
         ;; Fallback to manual definition
         (let ((map (make-sparse-keymap)))
           ;; Override base keybindings for center file mode
-          (define-key map (kbd "C-x g") 'enkan-repl-center-magit)
+          (define-key map (kbd "C-x g") 'enkan-repl-magit)
           (define-key map (kbd "M-<return>") 'enkan-repl-send-region)
           (define-key map (kbd "C-M-e") 'enkan-repl-send-enter)
           (define-key map (kbd "C-M-i") 'enkan-repl-send-line)

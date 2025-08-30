@@ -8,7 +8,7 @@
 ;;; Commentary:
 
 ;; Test that enkan-repl-project-aliases is properly initialized and cleared
-;; in enkan-repl-center-auto-setup and enkan-repl-teardown.
+;; in enkan-repl-setup and enkan-repl-teardown.
 
 ;;; Code:
 
@@ -24,7 +24,7 @@
     (error "Could not load enkan-repl.el")))
 
 (ert-deftest test-alias-setup-in-auto-setup ()
-  "Test that enkan-repl-center-auto-setup properly sets up aliases."
+  "Test that enkan-repl-setup properly sets up aliases."
   ;; Set global variables directly
   (setq enkan-repl-projects
         '(("test-layout" "er" "pt")))
@@ -44,7 +44,7 @@
     ;; Test that aliases are nil before setup
     (should (null enkan-repl-project-aliases))
     ;; Run auto-setup
-    (enkan-repl-center-auto-setup "test-layout")
+    (enkan-repl-setup "test-layout")
     ;; Verify that aliases are properly set
     (should enkan-repl-project-aliases)
     (should (equal '(("er" . "enkan-repl") ("pt" . "pt-tools"))

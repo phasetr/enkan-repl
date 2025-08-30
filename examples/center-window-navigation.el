@@ -15,33 +15,33 @@
 
 ;;;; Pure Functions for Project Path Resolution
 
-(defun enkan-repl--get-session-project-path-pure (session-number session-list target-directories)
-  "Get project path for SESSION-NUMBER from SESSION-LIST and TARGET-DIRECTORIES.
+(defun enkan-repl--get-session-project-path-pure (session-number session-list project-registry)
+  "Get project path for SESSION-NUMBER from SESSION-LIST and PROJECT-REGISTRY.
 Pure function that returns project path string or nil.
 SESSION-LIST format: ((session-number . project-name) ...)
-TARGET-DIRECTORIES format: ((alias . (project-name . project-path)) ...)"
+PROJECT-REGISTRY format: ((alias . (project-name . project-path)) ...)"
   (let* ((session-project (cdr (assoc session-number session-list)))
          (project-info (when session-project
                          (cl-find-if (lambda (entry)
                                        (string= (car (cdr entry)) session-project))
-                                     target-directories)))
+                                     project-registry)))
          (project-path (when project-info (cdr (cdr project-info)))))
     project-path))
 
-(defun enkan-repl--setup-window-dired-pure (window session-number session-list target-directories)
+(defun enkan-repl--setup-window-dired-pure (window session-number session-list project-registry)
   "Pure function to determine dired setup for WINDOW and SESSION-NUMBER.
 Returns cons (window . project-path) or nil if invalid."
   (let ((project-path (enkan-repl--get-session-project-path-pure
-                       session-number session-list target-directories)))
+                       session-number session-list project-registry)))
     (when (and project-path (file-directory-p (expand-file-name project-path)))
       (cons window project-path))))
 
-(defun enkan-repl--setup-window-eat-buffer-pure (window session-number session-list target-directories)
+(defun enkan-repl--setup-window-eat-buffer-pure (window session-number session-list project-registry)
   "Pure function to determine eat buffer setup for WINDOW and SESSION-NUMBER.
 Returns cons (window . buffer-name) or nil if session not registered."
   (let ((project-name (cdr (assoc session-number session-list))))
     (when project-name
-      (let ((project-path (enkan-repl--get-project-path-from-directories project-name target-directories)))
+      (let ((project-path (enkan-repl--get-project-path-from-registry project-name project-registry)))
         (when project-path
           (let* ((expanded-path (expand-file-name project-path))
                  (buffer-name (format "*enkan:%s*" expanded-path)))
@@ -111,7 +111,7 @@ Category: Utilities"
     (select-window enkan-repl--window-1)
     (find-file enkan-repl-center-file)
     (message "✅ Window 1: Opened center file %s" enkan-repl-center-file))
-  ;; Setup eat buffers in session windows (1, 2 for project order)
+  ;; Setup eat buffers in session windows (1, 2 for multi-project order)
   (when (and (boundp 'enkan-repl-session-list) enkan-repl-session-list)
     (enkan-repl--setup-session-eat-buffer enkan-repl--window-2 1))
   ;; Always select the center file window (Window 1) at the end
@@ -151,7 +151,7 @@ Category: Utilities"
     (select-window enkan-repl--window-1)
     (find-file enkan-repl-center-file)
     (message "✅ Window 1: Opened center file %s" enkan-repl-center-file))
-  ;; Setup eat buffers in session windows (1, 2 for project order)
+  ;; Setup eat buffers in session windows (1, 2 for multi-project order)
   (when (and (boundp 'enkan-repl-session-list) enkan-repl-session-list)
     (enkan-repl--setup-session-eat-buffer enkan-repl--window-2 1)
     (enkan-repl--setup-session-eat-buffer enkan-repl--window-3 2))
@@ -195,7 +195,7 @@ Category: Utilities"
     (select-window enkan-repl--window-1)
     (find-file enkan-repl-center-file)
     (message "✅ Window 1: Opened center file %s" enkan-repl-center-file))
-  ;; Setup eat buffers in session windows (4, 5, 6 in project order)
+  ;; Setup eat buffers in session windows (4, 5, 6 in multi-project order)
   (when (and (boundp 'enkan-repl-session-list) enkan-repl-session-list)
     (enkan-repl--setup-session-eat-buffer enkan-repl--window-2 1)
     (enkan-repl--setup-session-eat-buffer enkan-repl--window-3 2)
@@ -244,7 +244,7 @@ Category: Utilities"
     (select-window enkan-repl--window-1)
     (find-file enkan-repl-center-file)
     (message "✅ Window 1: Opened center file %s" enkan-repl-center-file))
-  ;; Setup eat buffers in session windows (4, 5, 6, 7 in project order)
+  ;; Setup eat buffers in session windows (4, 5, 6, 7 in multi-project order)
   (when (and (boundp 'enkan-repl-session-list) enkan-repl-session-list)
     (enkan-repl--setup-session-eat-buffer enkan-repl--window-2 1)
     (enkan-repl--setup-session-eat-buffer enkan-repl--window-3 2)
@@ -265,7 +265,7 @@ Category: Utilities"
   (interactive)
   (unless (and (boundp 'enkan-repl--current-project)
             enkan-repl--current-project)
-    (error "No current project active. Run enkan-repl-center-auto-setup first"))
+    (error "No current project active. Run enkan-repl-setup first"))
   (let ((alias-list (cdr (assoc enkan-repl--current-project enkan-repl-projects))))
     (unless alias-list
       (error "Project '%s' not found in enkan-repl-projects" enkan-repl--current-project))

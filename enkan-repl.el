@@ -505,12 +505,6 @@ References alias definitions, returns original name if not found."
   (or (cdr (assoc name-or-alias enkan-repl-project-aliases))
       name-or-alias))
 
-(defun enkan-repl--center-resolve-project-name (alias)
-  "Alias resolution for center file functionality.
-Resolves alias to canonical project name from project aliases."
-  (or (cdr (assoc alias enkan-repl-project-aliases))
-      alias))
-
 (defun enkan-repl--get-project-directory-from-directories (alias)
   "Get directory path from project directories.
 Returns: Directory path or nil"
@@ -613,7 +607,7 @@ Uses unified backend with smart buffer detection.
 
 Category: Text Sender"
   (interactive "r\nP")
-  (enkan-repl--center-send-unified
+  (enkan-repl--send-unified
     (buffer-substring-no-properties start end) prefix-arg nil))
 
 ;;;###autoload
@@ -627,7 +621,7 @@ Uses unified backend with smart buffer detection.
 
 Category: Text Sender"
   (interactive "P")
-  (enkan-repl--center-send-unified
+  (enkan-repl--send-unified
     (buffer-substring-no-properties (line-beginning-position) (line-end-position)) prefix-arg nil))
 
 ;;;###autoload
@@ -641,7 +635,7 @@ Uses unified backend with smart buffer detection.
 
 Category: Text Sender"
   (interactive "P")
-  (enkan-repl--center-send-unified "" prefix-arg :enter))
+  (enkan-repl--send-unified "" prefix-arg :enter))
 
 ;;;###autoload
 (defun enkan-repl-send-1 (&optional prefix-arg)
@@ -654,7 +648,7 @@ Uses unified backend with smart buffer detection.
 
 Category: Text Sender"
   (interactive "P")
-  (enkan-repl--center-send-unified "" prefix-arg 1))
+  (enkan-repl--send-unified "" prefix-arg 1))
 
 ;;;###autoload
 (defun enkan-repl-send-2 (&optional prefix-arg)
@@ -667,7 +661,7 @@ Uses unified backend with smart buffer detection.
 
 Category: Text Sender"
   (interactive "P")
-  (enkan-repl--center-send-unified "" prefix-arg 2))
+  (enkan-repl--send-unified "" prefix-arg 2))
 
 ;;;###autoload
 (defun enkan-repl-send-3 (&optional prefix-arg)
@@ -680,7 +674,7 @@ Uses unified backend with smart buffer detection.
 
 Category: Text Sender"
   (interactive "P")
-  (enkan-repl--center-send-unified "" prefix-arg 3))
+  (enkan-repl--send-unified "" prefix-arg 3))
 
 ;;;###autoload
 (defun enkan-repl-send-4 (&optional prefix-arg)
@@ -693,7 +687,7 @@ Uses unified backend with smart buffer detection.
 
 Category: Text Sender"
   (interactive "P")
-  (enkan-repl--center-send-unified "" prefix-arg 4))
+  (enkan-repl--send-unified "" prefix-arg 4))
 
 ;;;###autoload
 (defun enkan-repl-send-5 (&optional prefix-arg)
@@ -706,7 +700,7 @@ Uses unified backend with smart buffer detection.
 
 Category: Text Sender"
   (interactive "P")
-  (enkan-repl--center-send-unified "" prefix-arg 5))
+  (enkan-repl--send-unified "" prefix-arg 5))
 
 ;;;###autoload
 (defun enkan-repl-send-escape (&optional prefix-arg)
@@ -726,7 +720,7 @@ Category: Text Sender"
       (enkan-repl--send-primitive-action (current-buffer) send-data)))
    ;; Otherwise use unified backend
    (t
-    (enkan-repl--center-send-unified "" prefix-arg :escape))))
+    (enkan-repl--send-unified "" prefix-arg :escape))))
 
 ;;;###autoload
 (defun enkan-repl-recenter-bottom ()
@@ -907,7 +901,7 @@ Category: Session Controller"
                   ;; Reset global configuration
                   (enkan-repl--reset-global-session-variables)
                   ;; Auto-disable global center file mode
-                  (when (enkan-repl--disable-center-file-global-mode-if-active)
+                  (when (enkan-repl--disable-global-mode-if-active)
                     (princ "\n🔄 Auto-disabled center file global mode\n"))
                   ;; Display final state
                   (princ "\n🧹 Configuration reset:\n")
@@ -966,21 +960,21 @@ Category: Session Controller"
             (condition-case err
               (progn
                 ;; Log initial state
-                (enkan-repl--center-auto-setup-log-state buffer-name "Current"
+                (enkan-repl--setup-log-state buffer-name "Current"
                   (nth 0 old-state)
                   (nth 1 old-state)
                   (nth 2 old-state))
                 ;; Enable global mode
-                (enkan-repl--center-auto-setup-enable-global-mode buffer-name)
+                (enkan-repl--setup-enable-global-mode buffer-name)
                 ;; Reset configuration
-                (enkan-repl--center-auto-setup-reset-config buffer-name)
+                (enkan-repl--setup-reset-config buffer-name)
                 ;; Set project aliases
                 (let ((alias-list (cdr (assoc project-name enkan-repl-projects))))
                   (unless alias-list
                     (error "Project '%s' not found" project-name))
-                  (enkan-repl--center-auto-setup-set-project-aliases project-name alias-list buffer-name)
+                  (enkan-repl--setup-set-project-aliases project-name alias-list buffer-name)
                   ;; Start sessions
-                  (enkan-repl--center-auto-setup-start-sessions alias-list buffer-name))
+                  (enkan-repl--setup-start-sessions alias-list buffer-name))
                 ;; Set final project configuration
                 (setq enkan-repl--current-project project-name)
                 (princ (format "\n✅ Setup completed for project: %s\n" project-name))
@@ -1034,14 +1028,14 @@ Category: Command Palette"
         (when selected-command
           (call-interactively (intern selected-command)))))))
 
-;;;; Global Minor Mode for Center File Operations
+;;;; Global Minor Mode
 
 ;; Store original keybindings for safe restoration
-(defvar enkan-center-file-global-mode-map
+(defvar enkan-repl-global-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "<escape>") 'enkan-repl-send-escape)
-    (define-key map (kbd "C-c C-f") 'enkan-toggle-center-file-global-mode)
-    (define-key map (kbd "C-x g") 'enkan-repl-center-magit)
+    (define-key map (kbd "C-c C-f") 'enkan-repl-toggle-global-mode)
+    (define-key map (kbd "C-x g") 'enkan-repl-magit)
     (define-key map (kbd "C-M-e") 'enkan-repl-send-enter)
     (define-key map (kbd "C-M-i") 'enkan-repl-send-line)
     (define-key map (kbd "C-M-<return>") 'enkan-repl-send-region)
@@ -1052,29 +1046,26 @@ Category: Command Palette"
     (define-key map (kbd "C-M-t") 'enkan-repl-teardown)
     (define-key map (kbd "C-M-l") 'enkan-repl-setup-current-project-layout)
     map)
-  "Global keymap for center file operations.")
+  "Global keymap for file operations.")
 
-(defvar enkan-center-file-original-keybindings nil
-  "Stores original keybindings before center file mode overrides them.")
-
-(define-minor-mode enkan-center-file-global-mode
-  "Global minor mode for center file operations.
-When enabled, center file keybindings are available across all buffers."
+(define-minor-mode enkan-repl-global-mode
+  "Global minor mode for enkan-repl operations.
+When enabled, some keybindings are available across all buffers."
   :init-value nil
   :global t
   :lighter " ECF"
-  :keymap enkan-center-file-global-mode-map
+  :keymap enkan-repl-global-mode-map
   ;; Do nothing dangerous to global keymap - let minor mode keymap handle it
   ;; This avoids overriding critical keybindings like M-x
-  (message (if enkan-center-file-global-mode
-             "✅ Center file global mode enabled"
-             "❌ Center file global mode disabled")))
+  (message (if enkan-repl-global-mode
+             "✅ global mode enabled"
+             "❌ global mode disabled")))
 
 ;;;###autoload
-(defun enkan-toggle-center-file-global-mode ()
-  "Toggle center file global mode on/off."
+(defun enkan-repl-toggle-global-mode ()
+  "Toggle enkan-repl global mode on/off."
   (interactive)
-  (enkan-center-file-global-mode 'toggle))
+  (enkan-repl-global-mode 'toggle))
 
 ;;;; Auto Setup Functions
 
@@ -1083,10 +1074,6 @@ When enabled, center file keybindings are available across all buffers."
 Return (project-name . project-path) or nil if not found."
   (cdr (assoc alias enkan-repl-target-directories)))
 
-(defun enkan-repl--get-session-project-name (session-number session-list)
-  "Pure function to get project name from session number."
-  (cdr (assoc session-number session-list)))
-
 (defun enkan-repl--get-project-path-from-directories (project-name target-directories)
   "Pure function to get project path from directories by project name."
   (let ((project-info (cl-find-if (lambda (entry)
@@ -1094,95 +1081,6 @@ Return (project-name . project-path) or nil if not found."
                         target-directories)))
     (when project-info
       (cdr (cdr project-info)))))
-
-(defun enkan-repl--get-session-project-paths (session-numbers session-list target-directories)
-  "Pure function to get list of project paths for multiple session numbers.
-Returns: list of (session-number . project-path) for valid paths"
-  (cl-loop for session-number in session-numbers
-    for project-name = (enkan-repl--get-session-project-name session-number session-list)
-    for project-path = (when project-name
-                         (enkan-repl--get-project-path-from-directories project-name target-directories))
-    when project-path
-    collect (cons session-number project-path)))
-
-(defun enkan-repl--setup-project-session (alias)
-  "Setup project session for given ALIAS.
-Implemented as pure function, side effects are handled by upper functions."
-  (let ((project-info (enkan-repl--get-project-info-from-directories alias)))
-    (if project-info
-      (let ((project-name (car project-info))
-             (project-path (cdr project-info)))
-        (cons project-name project-path))
-      (error "Project alias '%s' not found in directories" alias))))
-
-(defun enkan-repl--center-auto-setup-log-state (buffer-name state-type layout sessions counter)
-  "Log current or final state to BUFFER-NAME.
-STATE-TYPE: 'Current' or 'Final'
-PROJECT: current project
-SESSIONS: session list
-COUNTER: session counter"
-  (with-current-buffer buffer-name
-    (princ (format "🔧 %s state %s:\n" state-type (if (string= state-type "Current") "before setup" "after setup")))
-    (princ (format "  Layout (enkan-repl--current-project): %s\n" (or layout "nil")))
-    (princ (format "  Sessions (enkan-repl-session-list): %s\n" (or sessions "nil")))
-    (princ (format "  Counter (enkan-repl--session-counter): %d\n\n" counter))))
-
-(defun enkan-repl--center-auto-setup-enable-global-mode (buffer-name)
-  "Enable global center file mode if not already enabled and log to BUFFER-NAME."
-  (unless enkan-center-file-global-mode
-    (enkan-center-file-global-mode 1)
-    (with-current-buffer buffer-name
-      (princ "🚀 Auto-enabled center file global mode for project workflow\n\n"))))
-
-(defun enkan-repl--center-auto-setup-reset-config (buffer-name)
-  "Reset session configuration and log to BUFFER-NAME."
-  (setq enkan-repl-session-list nil)
-  (setq enkan-repl--session-counter 0)
-  (setq enkan-repl--current-project nil)
-  (with-current-buffer buffer-name
-    (princ "🧹 Reset previous configuration\n\n")))
-
-(defun enkan-repl--center-auto-setup-set-project-aliases (project-name alias-list buffer-name)
-  "Set project aliases from ALIAS-LIST for PROJECT-NAME and log to BUFFER-NAME."
-  (let ((project-aliases '()))
-    (dolist (alias alias-list)
-      (let ((project-info (enkan-repl--get-project-info-from-directories alias)))
-        (when project-info
-          (let ((proj-name (car project-info)))
-            (push (cons alias proj-name) project-aliases)))))
-    (setq enkan-repl-project-aliases (nreverse project-aliases))
-    (with-current-buffer buffer-name
-      (princ (format "🔧 Setup project aliases (enkan-repl-project-aliases): %s\n\n" enkan-repl-project-aliases)))))
-
-(defun enkan-repl--center-auto-setup-start-sessions (alias-list buffer-name)
-  "Start eat sessions for each alias in ALIAS-LIST and log to BUFFER-NAME.
-Includes error handling for individual session failures."
-  (with-current-buffer buffer-name
-    (princ "🚀 Starting eat sessions:\n"))
-  (let ((session-number 1)
-         (success-count 0)
-         (failure-count 0))
-    (dolist (alias alias-list)
-      (condition-case err
-        (let ((project-info (enkan-repl--setup-project-session alias)))
-          (let ((project-name (car project-info))
-                 (project-path (expand-file-name (cdr project-info)))
-                 (default-directory (expand-file-name (cdr project-info))))
-            ;; Register session
-            (enkan-repl--register-session session-number project-name)
-            ;; Start eat session in current directory (force restart if needed)
-            (enkan-repl-start-eat t)
-            (with-current-buffer buffer-name
-              (princ (format "  ✅ Session %d: %s (%s) - SUCCESS\n" session-number alias project-name)))
-            (setq success-count (1+ success-count))))
-        (error
-          (with-current-buffer buffer-name
-            (princ (format "  ❌ Session %d: %s - FAILED (%s)\n" session-number alias (error-message-string err))))
-          (setq failure-count (1+ failure-count))))
-      (setq session-number (1+ session-number)))
-    (with-current-buffer buffer-name
-      (princ (format "\n📊 Session start summary: %d success, %d failed\n\n" success-count failure-count)))))
-
 
 ;;; Helper functions for state management and formatting
 
@@ -1257,12 +1155,12 @@ This function has the side effect of modifying global variables:
   (setq enkan-repl--current-project nil)
   (setq enkan-repl-project-aliases nil))
 
-(defun enkan-repl--disable-center-file-global-mode-if-active ()
-  "Disable `enkan-center-file-global-mode` if it is active.
-This function has the side effect of calling `enkan-center-file-global-mode`.
+(defun enkan-repl--disable-global-mode-if-active ()
+  "Disable `enkan-repl-global-mode` if it is active.
+This function has the side effect of calling `enkan-repl-global-mode`.
 Returns t if mode was disabled, nil otherwise."
-  (when enkan-center-file-global-mode
-    (enkan-center-file-global-mode -1)
+  (when enkan-repl-global-mode
+    (enkan-repl-global-mode -1)
     t))
 
 ;;;###autoload
@@ -1360,8 +1258,8 @@ Returns t on success, nil on failure."
               (eat--send-string eat--process "\r"))
             t))))))
 
-(defun enkan-repl--center-send-unified (text &optional prefix-arg special-key-type)
-  "Unified backend for all center-send commands.
+(defun enkan-repl--send-unified (text &optional prefix-arg special-key-type)
+  "Unified backend for all send commands.
 TEXT: text content to send
 PREFIX-ARG: numeric prefix for buffer selection (optional)
 SPECIAL-KEY-TYPE: :enter, :escape, 1-9, or nil for normal text (optional)
@@ -1380,7 +1278,7 @@ Returns t on success, nil on failure."
           nil)
       ;; Parse alias from text if no special-key-type
       (when (null special-key-type)
-        (setq parsed-command (enkan-repl-center--parse-alias-command-pure text))
+        (setq parsed-command (enkan-repl--parse-alias-command-pure text))
         (when (plist-get parsed-command :valid)
           (setq resolved-alias (plist-get parsed-command :alias))
           (setq final-text (plist-get parsed-command :text))
@@ -1479,7 +1377,7 @@ Returns plist with :valid, :number, :message."
    (t
     (list :valid t :number number :message (format "Valid number: %s" number)))))
 
-(defun enkan-repl--center-send-text-to-buffer (text buffer)
+(defun enkan-repl--send-text-to-buffer (text buffer)
   "Center file specific function to send TEXT to BUFFER.
 Sends text followed by carriage return, with cursor positioning."
   (when (and (bufferp buffer)
@@ -1516,7 +1414,7 @@ Category: Center File Multi-buffer Access"
       (enkan-repl--send-primitive-action (current-buffer) send-data)))
    ;; Otherwise use unified backend
    (t
-    (enkan-repl--center-send-unified "" prefix-arg :escape))))
+    (enkan-repl--send-unified "" prefix-arg :escape))))
 
 ;;;###autoload
 (defun enkan-repl-open-project-directory ()
@@ -1547,10 +1445,8 @@ Category: Center File Multi-buffer Access"
     (message "No project is currently active")))
 
 ;;;###autoload
-
-
-(defun enkan-repl--analyze-center-send-content-pure (content prefix-arg)
-  "Pure function to analyze center-send content and determine action.
+(defun enkan-repl--analyze-send-content-pure (content prefix-arg)
+  "Pure function to analyze send content and determine action.
 CONTENT is the text content to analyze.
 PREFIX-ARG is the numeric prefix argument.
 Returns plist with :action and :data."
@@ -1572,7 +1468,7 @@ Returns plist with :action and :data."
 
 ;; Alias command parsing functions
 
-(defun enkan-repl-center--parse-alias-command-pure (input-string)
+(defun enkan-repl--parse-alias-command-pure (input-string)
   "Pure function to parse alias command format: ':alias esc' or ':alias :ret'.
 INPUT-STRING is the command string to parse.
 Returns plist with :valid, :alias, :command, :text, :message."
@@ -1606,10 +1502,8 @@ Returns plist with :valid, :alias, :command, :text, :message."
    (t
     (list :valid nil :message "Invalid format. Use: :alias [text|esc|:ret]"))))
 
-
-
-;; Pure functions for center file operations (used by enkan-repl-center-open-file)
-(defun enkan-center-file-validate-path-pure (file-path)
+;; Pure functions for global operations
+(defun enkan-repl-validate-path-pure (file-path)
   "Validate center FILE-PATH for opening.
 Returns plist with :valid, :message."
   (cond
@@ -1622,19 +1516,19 @@ Returns plist with :valid, :message."
    (t
     (list :valid t :message "Valid center file path"))))
 
-(defun enkan-center-file-check-exists-pure (file-path)
+(defun enkan-repl-center-file-check-exists-pure (file-path)
   "Check if center FILE-PATH exists.
 Returns plist with :exists, :action."
   (if (file-exists-p file-path)
       (list :exists t :action "open")
     (list :exists nil :action "create")))
 
-(defun enkan-center-file-determine-action-pure (file-path)
+(defun enkan-repl-determine-action-pure (file-path)
   "Determine action to take for center FILE-PATH.
 Returns plist with :valid, :action, :message."
-  (let ((validation (enkan-center-file-validate-path-pure file-path)))
+  (let ((validation (enkan-repl-validate-path-pure file-path)))
     (if (plist-get validation :valid)
-        (let ((exists-check (enkan-center-file-check-exists-pure file-path)))
+        (let ((exists-check (enkan-repl-center-file-check-exists-pure file-path)))
           (list :valid t
                 :action (plist-get exists-check :action)
                 :message (if (plist-get exists-check :exists)
@@ -1642,19 +1536,19 @@ Returns plist with :valid, :action, :message."
                           "Creating new center file")))
       validation)))
 
-(defun enkan-repl-center-open-file ()
+(defun enkan-repl-open-center-file ()
   "Open or create the center file based on enkan-repl-center-file configuration.
 
 Category: Center File Operations"
   (interactive)
-  (let ((result (enkan-center-file-determine-action-pure enkan-repl-center-file)))
+  (let ((result (enkan-repl-determine-action-pure enkan-repl-center-file)))
     (if (plist-get result :valid)
         (progn
           (message "%s" (plist-get result :message))
           (find-file enkan-repl-center-file))
       (error "%s" (plist-get result :message)))))
 
-;; Pure functions for magit project selection (used by enkan-repl-center-magit)
+;; Pure functions for magit project selection (used by enkan-repl-magit)
 (defun enkan-repl--get-magit-project-list-pure (target-directories)
   "Get list of projects for magit selection from TARGET-DIRECTORIES.
 Returns list of (project-name . project-path) pairs."
@@ -1706,7 +1600,7 @@ Returns plist with :project-name, :project-path."
               :project-path (cdr matched-entry))
       (list :project-name nil :project-path nil))))
 
-(defun enkan-repl-center-magit ()
+(defun enkan-repl-magit ()
   "Open magit for selected project from active sessions only.
 
 Category: Center File Operations"
@@ -1737,7 +1631,7 @@ Category: Center File Operations"
 
 
 ;;;###autoload
-(defun enkan-repl-center-print-setup-to-buffer ()
+(defun enkan-repl-print-setup-to-buffer ()
   "Print current setup variables for debugging.
 Displays enkan-repl-projects, enkan-repl-target-directories,
 enkan-repl-project-aliases, and current session state.

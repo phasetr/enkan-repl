@@ -41,10 +41,9 @@
      ("C-M-4" enkan-repl-send-4 "Send 4 to REPL" quick-actions)
      ("C-M-5" enkan-repl-send-5 "Send 5 to REPL" quick-actions)
      ("C-M-b" enkan-repl-recenter-bottom "Recenter at bottom" quick-actions)
-     ;; Center File Multi-buffer Access
-     ("C-t" other-window "Move to other windows" center-file)
+     ("C-t" other-window "Move to other windows" quick-actions)
      ;; Project Management
-     ("C-M-s" enkan-repl-start-eat "Start eat session" project-management)
+     ("C-M-s" enkan-repl-setup "Start eat session" project-management)
      ("C-M-t" enkan-repl-teardown "Finish eat session" project-management)
      ;; Help and Documentation
      ("C-M-c" enkan-repl-cheat-sheet "Enkan cheat sheet" help))
@@ -56,7 +55,6 @@ Each entry is (KEY COMMAND DESCRIPTION CATEGORY).")
      (text-sending . "Text Sending")
      (quick-actions . "Quick Actions")
      (multi-buffer . "Multi-buffer Layout")
-     (center-file . "Center File Multi-buffer Access")
      (project-management . "Project Management")
      (help . "Help and Documentation"))
   "Alist of category symbols to display names.")
@@ -65,16 +63,15 @@ Each entry is (KEY COMMAND DESCRIPTION CATEGORY).")
 ;;; Mode-specific Override Definitions
 ;;; ========================================
 
-
 (defconst enkan-center-file-keybinding-overrides
   '(("<escape>" enkan-repl-send-escape "Send ESC to REPL (center)" quick-actions)
-    ("C-M-e" enkan-repl-center-send-enter "Send enter to REPL (center)" text-sending)
-    ("C-M-i" enkan-repl-center-send-line "Send line for the center file" window-navigation)
-    ("C-M-e" enkan-repl-center-send-enter "Send enter for the center file" quick-actions)
+    ("C-M-e" enkan-repl-send-enter "Send enter to REPL (center)" text-sending)
+    ("C-M-i" enkan-repl-send-line "Send line for the center file" window-navigation)
+    ("C-M-e" enkan-repl-send-enter "Send enter for the center file" quick-actions)
     ("C-M-t" other-window "Switch between center/work/reserve windows" window-navigation)
-    ("C-M-b" enkan-repl-center-recenter-bottom "Recenter at bottom (center)" quick-actions)
-    ("C-M-o" enkan-repl-center-open-file "Recenter at bottom (center)" quick-actions)
-    ("C-M-s" enkan-repl-center-auto-setup "Auto setup sessions using project window configuration" session-management)
+    ("C-M-b" enkan-repl-recenter-bottom "Recenter at bottom (center)" quick-actions)
+    ("C-M-o" enkan-repl-open-center-file "Open the center file" quick-actions)
+    ("C-M-s" enkan-repl-setup "Auto setup sessions using project window configuration" session-management)
     ("C-M-f" enkan-repl-teardown "Terminate all registered center sessions" session-management)
     ("C-c C-f" enkan-toggle-center-file-global-mode "Toggle center file global mode" global-mode))
   "Keybinding overrides for center file multi-buffer mode.
@@ -82,17 +79,13 @@ Each entry is (KEY COMMAND DESCRIPTION CATEGORY).")
 
 (defconst enkan-center-file-command-definitions
   '((enkan-repl-center-setup "Setup center file multi-buffer window layout")
-    (enkan-repl-center-reset "Reset center file multi-buffer layout")
-    (enkan-repl-center-send-enter "Send enter to REPL (center)")
-    (enkan-repl-center-setup-2session-layout "Setup 2-session layout")
-    (enkan-repl-send-escape "Send ESC to REPL (center)")
-    (enkan-repl-center-send-1 "Send 1 to REPL (center)")
-    (enkan-repl-center-send-2 "Send 2 to REPL (center)")
-    (enkan-repl-center-send-line-to-session-1 "Send line to session 1 (center)")
-    (enkan-repl-center-send-line-to-session-2 "Send line to session 2 (center)")
-    (enkan-repl-center-send-region-to-session-1 "Send region to session 1 (center)")
-    (enkan-repl-center-send-region-to-session-2 "Send region to session 2 (center)")
-    (enkan-repl-center-register-current-session "Register current session"))
+     (enkan-repl-center-reset "Reset center file multi-buffer layout")
+     (enkan-repl-send-enter "Send enter to REPL (center)")
+     (enkan-repl-center-setup-2session-layout "Setup 2-session layout")
+     (enkan-repl-send-escape "Send ESC to REPL (center)")
+     (enkan-repl-send-1 "Send 1 to REPL (center)")
+     (enkan-repl-send-2 "Send 2 to REPL (center)")
+     (enkan-repl-center-register-current-session "Register current session"))
   "Command definitions for center file multi-buffer mode.
 Each entry is (COMMAND DESCRIPTION).")
 
