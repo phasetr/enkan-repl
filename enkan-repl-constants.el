@@ -23,7 +23,7 @@
      ("enkan-repl-recenter-bottom" . "Move cursor to bottom of eat buffer for current directory.  Category: Utilities")
      ("enkan-repl-open-project-input-file" . "Open or create project input file for DIRECTORY. If DIRECTORY is nil, use current `default-directory'. If project input file exists, open it directly. If not exists, create from template then open.  Category: Utilities")
      ("enkan-repl-start-eat" . "Start eat terminal emulator session. Determines directory from current buffer filename if it's a persistent file. Checks for existing sessions to prevent double startup.  Category: Session Controller")
-     ("enkan-repl-finish-eat" . "Terminate eat session and close its buffer. Determines directory from current buffer filename if it's a persistent file.  Category: Session Controller")
+     ("enkan-repl-teardown" . "Terminate eat session(s) based on context. Standard input file: terminate single eat session for current directory. Center file: terminate all registered sessions.  Category: Session Controller")
      ("enkan-repl-setup" . "Set up window layout with org file on left and eat on right. This is the author's preference - customize as needed.  Category: Session Controller")
      ("enkan-repl-cheat-sheet" . "Display interactive cheat-sheet for enkan-repl commands.  Category: Command Palette"))
   "Precompiled list of cheat-sheet candidates.

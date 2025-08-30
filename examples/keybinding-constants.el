@@ -41,14 +41,11 @@
      ("C-M-4" enkan-repl-send-4 "Send 4 to REPL" quick-actions)
      ("C-M-5" enkan-repl-send-5 "Send 5 to REPL" quick-actions)
      ("C-M-b" enkan-repl-recenter-bottom "Recenter at bottom" quick-actions)
-     ;; Multi-buffer Layout
-     ("C-c w 2" enkan-repl-center-setup-2session-layout "Setup 2-session layout" multi-buffer)
      ;; Center File Multi-buffer Access
-     ("M-1" enkan-repl-send-line-to-session-1 "Send line to session 1" center-file)
-     ("M-2" enkan-repl-send-line-to-session-2 "Send line to session 2" center-file)
+     ("C-t" other-window "Move to other windows" center-file)
      ;; Project Management
      ("C-M-s" enkan-repl-start-eat "Start eat session" project-management)
-     ("C-M-f" enkan-repl-finish-eat "Finish eat session" project-management)
+     ("C-M-t" enkan-repl-teardown "Finish eat session" project-management)
      ;; Help and Documentation
      ("C-M-c" enkan-repl-cheat-sheet "Enkan cheat sheet" help))
   "Base keybinding definitions for enkan-repl.
@@ -78,7 +75,7 @@ Each entry is (KEY COMMAND DESCRIPTION CATEGORY).")
     ("C-M-b" enkan-repl-center-recenter-bottom "Recenter at bottom (center)" quick-actions)
     ("C-M-o" enkan-repl-center-open-file "Recenter at bottom (center)" quick-actions)
     ("C-M-s" enkan-repl-center-auto-setup "Auto setup sessions using project window configuration" session-management)
-    ("C-M-f" enkan-repl-center-finish-all-sessions "Terminate all registered center sessions" session-management)
+    ("C-M-f" enkan-repl-teardown "Terminate all registered center sessions" session-management)
     ("C-c C-f" enkan-toggle-center-file-global-mode "Toggle center file global mode" global-mode))
   "Keybinding overrides for center file multi-buffer mode.
 Each entry is (KEY COMMAND DESCRIPTION CATEGORY).")

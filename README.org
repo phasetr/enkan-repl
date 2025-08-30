@@ -222,7 +222,7 @@ The generated project file includes template functions and usage instructions.
 
 *** Session Control
 - =enkan-repl-start-eat= - Start eat terminal emulator session. Determines directory from current buffer filename if it's a persistent file. Checks for existing sessions to prevent double startup.
-- =enkan-repl-finish-eat= - Terminate eat session and close its buffer. Determines directory from current buffer filename if it's a persistent file.
+- =enkan-repl-teardown= - Terminate eat session(s) based on context. Standard input file: terminate single eat session for current directory. Center file: terminate all registered sessions.
 - =enkan-repl-setup= - Arrange windows for (the author's) optimal workflow
 
 *** Utilities

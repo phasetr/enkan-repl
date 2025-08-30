@@ -841,26 +841,81 @@ Category: Session Controller"
       (message "Started eat session in: %s" target-dir))))
 
 ;;;###autoload
-(defun enkan-repl-finish-eat ()
-  "Terminate eat session and close its buffer.
-Determines directory from current buffer filename if it's a persistent file.
+(defun enkan-repl-teardown ()
+  "Terminate eat session(s) based on context.
+- Standard input file: terminate single eat session for current directory
+- Center file: terminate all registered sessions
 
 Category: Session Controller"
   (interactive)
-  (let* ((session-info (enkan-repl--get-session-info))
-         (target-dir (nth 0 session-info))
-         (existing-buffer (nth 1 session-info))
-         (can-send (nth 2 session-info)))
-    (cond
-     ;; No session found
-     ((not existing-buffer)
-      (message "No eat session found for directory: %s" target-dir))
-     ;; Active or dead session - terminate
-     (t
-      (when (or (not can-send)
-                (y-or-n-p (format "Terminate eat session in %s? " target-dir)))
-        (kill-buffer existing-buffer)
-        (message "Terminated eat session in: %s" target-dir))))))
+  ;; Check if current buffer filename matches standard input file format
+  (let* ((current-file (buffer-file-name))
+          (is-standard-file (enkan-repl--is-standard-file-path-pure current-file default-directory)))
+    (if is-standard-file
+      ;; Standard input file mode: terminate single session
+      (let* ((session-info (enkan-repl--get-session-info))
+              (target-dir (nth 0 session-info))
+              (existing-buffer (nth 1 session-info))
+              (can-send (nth 2 session-info)))
+        (cond
+          ;; No session found
+          ((not existing-buffer)
+            (message "No eat session found for directory: %s" target-dir))
+          ;; Active or dead session - terminate
+          (t
+            (when (or (not can-send)
+                    (y-or-n-p (format "Terminate eat session in %s? " target-dir)))
+              (kill-buffer existing-buffer)
+              (message "Terminated eat session in: %s" target-dir)))))
+      ;; Center file mode: terminate all sessions
+      (if (enkan-repl--is-center-file-path-pure enkan-repl-center-file enkan-repl-projects)
+        ;; Center file mode implementation
+        (let ((buffer-name "*ENKAN-REPL Finish Sessions*"))
+          (if (null enkan-repl-session-list)
+            (message "No registered sessions to terminate")
+            (with-output-to-temp-buffer buffer-name
+              (princ "=== ENKAN-REPL FINISH ALL SESSIONS ===\n\n")
+              ;; Display current state before termination
+              (princ "🔧 Current state before termination:\n")
+              (princ (enkan-repl--format-session-state-display
+                       (enkan-repl--get-current-session-state-info)))
+              (princ "\n")
+              (let ((terminated-count 0)
+                     (original-session-list enkan-repl-session-list)) ; Capture for y-or-n-p
+                (when (y-or-n-p (format "Terminate all %d registered sessions? "
+                                  (length original-session-list)))
+                  (princ "🚫 Terminating sessions:\n")
+                  ;; Terminate all session buffers
+                  (let* ((termination-result (enkan-repl--terminate-all-session-buffers
+                                               original-session-list
+                                               enkan-repl-target-directories))
+                          (actual-terminated-count (car termination-result))
+                          (session-termination-details (cdr termination-result)))
+                    (setq terminated-count actual-terminated-count)
+                    ;; Display termination results
+                    (dolist (detail session-termination-details)
+                      (let ((session-number (cdr (assoc :session-number detail)))
+                             (project-name (cdr (assoc :project-name detail)))
+                             (status (cdr (assoc :status detail))))
+                        (cond
+                          ((eq status 'terminated)
+                            (princ (format "  ✅ Session %d: %s (terminated)\n" session-number project-name)))
+                          ((eq status 'buffer-not-found)
+                            (princ (format "  ⚠️ Session %d: %s (buffer not found)\n" session-number project-name)))
+                          ((eq status 'project-path-not-found)
+                            (princ (format "  ❌ Session %d: %s (project path not found)\n" session-number project-name)))))))
+                  ;; Reset global configuration
+                  (enkan-repl--reset-global-session-variables)
+                  ;; Auto-disable global center file mode
+                  (when (enkan-repl--disable-center-file-global-mode-if-active)
+                    (princ "\n🔄 Auto-disabled center file global mode\n"))
+                  ;; Display final state
+                  (princ "\n🧹 Configuration reset:\n")
+                  (princ (enkan-repl--format-session-state-display
+                           (enkan-repl--get-current-session-state-info)))
+                  (princ (format "\n✅ Terminated %d sessions, cleared session list and reset project configuration.\n" terminated-count))
+                  (princ "\n=== END FINISH SESSIONS ===\n"))))))
+        (message "Not in standard file or center file mode")))))
 
 (defun enkan-repl--is-standard-file-path-pure (file-path directory-name)
   "Decide the standard input file or not."
@@ -991,10 +1046,10 @@ Category: Command Palette"
     (define-key map (kbd "C-M-i") 'enkan-repl-send-line)
     (define-key map (kbd "C-M-<return>") 'enkan-repl-send-region)
     (define-key map (kbd "C-M-@") 'enkan-repl-center-open-project-directory)
-    (define-key map (kbd "C-M-t") 'other-window)
+    (define-key map (kbd "C-t") 'other-window)
     (define-key map (kbd "C-M-b") 'enkan-repl-recenter-bottom)
     (define-key map (kbd "C-M-s") 'enkan-repl-setup)
-    (define-key map (kbd "C-M-f") 'enkan-repl-center-finish-all-sessions)
+    (define-key map (kbd "C-M-t") 'enkan-repl-teardown)
     (define-key map (kbd "C-M-l") 'enkan-repl-setup-current-project-layout)
     map)
   "Global keymap for center file operations.")
@@ -1209,59 +1264,6 @@ Returns t if mode was disabled, nil otherwise."
   (when enkan-center-file-global-mode
     (enkan-center-file-global-mode -1)
     t))
-
-
-(defun enkan-repl-center-finish-all-sessions ()
-  "Terminate all registered center file sessions.
-This function orchestrates session termination, state reset, and output display.
-
-Category: Center File Multi-buffer Access"
-  (interactive)
-  (let ((buffer-name "*ENKAN-REPL Finish Sessions*"))
-    (if (null enkan-repl-session-list)
-      (message "No registered sessions to terminate")
-      (with-output-to-temp-buffer buffer-name
-        (princ "=== ENKAN-REPL FINISH ALL SESSIONS ===\n\n")
-        ;; Display current state before termination
-        (princ "🔧 Current state before termination:\n")
-        (princ (enkan-repl--format-session-state-display
-                 (enkan-repl--get-current-session-state-info)))
-        (princ "\n")
-        (let ((terminated-count 0)
-               (original-session-list enkan-repl-session-list)) ; Capture for y-or-n-p
-          (when (y-or-n-p (format "Terminate all %d registered sessions? "
-                            (length original-session-list)))
-            (princ "🚫 Terminating sessions:\n")
-            ;; Terminate all session buffers
-            (let* ((termination-result (enkan-repl--terminate-all-session-buffers
-                                         original-session-list
-                                         enkan-repl-target-directories))
-                    (actual-terminated-count (car termination-result))
-                    (session-termination-details (cdr termination-result)))
-              (setq terminated-count actual-terminated-count)
-              ;; Display termination results
-              (dolist (detail session-termination-details)
-                (let ((session-number (cdr (assoc :session-number detail)))
-                       (project-name (cdr (assoc :project-name detail)))
-                       (status (cdr (assoc :status detail))))
-                  (cond
-                    ((eq status 'terminated)
-                      (princ (format "  ✅ Session %d: %s (terminated)\n" session-number project-name)))
-                    ((eq status 'buffer-not-found)
-                      (princ (format "  ⚠️ Session %d: %s (buffer not found)\n" session-number project-name)))
-                    ((eq status 'project-path-not-found)
-                      (princ (format "  ❌ Session %d: %s (project path not found)\n" session-number project-name)))))))
-            ;; Reset global configuration
-            (enkan-repl--reset-global-session-variables)
-            ;; Auto-disable global center file mode
-            (when (enkan-repl--disable-center-file-global-mode-if-active)
-              (princ "\n🔄 Auto-disabled center file global mode\n"))
-            ;; Display final state
-            (princ "\n🧹 Configuration reset:\n")
-            (princ (enkan-repl--format-session-state-display
-                     (enkan-repl--get-current-session-state-info)))
-            (princ (format "\n✅ Terminated %d sessions, cleared session list and reset project configuration.\n" terminated-count))
-            (princ "\n=== END FINISH SESSIONS ===\n")))))))
 
 ;;;###autoload
 (defun enkan-repl--get-buffer-process-info-pure (buffer)
