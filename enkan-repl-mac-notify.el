@@ -81,7 +81,7 @@ This is a pure function for testing."
   (and (eq sys-type 'darwin)
        enabled-p
        (stringp file-path)
-       (not (string-empty-p file-path))))
+       (not (string= "" file-path))))
 
 (defun enkan-repl--should-show-notification-p (sys-type enabled-p)
   "Check if notification should be shown based on SYS-TYPE and ENABLED-P.
