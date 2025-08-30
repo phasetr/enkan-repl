@@ -67,7 +67,7 @@ Each entry is (KEY COMMAND DESCRIPTION CATEGORY).")
 
 
 (defconst enkan-center-file-keybinding-overrides
-  '(("<escape>" enkan-repl-center-send-escape "Send ESC to REPL (center)" quick-actions)
+  '(("<escape>" enkan-repl-send-escape "Send ESC to REPL (center)" quick-actions)
     ("C-M-e" enkan-repl-center-send-enter "Send enter to REPL (center)" text-sending)
     ("C-M-i" enkan-repl-center-send-line "Send line for the center file" window-navigation)
     ("C-M-e" enkan-repl-center-send-enter "Send enter for the center file" quick-actions)
@@ -85,7 +85,7 @@ Each entry is (KEY COMMAND DESCRIPTION CATEGORY).")
     (enkan-repl-center-reset "Reset center file multi-buffer layout")
     (enkan-repl-center-send-enter "Send enter to REPL (center)")
     (enkan-repl-center-setup-2session-layout "Setup 2-session layout")
-    (enkan-repl-center-send-escape "Send ESC to REPL (center)")
+    (enkan-repl-send-escape "Send ESC to REPL (center)")
     (enkan-repl-center-send-1 "Send 1 to REPL (center)")
     (enkan-repl-center-send-2 "Send 2 to REPL (center)")
     (enkan-repl-center-send-line-to-session-1 "Send line to session 1 (center)")

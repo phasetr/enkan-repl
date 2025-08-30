@@ -1039,7 +1039,7 @@ Category: Command Palette"
 ;; Store original keybindings for safe restoration
 (defvar enkan-center-file-global-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "<escape>") 'enkan-repl-center-send-escape)
+    (define-key map (kbd "<escape>") 'enkan-repl-send-escape)
     (define-key map (kbd "C-c C-f") 'enkan-toggle-center-file-global-mode)
     (define-key map (kbd "C-x g") 'enkan-repl-center-magit)
     (define-key map (kbd "C-M-e") 'enkan-repl-send-enter)
@@ -1501,7 +1501,7 @@ Sends text followed by carriage return, with cursor positioning."
       t)))
 
 ;;;###autoload
-(defun enkan-repl-center-send-escape (&optional prefix-arg)
+(defun enkan-repl-send-escape (&optional prefix-arg)
   "Send ESC key to eat session buffer from center file or current enkan buffer.
 - If called from enkan buffer: Send ESC to current buffer
 - If called from center file without prefix: Select from available enkan buffers
