@@ -65,8 +65,10 @@
             (should (= (length functions) 1))
             (let ((func (car functions)))
               (should (string= (plist-get func :name) "test-multiline"))
-              (should (string-match "First line.*Second line.*Third line" 
-                                   (plist-get func :docstring)))
+              (let ((docstring (plist-get func :docstring)))
+                (should (string-match-p "First line" docstring))
+                (should (string-match-p "Second line" docstring))
+                (should (string-match-p "Third line" docstring)))
               (should (plist-get func :interactive)))))
       (when (file-exists-p test-file)
         (delete-file test-file)))))
