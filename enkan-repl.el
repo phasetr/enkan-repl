@@ -499,13 +499,6 @@ Example: \\='*enkan:/path/to/pt-tools/*\\=' -> \\='pt-tools\\='"
                 buffer-name-or-path)))
     (file-name-nondirectory (directory-file-name path))))
 
-(defun enkan-repl--resolve-project-name (name-or-alias)
-  "Resolve project name or alias to canonical project name.
-References alias definitions, returns original name if not found."
-  (or (cdr (assoc name-or-alias enkan-repl-project-aliases))
-      name-or-alias))
-
-
 (defun enkan-repl--register-session (session-number project-name)
   "Register project to session number.
 Order is maintained by session number (ascending)."
@@ -847,7 +840,11 @@ Category: Session Controller"
                 ;; Display current state before termination
                 (princ "🔧 Current state before termination:\n")
                 (princ (enkan-repl--format-session-state-display
-                        (enkan-repl--get-current-session-state-info)))
+                        (enkan-repl--get-current-session-state-info 
+                         enkan-repl--current-project
+                         enkan-repl-session-list
+                         enkan-repl--session-counter
+                         enkan-repl-project-aliases)))
                 (princ "\n")
                 (let ((terminated-count 0)
                       (original-session-list enkan-repl-session-list)) ; Capture for y-or-n-p
@@ -881,7 +878,11 @@ Category: Session Controller"
                     ;; Display final state
                     (princ "\n🧹 Configuration reset:\n")
                     (princ (enkan-repl--format-session-state-display
-                            (enkan-repl--get-current-session-state-info)))
+                            (enkan-repl--get-current-session-state-info
+                             enkan-repl--current-project
+                             enkan-repl-session-list
+                             enkan-repl--session-counter
+                             enkan-repl-project-aliases)))
                     (princ (format "\n✅ Terminated %d sessions, cleared session list and reset project configuration.\n" terminated-count))
                     (princ "\n=== END FINISH SESSIONS ===\n"))))))
         (message "Not in standard file or center file mode")))))
@@ -931,7 +932,7 @@ COUNTER: session counter"
   "Set project aliases from ALIAS-LIST for PROJECT-NAME and log to BUFFER-NAME."
   (let ((project-aliases '()))
     (dolist (alias alias-list)
-      (let ((project-info (enkan-repl--get-project-info-from-directories alias)))
+      (let ((project-info (enkan-repl--get-project-info-from-directories alias enkan-repl-target-directories)))
         (when project-info
           (let ((proj-name (car project-info)))
             (push (cons alias proj-name) project-aliases)))))
@@ -971,7 +972,7 @@ Includes error handling for individual session failures."
 (defun enkan-repl--setup-project-session (alias)
   "Setup project session for given ALIAS.
 Implemented as pure function, side effects are handled by upper functions."
-  (let ((project-info (enkan-repl--get-project-info-from-directories alias)))
+  (let ((project-info (enkan-repl--get-project-info-from-directories alias enkan-repl-target-directories)))
     (if project-info
         (let ((project-name (car project-info))
               (project-path (cdr project-info)))
@@ -1135,10 +1136,10 @@ When enabled, some keybindings are available across all buffers."
 
 ;;;; Auto Setup Functions
 
-(defun enkan-repl--get-project-info-from-directories (alias)
-  "Get project info from directories for ALIAS.
+(defun enkan-repl--get-project-info-from-directories (alias target-directories)
+  "Get project info from directories for ALIAS in TARGET-DIRECTORIES.
 Return (project-name . project-path) or nil if not found."
-  (cdr (assoc alias enkan-repl-target-directories)))
+  (cdr (assoc alias target-directories)))
 
 (defun enkan-repl--get-project-path-from-directories (project-name target-directories)
   "Pure function to get project path from directories by project name."
@@ -1150,14 +1151,18 @@ Return (project-name . project-path) or nil if not found."
 
 ;;; Helper functions for state management and formatting
 
-(defun enkan-repl--get-current-session-state-info ()
-  "Retrieve current session state information as an alist.
+(defun enkan-repl--get-current-session-state-info (current-project session-list session-counter project-aliases)
+  "Retrieve session state information as an alist.
+CURRENT-PROJECT is the current project list.
+SESSION-LIST is the list of sessions.
+SESSION-COUNTER is the session counter value.
+PROJECT-ALIASES is the list of project aliases.
 This is a pure function."
   (list
-   (cons 'current-project enkan-repl--current-project)
-   (cons 'session-list enkan-repl-session-list)
-   (cons 'session-counter enkan-repl--session-counter)
-   (cons 'project-aliases enkan-repl-project-aliases)))
+   (cons 'current-project current-project)
+   (cons 'session-list session-list)
+   (cons 'session-counter session-counter)
+   (cons 'project-aliases project-aliases)))
 
 (defun enkan-repl--format-session-state-display (state-info &optional prefix)
   "Format session state information for display.
@@ -1493,7 +1498,7 @@ Category: Center File Multi-buffer Access"
             (progn
               ;; Build choices list with alias and directory
               (dolist (alias current-project)
-                (let ((project-info (enkan-repl--get-project-info-from-directories alias)))
+                (let ((project-info (enkan-repl--get-project-info-from-directories alias enkan-repl-target-directories)))
                   (when project-info
                     (let ((project-name (car project-info))
                           (project-path (cdr project-info)))
@@ -1692,7 +1697,6 @@ Category: Center File Operations"
                         (message "Opened magit for project: %s" project-path))
                     (error "Invalid project path: %s" (plist-get validation :message))))
               (error "Failed to extract project path from buffer: %s" (buffer-name selected-buffer)))))))))
-
 
 ;;;###autoload
 (defun enkan-repl-print-setup-to-buffer ()
