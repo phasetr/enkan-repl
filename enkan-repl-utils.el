@@ -4,7 +4,7 @@
 
 ;; Author: [phasetr] <phasetr@gmail.com>
 ;; Keywords: tools
-;; Package-Requires: ((emacs "28.1") (cl-lib "0.5"))
+;; Package-Requires: ((emacs "28.2") (cl-lib "0.5"))
 
 ;; This file is not part of GNU Emacs.
 

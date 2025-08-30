@@ -39,7 +39,7 @@ This project uses [Conventional Commits](https://www.conventionalcommits.org/) f
 
 ```bash
 feat: add interactive template error handling
-fix: resolve newline handling issues on macOS
+んfix: resolve newline handling issues on macOS
 docs: update README with installation instructions
 refactor: improve code formatting and structure
 test: add comprehensive error handling tests
