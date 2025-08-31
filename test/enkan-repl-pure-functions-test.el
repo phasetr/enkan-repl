@@ -29,6 +29,71 @@
     ;; Test with nil directories
     (should (null (enkan-repl--get-project-info-from-directories "proj1" nil)))))
 
+;; Tests for enkan-repl--resolve-send-target
+(ert-deftest test-enkan-repl--resolve-send-target ()
+  "Test resolving send target with prefix-arg and alias."
+  ;; Test with no current project and no buffers
+  (let ((result (enkan-repl--resolve-send-target
+                 nil nil nil nil nil)))
+    (should (equal (plist-get result :status) 'no-buffers))
+    (should (string-match-p "No active enkan sessions" (plist-get result :message))))
+  
+  ;; Test with prefix-arg resolving to buffer
+  (let* ((buffer1 (get-buffer-create "*enkan:/path/1*"))
+         (buffer2 (get-buffer-create "*enkan:/path/2*"))
+         (result (enkan-repl--resolve-send-target
+                  1 nil "test-project"
+                  '(("test-project" . ("alias1" "alias2")))
+                  '(("alias1" "Project One" . "/path/1")
+                    ("alias2" "Project Two" . "/path/2")))))
+    (should (equal (plist-get result :status) 'selected))
+    (should (equal (plist-get result :buffer) buffer1))
+    (kill-buffer buffer1)
+    (kill-buffer buffer2))
+  
+  ;; Test with alias resolving to buffer
+  (let* ((buffer1 (get-buffer-create "*enkan:/path/to/proj1*"))
+         (result (enkan-repl--resolve-send-target
+                  nil "alias1" "test-project" 
+                  '(("test-project" . ("alias1")))
+                  '(("alias1" "Project One" . "/path/to/proj1")))))
+    (should (equal (plist-get result :status) 'selected))
+    (should (equal (plist-get result :buffer) buffer1))
+    (kill-buffer buffer1))
+  
+  ;; Test with alias not found (but buffer exists for other aliases)
+  (let* ((buffer1 (get-buffer-create "*enkan:/path/to/proj1*"))
+         (result (enkan-repl--resolve-send-target
+                  nil "nonexistent" "test-project"
+                  '(("test-project" . ("alias1")))
+                  '(("alias1" "Project One" . "/path/to/proj1")))))
+    (should (equal (plist-get result :status) 'invalid))
+    (should (string-match-p "No buffer found for alias" (plist-get result :message)))
+    (kill-buffer buffer1))
+  
+  ;; Test with single buffer auto-selection
+  (let* ((buffer1 (get-buffer-create "*enkan:/single/path*"))
+         (result (enkan-repl--resolve-send-target
+                  nil nil "test-project"
+                  '(("test-project" . ("alias1")))
+                  '(("alias1" "Project One" . "/single/path")))))
+    (should (equal (plist-get result :status) 'single))
+    (should (equal (plist-get result :buffer) buffer1))
+    (kill-buffer buffer1))
+  
+  ;; Test requiring interactive selection
+  (let* ((buffer1 (get-buffer-create "*enkan:/path/1*"))
+         (buffer2 (get-buffer-create "*enkan:/path/2*"))
+         (result (enkan-repl--resolve-send-target
+                  nil nil "test-project"
+                  '(("test-project" . ("alias1" "alias2")))
+                  '(("alias1" "Project One" . "/path/1")
+                    ("alias2" "Project Two" . "/path/2")))))
+    (should (equal (plist-get result :status) 'needs-selection))
+    (should (equal (length (plist-get result :buffers)) 2))
+    (kill-buffer buffer1)
+    (kill-buffer buffer2)))
+
 ;; Tests for enkan-repl--target-directory-info
 (ert-deftest test-enkan-repl--target-directory-info ()
   "Test unified project selection handling."
