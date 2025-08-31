@@ -1743,56 +1743,6 @@ Category: Center File Operations"
       (error "%s" (plist-get result :message)))))
 
 ;; Pure functions for magit project selection (used by enkan-repl-magit)
-(defun enkan-repl--get-magit-project-list-pure (target-directories)
-  "Get list of projects for magit selection from TARGET-DIRECTORIES.
-Returns list of (project-name . project-path) pairs."
-  (unless target-directories
-    (error "Project directories is empty"))
-  (mapcar (lambda (entry)
-            (let ((project-name (car entry))
-                  (project-path (if (stringp (cdr entry))
-                                    (cdr entry)
-                                  ;; Handle nested cons structure
-                                  (if (consp (cdr entry))
-                                      (cdr (cdr entry))
-                                    (cdr entry)))))
-              (cons project-name (expand-file-name project-path))))
-          target-directories))
-
-(defun enkan-repl--validate-magit-project-path-pure (project-path)
-  "Validate PROJECT-PATH for magit operation.
-Returns plist with :valid, :message."
-  (cond
-   ((null project-path)
-    (list :valid nil :message "Project path is null"))
-   ((not (stringp project-path))
-    (list :valid nil :message "Project path must be a string"))
-   ((not (file-directory-p project-path))
-    (list :valid nil :message "Project path does not exist or is not a directory"))
-   (t
-    (list :valid t :message "Valid project path"))))
-
-(defun enkan-repl--create-magit-completion-list-pure (project-list)
-  "Create completion list for magit project selection from PROJECT-LIST.
-Returns list of strings for selection interface."
-  (unless project-list
-    (error "Project list is empty"))
-  (mapcar (lambda (entry)
-            (format "%s (%s)" (car entry) (cdr entry)))
-          project-list))
-
-(defun enkan-repl--parse-selected-magit-project-pure (selected-string project-list)
-  "Parse SELECTED-STRING to get project info from PROJECT-LIST.
-Returns plist with :project-name, :project-path."
-  (let ((matched-entry (cl-find-if
-                        (lambda (entry)
-                          (string= selected-string
-                                   (format "%s (%s)" (car entry) (cdr entry))))
-                        project-list)))
-    (if matched-entry
-        (list :project-name (car matched-entry)
-              :project-path (cdr matched-entry))
-      (list :project-name nil :project-path nil))))
 
 (defun enkan-repl-magit ()
   "Open magit for selected project from enkan-repl-projects.
