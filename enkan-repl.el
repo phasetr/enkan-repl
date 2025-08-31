@@ -1171,55 +1171,51 @@ TARGET-DIRECTORIES: directory configuration
 Returns a plist with :status and other keys."
   (let* ((project-paths (when current-project
                           (enkan-repl--get-project-paths-for-current
-                           current-project projects target-directories)))
-         (available-buffers (if project-paths
-                               ;; Get buffers from project paths
-                               (cl-loop for (alias . path) in project-paths
-                                        for buffer-name = (format "*enkan:%s*" (expand-file-name path))
-                                        for buffer = (get-buffer buffer-name)
-                                        when buffer
-                                        collect buffer)
-                             ;; Fallback to original method
-                             (enkan-repl--get-available-buffers-pure (buffer-list))))
-         (target-buffer nil))
-    ;; Early return if no available buffers
-    (if (null available-buffers)
+                            current-project projects target-directories)))
+          ;; Helper function to convert path to buffer
+          (path-to-buffer (lambda (path)
+                            (get-buffer (format "*enkan:%s*" (expand-file-name path)))))
+          ;; Helper function to check if buffer exists
+          (get-active-buffers (lambda (paths)
+                                (cl-loop for (alias . path) in paths
+                                  for buffer = (funcall path-to-buffer path)
+                                  when buffer
+                                  collect (cons alias buffer)))))
+    ;; Check if we have active buffers
+    (let ((active-pairs (if project-paths
+                          (funcall get-active-buffers project-paths)
+                          ;; Fallback to all available buffers
+                          (cl-loop for buffer in (enkan-repl--get-available-buffers-pure (buffer-list))
+                            collect (cons nil buffer)))))
+      (if (null active-pairs)
         (list :status 'no-buffers
-              :message "No active enkan sessions found. Start one with M-x enkan-repl-start-eat")
-      ;; Resolve target buffer based on prefix-arg or alias
-      (cond
-       ;; Priority 1: prefix-arg based selection
-       ((and prefix-arg (numberp prefix-arg) (> prefix-arg 0))
-        (if (<= prefix-arg (length available-buffers))
-            (list :status 'selected
-                  :buffer (nth (1- prefix-arg) available-buffers))
-          (list :status 'invalid
-                :message (format "Invalid prefix arg: %d (only %d buffers available)"
-                                prefix-arg (length available-buffers)))))
-       ;; Priority 2: alias based selection
-       ((and resolved-alias (stringp resolved-alias) (not (string= "" resolved-alias)))
-        ;; Find buffer matching the alias
-        (let ((matching-buffer
-               (cl-find-if (lambda (buffer)
-                             (let ((buffer-name (buffer-name buffer)))
-                               ;; Check if buffer name contains the alias path
-                               (when-let ((path-info (assoc resolved-alias target-directories)))
-                                 (let ((expected-path (expand-file-name (cdr (cdr path-info)))))
-                                   (string= buffer-name (format "*enkan:%s*" expected-path))))))
-                           available-buffers)))
-          (if matching-buffer
+          :message "No active enkan sessions found. Start one with M-x enkan-repl-start-eat")
+        ;; Resolve based on prefix-arg or alias
+        (cond
+          ;; Priority 1: prefix-arg based selection
+          ((and prefix-arg (numberp prefix-arg) (> prefix-arg 0))
+            (if (<= prefix-arg (length active-pairs))
               (list :status 'selected
-                    :buffer matching-buffer)
-            (list :status 'invalid
+                :buffer (cdr (nth (1- prefix-arg) active-pairs)))
+              (list :status 'invalid
+                :message (format "Invalid prefix arg: %d (only %d buffers available)"
+                           prefix-arg (length active-pairs)))))
+          ;; Priority 2: alias based selection
+          ((and resolved-alias (stringp resolved-alias) (not (string= "" resolved-alias)))
+            (let ((matching-pair (assoc resolved-alias active-pairs)))
+              (if matching-pair
+                (list :status 'selected
+                  :buffer (cdr matching-pair))
+                (list :status 'invalid
                   :message (format "No buffer found for alias '%s'" resolved-alias)))))
-       ;; Priority 3: auto-select if single buffer
-       ((= 1 (length available-buffers))
-        (list :status 'single
-              :buffer (car available-buffers)))
-       ;; Priority 4: multiple buffers - need interactive selection
-       (t
-        (list :status 'needs-selection
-              :buffers available-buffers))))))
+         ;; Priority 3: auto-select if single buffer
+          ((= 1 (length active-pairs))
+            (list :status 'single
+              :buffer (cdr (car active-pairs))))
+          ;; Priority 4: multiple buffers - need interactive selection
+          (t
+            (list :status 'needs-selection
+              :buffers (mapcar #'cdr active-pairs))))))))
 
 (defun enkan-repl--select-project (project-paths current-project prompt action-fn validation-fn)
   "Handle project selection based on PROJECT-PATHS.
@@ -1474,8 +1470,8 @@ SPECIAL-KEY-TYPE: :enter, :escape, 1-9, or nil for normal text (optional)
 Resolution priority: prefix-arg → alias parsing → interactive selection
 Returns t on success, nil on failure."
   (let* ((parsed-command nil)
-         (resolved-alias nil)
-         (final-text text))
+          (resolved-alias nil)
+          (final-text text))
     ;; Parse alias from text if no special-key-type
     (when (null special-key-type)
       (setq parsed-command (enkan-repl--parse-alias-command-pure text))
@@ -1485,41 +1481,42 @@ Returns t on success, nil on failure."
         ;; Handle special commands within alias
         (let ((command (plist-get parsed-command :command)))
           (cond
-           ((eq command :esc)
-            (setq special-key-type :escape)
-            (setq final-text ""))
-           ((eq command :ret)
-            (setq special-key-type :enter)
-            (setq final-text ""))
-           ((and (stringp command) (string-match-p "^[1-9]$" command))
-            (setq special-key-type (string-to-number command))
-            (setq final-text ""))))))
+            ((eq command :esc)
+              (setq special-key-type :escape)
+              (setq final-text ""))
+            ((eq command :ret)
+              (setq special-key-type :enter)
+              (setq final-text ""))
+            ((and (stringp command) (string-match-p "^[1-9]$" command))
+              (setq special-key-type (string-to-number command))
+              (setq final-text ""))))))
     ;; Resolve target buffer using new unified function
     (let* ((resolution (enkan-repl--resolve-send-target
-                        prefix-arg resolved-alias
-                        enkan-repl--current-project
-                        enkan-repl-projects
-                        enkan-repl-target-directories))
-           (status (plist-get resolution :status))
-           (target-buffer nil))
+                         prefix-arg
+                         resolved-alias
+                         enkan-repl--current-project
+                         enkan-repl-projects
+                         enkan-repl-target-directories))
+            (status (plist-get resolution :status))
+            (target-buffer nil))
       (pcase status
         ('no-buffers
-         (message (plist-get resolution :message))
-         nil)
+          (message (plist-get resolution :message))
+          nil)
         ('invalid
-         (message (plist-get resolution :message))
-         nil)
+          (message (plist-get resolution :message))
+          nil)
         ((or 'selected 'single)
-         (setq target-buffer (plist-get resolution :buffer)))
+          (setq target-buffer (plist-get resolution :buffer)))
         ('needs-selection
-         (let* ((available-buffers (plist-get resolution :buffers))
-                (choices (enkan-repl--build-buffer-selection-choices-pure available-buffers))
-                (selection (hmenu "Select buffer for send:" choices)))
-           (setq target-buffer (cdr (assoc selection choices))))))
+          (let* ((available-buffers (plist-get resolution :buffers))
+                  (choices (enkan-repl--build-buffer-selection-choices-pure available-buffers))
+                  (selection (hmenu "Select buffer for send:" choices)))
+            (setq target-buffer (cdr (assoc selection choices))))))
       ;; Execute send
       (when target-buffer
         (let* ((send-data (enkan-repl--send-primitive-pure final-text special-key-type))
-               (success (enkan-repl--send-primitive-action target-buffer send-data)))
+                (success (enkan-repl--send-primitive-action target-buffer send-data)))
           (when success
             (message "Sent to buffer: %s" (buffer-name target-buffer)))
           success)))))
