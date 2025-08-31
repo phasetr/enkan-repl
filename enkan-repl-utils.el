@@ -379,6 +379,26 @@ Returns formatted string."
    sessions
    "\n"))
 
+;;;; Path encode/decode helpers (pure)
+
+(defun enkan-repl-utils--encode-full-path (path prefix separator)
+  "Encode PATH with PREFIX and SEPARATOR (pure).
+Returns string like PREFIX + PATH with '/' replaced by SEPARATOR.
+Example: PATH '/Users/proj', PREFIX 'enkan', SEP '--' -> 'enkan--Users--proj'"
+  (let* ((expanded-path (expand-file-name path))
+         (cleaned-path (if (string-suffix-p "/" expanded-path)
+                           (substring expanded-path 0 -1)
+                         expanded-path)))
+    (concat prefix (replace-regexp-in-string "/" separator cleaned-path)))
+
+(defun enkan-repl-utils--decode-full-path (encoded-name prefix separator)
+  "Decode ENCODED-NAME using PREFIX and SEPARATOR (pure).
+Returns normalized directory path ending with '/'.
+Example: 'enkan--Users--proj' -> '/Users/proj/'"
+  (when (string-prefix-p prefix encoded-name)
+    (let ((path-part (substring encoded-name (length prefix))))
+      (concat (replace-regexp-in-string (regexp-quote separator) "/" path-part) "/"))))
+
 (provide 'enkan-repl-utils)
 
 ;;; enkan-repl-utils.el ends here

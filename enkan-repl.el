@@ -69,6 +69,8 @@
 (declare-function enkan-repl--find-session-buffer-pure "enkan-repl-utils" (selected-name buffer-info-list))
 (declare-function enkan-repl--collect-sessions-pure "enkan-repl-utils" (buffer-info-list))
 (declare-function enkan-repl--format-numbered-sessions-pure "enkan-repl-utils" (sessions))
+(declare-function enkan-repl-utils--encode-full-path "enkan-repl-utils" (path prefix separator))
+(declare-function enkan-repl-utils--decode-full-path "enkan-repl-utils" (encoded-name prefix separator))
 
 ;; Declare external functions to avoid byte-compiler warnings
 (declare-function eat "eat" (&optional program))
@@ -233,7 +235,7 @@ When nil, executes normal setup behavior.")
 (defun enkan-repl--make-project-filename (path)
   "Create encoded filename for project file from PATH.
 Example: \\='/Users/project/\\=' -> \\='enkan--Users--project\\='"
-  (enkan-repl--encode-full-path-pure
+  (enkan-repl-utils--encode-full-path
    path
    enkan-repl-file-prefix
    enkan-repl-path-separator))
@@ -241,7 +243,7 @@ Example: \\='/Users/project/\\=' -> \\='enkan--Users--project\\='"
 (defun enkan-repl--decode-project-filename (encoded-name)
   "Decode project filename back to directory path.
 Example: \\='enkan--Users--project\\=' -> \\='/Users/project/\\='"
-  (enkan-repl--decode-full-path-pure
+  (enkan-repl-utils--decode-full-path
    encoded-name
    enkan-repl-file-prefix
    enkan-repl-path-separator))
