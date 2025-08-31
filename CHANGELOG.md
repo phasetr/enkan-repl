@@ -1,3 +1,10 @@
+## [0.13.1](https://github.com/phasetr/enkan-repl/compare/v0.13.0...v0.13.1) (2025-08-31)
+
+
+### Bug Fixes
+
+* resolve buffer name parsing and prefix-arg handling issues ([b887d5d](https://github.com/phasetr/enkan-repl/commit/b887d5dbee4a29aab43f72f900de0d64f033d63b))
+
 # [0.13.0](https://github.com/phasetr/enkan-repl/compare/v0.12.0...v0.13.0) (2025-08-30)
 
 
