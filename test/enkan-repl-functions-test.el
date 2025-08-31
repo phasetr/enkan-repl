@@ -1,7 +1,7 @@
-;;; enkan-repl-pure-functions-test.el --- Tests for pure functions -*- lexical-binding: t -*-
+;;; enkan-repl-functions-test.el --- Tests for functions -*- lexical-binding: t -*-
 
 ;;; Commentary:
-;; Test suite for pure functions in enkan-repl
+;; Test suite for functions in enkan-repl
 
 ;;; Code:
 
@@ -200,5 +200,5 @@
     (should (equal (cdr (assoc 'session-counter state-info)) 0))
     (should (equal (cdr (assoc 'project-aliases state-info)) '()))))
 
-(provide 'enkan-repl-pure-functions-test)
-;;; enkan-repl-pure-functions-test.el ends here
+(provide 'enkan-repl-functions-test)
+;;; enkan-repl-functions-test.el ends here

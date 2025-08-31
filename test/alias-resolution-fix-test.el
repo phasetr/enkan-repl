@@ -14,17 +14,17 @@
     (unwind-protect
         (let ((enkan-buffers (list test-buffer-er test-buffer-pt)))
           ;; Test er alias should resolve to enkan-repl buffer exactly
-          (let ((resolved-buffer (enkan-repl--resolve-target-buffer-pure nil "er" enkan-buffers)))
+          (let ((resolved-buffer (enkan-repl--resolve-target-buffer nil "er" enkan-buffers)))
             (should (eq resolved-buffer test-buffer-er))
             (should (string= (buffer-name resolved-buffer) "*enkan:/Users/sekine/dev/self/enkan-repl*")))
           
           ;; Test pt alias should resolve to pt-tools buffer exactly
-          (let ((resolved-buffer (enkan-repl--resolve-target-buffer-pure nil "pt" enkan-buffers)))
+          (let ((resolved-buffer (enkan-repl--resolve-target-buffer nil "pt" enkan-buffers)))
             (should (eq resolved-buffer test-buffer-pt))
             (should (string= (buffer-name resolved-buffer) "*enkan:/Users/sekine/pt-tools*")))
           
           ;; Test non-existent alias
-          (should (null (enkan-repl--resolve-target-buffer-pure nil "nonexistent" enkan-buffers))))
+          (should (null (enkan-repl--resolve-target-buffer nil "nonexistent" enkan-buffers))))
       
       ;; Clean up
       (kill-buffer test-buffer-er)
