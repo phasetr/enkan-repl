@@ -229,17 +229,18 @@ When nil, executes normal setup behavior.")
 
 ;;;; File Naming and Path Management
 
-(defun enkan-repl--encode-full-path (path)
-  "Encode PATH by replacing forward slashes with the configured separator.
-Example: \\='/Users/phasetr/project1/\\=' -> \\='enkan--Users--phasetr--project1\\='"
+;; Project file name encoding/decoding
+(defun enkan-repl--make-project-filename (path)
+  "Create encoded filename for project file from PATH.
+Example: \\='/Users/project/\\=' -> \\='enkan--Users--project\\='"
   (enkan-repl--encode-full-path-pure
    path
    enkan-repl-file-prefix
    enkan-repl-path-separator))
 
-(defun enkan-repl--decode-full-path (encoded-name)
-  "Decode ENCODED-NAME back to original path.
-Example: \\='enkan--Users--phasetr--project1\\=' -> \\='/Users/phasetr/project1/\\='"
+(defun enkan-repl--decode-project-filename (encoded-name)
+  "Decode project filename back to directory path.
+Example: \\='enkan--Users--project\\=' -> \\='/Users/project/\\='"
   (enkan-repl--decode-full-path-pure
    encoded-name
    enkan-repl-file-prefix
@@ -248,10 +249,9 @@ Example: \\='enkan--Users--phasetr--project1\\=' -> \\='/Users/phasetr/project1/
 (defun enkan-repl--get-project-file-path (&optional directory)
   "Get the full path for the project file based on DIRECTORY.
 If DIRECTORY is nil, use the current `default-directory'."
-  (let*
-      ((target-dir (or directory default-directory))
-       (encoded-name (enkan-repl--encode-full-path target-dir))
-       (filename (concat encoded-name ".org")))
+  (let* ((target-dir (or directory default-directory))
+         (encoded-name (enkan-repl--make-project-filename target-dir))
+         (filename (concat encoded-name ".org")))
     (expand-file-name filename target-dir)))
 
 ;;;; Template Loading Functions
@@ -484,7 +484,7 @@ For other buffers, use current `default-directory'."
    ((and buffer-file-name
          (string-match-p "enkan-.+\\.org$" (file-name-nondirectory buffer-file-name)))
     ;; This is a persistent file, extract directory from filename
-    (enkan-repl--decode-full-path
+    (enkan-repl--decode-project-filename
      (file-name-base (file-name-nondirectory buffer-file-name))))
    ;; Default case
    (t default-directory)))
@@ -534,8 +534,7 @@ Returns t if buffer is enkan buffer for target directory, nil otherwise."
   (and (stringp buffer-name)
        (stringp target-directory)
        (string-match-p "^\\*enkan:" buffer-name)
-       (let ((expanded-target (expand-file-name target-directory)))
-         (string= buffer-name (concat "*enkan:" expanded-target "*")))))
+       (string= buffer-name (enkan-repl--make-buffer-name target-directory))))
 
 (defun enkan-repl--get-buffer-for-directory (&optional directory)
   "Get the eat buffer for DIRECTORY if it exists and is live.
@@ -794,7 +793,7 @@ Category: Session Controller"
   (require 'eat)
   ;; Always start new eat session in current directory
   (let* ((target-dir default-directory)
-         (buffer-name (concat "*enkan:" (expand-file-name target-dir) "*"))
+         (buffer-name (enkan-repl--make-buffer-name target-dir))
          (eat-buffer (eat)))
     ;; Simple buffer renaming - no error handling
     (when eat-buffer
@@ -891,7 +890,7 @@ Category: Session Controller"
   "Decide the standard input file or not."
   (when file-path
     (let* ((base-name (file-name-sans-extension (file-name-nondirectory file-path)))
-           (decoded-path (enkan-repl--decode-full-path base-name)))
+           (decoded-path (enkan-repl--decode-project-filename base-name)))
       (and (not (string= "" decoded-path)) (string= decoded-path directory-name)))))
 
 (defun enkan-repl--is-center-file-path-pure (center-file-path projects)
@@ -1151,6 +1150,11 @@ Return (project-name . project-path) or nil if not found."
 
 ;;; Helper functions for state management and formatting
 
+(defun enkan-repl--make-buffer-name (path)
+  "Create buffer name for given PATH.
+Returns buffer name in format *enkan:<expanded-path>*"
+  (format "*enkan:%s*" (expand-file-name path)))
+
 (defun enkan-repl--get-project-paths-for-current (current-project projects target-directories)
   "Get project paths for CURRENT-PROJECT from PROJECTS and TARGET-DIRECTORIES.
 Returns a list of (alias . path) pairs."
@@ -1174,7 +1178,7 @@ Returns a plist with :status and other keys."
                             current-project projects target-directories)))
           ;; Helper function to convert path to buffer
           (path-to-buffer (lambda (path)
-                            (get-buffer (format "*enkan:%s*" (expand-file-name path)))))
+                            (get-buffer (enkan-repl--make-buffer-name path))))
           ;; Helper function to check if buffer exists
           (get-active-buffers (lambda (paths)
                                 (cl-loop for (alias . path) in paths
