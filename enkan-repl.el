@@ -229,17 +229,18 @@ When nil, executes normal setup behavior.")
 
 ;;;; File Naming and Path Management
 
-(defun enkan-repl--encode-full-path (path)
-  "Encode PATH by replacing forward slashes with the configured separator.
-Example: \\='/Users/phasetr/project1/\\=' -> \\='enkan--Users--phasetr--project1\\='"
+;; Project file name encoding/decoding
+(defun enkan-repl--make-project-filename (path)
+  "Create encoded filename for project file from PATH.
+Example: \\='/Users/project/\\=' -> \\='enkan--Users--project\\='"
   (enkan-repl--encode-full-path-pure
    path
    enkan-repl-file-prefix
    enkan-repl-path-separator))
 
-(defun enkan-repl--decode-full-path (encoded-name)
-  "Decode ENCODED-NAME back to original path.
-Example: \\='enkan--Users--phasetr--project1\\=' -> \\='/Users/phasetr/project1/\\='"
+(defun enkan-repl--decode-project-filename (encoded-name)
+  "Decode project filename back to directory path.
+Example: \\='enkan--Users--project\\=' -> \\='/Users/project/\\='"
   (enkan-repl--decode-full-path-pure
    encoded-name
    enkan-repl-file-prefix
@@ -248,10 +249,9 @@ Example: \\='enkan--Users--phasetr--project1\\=' -> \\='/Users/phasetr/project1/
 (defun enkan-repl--get-project-file-path (&optional directory)
   "Get the full path for the project file based on DIRECTORY.
 If DIRECTORY is nil, use the current `default-directory'."
-  (let*
-      ((target-dir (or directory default-directory))
-       (encoded-name (enkan-repl--encode-full-path target-dir))
-       (filename (concat encoded-name ".org")))
+  (let* ((target-dir (or directory default-directory))
+         (encoded-name (enkan-repl--make-project-filename target-dir))
+         (filename (concat encoded-name ".org")))
     (expand-file-name filename target-dir)))
 
 ;;;; Template Loading Functions
@@ -484,7 +484,7 @@ For other buffers, use current `default-directory'."
    ((and buffer-file-name
          (string-match-p "enkan-.+\\.org$" (file-name-nondirectory buffer-file-name)))
     ;; This is a persistent file, extract directory from filename
-    (enkan-repl--decode-full-path
+    (enkan-repl--decode-project-filename
      (file-name-base (file-name-nondirectory buffer-file-name))))
    ;; Default case
    (t default-directory)))
@@ -498,13 +498,6 @@ Example: \\='*enkan:/path/to/pt-tools/*\\=' -> \\='pt-tools\\='"
                   (match-string 1 buffer-name-or-path)
                 buffer-name-or-path)))
     (file-name-nondirectory (directory-file-name path))))
-
-(defun enkan-repl--resolve-project-name (name-or-alias)
-  "Resolve project name or alias to canonical project name.
-References alias definitions, returns original name if not found."
-  (or (cdr (assoc name-or-alias enkan-repl-project-aliases))
-      name-or-alias))
-
 
 (defun enkan-repl--register-session (session-number project-name)
   "Register project to session number.
@@ -541,8 +534,7 @@ Returns t if buffer is enkan buffer for target directory, nil otherwise."
   (and (stringp buffer-name)
        (stringp target-directory)
        (string-match-p "^\\*enkan:" buffer-name)
-       (let ((expanded-target (expand-file-name target-directory)))
-         (string= buffer-name (concat "*enkan:" expanded-target "*")))))
+       (string= buffer-name (enkan-repl--make-buffer-name target-directory))))
 
 (defun enkan-repl--get-buffer-for-directory (&optional directory)
   "Get the eat buffer for DIRECTORY if it exists and is live.
@@ -801,7 +793,7 @@ Category: Session Controller"
   (require 'eat)
   ;; Always start new eat session in current directory
   (let* ((target-dir default-directory)
-         (buffer-name (concat "*enkan:" (expand-file-name target-dir) "*"))
+         (buffer-name (enkan-repl--make-buffer-name target-dir))
          (eat-buffer (eat)))
     ;; Simple buffer renaming - no error handling
     (when eat-buffer
@@ -847,7 +839,11 @@ Category: Session Controller"
                 ;; Display current state before termination
                 (princ "🔧 Current state before termination:\n")
                 (princ (enkan-repl--format-session-state-display
-                        (enkan-repl--get-current-session-state-info)))
+                        (enkan-repl--get-current-session-state-info
+                         enkan-repl--current-project
+                         enkan-repl-session-list
+                         enkan-repl--session-counter
+                         enkan-repl-project-aliases)))
                 (princ "\n")
                 (let ((terminated-count 0)
                       (original-session-list enkan-repl-session-list)) ; Capture for y-or-n-p
@@ -881,7 +877,11 @@ Category: Session Controller"
                     ;; Display final state
                     (princ "\n🧹 Configuration reset:\n")
                     (princ (enkan-repl--format-session-state-display
-                            (enkan-repl--get-current-session-state-info)))
+                            (enkan-repl--get-current-session-state-info
+                             enkan-repl--current-project
+                             enkan-repl-session-list
+                             enkan-repl--session-counter
+                             enkan-repl-project-aliases)))
                     (princ (format "\n✅ Terminated %d sessions, cleared session list and reset project configuration.\n" terminated-count))
                     (princ "\n=== END FINISH SESSIONS ===\n"))))))
         (message "Not in standard file or center file mode")))))
@@ -890,7 +890,7 @@ Category: Session Controller"
   "Decide the standard input file or not."
   (when file-path
     (let* ((base-name (file-name-sans-extension (file-name-nondirectory file-path)))
-           (decoded-path (enkan-repl--decode-full-path base-name)))
+           (decoded-path (enkan-repl--decode-project-filename base-name)))
       (and (not (string= "" decoded-path)) (string= decoded-path directory-name)))))
 
 (defun enkan-repl--is-center-file-path-pure (center-file-path projects)
@@ -931,7 +931,7 @@ COUNTER: session counter"
   "Set project aliases from ALIAS-LIST for PROJECT-NAME and log to BUFFER-NAME."
   (let ((project-aliases '()))
     (dolist (alias alias-list)
-      (let ((project-info (enkan-repl--get-project-info-from-directories alias)))
+      (let ((project-info (enkan-repl--get-project-info-from-directories alias enkan-repl-target-directories)))
         (when project-info
           (let ((proj-name (car project-info)))
             (push (cons alias proj-name) project-aliases)))))
@@ -971,7 +971,7 @@ Includes error handling for individual session failures."
 (defun enkan-repl--setup-project-session (alias)
   "Setup project session for given ALIAS.
 Implemented as pure function, side effects are handled by upper functions."
-  (let ((project-info (enkan-repl--get-project-info-from-directories alias)))
+  (let ((project-info (enkan-repl--get-project-info-from-directories alias enkan-repl-target-directories)))
     (if project-info
         (let ((project-name (car project-info))
               (project-path (cdr project-info)))
@@ -1135,10 +1135,10 @@ When enabled, some keybindings are available across all buffers."
 
 ;;;; Auto Setup Functions
 
-(defun enkan-repl--get-project-info-from-directories (alias)
-  "Get project info from directories for ALIAS.
+(defun enkan-repl--get-project-info-from-directories (alias target-directories)
+  "Get project info from directories for ALIAS in TARGET-DIRECTORIES.
 Return (project-name . project-path) or nil if not found."
-  (cdr (assoc alias enkan-repl-target-directories)))
+  (cdr (assoc alias target-directories)))
 
 (defun enkan-repl--get-project-path-from-directories (project-name target-directories)
   "Pure function to get project path from directories by project name."
@@ -1150,14 +1150,197 @@ Return (project-name . project-path) or nil if not found."
 
 ;;; Helper functions for state management and formatting
 
-(defun enkan-repl--get-current-session-state-info ()
-  "Retrieve current session state information as an alist.
+(defun enkan-repl--make-buffer-name (path)
+  "Create buffer name for given PATH.
+Returns buffer name in format *enkan:<expanded-path>*"
+  (format "*enkan:%s*" (expand-file-name path)))
+
+(defun enkan-repl--get-project-paths-for-current (current-project projects target-directories)
+  "Get project paths for CURRENT-PROJECT from PROJECTS and TARGET-DIRECTORIES.
+Returns a list of (alias . path) pairs."
+  (let ((alias-list (cdr (assoc current-project projects))))
+    (cl-loop for alias in alias-list
+             for project-info = (enkan-repl--get-project-info-from-directories
+                                 alias target-directories)
+             when project-info
+             collect (cons alias (cdr project-info)))))
+
+(defun enkan-repl--resolve-send-target (prefix-arg resolved-alias current-project projects target-directories)
+  "Resolve send target buffer based on PREFIX-ARG, RESOLVED-ALIAS, and project config.
+PREFIX-ARG: numeric prefix for buffer selection (optional)
+RESOLVED-ALIAS: resolved alias from command parsing (optional)
+CURRENT-PROJECT: current project name
+PROJECTS: project configuration
+TARGET-DIRECTORIES: directory configuration
+Returns a plist with :status and other keys."
+  (let* ((project-paths (when current-project
+                          (enkan-repl--get-project-paths-for-current
+                            current-project projects target-directories)))
+          ;; Helper function to convert path to buffer
+          (path-to-buffer (lambda (path)
+                            (get-buffer (enkan-repl--make-buffer-name path))))
+          ;; Helper function to check if buffer exists
+          (get-active-buffers (lambda (paths)
+                                (cl-loop for (alias . path) in paths
+                                  for buffer = (funcall path-to-buffer path)
+                                  when buffer
+                                  collect (cons alias buffer)))))
+    ;; Check if we have active buffers
+    (let ((active-pairs (if project-paths
+                          (funcall get-active-buffers project-paths)
+                          ;; Fallback to all available buffers
+                          (cl-loop for buffer in (enkan-repl--get-available-buffers-pure (buffer-list))
+                            collect (cons nil buffer)))))
+      (if (null active-pairs)
+        (list :status 'no-buffers
+          :message "No active enkan sessions found. Start one with M-x enkan-repl-start-eat")
+        ;; Resolve based on prefix-arg or alias
+        (cond
+          ;; Priority 1: prefix-arg based selection
+          ((and prefix-arg (numberp prefix-arg) (> prefix-arg 0))
+            (if (<= prefix-arg (length active-pairs))
+              (list :status 'selected
+                :buffer (cdr (nth (1- prefix-arg) active-pairs)))
+              (list :status 'invalid
+                :message (format "Invalid prefix arg: %d (only %d buffers available)"
+                           prefix-arg (length active-pairs)))))
+          ;; Priority 2: alias based selection
+          ((and resolved-alias (stringp resolved-alias) (not (string= "" resolved-alias)))
+            (let ((matching-pair (assoc resolved-alias active-pairs)))
+              (if matching-pair
+                (list :status 'selected
+                  :buffer (cdr matching-pair))
+                (list :status 'invalid
+                  :message (format "No buffer found for alias '%s'" resolved-alias)))))
+         ;; Priority 3: auto-select if single buffer
+          ((= 1 (length active-pairs))
+            (list :status 'single
+              :buffer (cdr (car active-pairs))))
+          ;; Priority 4: multiple buffers - need interactive selection
+          (t
+            (list :status 'needs-selection
+              :buffers (mapcar #'cdr active-pairs))))))))
+
+(defun enkan-repl--select-project (project-paths current-project prompt action-fn validation-fn)
+  "Handle project selection based on PROJECT-PATHS.
+CURRENT-PROJECT is the current project name.
+PROMPT is the hmenu prompt for multiple projects.
+ACTION-FN is a function that takes a path and performs the action.
+VALIDATION-FN is an optional function to validate the path before action.
+Returns a plist with :status and other relevant keys."
+  (let ((num-projects (length project-paths)))
+    (cond
+      ((= num-projects 0)
+        (list :status 'no-projects
+          :message (format "No projects found in enkan-repl-target-directories for project '%s'"
+                     current-project)))
+      ((= num-projects 1)
+        ;; Auto-select single project
+        (let* ((project-entry (car project-paths))
+                (project-path (cdr project-entry)))
+          (if (and validation-fn (not (funcall validation-fn project-path)))
+            (list :status 'invalid
+              :path project-path
+              :message (format "Invalid path: %s" project-path))
+            (list :status 'single
+              :path project-path
+              :alias (car project-entry)))))
+      (t
+        ;; Multiple projects - require selection
+        (let* ((choices (mapcar (lambda (entry)
+                                  (format "%s (%s)" (car entry) (cdr entry)))
+                          project-paths))
+                (selected-display (hmenu prompt choices)))
+          (if selected-display
+            (let* ((selected-index (cl-position selected-display choices :test 'string=))
+                    (selected-entry (nth selected-index project-paths))
+                    (project-path (cdr selected-entry)))
+              (if (and validation-fn (not (funcall validation-fn project-path)))
+                (list :status 'invalid
+                  :path project-path
+                  :message (format "Invalid path: %s" project-path))
+                (list :status 'selected
+                  :path project-path
+                  :alias (car selected-entry))))
+            (list :status 'cancelled)))))))
+
+(defun enkan-repl--target-directory-info (current-project projects target-directories prompt validation-fn &optional prefix-arg)
+  "Get target directory info for CURRENT-PROJECT.
+PROJECTS is the project configuration.
+TARGET-DIRECTORIES is the directory configuration.
+PROMPT is the message for selection.
+VALIDATION-FN is an optional validation function.
+PREFIX-ARG if provided, select from existing buffers instead.
+Returns a plist with :status and other relevant keys."
+  ;; If prefix-arg is provided, use buffer resolution
+  (if prefix-arg
+    (let* ((numeric-prefix (prefix-numeric-value prefix-arg))
+            (resolution (enkan-repl--resolve-send-target
+                          numeric-prefix
+                          nil
+                          current-project
+                          projects
+                          target-directories))
+            (status (plist-get resolution :status)))
+      (pcase status
+        ('no-buffers
+          (list :status 'no-buffers
+            :message (plist-get resolution :message)))
+        ('invalid
+          (list :status 'invalid
+            :message (plist-get resolution :message)))
+        ((or 'selected 'single)
+          (let* ((buffer (plist-get resolution :buffer))
+                  (buffer-name (buffer-name buffer))
+                  ;; Extract path from buffer name format: *enkan:/path/to/project*
+                  (decoded-path (when (string-match "^\\*enkan:\\(.+\\)\\*$" buffer-name)
+                                  (match-string 1 buffer-name))))
+            (list :status 'selected
+              :path decoded-path)))
+        ('needs-selection
+          (let* ((available-buffers (plist-get resolution :buffers))
+                  (choices (enkan-repl--build-buffer-selection-choices-pure available-buffers))
+                  (selection (hmenu prompt choices)))
+            (if selection
+              (let* ((selected-buffer (cdr (assoc selection choices)))
+                      (buffer-name (buffer-name selected-buffer))
+                      ;; Extract path from buffer name format: *enkan:/path/to/project*
+                      (decoded-path (when (string-match "^\\*enkan:\\(.+\\)\\*$" buffer-name)
+                                      (match-string 1 buffer-name))))
+                (list :status 'selected
+                  :path decoded-path))
+              (list :status 'cancelled
+                :message "Selection cancelled"))))))
+    ;; Original behavior without prefix-arg
+    (if (not current-project)
+      (list :status 'no-project
+        :message "No current project selected")
+      (let* ((project-paths (enkan-repl--get-project-paths-for-current
+                              current-project projects target-directories))
+              (selection (enkan-repl--select-project
+                           project-paths
+                           current-project
+                           prompt
+                           nil
+                           validation-fn)))
+        (if (zerop (length project-paths))
+          (list :status 'no-paths
+            :message (format "No projects found in enkan-repl-target-directories for project '%s'"
+                       current-project))
+          selection)))))
+
+(defun enkan-repl--get-current-session-state-info (current-project session-list session-counter project-aliases)
+  "Retrieve session state information as an alist.
+CURRENT-PROJECT is the current project list.
+SESSION-LIST is the list of sessions.
+SESSION-COUNTER is the session counter value.
+PROJECT-ALIASES is the list of project aliases.
 This is a pure function."
   (list
-   (cons 'current-project enkan-repl--current-project)
-   (cons 'session-list enkan-repl-session-list)
-   (cons 'session-counter enkan-repl--session-counter)
-   (cons 'project-aliases enkan-repl-project-aliases)))
+    (cons 'current-project current-project)
+    (cons 'session-list session-list)
+    (cons 'session-counter session-counter)
+    (cons 'project-aliases project-aliases)))
 
 (defun enkan-repl--format-session-state-display (state-info &optional prefix)
   "Format session state information for display.
@@ -1246,7 +1429,6 @@ Returns plist with :buffer, :name, :live-p, :has-process, :process."
             :has-process (and process-info (plist-get process-info :bound) (plist-get process-info :process))
             :process (when process-info (plist-get process-info :process))))))
 
-
 (defun enkan-repl--get-available-buffers-pure (buffer-list)
   "Pure function to get available enkan buffers from BUFFER-LIST.
 Consolidates buffer collection and filtering into single function.
@@ -1332,60 +1514,57 @@ SPECIAL-KEY-TYPE: :enter, :escape, 1-9, or nil for normal text (optional)
 
 Resolution priority: prefix-arg → alias parsing → interactive selection
 Returns t on success, nil on failure."
-  (let* ((available-buffers (enkan-repl--get-available-buffers-pure (buffer-list)))
-         (parsed-command nil)
-         (resolved-alias nil)
-         (target-buffer nil)
-         (final-text text))
-    ;; Early return if no available buffers
-    (if (null available-buffers)
-        (progn
-          (message "No active enkan sessions found. Start one with M-x enkan-repl-start-eat")
-          nil)
-      ;; Parse alias from text if no special-key-type
-      (when (null special-key-type)
-        (setq parsed-command (enkan-repl--parse-alias-command-pure text))
-        (when (plist-get parsed-command :valid)
-          (setq resolved-alias (plist-get parsed-command :alias))
-          (setq final-text (plist-get parsed-command :text))
-          ;; Handle special commands within alias
-          (let ((command (plist-get parsed-command :command)))
-            (cond
-             ((eq command :esc)
+  (let* ((parsed-command nil)
+          (resolved-alias nil)
+          (final-text text))
+    ;; Parse alias from text if no special-key-type
+    (when (null special-key-type)
+      (setq parsed-command (enkan-repl--parse-alias-command-pure text))
+      (when (plist-get parsed-command :valid)
+        (setq resolved-alias (plist-get parsed-command :alias))
+        (setq final-text (plist-get parsed-command :text))
+        ;; Handle special commands within alias
+        (let ((command (plist-get parsed-command :command)))
+          (cond
+            ((eq command :esc)
               (setq special-key-type :escape)
               (setq final-text ""))
-             ((eq command :ret)
+            ((eq command :ret)
               (setq special-key-type :enter)
               (setq final-text ""))
-             ((and (stringp command) (string-match-p "^[1-9]$" command))
+            ((and (stringp command) (string-match-p "^[1-9]$" command))
               (setq special-key-type (string-to-number command))
               (setq final-text ""))))))
-      ;; Resolve target buffer
-      (setq target-buffer (enkan-repl--resolve-target-buffer-pure
-                           prefix-arg resolved-alias available-buffers))
-      ;; Handle alias resolution failure
-      (if (and resolved-alias (null target-buffer))
-          ;; Explicit alias specified but not found - show error and return
-          (progn
-            (message "No buffer found for alias '%s'" resolved-alias)
-            nil)
-        ;; Interactive selection if no target resolved and no explicit alias
-        (unless target-buffer
-          (if (= 1 (length available-buffers))
-              (setq target-buffer (car available-buffers))
-            (let* ((choices (enkan-repl--build-buffer-selection-choices-pure available-buffers))
-                   (selection (hmenu "Select buffer for send:" choices)))
-              (message "DEBUG: hmenu returned: %S (type: %s)" selection (type-of selection))
-              (message "DEBUG: choices alist: %S" choices)
-              (setq target-buffer (cdr (assoc selection choices)))
-              (message "DEBUG: resolved target-buffer: %S" target-buffer))))
-        ;; Execute send
-        (when target-buffer
-          (let* ((send-data (enkan-repl--send-primitive-pure final-text special-key-type))
-                 (success (enkan-repl--send-primitive-action target-buffer send-data)))
-            (when success
-              (message "Sent to buffer: %s" (buffer-name target-buffer)))
-            success))))))
+    ;; Resolve target buffer using new unified function
+    (let* ((resolution (enkan-repl--resolve-send-target
+                         prefix-arg
+                         resolved-alias
+                         enkan-repl--current-project
+                         enkan-repl-projects
+                         enkan-repl-target-directories))
+            (status (plist-get resolution :status))
+            (target-buffer nil))
+      (pcase status
+        ('no-buffers
+          (message (plist-get resolution :message))
+          nil)
+        ('invalid
+          (message (plist-get resolution :message))
+          nil)
+        ((or 'selected 'single)
+          (setq target-buffer (plist-get resolution :buffer)))
+        ('needs-selection
+          (let* ((available-buffers (plist-get resolution :buffers))
+                  (choices (enkan-repl--build-buffer-selection-choices-pure available-buffers))
+                  (selection (hmenu "Select buffer for send:" choices)))
+            (setq target-buffer (cdr (assoc selection choices))))))
+      ;; Execute send
+      (when target-buffer
+        (let* ((send-data (enkan-repl--send-primitive-pure final-text special-key-type))
+                (success (enkan-repl--send-primitive-action target-buffer send-data)))
+          (when success
+            (message "Sent to buffer: %s" (buffer-name target-buffer)))
+          success)))))
 
 (defun enkan-repl--build-buffer-selection-choices-pure (buffers)
   "Pure function to build selection choices from BUFFERS.
@@ -1481,32 +1660,30 @@ Category: Center File Multi-buffer Access"
     (enkan-repl--send-unified "" prefix-arg :escape))))
 
 ;;;###autoload
-(defun enkan-repl-open-project-directory ()
-  "Open project directory in dired from current project.
+(defun enkan-repl-open-project-directory (&optional prefix-arg)
+  "Open project directory in dired from enkan-repl-projects.
+With prefix argument (C-u), select from available buffers.
 
 Category: Center File Multi-buffer Access"
-  (interactive)
-  (if enkan-repl--current-project
-      (let* ((current-project (cdr (assoc enkan-repl--current-project enkan-repl-projects)))
-             (project-choices '()))
-        (if current-project
-            (progn
-              ;; Build choices list with alias and directory
-              (dolist (alias current-project)
-                (let ((project-info (enkan-repl--get-project-info-from-directories alias)))
-                  (when project-info
-                    (let ((project-name (car project-info))
-                          (project-path (cdr project-info)))
-                      (push (cons (format "%s (%s)" alias project-path) project-path) project-choices)))))
-              (if project-choices
-                  (let* ((selected-display (hmenu "Select project directory to open:" project-choices))
-                         (selected-path (cdr (assoc selected-display project-choices))))
-                    (if (file-directory-p selected-path)
-                        (dired selected-path)
-                      (message "Directory does not exist: %s" selected-path)))
-                (message "No valid project directories found in project")))
-          (message "Current project '%s' not found in configurations" enkan-repl--current-project)))
-    (message "No project is currently active")))
+  (interactive "P")
+  (let ((result (enkan-repl--target-directory-info
+                  enkan-repl--current-project
+                  enkan-repl-projects
+                  enkan-repl-target-directories
+                  "Select project directory to open:"
+                  #'file-directory-p
+                  prefix-arg)))
+    (pcase (plist-get result :status)
+      ((or 'no-project 'no-paths 'no-buffers)
+        (message (plist-get result :message)))
+      ('invalid
+        (message "Directory does not exist: %s" (plist-get result :path)))
+      ((or 'single 'selected)
+        (let ((path (plist-get result :path)))
+          (when (and path (file-directory-p path))
+            (dired path))))
+      ('cancelled
+        (message "Selection cancelled")))))
 
 ;;;###autoload
 (defun enkan-repl--analyze-send-content-pure (content prefix-arg)
@@ -1613,86 +1790,32 @@ Category: Center File Operations"
       (error "%s" (plist-get result :message)))))
 
 ;; Pure functions for magit project selection (used by enkan-repl-magit)
-(defun enkan-repl--get-magit-project-list-pure (target-directories)
-  "Get list of projects for magit selection from TARGET-DIRECTORIES.
-Returns list of (project-name . project-path) pairs."
-  (unless target-directories
-    (error "Project directories is empty"))
-  (mapcar (lambda (entry)
-            (let ((project-name (car entry))
-                  (project-path (if (stringp (cdr entry))
-                                    (cdr entry)
-                                  ;; Handle nested cons structure
-                                  (if (consp (cdr entry))
-                                      (cdr (cdr entry))
-                                    (cdr entry)))))
-              (cons project-name (expand-file-name project-path))))
-          target-directories))
 
-(defun enkan-repl--validate-magit-project-path-pure (project-path)
-  "Validate PROJECT-PATH for magit operation.
-Returns plist with :valid, :message."
-  (cond
-   ((null project-path)
-    (list :valid nil :message "Project path is null"))
-   ((not (stringp project-path))
-    (list :valid nil :message "Project path must be a string"))
-   ((not (file-directory-p project-path))
-    (list :valid nil :message "Project path does not exist or is not a directory"))
-   (t
-    (list :valid t :message "Valid project path"))))
-
-(defun enkan-repl--create-magit-completion-list-pure (project-list)
-  "Create completion list for magit project selection from PROJECT-LIST.
-Returns list of strings for selection interface."
-  (unless project-list
-    (error "Project list is empty"))
-  (mapcar (lambda (entry)
-            (format "%s (%s)" (car entry) (cdr entry)))
-          project-list))
-
-(defun enkan-repl--parse-selected-magit-project-pure (selected-string project-list)
-  "Parse SELECTED-STRING to get project info from PROJECT-LIST.
-Returns plist with :project-name, :project-path."
-  (let ((matched-entry (cl-find-if
-                        (lambda (entry)
-                          (string= selected-string
-                                   (format "%s (%s)" (car entry) (cdr entry))))
-                        project-list)))
-    (if matched-entry
-        (list :project-name (car matched-entry)
-              :project-path (cdr matched-entry))
-      (list :project-name nil :project-path nil))))
-
-(defun enkan-repl-magit ()
-  "Open magit for selected project from active sessions only.
+(defun enkan-repl-magit (&optional prefix-arg)
+  "Open magit for selected project from enkan-repl-projects.
+With prefix argument (C-u), select from available buffers.
 
 Category: Center File Operations"
-  (interactive)
-  (let* ((valid-buffers (enkan-repl--get-available-buffers-pure (buffer-list))))
-    (if (= (length valid-buffers) 0)
-        (message "No active enkan sessions found for magit")
-      (let* ((selected-buffer
-              (if (= 1 (length valid-buffers))
-                  ;; Auto-select single session
-                  (car valid-buffers)
-                ;; Interactive selection for multiple sessions
-                (let* ((choices (enkan-repl--build-buffer-selection-choices-pure valid-buffers))
-                       (selected-display (hmenu "Select project for magit:" choices)))
-                  (cdr (assoc selected-display choices))))))
-        (when selected-buffer
-          (let ((project-path (enkan-repl--extract-directory-from-buffer-name-pure
-                               (buffer-name selected-buffer))))
-            (if project-path
-                (let ((validation (enkan-repl--validate-magit-project-path-pure project-path)))
-                  (if (plist-get validation :valid)
-                      (progn
-                        (let ((default-directory project-path))
-                          (magit-status))
-                        (message "Opened magit for project: %s" project-path))
-                    (error "Invalid project path: %s" (plist-get validation :message))))
-              (error "Failed to extract project path from buffer: %s" (buffer-name selected-buffer)))))))))
-
+  (interactive "P")
+  (let ((result (enkan-repl--target-directory-info
+                  enkan-repl--current-project
+                  enkan-repl-projects
+                  enkan-repl-target-directories
+                  "Select project for magit:"
+                  #'file-directory-p
+                  prefix-arg)))
+    (pcase (plist-get result :status)
+      ((or 'no-project 'no-paths 'no-buffers)
+        (message (plist-get result :message)))
+      ('invalid
+        (message "Directory does not exist: %s" (plist-get result :path)))
+      ((or 'single 'selected)
+        (let ((path (plist-get result :path)))
+          (when (and path (file-directory-p path))
+            (let ((default-directory path))
+              (magit-status)))))
+      ('cancelled
+        (message "Selection cancelled")))))
 
 ;;;###autoload
 (defun enkan-repl-print-setup-to-buffer ()

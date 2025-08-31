@@ -54,19 +54,6 @@
   (should (string= (enkan-repl--decode-full-path-pure "enkan-repl_relative_path" "enkan-repl" "_")
                    "/relative/path/")))
 
-;; Tests for enkan-repl--resolve-project-name
-(ert-deftest test-enkan-repl--resolve-project-name ()
-  "Test project name resolution with aliases."
-  (let ((enkan-repl-project-aliases '(("myproj" . "my-awesome-project")
-                                       ("web" . "website-development"))))
-    (should (string= (enkan-repl--resolve-project-name "myproj")
-                     "my-awesome-project"))
-    (should (string= (enkan-repl--resolve-project-name "web")
-                     "website-development"))
-    (should (string= (enkan-repl--resolve-project-name "unaliased")
-                     "unaliased"))
-    (should (string= (enkan-repl--resolve-project-name nil)
-                     nil))))
 
 ;; Tests for enkan-repl--register-session
 (ert-deftest test-enkan-repl--register-session ()
