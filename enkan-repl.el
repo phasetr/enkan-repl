@@ -1087,19 +1087,6 @@ When enabled, some keybindings are available across all buffers."
 
 ;;;; Auto Setup Functions
 
-(defun enkan-repl--get-project-info-from-directories (alias target-directories)
-  "Get project info from directories for ALIAS in TARGET-DIRECTORIES.
-Return (project-name . project-path) or nil if not found."
-  (cdr (assoc alias target-directories)))
-
-(defun enkan-repl--get-project-path-from-directories (project-name target-directories)
-  "Pure function to get project path from directories by project name."
-  (let ((project-info (cl-find-if (lambda (entry)
-                                    (string= (car (cdr entry)) project-name))
-                                  target-directories)))
-    (when project-info
-      (cdr (cdr project-info)))))
-
 ;;; Helper functions for state management and formatting
 
 (defun enkan-repl--get-project-paths-for-current (current-project projects target-directories)
@@ -1275,36 +1262,6 @@ Returns a plist with :status and other relevant keys."
                   :message (format "No projects found in enkan-repl-target-directories for project '%s'"
                                    current-project))
           selection)))))
-
-(defun enkan-repl--get-current-session-state-info (current-project session-list session-counter project-aliases)
-  "Retrieve session state information as an alist.
-CURRENT-PROJECT is the current project list.
-SESSION-LIST is the list of sessions.
-SESSION-COUNTER is the session counter value.
-PROJECT-ALIASES is the list of project aliases.
-This is a pure function."
-  (list
-   (cons 'current-project current-project)
-   (cons 'session-list session-list)
-   (cons 'session-counter session-counter)
-   (cons 'project-aliases project-aliases)))
-
-(defun enkan-repl--format-session-state-display (state-info &optional prefix)
-  "Format session state information for display.
-STATE-INFO is an alist from `enkan-repl--get-current-session-state-info`.
-PREFIX is an optional string to prepend to each line.
-This is a pure function."
-  (let ((current-project (cdr (assoc 'current-project state-info)))
-        (session-list (cdr (assoc 'session-list state-info)))
-        (session-counter (cdr (assoc 'session-counter state-info)))
-        (project-aliases (cdr (assoc 'project-aliases state-info)))
-        (prefix-str (or prefix "")))
-    (concat
-     (format "%s  Layout (enkan-repl--current-project): %s\n" prefix-str (or current-project "nil"))
-     (format "%s  Sessions (enkan-repl-session-list): %s\n" prefix-str session-list)
-     (format "%s  Counter (enkan-repl--session-counter): %d\n" prefix-str session-counter)
-     (when project-aliases
-       (format "%s  Permanent aliases (enkan-repl-project-aliases): %s\n" prefix-str project-aliases)))))
 
 ;;; Functions with side effects
 
