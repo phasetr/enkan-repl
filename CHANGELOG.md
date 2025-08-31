@@ -1,3 +1,10 @@
+## [0.13.2](https://github.com/phasetr/enkan-repl/compare/v0.13.1...v0.13.2) (2025-08-31)
+
+
+### Bug Fixes
+
+* extract pure functions to utils for better maintainability ([ca285b1](https://github.com/phasetr/enkan-repl/commit/ca285b1e2fb444ec53f8926e60416bb5c9786541))
+
 ## [0.13.1](https://github.com/phasetr/enkan-repl/compare/v0.13.0...v0.13.1) (2025-08-31)
 
 
