@@ -32,6 +32,7 @@
        ("C-M-@"   . enkan-repl-open-project-directory)
        ("C-t"     . other-window-or-split)
        ("C-M-b"   . enkan-repl-recenter-bottom)
+       ("C-M-o"   . enkan-repl-open-center-file)
        ("C-M-s"   . enkan-repl-setup)
        ("C-M-t"   . enkan-repl-teardown)
        ("C-M-l"   . enkan-repl-setup-current-project-layout))))
