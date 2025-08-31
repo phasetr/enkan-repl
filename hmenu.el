@@ -86,14 +86,15 @@ Returns selected value or nil if cancelled."
           (max-index (1- (length choices)))
           (continue t)
           (result nil))
-    ;; Limit direct selection to first 9 items
+    ;; Limit direct selection to first 9 items (informative prompt only)
     (let ((numbered-choices (cl-subseq choice-displays 0 (min 9 (length choice-displays)))))
-      (message "Direct selection: %s"
-        (mapconcat (lambda (choice)
-                     (format "%d:%s"
-                       (1+ (cl-position choice numbered-choices))
-                       choice))
-          numbered-choices " ")))
+      (message "%s %s"
+               (propertize "Direct selection:" 'face 'hmenu-prompt-face)
+               (mapconcat (lambda (choice)
+                            (format "%d:%s"
+                                    (1+ (cl-position choice numbered-choices))
+                                    choice))
+                          numbered-choices " ")))
     (while continue
       (let* ((formatted (hmenu--format-choices choice-displays selected-index))
               (prompt-text (propertize (format "%s " prompt) 'face 'hmenu-prompt-face))
@@ -109,7 +110,6 @@ Returns selected value or nil if cancelled."
             ;; Confirm selection
             ((or (eq key ?\r) (eq key ?\n) (eq key ?\s))  ; Enter, C-j, Space
               (setq result (hmenu--get-choice-value choices selected-index))
-              (message "DEBUG: hmenu confirming selection: key=%S selected-index=%d result=%S" key selected-index result)
               (setq continue nil))
             ;; Cancel selection
             ((or (eq key 7) (eq key 27) (eq key 113))  ; C-g(7), ESC(27), q(113)
@@ -128,7 +128,6 @@ Returns selected value or nil if cancelled."
               (message "Invalid key. Use arrows/h/l to navigate, Enter to select, C-g to cancel")
               (sit-for 1))))))
     (message "")  ; Clear message line
-    (message "DEBUG: hmenu final result: %S (type: %s)" result (type-of result))
     result))
 
 (defun hmenu-read-string (prompt choices)

@@ -37,6 +37,8 @@
 
 ;;; Code:
 
+(require 'enkan-repl-utils)
+
 (defgroup enkan-repl-notifications nil
   "Customization options for enkan-repl notifications."
   :group 'enkan-repl)
@@ -67,27 +69,6 @@ Defaults to a system sound. Change this to your preferred sound."
   "Default message for the macOS native notification."
   :type 'string
   :group 'enkan-repl-notifications)
-
-(defun enkan-repl--build-notification-command (message title)
-  "Build osascript command for notification with MESSAGE and TITLE.
-This is a pure function for testing."
-  (format "display notification \"%s\" with title \"%s\""
-          (replace-regexp-in-string "\"" "\\\"" message t t)
-          (replace-regexp-in-string "\"" "\\\"" title t t)))
-
-(defun enkan-repl--should-play-sound-p (sys-type enabled-p file-path)
-  "Check if sound should be played based on SYS-TYPE, ENABLED-P, and FILE-PATH.
-This is a pure function for testing."
-  (and (eq sys-type 'darwin)
-       enabled-p
-       (stringp file-path)
-       (not (string= "" file-path))))
-
-(defun enkan-repl--should-show-notification-p (sys-type enabled-p)
-  "Check if notification should be shown based on SYS-TYPE and ENABLED-P.
-This is a pure function for testing."
-  (and (eq sys-type 'darwin)
-       enabled-p))
 
 (defun enkan-repl--play-completion-sound ()
   "Play a notification sound on macOS using afplay.
