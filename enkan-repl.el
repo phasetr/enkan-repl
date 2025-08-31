@@ -1264,29 +1264,70 @@ Returns a plist with :status and other relevant keys."
                   :alias (car selected-entry))))
             (list :status 'cancelled)))))))
 
-(defun enkan-repl--target-directory-info (current-project projects target-directories prompt validation-fn)
+(defun enkan-repl--target-directory-info (current-project projects target-directories prompt validation-fn &optional prefix-arg)
   "Get target directory info for CURRENT-PROJECT.
 PROJECTS is the project configuration.
 TARGET-DIRECTORIES is the directory configuration.
 PROMPT is the message for selection.
 VALIDATION-FN is an optional validation function.
+PREFIX-ARG if provided, select from existing buffers instead.
 Returns a plist with :status and other relevant keys."
-  (if (not current-project)
-    (list :status 'no-project
-      :message "No current project selected")
-    (let* ((project-paths (enkan-repl--get-project-paths-for-current
-                            current-project projects target-directories))
-            (selection (enkan-repl--select-project
-                         project-paths
-                         current-project
-                         prompt
-                         nil
-                         validation-fn)))
-      (if (zerop (length project-paths))
-        (list :status 'no-paths
-          :message (format "No projects found in enkan-repl-target-directories for project '%s'"
-                     current-project))
-        selection))))
+  ;; If prefix-arg is provided, use buffer resolution
+  (if prefix-arg
+    (let* ((numeric-prefix (prefix-numeric-value prefix-arg))
+            (resolution (enkan-repl--resolve-send-target
+                          numeric-prefix
+                          nil
+                          current-project
+                          projects
+                          target-directories))
+            (status (plist-get resolution :status)))
+      (pcase status
+        ('no-buffers
+          (list :status 'no-buffers
+            :message (plist-get resolution :message)))
+        ('invalid
+          (list :status 'invalid
+            :message (plist-get resolution :message)))
+        ((or 'selected 'single)
+          (let* ((buffer (plist-get resolution :buffer))
+                  (buffer-name (buffer-name buffer))
+                  ;; Extract path from buffer name format: *enkan:/path/to/project*
+                  (decoded-path (when (string-match "^\\*enkan:\\(.+\\)\\*$" buffer-name)
+                                  (match-string 1 buffer-name))))
+            (list :status 'selected
+              :path decoded-path)))
+        ('needs-selection
+          (let* ((available-buffers (plist-get resolution :buffers))
+                  (choices (enkan-repl--build-buffer-selection-choices-pure available-buffers))
+                  (selection (hmenu prompt choices)))
+            (if selection
+              (let* ((selected-buffer (cdr (assoc selection choices)))
+                      (buffer-name (buffer-name selected-buffer))
+                      ;; Extract path from buffer name format: *enkan:/path/to/project*
+                      (decoded-path (when (string-match "^\\*enkan:\\(.+\\)\\*$" buffer-name)
+                                      (match-string 1 buffer-name))))
+                (list :status 'selected
+                  :path decoded-path))
+              (list :status 'cancelled
+                :message "Selection cancelled"))))))
+    ;; Original behavior without prefix-arg
+    (if (not current-project)
+      (list :status 'no-project
+        :message "No current project selected")
+      (let* ((project-paths (enkan-repl--get-project-paths-for-current
+                              current-project projects target-directories))
+              (selection (enkan-repl--select-project
+                           project-paths
+                           current-project
+                           prompt
+                           nil
+                           validation-fn)))
+        (if (zerop (length project-paths))
+          (list :status 'no-paths
+            :message (format "No projects found in enkan-repl-target-directories for project '%s'"
+                       current-project))
+          selection)))))
 
 (defun enkan-repl--get-current-session-state-info (current-project session-list session-counter project-aliases)
   "Retrieve session state information as an alist.
@@ -1619,26 +1660,28 @@ Category: Center File Multi-buffer Access"
     (enkan-repl--send-unified "" prefix-arg :escape))))
 
 ;;;###autoload
-(defun enkan-repl-open-project-directory ()
+(defun enkan-repl-open-project-directory (&optional prefix-arg)
   "Open project directory in dired from enkan-repl-projects.
+With prefix argument (C-u), select from available buffers.
 
 Category: Center File Multi-buffer Access"
-  (interactive)
+  (interactive "P")
   (let ((result (enkan-repl--target-directory-info
                   enkan-repl--current-project
                   enkan-repl-projects
                   enkan-repl-target-directories
                   "Select project directory to open:"
-                  #'file-directory-p)))
+                  #'file-directory-p
+                  prefix-arg)))
     (pcase (plist-get result :status)
-      ('no-project
-        (message (plist-get result :message)))
-      ('no-paths
+      ((or 'no-project 'no-paths 'no-buffers)
         (message (plist-get result :message)))
       ('invalid
         (message "Directory does not exist: %s" (plist-get result :path)))
       ((or 'single 'selected)
-        (dired (plist-get result :path)))
+        (let ((path (plist-get result :path)))
+          (when (and path (file-directory-p path))
+            (dired path))))
       ('cancelled
         (message "Selection cancelled")))))
 
@@ -1748,27 +1791,29 @@ Category: Center File Operations"
 
 ;; Pure functions for magit project selection (used by enkan-repl-magit)
 
-(defun enkan-repl-magit ()
+(defun enkan-repl-magit (&optional prefix-arg)
   "Open magit for selected project from enkan-repl-projects.
+With prefix argument (C-u), select from available buffers.
 
 Category: Center File Operations"
-  (interactive)
+  (interactive "P")
   (let ((result (enkan-repl--target-directory-info
                   enkan-repl--current-project
                   enkan-repl-projects
                   enkan-repl-target-directories
                   "Select project for magit:"
-                  #'file-directory-p)))
+                  #'file-directory-p
+                  prefix-arg)))
     (pcase (plist-get result :status)
-      ('no-project
-        (message (plist-get result :message)))
-      ('no-paths
+      ((or 'no-project 'no-paths 'no-buffers)
         (message (plist-get result :message)))
       ('invalid
         (message "Directory does not exist: %s" (plist-get result :path)))
       ((or 'single 'selected)
-        (let ((default-directory (plist-get result :path)))
-          (magit-status)))
+        (let ((path (plist-get result :path)))
+          (when (and path (file-directory-p path))
+            (let ((default-directory path))
+              (magit-status)))))
       ('cancelled
         (message "Selection cancelled")))))
 
