@@ -218,7 +218,6 @@ The generated project file includes template functions and usage instructions.
 - =enkan-repl-send-1/2/3= - Send numbered choices for AI prompts
 - =enkan-repl-send-4= - Send \\='4\\=' to enkan session buffer for numbered choice prompt. - From enkan buffer: Send to current buffer - From other buffer without prefix: Interactive buffer selection - With numeric prefix: Send to buffer at index (1-based)  Uses unified backend with smart buffer detection.
 - =enkan-repl-send-5= - Send \\='5\\=' to enkan session buffer for numbered choice prompt. - From enkan buffer: Send to current buffer - From other buffer without prefix: Interactive buffer selection - With numeric prefix: Send to buffer at index (1-based)  Uses unified backend with smart buffer detection.
-- =enkan-repl-send-escape= - Send ESC key to enkan session buffer. - From enkan buffer: Send to current buffer - From other buffer without prefix: Interactive buffer selection - With numeric prefix: Send to buffer at index (1-based)  Uses unified backend with smart buffer detection.
 
 *** Session Control
 - =enkan-repl-start-eat= - Start eat terminal emulator session in current directory. Simplified version for use within setup functions only. FORCE parameter ignored - always starts new session.
