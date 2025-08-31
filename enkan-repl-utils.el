@@ -389,7 +389,7 @@ Example: PATH '/Users/proj', PREFIX 'enkan', SEP '--' -> 'enkan--Users--proj'"
          (cleaned-path (if (string-suffix-p "/" expanded-path)
                            (substring expanded-path 0 -1)
                          expanded-path)))
-    (concat prefix (replace-regexp-in-string "/" separator cleaned-path)))
+    (concat prefix (replace-regexp-in-string "/" separator cleaned-path))))
 
 (defun enkan-repl-utils--decode-full-path (encoded-name prefix separator)
   "Decode ENCODED-NAME using PREFIX and SEPARATOR (pure).
