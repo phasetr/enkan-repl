@@ -23,35 +23,35 @@
         (delete-process proc))
       (kill-buffer buffer))))
 
-;; Tests for enkan-repl--encode-full-path-pure
-(ert-deftest test-enkan-repl--encode-full-path-pure ()
+;; Tests for enkan-repl--encode-full-path
+(ert-deftest test-enkan-repl--encode-full-path ()
   "Test pure path encoding function."
   ;; Absolute paths - note the leading slash gets encoded
-  (should (string= (enkan-repl--encode-full-path-pure "/home/user/project" "enkan-repl" "_")
+  (should (string= (enkan-repl--encode-full-path "/home/user/project" "enkan-repl" "_")
                    "enkan-repl_home_user_project"))
-  (should (string= (enkan-repl--encode-full-path-pure "/path/with/many/levels" "enkan-repl" "_")
+  (should (string= (enkan-repl--encode-full-path "/path/with/many/levels" "enkan-repl" "_")
                    "enkan-repl_path_with_many_levels"))
   ;; Root directory - just the separator remains
-  (should (string= (enkan-repl--encode-full-path-pure "/" "enkan-repl" "_")
+  (should (string= (enkan-repl--encode-full-path "/" "enkan-repl" "_")
                    "enkan-repl"))
   ;; Relative path gets expanded to absolute
-  (let ((result (enkan-repl--encode-full-path-pure "relative/path" "enkan-repl" "_")))
+  (let ((result (enkan-repl--encode-full-path "relative/path" "enkan-repl" "_")))
     (should (string-prefix-p "enkan-repl" result))
     (should (string-match-p "relative_path" result))))
 
-;; Tests for enkan-repl--decode-full-path-pure
-(ert-deftest test-enkan-repl--decode-full-path-pure ()
+;; Tests for enkan-repl--decode-full-path
+(ert-deftest test-enkan-repl--decode-full-path ()
   "Test pure path decoding function."
   ;; Decode adds trailing slash
-  (should (string= (enkan-repl--decode-full-path-pure "enkan-repl_home_user_project" "enkan-repl" "_")
+  (should (string= (enkan-repl--decode-full-path "enkan-repl_home_user_project" "enkan-repl" "_")
                    "/home/user/project/"))
-  (should (string= (enkan-repl--decode-full-path-pure "enkan-repl_path_with_many_levels" "enkan-repl" "_")
+  (should (string= (enkan-repl--decode-full-path "enkan-repl_path_with_many_levels" "enkan-repl" "_")
                    "/path/with/many/levels/"))
   ;; Root directory - prefix followed by single separator becomes slash with trailing slash
-  (should (string= (enkan-repl--decode-full-path-pure "enkan-repl_" "enkan-repl_" "_")
+  (should (string= (enkan-repl--decode-full-path "enkan-repl_" "enkan-repl_" "_")
                    "/"))
   ;; Relative path becomes absolute path with trailing slash
-  (should (string= (enkan-repl--decode-full-path-pure "enkan-repl_relative_path" "enkan-repl" "_")
+  (should (string= (enkan-repl--decode-full-path "enkan-repl_relative_path" "enkan-repl" "_")
                    "/relative/path/")))
 
 

@@ -66,9 +66,11 @@
 
 ;; Declare external functions to avoid byte-compile warnings
 (declare-function enkan-repl-utils--extract-function-info "enkan-repl-utils" (file-path))
-(declare-function enkan-repl--find-session-buffer-pure "enkan-repl-utils" (selected-name buffer-info-list))
-(declare-function enkan-repl--collect-sessions-pure "enkan-repl-utils" (buffer-info-list))
-(declare-function enkan-repl--format-numbered-sessions-pure "enkan-repl-utils" (sessions))
+(declare-function enkan-repl--find-session-buffer "enkan-repl-utils" (selected-name buffer-info-list))
+(declare-function enkan-repl--collect-sessions "enkan-repl-utils" (buffer-info-list))
+(declare-function enkan-repl--format-numbered-sessions "enkan-repl-utils" (sessions))
+(declare-function enkan-repl-utils--encode-full-path "enkan-repl-utils" (path prefix separator))
+(declare-function enkan-repl-utils--decode-full-path "enkan-repl-utils" (encoded-name prefix separator))
 
 ;; Declare external functions to avoid byte-compiler warnings
 (declare-function eat "eat" (&optional program))
@@ -233,7 +235,7 @@ When nil, executes normal setup behavior.")
 (defun enkan-repl--make-project-filename (path)
   "Create encoded filename for project file from PATH.
 Example: \\='/Users/project/\\=' -> \\='enkan--Users--project\\='"
-  (enkan-repl--encode-full-path-pure
+  (enkan-repl-utils--encode-full-path
    path
    enkan-repl-file-prefix
    enkan-repl-path-separator))
@@ -241,7 +243,7 @@ Example: \\='/Users/project/\\=' -> \\='enkan--Users--project\\='"
 (defun enkan-repl--decode-project-filename (encoded-name)
   "Decode project filename back to directory path.
 Example: \\='enkan--Users--project\\=' -> \\='/Users/project/\\='"
-  (enkan-repl--decode-full-path-pure
+  (enkan-repl-utils--decode-full-path
    encoded-name
    enkan-repl-file-prefix
    enkan-repl-path-separator))
@@ -439,34 +441,6 @@ Returns categorized functions as string, or falls back to static list."
           "- [ ] Item 2\n"
           "- [ ] Item 3\n"))
 
-;;;; Pure Functions for Directory/Buffer Detection
-
-(defun enkan-repl--encode-full-path-pure (path prefix separator)
-  "Pure function: Encode PATH with PREFIX and SEPARATOR.
-PATH: Directory path to encode.
-PREFIX: Prefix string to add (e.g., \\='enkan\\=').
-SEPARATOR: String to replace '/' with (e.g., '--').
-Example: \='/Users/project\=' + \='enkan\=' + \='--\=' -> \='enkan--Users--project\='"
-  (let*
-      ((expanded-path (expand-file-name path))
-       (cleaned-path
-        (if
-            (string-suffix-p "/" expanded-path)
-            (substring expanded-path 0 -1)
-          expanded-path)))
-    (concat prefix (replace-regexp-in-string "/" separator cleaned-path))))
-
-(defun enkan-repl--decode-full-path-pure (encoded-name prefix separator)
-  "Pure function: Decode ENCODED-NAME with PREFIX and SEPARATOR.
-ENCODED-NAME: Encoded filename to decode.
-PREFIX: Expected prefix string (e.g., \\='enkan\\=').
-SEPARATOR: String to replace with '/' (e.g., '--').
-Example: \='enkan--Users--project\=' + \='enkan\=' + \='--\=' -> \='/Users/project/\='"
-  (when (string-prefix-p prefix encoded-name)
-    (let
-        ((path-part (substring encoded-name (length prefix))))  ; Remove prefix
-      (concat (replace-regexp-in-string (regexp-quote separator) "/" path-part) "/"))))
-
 ;;;; Target Directory Detection Functions
 
 (defun enkan-repl--get-target-directory-for-buffer ()
@@ -491,14 +465,6 @@ For other buffers, use current `default-directory'."
 
 ;;;; Multi-buffer access core functions
 
-(defun enkan-repl--extract-project-name (buffer-name-or-path)
-  "Extract final directory name from buffer name or path for use as project name.
-Example: \\='*enkan:/path/to/pt-tools/*\\=' -> \\='pt-tools\\='"
-  (let ((path (if (string-match "\\*enkan:\\(.+\\)\\*" buffer-name-or-path)
-                  (match-string 1 buffer-name-or-path)
-                buffer-name-or-path)))
-    (file-name-nondirectory (directory-file-name path))))
-
 (defun enkan-repl--register-session (session-number project-name)
   "Register project to session number.
 Order is maintained by session number (ascending)."
@@ -507,13 +473,6 @@ Order is maintained by session number (ascending)."
     (setq enkan-repl-session-list
           (sort (cons new-entry updated-list)
                 (lambda (a b) (< (car a) (car b)))))))
-
-(defun enkan-repl--extract-directory-from-buffer-name-pure (buffer-name)
-  "Pure function to extract expanded directory path from enkan buffer name.
-Returns expanded directory path or nil if buffer name is not valid enkan format."
-  (when (and (stringp buffer-name) (string-match "^\\*enkan:\\(.*\\)\\*$" buffer-name))
-    (let ((raw-path (match-string 1 buffer-name)))
-      (file-name-as-directory (expand-file-name raw-path)))))
 
 (defun enkan-repl--find-directory-by-project-name (project-name)
   "Search for corresponding directory by project name.
@@ -526,15 +485,7 @@ Returns: Directory path or nil"
                    (string-equal project-name
                                  (enkan-repl--extract-project-name (buffer-name))))
           (cl-return-from search-buffers
-            (enkan-repl--extract-directory-from-buffer-name-pure (buffer-name))))))))
-
-(defun enkan-repl--buffer-matches-directory-pure (buffer-name target-directory)
-  "Pure function to check if buffer name matches target directory.
-Returns t if buffer is enkan buffer for target directory, nil otherwise."
-  (and (stringp buffer-name)
-       (stringp target-directory)
-       (string-match-p "^\\*enkan:" buffer-name)
-       (string= buffer-name (enkan-repl--make-buffer-name target-directory))))
+            (enkan-repl--extract-directory-from-buffer-name (buffer-name))))))))
 
 (defun enkan-repl--get-buffer-for-directory (&optional directory)
   "Get the eat buffer for DIRECTORY if it exists and is live.
@@ -552,19 +503,20 @@ If DIRECTORY is nil, use current `default-directory'."
           (when
               (and (buffer-live-p buf)
                    name     ; Ensure name is not nil
-                   ;; Check for directory-specific enkan buffer using pure function
-                   (enkan-repl--buffer-matches-directory-pure name target-dir))
+                   ;; Check for directory-specific enkan buffer using the buffer-name matcher
+                   (enkan-repl--buffer-matches-directory name target-dir))
             (setq matching-buffer buf)
             (cl-return-from search-buffers)))))
     matching-buffer))
 
-(defun enkan-repl--buffer-matches-directory (buffer target-dir)
+(defun enkan-repl--buffer-working-directory-matches (buffer target-dir)
   "Check if BUFFER's working directory matches TARGET-DIR."
   (with-current-buffer buffer
     (when (boundp 'default-directory)
       (string=
        (file-truename default-directory)
        (file-truename target-dir)))))
+
 
 ;;;; Send Functions - Internal Helpers
 
@@ -811,7 +763,7 @@ Category: Session Controller"
   (interactive)
   ;; Check if current buffer filename matches standard input file format
   (let* ((current-file (buffer-file-name))
-         (is-standard-file (enkan-repl--is-standard-file-path-pure current-file default-directory)))
+         (is-standard-file (enkan-repl--is-standard-file-path current-file default-directory)))
     (if is-standard-file
         ;; Standard input file mode: terminate single session
         (let* ((session-info (enkan-repl--get-session-info))
@@ -829,7 +781,7 @@ Category: Session Controller"
               (kill-buffer existing-buffer)
               (message "Terminated eat session in: %s" target-dir)))))
       ;; Center file mode: terminate all sessions
-      (if (enkan-repl--is-center-file-path-pure enkan-repl-center-file enkan-repl-projects)
+      (if (enkan-repl--is-center-file-path enkan-repl-center-file enkan-repl-projects)
           ;; Center file mode implementation
           (let ((buffer-name "*ENKAN-REPL Finish Sessions*"))
             (if (null enkan-repl-session-list)
@@ -886,14 +838,14 @@ Category: Session Controller"
                     (princ "\n=== END FINISH SESSIONS ===\n"))))))
         (message "Not in standard file or center file mode")))))
 
-(defun enkan-repl--is-standard-file-path-pure (file-path directory-name)
+(defun enkan-repl--is-standard-file-path (file-path directory-name)
   "Decide the standard input file or not."
   (when file-path
     (let* ((base-name (file-name-sans-extension (file-name-nondirectory file-path)))
            (decoded-path (enkan-repl--decode-project-filename base-name)))
       (and (not (string= "" decoded-path)) (string= decoded-path directory-name)))))
 
-(defun enkan-repl--is-center-file-path-pure (center-file-path projects)
+(defun enkan-repl--is-center-file-path (center-file-path projects)
   "Decide the center file or not."
   (and center-file-path
        (stringp center-file-path)
@@ -988,7 +940,7 @@ Category: Session Controller"
   (interactive)
   ;; Check if current buffer filename matches standard input file format
   (let* ((current-file (buffer-file-name))
-         (is-standard-file (enkan-repl--is-standard-file-path-pure current-file default-directory)))
+         (is-standard-file (enkan-repl--is-standard-file-path current-file default-directory)))
     (if is-standard-file
         ;; Standard input file mode: simple window layout
         (progn
@@ -1002,7 +954,7 @@ Category: Session Controller"
           (enkan-repl-open-project-input-file)
           (message "Basic window layout setup complete"))
       ;; Center file mode: check if center file is specified as non-empty string
-      (if (enkan-repl--is-center-file-path-pure enkan-repl-center-file enkan-repl-projects)
+      (if (enkan-repl--is-center-file-path enkan-repl-center-file enkan-repl-projects)
           (let ((project-name (hmenu "Project:" (mapcar #'car enkan-repl-projects)))
                 (buffer-name "*ENKAN-REPL Auto Setup*")
                 (old-state (list enkan-repl--current-project
@@ -1135,25 +1087,7 @@ When enabled, some keybindings are available across all buffers."
 
 ;;;; Auto Setup Functions
 
-(defun enkan-repl--get-project-info-from-directories (alias target-directories)
-  "Get project info from directories for ALIAS in TARGET-DIRECTORIES.
-Return (project-name . project-path) or nil if not found."
-  (cdr (assoc alias target-directories)))
-
-(defun enkan-repl--get-project-path-from-directories (project-name target-directories)
-  "Pure function to get project path from directories by project name."
-  (let ((project-info (cl-find-if (lambda (entry)
-                                    (string= (car (cdr entry)) project-name))
-                                  target-directories)))
-    (when project-info
-      (cdr (cdr project-info)))))
-
 ;;; Helper functions for state management and formatting
-
-(defun enkan-repl--make-buffer-name (path)
-  "Create buffer name for given PATH.
-Returns buffer name in format *enkan:<expanded-path>*"
-  (format "*enkan:%s*" (expand-file-name path)))
 
 (defun enkan-repl--get-project-paths-for-current (current-project projects target-directories)
   "Get project paths for CURRENT-PROJECT from PROJECTS and TARGET-DIRECTORIES.
@@ -1189,7 +1123,7 @@ Returns a plist with :status and other keys."
     (let ((active-pairs (if project-paths
                             (funcall get-active-buffers project-paths)
                           ;; Fallback to all available buffers
-                          (cl-loop for buffer in (enkan-repl--get-available-buffers-pure (buffer-list))
+                          (cl-loop for buffer in (enkan-repl--get-available-buffers (buffer-list))
                                    collect (cons nil buffer)))))
       (if (null active-pairs)
           (list :status 'no-buffers
@@ -1299,7 +1233,7 @@ Returns a plist with :status and other relevant keys."
                    :path decoded-path)))
           ('needs-selection
            (let* ((available-buffers (plist-get resolution :buffers))
-                  (choices (enkan-repl--build-buffer-selection-choices-pure available-buffers))
+                  (choices (enkan-repl--build-buffer-selection-choices available-buffers))
                   (selection (hmenu prompt choices)))
              (if selection
                  (let* ((selected-buffer (cdr (assoc selection choices)))
@@ -1328,36 +1262,6 @@ Returns a plist with :status and other relevant keys."
                   :message (format "No projects found in enkan-repl-target-directories for project '%s'"
                                    current-project))
           selection)))))
-
-(defun enkan-repl--get-current-session-state-info (current-project session-list session-counter project-aliases)
-  "Retrieve session state information as an alist.
-CURRENT-PROJECT is the current project list.
-SESSION-LIST is the list of sessions.
-SESSION-COUNTER is the session counter value.
-PROJECT-ALIASES is the list of project aliases.
-This is a pure function."
-  (list
-   (cons 'current-project current-project)
-   (cons 'session-list session-list)
-   (cons 'session-counter session-counter)
-   (cons 'project-aliases project-aliases)))
-
-(defun enkan-repl--format-session-state-display (state-info &optional prefix)
-  "Format session state information for display.
-STATE-INFO is an alist from `enkan-repl--get-current-session-state-info`.
-PREFIX is an optional string to prepend to each line.
-This is a pure function."
-  (let ((current-project (cdr (assoc 'current-project state-info)))
-        (session-list (cdr (assoc 'session-list state-info)))
-        (session-counter (cdr (assoc 'session-counter state-info)))
-        (project-aliases (cdr (assoc 'project-aliases state-info)))
-        (prefix-str (or prefix "")))
-    (concat
-     (format "%s  Layout (enkan-repl--current-project): %s\n" prefix-str (or current-project "nil"))
-     (format "%s  Sessions (enkan-repl-session-list): %s\n" prefix-str session-list)
-     (format "%s  Counter (enkan-repl--session-counter): %d\n" prefix-str session-counter)
-     (when project-aliases
-       (format "%s  Permanent aliases (enkan-repl-project-aliases): %s\n" prefix-str project-aliases)))))
 
 ;;; Functions with side effects
 
@@ -1413,7 +1317,7 @@ Returns t if mode was disabled, nil otherwise."
     t))
 
 ;;;###autoload
-(defun enkan-repl--get-buffer-process-info-pure (buffer)
+(defun enkan-repl--get-buffer-process-info (buffer)
   "Pure function to get process info for BUFFER.
 Returns plist with :buffer, :name, :live-p, :has-process, :process."
   (when (bufferp buffer)
@@ -1429,7 +1333,7 @@ Returns plist with :buffer, :name, :live-p, :has-process, :process."
             :has-process (and process-info (plist-get process-info :bound) (plist-get process-info :process))
             :process (when process-info (plist-get process-info :process))))))
 
-(defun enkan-repl--get-available-buffers-pure (buffer-list)
+(defun enkan-repl--get-available-buffers (buffer-list)
   "Pure function to get available enkan buffers from BUFFER-LIST.
 Consolidates buffer collection and filtering into single function.
 Returns list of valid enkan buffers with active eat processes."
@@ -1443,7 +1347,7 @@ Returns list of valid enkan buffers with active eat processes."
                             (process-live-p eat--process)))))
               buffer-list))
 
-(defun enkan-repl--resolve-target-buffer-pure (prefix-arg alias buffers)
+(defun enkan-repl--resolve-target-buffer (prefix-arg alias buffers)
   "Pure function to resolve target buffer from multiple inputs.
 PREFIX-ARG: numeric prefix for index-based selection
 ALIAS: alias string for alias-based selection
@@ -1469,29 +1373,10 @@ Resolution priority: prefix-arg → alias → nil (for interactive selection)."
    ;; Priority 3: return nil for interactive selection
    (t nil)))
 
-(defun enkan-repl--send-primitive-pure (text special-key-type)
-  "Pure function to prepare send content from TEXT and SPECIAL-KEY-TYPE.
-TEXT: original text content
-SPECIAL-KEY-TYPE: :enter, :escape, number 1-9, or nil
-Returns plist with :content (string to send) and :action (action type)."
-  (cond
-   ((eq special-key-type :enter)
-    (list :content "\r" :action 'key))
-   ((eq special-key-type :escape)
-    (list :content "\e" :action 'key))
-   ((and (numberp special-key-type)
-         (>= special-key-type 1)
-         (<= special-key-type 9))
-    (list :content (number-to-string special-key-type) :action 'number))
-   ((null special-key-type)
-    (list :content text :action 'text))
-   (t
-    (error "Invalid special-key-type: %s" special-key-type))))
-
 (defun enkan-repl--send-primitive-action (buffer send-data)
   "Side-effect function to execute send action to BUFFER.
 BUFFER: target buffer with eat process
-SEND-DATA: plist from enkan-repl--send-primitive-pure
+SEND-DATA: plist from enkan-repl--send-primitive
 Returns t on success, nil on failure."
   (when (and buffer (buffer-live-p buffer))
     (with-current-buffer buffer
@@ -1519,7 +1404,7 @@ Returns t on success, nil on failure."
          (final-text text))
     ;; Parse alias from text if no special-key-type
     (when (null special-key-type)
-      (setq parsed-command (enkan-repl--parse-alias-command-pure text))
+      (setq parsed-command (enkan-repl--parse-alias-command text))
       (when (plist-get parsed-command :valid)
         (setq resolved-alias (plist-get parsed-command :alias))
         (setq final-text (plist-get parsed-command :text))
@@ -1555,29 +1440,29 @@ Returns t on success, nil on failure."
          (setq target-buffer (plist-get resolution :buffer)))
         ('needs-selection
          (let* ((available-buffers (plist-get resolution :buffers))
-                (choices (enkan-repl--build-buffer-selection-choices-pure available-buffers))
+                (choices (enkan-repl--build-buffer-selection-choices available-buffers))
                 (selection (hmenu "Select buffer for send:" choices)))
            (setq target-buffer (cdr (assoc selection choices))))))
       ;; Execute send
       (when target-buffer
-        (let* ((send-data (enkan-repl--send-primitive-pure final-text special-key-type))
+        (let* ((send-data (enkan-repl--send-primitive final-text special-key-type))
                (success (enkan-repl--send-primitive-action target-buffer send-data)))
           (when success
             (message "Sent to buffer: %s" (buffer-name target-buffer)))
           success)))))
 
-(defun enkan-repl--build-buffer-selection-choices-pure (buffers)
+(defun enkan-repl--build-buffer-selection-choices (buffers)
   "Pure function to build selection choices from BUFFERS.
 Returns list of cons cells (display-name . buffer) for selection UI."
   (mapcar (lambda (buffer)
-            (let ((info (enkan-repl--get-buffer-process-info-pure buffer)))
+            (let ((info (enkan-repl--get-buffer-process-info buffer)))
               (cons (format "%s%s"
                             (plist-get info :name)
                             (if (plist-get info :has-process) " [ACTIVE]" " [INACTIVE]"))
                     buffer)))
           buffers))
 
-(defun enkan-repl--parse-prefix-arg-pure (prefix-arg)
+(defun enkan-repl--parse-prefix-arg (prefix-arg)
   "Pure function to parse PREFIX-ARG into action type.
 Returns plist with :action and :index."
   (cond
@@ -1588,16 +1473,16 @@ Returns plist with :action and :index."
    (t
     (list :action 'invalid :index nil))))
 
-(defun enkan-repl--should-show-buffer-selection-pure (action-type valid-buffers)
+(defun enkan-repl--should-show-buffer-selection (action-type valid-buffers)
   "Pure function to determine if buffer selection should be shown.
 Returns t if selection UI needed, nil for direct index access."
   (and (eq action-type 'select)
        (> (length valid-buffers) 0)))
 
-(defun enkan-repl--send-number-to-buffer-pure (number buffer)
+(defun enkan-repl--send-number-to-buffer (number buffer)
   "Pure function to determine parameters for sending NUMBER to BUFFER.
 Returns plist with :can-send, :number, :buffer, :message."
-  (let ((info (enkan-repl--get-buffer-process-info-pure buffer)))
+  (let ((info (enkan-repl--get-buffer-process-info buffer)))
     (list :can-send (plist-get info :has-process)
           :number number
           :buffer buffer
@@ -1605,7 +1490,7 @@ Returns plist with :can-send, :number, :buffer, :message."
                        (format "Will send '%s' to %s" number (plist-get info :name))
                      (format "Cannot send to inactive buffer: %s" (plist-get info :name))))))
 
-(defun enkan-repl--validate-number-input-pure (number)
+(defun enkan-repl--validate-number-input (number)
   "Pure function to validate NUMBER input for sending.
 Returns plist with :valid, :number, :message."
   (cond
@@ -1653,7 +1538,7 @@ Category: Center File Multi-buffer Access"
   (cond
    ;; Special case: if current buffer is enkan buffer, send ESC directly
    ((string-match-p "^\\*enkan:" (buffer-name))
-    (let ((send-data (enkan-repl--send-primitive-pure "" :escape)))
+    (let ((send-data (enkan-repl--send-primitive "" :escape)))
       (enkan-repl--send-primitive-action (current-buffer) send-data)))
    ;; Otherwise use unified backend
    (t
@@ -1686,7 +1571,7 @@ Category: Center File Multi-buffer Access"
        (message "Selection cancelled")))))
 
 ;;;###autoload
-(defun enkan-repl--analyze-send-content-pure (content prefix-arg)
+(defun enkan-repl--analyze-send-content (content prefix-arg)
   "Pure function to analyze send content and determine action.
 CONTENT is the text content to analyze.
 PREFIX-ARG is the numeric prefix argument.
@@ -1709,7 +1594,7 @@ Returns plist with :action and :data."
 
 ;; Alias command parsing functions
 
-(defun enkan-repl--parse-alias-command-pure (input-string)
+(defun enkan-repl--parse-alias-command (input-string)
   "Pure function to parse alias command format: ':alias esc' or ':alias :ret'.
 INPUT-STRING is the command string to parse.
 Returns plist with :valid, :alias, :command, :text, :message."
@@ -1744,7 +1629,7 @@ Returns plist with :valid, :alias, :command, :text, :message."
     (list :valid nil :message "Invalid format. Use: :alias [text|esc|:ret]"))))
 
 ;; Pure functions for global operations
-(defun enkan-repl-validate-path-pure (file-path)
+(defun enkan-repl-validate-path (file-path)
   "Validate center FILE-PATH for opening.
 Returns plist with :valid, :message."
   (cond
@@ -1757,19 +1642,19 @@ Returns plist with :valid, :message."
    (t
     (list :valid t :message "Valid center file path"))))
 
-(defun enkan-repl-center-file-check-exists-pure (file-path)
+(defun enkan-repl-center-file-check-exists (file-path)
   "Check if center FILE-PATH exists.
 Returns plist with :exists, :action."
   (if (file-exists-p file-path)
       (list :exists t :action "open")
     (list :exists nil :action "create")))
 
-(defun enkan-repl-determine-action-pure (file-path)
+(defun enkan-repl-determine-action (file-path)
   "Determine action to take for center FILE-PATH.
 Returns plist with :valid, :action, :message."
-  (let ((validation (enkan-repl-validate-path-pure file-path)))
+  (let ((validation (enkan-repl-validate-path file-path)))
     (if (plist-get validation :valid)
-        (let ((exists-check (enkan-repl-center-file-check-exists-pure file-path)))
+        (let ((exists-check (enkan-repl-center-file-check-exists file-path)))
           (list :valid t
                 :action (plist-get exists-check :action)
                 :message (if (plist-get exists-check :exists)
@@ -1782,7 +1667,7 @@ Returns plist with :valid, :action, :message."
 
 Category: Center File Operations"
   (interactive)
-  (let ((result (enkan-repl-determine-action-pure enkan-repl-center-file)))
+  (let ((result (enkan-repl-determine-action enkan-repl-center-file)))
     (if (plist-get result :valid)
         (progn
           (message "%s" (plist-get result :message))

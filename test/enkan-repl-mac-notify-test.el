@@ -13,6 +13,7 @@
 
 (require 'ert)
 (require 'enkan-repl-mac-notify)
+(require 'enkan-repl-utils)
 
 ;;;; Pure Function Tests
 
