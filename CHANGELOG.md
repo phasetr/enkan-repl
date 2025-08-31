@@ -1,3 +1,10 @@
+## [0.13.3](https://github.com/phasetr/enkan-repl/compare/v0.13.2...v0.13.3) (2025-08-31)
+
+
+### Bug Fixes
+
+* correct duplicate keybinding in examples ([dd96404](https://github.com/phasetr/enkan-repl/commit/dd96404ea6803921e8cf0f78cdf9a3d506c7a427))
+
 ## [0.13.2](https://github.com/phasetr/enkan-repl/compare/v0.13.1...v0.13.2) (2025-08-31)
 
 
