@@ -500,6 +500,27 @@ This is a pure function."
      (when project-aliases
        (format "%s  Permanent aliases (enkan-repl-project-aliases): %s\n" prefix-str project-aliases)))))
 
+;;;; Send Primitive Pure Functions
+
+(defun enkan-repl--send-primitive (text special-key-type)
+  "Pure function to prepare send content from TEXT and SPECIAL-KEY-TYPE.
+TEXT: original text content
+SPECIAL-KEY-TYPE: :enter, :escape, number 1-9, or nil
+Returns plist with :content (string to send) and :action (action type)."
+  (cond
+   ((eq special-key-type :enter)
+    (list :content "\r" :action 'key))
+   ((eq special-key-type :escape)
+    (list :content "\e" :action 'key))
+   ((and (numberp special-key-type)
+         (>= special-key-type 1)
+         (<= special-key-type 9))
+    (list :content (number-to-string special-key-type) :action 'number))
+   ((null special-key-type)
+    (list :content text :action 'text))
+   (t
+    (error "Invalid special-key-type: %s" special-key-type))))
+
 ;;;; macOS Notification Pure Functions
 
 (defun enkan-repl--build-notification-command (message title)
