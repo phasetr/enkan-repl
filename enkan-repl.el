@@ -3,7 +3,7 @@
 ;; Copyright (C) 2025 [phasetr]
 
 ;; Author: [phasetr] <phasetr@gmail.com>
-;; Version: 0.13.1
+;; Version: 0.13.2
 ;; Package-Requires: ((emacs "28.2") (eat "0.9.4"))
 ;; Keywords: enkan ai tools convenience
 ;; URL: https://github.com/phasetr/enkan-repl
