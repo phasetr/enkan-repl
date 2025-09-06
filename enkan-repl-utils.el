@@ -43,14 +43,27 @@ Returns buffer name in format *ws:01 enkan:<expanded-path>*.
 Always uses workspace ID 01 for now (single workspace mode)."
   (format "*ws:01 enkan:%s*" (expand-file-name path)))
 
+(defun enkan-repl--buffer-name-matches-workspace (name workspace-id)
+  "Check if buffer NAME belongs to WORKSPACE-ID.
+Returns t if the buffer name has the correct workspace prefix."
+  (and (stringp name)
+       (stringp workspace-id)
+       (string-match-p (format "^\\*ws:%s enkan:" workspace-id) name)))
+
+(defun enkan-repl--extract-workspace-id (name)
+  "Extract workspace ID from buffer NAME.
+Returns workspace ID string (e.g., \"01\") or nil if not an enkan buffer."
+  (when (and (stringp name)
+             (string-match "^\\*ws:\\([0-9]\\{2\\}\\) enkan:" name))
+    (match-string 1 name)))
+
 ;;;; Session List Pure Functions
 
 (defun enkan-repl--extract-project-name (buffer-name-or-path)
   "Extract final directory name from buffer name or path for use as project name.
 Example: \\='*ws:01 enkan:/path/to/pt-tools/*\\=' -> \\='pt-tools\\='"
-  (let ((path (if (string-match "\\*ws:[0-9]\\{2\\} enkan:\\(.+\\)\\*" buffer-name-or-path)
-                  (match-string 1 buffer-name-or-path)
-                buffer-name-or-path)))
+  (let ((path (or (enkan-repl--buffer-name->path buffer-name-or-path)
+                   buffer-name-or-path)))
     (file-name-nondirectory (directory-file-name path))))
 
 (defun enkan-repl--encode-full-path (path prefix separator)
@@ -108,8 +121,8 @@ PROCESS-LIVE-P indicates if the process is alive.
 Returns a plist with :name, :directory, and :status, or nil if not a session."
   (when (and buffer-name
              buffer-live-p
-             (string-match "^\\*ws:[0-9]\\{2\\} enkan:\\(.*?\\)\\*$" buffer-name))
-    (let ((dir (match-string 1 buffer-name))
+             (enkan-repl--is-enkan-buffer-name buffer-name))
+    (let ((dir (enkan-repl--buffer-name->path buffer-name))
           (status (if (and has-eat-process process-live-p)
                       'alive
                     'dead)))
@@ -164,19 +177,24 @@ or nil if not on a session entry."
       ;; Check if we're on or near a session entry
       (cond
        ;; On session name line
-       ((string-match "^  \\*ws:[0-9]\\{2\\} enkan:" line)
+       ((and (>= (length line) 2)
+             (enkan-repl--is-enkan-buffer-name (substring line 2)))
         (list :start-line current-line
               :end-line (min (+ current-line 4) (length lines))))
        ;; On directory line
        ((and (> current-line 0)
              (string-match "^    Directory:" line)
-             (string-match "^  \\*ws:[0-9]\\{2\\} enkan:" (nth (1- current-line) lines)))
+             (let ((prev-line (nth (1- current-line) lines)))
+               (and (>= (length prev-line) 2)
+                    (enkan-repl--is-enkan-buffer-name (substring prev-line 2)))))
         (list :start-line (1- current-line)
               :end-line (min (+ current-line 3) (length lines))))
        ;; On status line
        ((and (> current-line 1)
              (string-match "^    Status:" line)
-             (string-match "^  \\*ws:[0-9]\\{2\\} enkan:" (nth (- current-line 2) lines)))
+             (let ((prev-prev-line (nth (- current-line 2) lines)))
+               (and (>= (length prev-prev-line) 2)
+                    (enkan-repl--is-enkan-buffer-name (substring prev-prev-line 2)))))
         (list :start-line (- current-line 2)
               :end-line (min (+ current-line 2) (length lines))))
        (t nil)))))
@@ -450,9 +468,8 @@ Returns formatted string."
      (let ((name (plist-get session :name))
            (status (plist-get session :status)))
        (format "%s [%s]"
-               (if (string-match "\\*ws:[0-9]\\{2\\} enkan:\\(.*?\\)\\*" name)
-                   (match-string 1 name)
-                 name)
+               (or (enkan-repl--buffer-name->path name)
+                   name)
                (upcase (symbol-name status)))))
    sessions
    "\n"))
