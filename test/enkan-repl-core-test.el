@@ -101,9 +101,9 @@
 ;; Tests for enkan-repl--extract-project-name
 (ert-deftest test-enkan-repl--extract-project-name ()
   "Test project name extraction from buffer names."
-  ;; Function extracts from *enkan:/path/* pattern or uses file-name-nondirectory
+  ;; Function extracts from *ws:01 enkan:/path/* pattern or uses file-name-nondirectory
   ;; Test extraction from enkan buffer pattern
-  (should (string= (enkan-repl--extract-project-name "*enkan:/home/user/myproject/*")
+  (should (string= (enkan-repl--extract-project-name "*ws:01 enkan:/home/user/myproject/*")
                    "myproject"))
   ;; Test extraction from path directly (no enkan pattern)
   (should (string= (enkan-repl--extract-project-name "/home/user/project")
