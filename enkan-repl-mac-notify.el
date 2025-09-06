@@ -39,6 +39,9 @@
 
 (require 'enkan-repl-utils)
 
+;; Declare functions from enkan-repl-utils
+(declare-function enkan-repl--is-enkan-buffer-name "enkan-repl-utils" (name))
+
 (defgroup enkan-repl-notifications nil
   "Customization options for enkan-repl notifications."
   :group 'enkan-repl)
@@ -113,7 +116,7 @@ Use this if system notifications aren't working after starting a session."
   (interactive)
   ;; Find eat buffer matching pattern *ws:XX enkan:*
   (let ((eat-buffer (seq-find (lambda (buf)
-                                (string-match-p "^\\*ws:[0-9]\\{2\\} enkan:.*\\*$" (buffer-name buf)))
+                                (enkan-repl--is-enkan-buffer-name (buffer-name buf)))
                               (buffer-list))))
     (when eat-buffer
       (with-current-buffer eat-buffer
