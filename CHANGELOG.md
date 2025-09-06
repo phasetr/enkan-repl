@@ -1,3 +1,10 @@
+## [0.13.4](https://github.com/phasetr/enkan-repl/compare/v0.13.3...v0.13.4) (2025-09-06)
+
+
+### Bug Fixes
+
+* refactoring for workspace enhancement ([cc0e816](https://github.com/phasetr/enkan-repl/commit/cc0e816f5ee3fee4e642f6046511f16042d6ff1d))
+
 ## [0.13.3](https://github.com/phasetr/enkan-repl/compare/v0.13.2...v0.13.3) (2025-08-31)
 
 
