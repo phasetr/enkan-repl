@@ -588,11 +588,11 @@ For other buffers, use current `default-directory'."
 (defun enkan-repl--register-session (session-number project-name)
   "Register project to session number.
 Order is maintained by session number (ascending)."
-  (let ((updated-list (assq-delete-all session-number enkan-repl-session-list))
+  (let ((updated-list (assq-delete-all session-number (enkan-repl--ws-session-list)))
         (new-entry (cons session-number project-name)))
-    (setq enkan-repl-session-list
-          (sort (cons new-entry updated-list)
-                (lambda (a b) (< (car a) (car b)))))))
+    (enkan-repl--ws-set-session-list
+     (sort (cons new-entry updated-list)
+           (lambda (a b) (< (car a) (car b)))))))
 
 (defun enkan-repl--find-directory-by-project-name (project-name)
   "Search for corresponding directory by project name.
@@ -993,9 +993,9 @@ COUNTER: session counter"
 
 (defun enkan-repl--setup-reset-config (buffer-name)
   "Reset session configuration and log to BUFFER-NAME."
-  (setq enkan-repl-session-list nil)
-  (setq enkan-repl--session-counter 0)
-  (setq enkan-repl--current-project nil)
+  (enkan-repl--ws-set-session-list nil)
+  (enkan-repl--ws-set-session-counter 0)
+  (enkan-repl--ws-set-current-project nil)
   (with-current-buffer buffer-name
     (princ "🧹 Reset previous configuration\n\n")))
 
@@ -1007,9 +1007,9 @@ COUNTER: session counter"
         (when project-info
           (let ((proj-name (car project-info)))
             (push (cons alias proj-name) project-aliases)))))
-    (setq enkan-repl-project-aliases (nreverse project-aliases))
+    (enkan-repl--ws-set-project-aliases (nreverse project-aliases))
     (with-current-buffer buffer-name
-      (princ (format "🔧 Setup project aliases (enkan-repl-project-aliases): %s\n\n" enkan-repl-project-aliases)))))
+      (princ (format "🔧 Setup project aliases (enkan-repl-project-aliases): %s\n\n" (enkan-repl--ws-project-aliases))))))
 
 (defun enkan-repl--setup-start-sessions (alias-list buffer-name)
   "Start eat sessions for each alias in ALIAS-LIST and log to BUFFER-NAME.
@@ -1101,7 +1101,7 @@ Category: Session Controller"
                       ;; Start sessions
                       (enkan-repl--setup-start-sessions alias-list buffer-name))
                     ;; Set final project configuration
-                    (setq enkan-repl--current-project project-name)
+                    (enkan-repl--ws-set-current-project project-name)
                     (princ (format "\n✅ Setup completed for project: %s\n" project-name))
                     (princ "Arrange your preferred window configuration!\n\n")
                     (princ "=== END SETUP ===\n"))
@@ -1426,10 +1426,10 @@ This function has the side effect of killing buffers."
 This function has the side effect of modifying global variables:
 `enkan-repl-session-list`, `enkan-repl--session-counter`,
 `enkan-repl--current-project`, `enkan-repl-project-aliases`."
-  (setq enkan-repl-session-list nil)
-  (setq enkan-repl--session-counter 0)
-  (setq enkan-repl--current-project nil)
-  (setq enkan-repl-project-aliases nil))
+  (enkan-repl--ws-set-session-list nil)
+  (enkan-repl--ws-set-session-counter 0)
+  (enkan-repl--ws-set-current-project nil)
+  (enkan-repl--ws-set-project-aliases nil))
 
 (defun enkan-repl--disable-global-minor-mode-if-active ()
   "Disable `enkan-repl-global-minor-mode` if it is active.
