@@ -1124,6 +1124,10 @@ Implemented as pure function, side effects are handled by upper functions."
 
 Category: Session Controller"
   (interactive)
+  ;; Ensure default workspace exists
+  (unless enkan-repl--workspaces
+    ;; Initialize workspace "01" if no workspaces exist
+    (enkan-repl--save-workspace-state "01"))
   ;; Check if current buffer filename matches standard input file format
   (let* ((current-file (buffer-file-name))
          (is-standard-file (enkan-repl--is-standard-file-path current-file default-directory)))
