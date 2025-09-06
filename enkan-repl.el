@@ -269,7 +269,7 @@ for subsequent workspace implementation.")
   "Return workspace token string like \"ws:<id>\" for buffer naming."
   (format "ws:%s" (enkan-repl--ws-id)))
 
-;; Accessors (PR-1): Read/write via a stable API (no behavior change)
+;; Workspace accessors: stable API for state access (no behavior change)
 (defun enkan-repl--ws-current-project ()
   "Getter: current project name for the active workspace."
   enkan-repl--current-project)
