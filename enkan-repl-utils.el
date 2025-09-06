@@ -535,11 +535,11 @@ This is a pure function."
         (project-aliases (cdr (assoc 'project-aliases state-info)))
         (prefix-str (or prefix "")))
     (concat
-     (format "%s  Layout (enkan-repl--current-project): %s\n" prefix-str (or current-project "nil"))
-     (format "%s  Sessions (enkan-repl-session-list): %s\n" prefix-str session-list)
-     (format "%s  Counter (enkan-repl--session-counter): %d\n" prefix-str session-counter)
+     (format "%s  Layout (current-project): %s\n" prefix-str (or current-project "nil"))
+     (format "%s  Sessions (session-list): %s\n" prefix-str session-list)
+     (format "%s  Counter (session-counter): %d\n" prefix-str session-counter)
      (when project-aliases
-       (format "%s  Permanent aliases (enkan-repl-project-aliases): %s\n" prefix-str project-aliases)))))
+       (format "%s  Permanent aliases (project-aliases): %s\n" prefix-str project-aliases)))))
 
 ;;;; Send Primitive Pure Functions
 

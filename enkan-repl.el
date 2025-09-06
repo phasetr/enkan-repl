@@ -989,9 +989,9 @@ SESSIONS: session list
 COUNTER: session counter"
   (with-current-buffer buffer-name
     (princ (format "🔧 %s state %s:\n" state-type (if (string= state-type "Current") "before setup" "after setup")))
-    (princ (format "  Layout (enkan-repl--current-project): %s\n" (or layout "nil")))
-    (princ (format "  Sessions (enkan-repl-session-list): %s\n" (or sessions "nil")))
-    (princ (format "  Counter (enkan-repl--session-counter): %d\n\n" counter))))
+    (princ (format "  Layout (current-project): %s\n" (or layout "nil")))
+    (princ (format "  Sessions (session-list): %s\n" (or sessions "nil")))
+    (princ (format "  Counter (session-counter): %d\n\n" counter))))
 
 (defun enkan-repl--setup-enable-global-mode (buffer-name)
   "Enable global center file mode if not already enabled and log to BUFFER-NAME."
