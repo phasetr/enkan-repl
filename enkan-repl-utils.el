@@ -92,17 +92,6 @@ Example: \='enkan--Users--project\=' + \='enkan\=' + \='--\=' -> \='/Users/proje
         ((path-part (substring encoded-name (length prefix))))  ; Remove prefix
       (concat (replace-regexp-in-string (regexp-quote separator) "/" path-part) "/"))))
 
-(defun enkan-repl--extract-directory-from-buffer-name (buffer-name)
-  "Pure function to extract expanded directory path from enkan buffer name.
-Returns expanded directory path or nil if buffer name is not valid enkan format."
-  ;; Thin wrapper around new API for compatibility
-  (enkan-repl--buffer-name->path buffer-name))
-
-(defun enkan-repl--make-buffer-name (path)
-  "Create buffer name for given PATH.
-Returns buffer name in format *enkan:<expanded-path>*"
-  ;; Thin wrapper around new API for compatibility
-  (enkan-repl--path->buffer-name path))
 
 (defun enkan-repl--buffer-matches-directory (buffer-name target-directory)
   "Pure function to check if buffer name matches target directory.
