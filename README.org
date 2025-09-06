@@ -199,6 +199,21 @@ To ensure predictable behavior:
 
 The generated project file includes template functions and usage instructions.
 
+** Workspace Support
+
+*** Overview
+=enkan-repl= now includes workspace functionality for managing multiple projects concurrently.
+Currently operates with a single fixed workspace (=ws:01=), with multi-workspace support planned for future releases.
+
+*** Breaking Changes
+*Important*: Buffer naming format has changed from =*enkan:/path*= to =*ws:01 enkan:/path*=.
+See [[file:docs/migration-guide.md][Migration Guide]] for upgrade instructions.
+
+*** Workspace Behavior
+- All sessions are scoped to workspace =ws:01=
+- Session discovery only finds buffers in the current workspace
+- Setup/teardown operations affect only the current workspace
+
 ** Core Functions
 
 *** Command Palette
