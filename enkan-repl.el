@@ -227,6 +227,73 @@ Example: \\='((1 . \"project1\") (2 . \"project2\") (3 . \"project3\") (4 . \"pr
   "Currently selected project name.
 When nil, executes normal setup behavior.")
 
+;;;; Workspace State (skeleton — no behavior change)
+
+(defvar enkan-repl--current-workspace "01"
+  "Current workspace ID as a zero-padded numeric string (e.g., \="01\=").
+This skeleton introduces a workspace-first model without changing behavior.")
+
+(defvar enkan-repl--workspaces nil
+  "Alist of workspace states keyed by workspace ID string.
+Each value is a plist containing the following keys:
+  :current-project   (string or nil)
+  :session-list      (alist (number . project-name))
+  :session-counter   (integer)
+  :project-aliases   (alist (alias . project-name))
+This variable is currently unused by the runtime and serves as a staging area
+for subsequent workspace implementation.")
+
+(defun enkan-repl--ws-id ()
+  "Return current workspace ID string (zero-padded numeric)."
+  enkan-repl--current-workspace)
+
+(defun enkan-repl--ws-token ()
+  "Return workspace token string like \="ws:<id>\=" for buffer naming."
+  (format "ws:%s" (enkan-repl--ws-id)))
+
+(defun enkan-repl--ws-state->plist ()
+  "Collect current global session-related variables into a plist.
+This function does not change behavior; it only mirrors current globals."
+  (list :current-project   enkan-repl--current-project
+        :session-list      enkan-repl-session-list
+        :session-counter   enkan-repl--session-counter
+        :project-aliases   enkan-repl-project-aliases))
+
+(defun enkan-repl--plist->ws-state (state)
+  "Set current global session-related variables from STATE plist.
+Keys: :current-project, :session-list, :session-counter, :project-aliases.
+This is a skeleton setter and does not get invoked by runtime yet."
+  (when (plist-member state :current-project)
+    (setq enkan-repl--current-project (plist-get state :current-project)))
+  (when (plist-member state :session-list)
+    (setq enkan-repl-session-list (plist-get state :session-list)))
+  (when (plist-member state :session-counter)
+    (setq enkan-repl--session-counter (plist-get state :session-counter)))
+  (when (plist-member state :project-aliases)
+    (setq enkan-repl-project-aliases (plist-get state :project-aliases))))
+
+(defun enkan-repl--save-workspace-state (&optional workspace-id)
+  "Save current globals into `enkan-repl--workspaces' under WORKSPACE-ID.
+When WORKSPACE-ID is nil, use `enkan-repl--current-workspace'.
+This function has no effect on runtime selection yet (skeleton only)."
+  (let* ((ws (or workspace-id enkan-repl--current-workspace))
+         (plist (enkan-repl--ws-state->plist))
+         (existing (assq-delete-all (intern ws) enkan-repl--workspaces)))
+    (setq enkan-repl--workspaces
+          (cons (cons (intern ws) plist) existing))
+    plist))
+
+(defun enkan-repl--load-workspace-state (&optional workspace-id)
+  "Load state from `enkan-repl--workspaces' into globals for WORKSPACE-ID.
+When WORKSPACE-ID is nil, use `enkan-repl--current-workspace'.
+If no state is found, globals remain unchanged. Skeleton only."
+  (let* ((ws (or workspace-id enkan-repl--current-workspace))
+         (entry (assoc (intern ws) enkan-repl--workspaces))
+         (plist (cdr entry)))
+    (when plist
+      (enkan-repl--plist->ws-state plist))
+    plist))
+
 ;;;; Core Functions
 
 ;;;; File Naming and Path Management
