@@ -78,6 +78,8 @@
 (declare-function enkan-repl--buffer-matches-directory "enkan-repl-utils" (buffer-name target-directory))
 (declare-function enkan-repl--extract-directory-from-buffer-name "enkan-repl-utils" (buffer-name))
 (declare-function enkan-repl--extract-project-name "enkan-repl-utils" (buffer-name-or-path))
+(declare-function enkan-repl--is-enkan-buffer-name "enkan-repl-utils" (name))
+(declare-function enkan-repl--buffer-name->path "enkan-repl-utils" (name))
 (declare-function enkan-repl--get-project-info-from-directories "enkan-repl-utils" (alias target-directories))
 (declare-function enkan-repl--get-project-path-from-directories "enkan-repl-utils" (project-name target-directories))
 (declare-function enkan-repl--send-primitive "enkan-repl-utils" (text special-key-type))
@@ -603,7 +605,7 @@ Returns: Directory path or nil"
   (cl-block search-buffers
     (dolist (buffer (buffer-list))
       (with-current-buffer buffer
-        (when (and (string-match "^\\*ws:[0-9]\\{2\\} enkan:" (buffer-name))
+        (when (and (enkan-repl--is-enkan-buffer-name (buffer-name))
                    (string-equal project-name
                                  (enkan-repl--extract-project-name (buffer-name))))
           (cl-return-from search-buffers
@@ -776,7 +778,7 @@ Category: Utilities"
   (let ((original-window (selected-window))
         (enkan-buffers (seq-filter
                         (lambda (buf)
-                          (string-match-p "^\\*ws:[0-9]\\{2\\} enkan:" (buffer-name buf)))
+                          (enkan-repl--is-enkan-buffer-name (buffer-name buf)))
                         (buffer-list)))
         (recentered-count 0))
     (dolist (buffer enkan-buffers)
@@ -1356,8 +1358,7 @@ Returns a plist with :status and other relevant keys."
            (let* ((buffer (plist-get resolution :buffer))
                   (buffer-name (buffer-name buffer))
                   ;; Extract path from buffer name format: *ws:01 enkan:/path/to/project*
-                  (decoded-path (when (string-match "^\\*ws:[0-9]\\{2\\} enkan:\\(.+\\)\\*$" buffer-name)
-                                  (match-string 1 buffer-name))))
+                  (decoded-path (enkan-repl--buffer-name->path buffer-name)))
              (list :status 'selected
                    :path decoded-path)))
           ('needs-selection
@@ -1368,8 +1369,7 @@ Returns a plist with :status and other relevant keys."
                  (let* ((selected-buffer (cdr (assoc selection choices)))
                         (buffer-name (buffer-name selected-buffer))
                         ;; Extract path from buffer name format: *ws:01 enkan:/path/to/project*
-                        (decoded-path (when (string-match "^\\*ws:[0-9]\\{2\\} enkan:\\(.+\\)\\*$" buffer-name)
-                                        (match-string 1 buffer-name))))
+                        (decoded-path (enkan-repl--buffer-name->path buffer-name)))
                    (list :status 'selected
                          :path decoded-path))
                (list :status 'cancelled
@@ -1670,7 +1670,7 @@ Category: Center File Multi-buffer Access"
   (interactive "P")
   (cond
    ;; Special case: if current buffer is enkan buffer, send ESC directly
-   ((string-match-p "^\\*ws:[0-9]\\{2\\} enkan:" (buffer-name))
+   ((enkan-repl--is-enkan-buffer-name (buffer-name))
     (let ((send-data (enkan-repl--send-primitive "" :escape)))
       (enkan-repl--send-primitive-action (current-buffer) send-data)))
    ;; Otherwise use unified backend
