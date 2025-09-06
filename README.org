@@ -221,18 +221,12 @@ The generated project file includes template functions and usage instructions.
 
 *** Session Control
 - =enkan-repl-start-eat= - Start eat terminal emulator session in current directory. Simplified version for use within setup functions only. FORCE parameter ignored - always starts new session.
-- =enkan-repl-teardown= - Terminate eat session(s) based on context. - Standard input file: terminate single eat session for current directory - Center file: terminate all registered sessions
+- =enkan-repl-teardown= - Terminate eat session(s) based on context. - Standard input file: terminate single eat session for current directory in current workspace - Center file: terminate all registered sessions in current workspace
 - =enkan-repl-setup= - Arrange windows for (the author's) optimal workflow
 
 *** Utilities
 - =enkan-repl-recenter-bottom= - Recenter all enkan terminal buffers at bottom.
 - =enkan-repl-toggle-global-mode= - Toggle enkan-repl global mode on/off.
-
-*** Workspace Support (Experimental)
-- All sessions are now scoped to a single workspace (ID: =01=)
-- Buffer naming format: =*ws:01 enkan:/path/to/directory*=
-- Session operations (setup/teardown) are workspace-isolated
-- Future versions will support multiple concurrent workspaces
 
 ** Configuration
 
