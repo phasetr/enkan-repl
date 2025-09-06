@@ -19,6 +19,30 @@
 
 (require 'cl-lib)
 
+;;;; Buffer Name API (New - Compatibility Mode)
+
+(defun enkan-repl--is-enkan-buffer-name (name)
+  "Check if NAME is an enkan buffer name.
+Returns t if name matches enkan buffer pattern, nil otherwise.
+Currently supports legacy format *enkan:/path* only."
+  (and (stringp name)
+       (string-match-p "^\\*enkan:" name)))
+
+(defun enkan-repl--buffer-name->path (name)
+  "Extract expanded directory path from enkan buffer NAME.
+Returns expanded directory path ending with '/', or nil if invalid format.
+Currently supports legacy format *enkan:/path* only."
+  (when (and (stringp name)
+             (string-match "^\\*enkan:\\(.*\\)\\*$" name))
+    (let ((raw-path (match-string 1 name)))
+      (file-name-as-directory (expand-file-name raw-path)))))
+
+(defun enkan-repl--path->buffer-name (path)
+  "Generate buffer name from PATH.
+Returns buffer name in format *enkan:<expanded-path>*.
+Currently generates legacy format only."
+  (format "*enkan:%s*" (expand-file-name path)))
+
 ;;;; Session List Pure Functions
 
 (defun enkan-repl--extract-project-name (buffer-name-or-path)
@@ -58,22 +82,22 @@ Example: \='enkan--Users--project\=' + \='enkan\=' + \='--\=' -> \='/Users/proje
 (defun enkan-repl--extract-directory-from-buffer-name (buffer-name)
   "Pure function to extract expanded directory path from enkan buffer name.
 Returns expanded directory path or nil if buffer name is not valid enkan format."
-  (when (and (stringp buffer-name) (string-match "^\\*enkan:\\(.*\\)\\*$" buffer-name))
-    (let ((raw-path (match-string 1 buffer-name)))
-      (file-name-as-directory (expand-file-name raw-path)))))
+  ;; Thin wrapper around new API for compatibility
+  (enkan-repl--buffer-name->path buffer-name))
 
 (defun enkan-repl--make-buffer-name (path)
   "Create buffer name for given PATH.
 Returns buffer name in format *enkan:<expanded-path>*"
-  (format "*enkan:%s*" (expand-file-name path)))
+  ;; Thin wrapper around new API for compatibility
+  (enkan-repl--path->buffer-name path))
 
 (defun enkan-repl--buffer-matches-directory (buffer-name target-directory)
   "Pure function to check if buffer name matches target directory.
 Returns t if buffer is enkan buffer for target directory, nil otherwise."
   (and (stringp buffer-name)
        (stringp target-directory)
-       (string-match-p "^\\*enkan:" buffer-name)
-       (string= buffer-name (enkan-repl--make-buffer-name target-directory))))
+       (enkan-repl--is-enkan-buffer-name buffer-name)
+       (string= buffer-name (enkan-repl--path->buffer-name target-directory))))
 
 (defun enkan-repl--extract-session-info (buffer-name buffer-live-p has-eat-process process-live-p)
   "Pure function to extract session info from buffer properties.
