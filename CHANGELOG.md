@@ -1,3 +1,19 @@
+# [0.14.0](https://github.com/phasetr/enkan-repl/compare/v0.13.4...v0.14.0) (2025-09-06)
+
+
+* PR-4: Switch buffer naming to workspace-prefixed format (#31) ([f9d4298](https://github.com/phasetr/enkan-repl/commit/f9d4298a1c890aa4c8024cb80d4266e6b1a50fb3)), closes [#31](https://github.com/phasetr/enkan-repl/issues/31)
+
+
+### BREAKING CHANGES
+
+* Buffer naming format changes from *enkan:/path* to *ws:01 enkan:/path*
+
+- Update buffer name API to use workspace-prefixed format
+- All buffers now use format *ws:01 enkan:/path* (ID 01 for single workspace mode)
+- Update all test files to use new buffer naming format
+- Update all regex patterns throughout codebase
+- All 77 tests pass with make check
+
 ## [0.13.4](https://github.com/phasetr/enkan-repl/compare/v0.13.3...v0.13.4) (2025-09-06)
 
 
