@@ -24,31 +24,31 @@
 (defun enkan-repl--is-enkan-buffer-name (name)
   "Check if NAME is an enkan buffer name.
 Returns t if name matches enkan buffer pattern, nil otherwise.
-Currently supports legacy format *enkan:/path* only."
+Now supports workspace-prefixed format *ws:01 enkan:/path*."
   (and (stringp name)
-       (string-match-p "^\\*enkan:" name)))
+       (string-match-p "^\\*ws:[0-9]\\{2\\} enkan:" name)))
 
 (defun enkan-repl--buffer-name->path (name)
   "Extract expanded directory path from enkan buffer NAME.
 Returns expanded directory path ending with '/', or nil if invalid format.
-Currently supports legacy format *enkan:/path* only."
+Now supports workspace-prefixed format *ws:01 enkan:/path*."
   (when (and (stringp name)
-             (string-match "^\\*enkan:\\(.*\\)\\*$" name))
+             (string-match "^\\*ws:[0-9]\\{2\\} enkan:\\(.*\\)\\*$" name))
     (let ((raw-path (match-string 1 name)))
       (file-name-as-directory (expand-file-name raw-path)))))
 
 (defun enkan-repl--path->buffer-name (path)
   "Generate buffer name from PATH.
-Returns buffer name in format *enkan:<expanded-path>*.
-Currently generates legacy format only."
-  (format "*enkan:%s*" (expand-file-name path)))
+Returns buffer name in format *ws:01 enkan:<expanded-path>*.
+Always uses workspace ID 01 for now (single workspace mode)."
+  (format "*ws:01 enkan:%s*" (expand-file-name path)))
 
 ;;;; Session List Pure Functions
 
 (defun enkan-repl--extract-project-name (buffer-name-or-path)
   "Extract final directory name from buffer name or path for use as project name.
-Example: \\='*enkan:/path/to/pt-tools/*\\=' -> \\='pt-tools\\='"
-  (let ((path (if (string-match "\\*enkan:\\(.+\\)\\*" buffer-name-or-path)
+Example: \\='*ws:01 enkan:/path/to/pt-tools/*\\=' -> \\='pt-tools\\='"
+  (let ((path (if (string-match "\\*ws:[0-9]\\{2\\} enkan:\\(.+\\)\\*" buffer-name-or-path)
                   (match-string 1 buffer-name-or-path)
                 buffer-name-or-path)))
     (file-name-nondirectory (directory-file-name path))))
@@ -108,7 +108,7 @@ PROCESS-LIVE-P indicates if the process is alive.
 Returns a plist with :name, :directory, and :status, or nil if not a session."
   (when (and buffer-name
              buffer-live-p
-             (string-match "^\\*enkan:\\(.*?\\)\\*$" buffer-name))
+             (string-match "^\\*ws:[0-9]\\{2\\} enkan:\\(.*?\\)\\*$" buffer-name))
     (let ((dir (match-string 1 buffer-name))
           (status (if (and has-eat-process process-live-p)
                       'alive
@@ -164,19 +164,19 @@ or nil if not on a session entry."
       ;; Check if we're on or near a session entry
       (cond
        ;; On session name line
-       ((string-match "^  \\*enkan:" line)
+       ((string-match "^  \\*ws:[0-9]\\{2\\} enkan:" line)
         (list :start-line current-line
               :end-line (min (+ current-line 4) (length lines))))
        ;; On directory line
        ((and (> current-line 0)
              (string-match "^    Directory:" line)
-             (string-match "^  \\*enkan:" (nth (1- current-line) lines)))
+             (string-match "^  \\*ws:[0-9]\\{2\\} enkan:" (nth (1- current-line) lines)))
         (list :start-line (1- current-line)
               :end-line (min (+ current-line 3) (length lines))))
        ;; On status line
        ((and (> current-line 1)
              (string-match "^    Status:" line)
-             (string-match "^  \\*enkan:" (nth (- current-line 2) lines)))
+             (string-match "^  \\*ws:[0-9]\\{2\\} enkan:" (nth (- current-line 2) lines)))
         (list :start-line (- current-line 2)
               :end-line (min (+ current-line 2) (length lines))))
        (t nil)))))
@@ -450,7 +450,7 @@ Returns formatted string."
      (let ((name (plist-get session :name))
            (status (plist-get session :status)))
        (format "%s [%s]"
-               (if (string-match "\\*enkan:\\(.*?\\)\\*" name)
+               (if (string-match "\\*ws:[0-9]\\{2\\} enkan:\\(.*?\\)\\*" name)
                    (match-string 1 name)
                  name)
                (upcase (symbol-name status)))))

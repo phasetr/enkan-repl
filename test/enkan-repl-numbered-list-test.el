@@ -14,8 +14,8 @@
   "Test formatting numbered session list."
   (let* ((sessions
           (list
-           (list :name "*enkan:/home/user/*" :directory "/home/user/" :status 'alive)
-           (list :name "*enkan:/tmp/*" :directory "/tmp/" :status 'dead)))
+           (list :name "*ws:01 enkan:/home/user/*" :directory "/home/user/" :status 'alive)
+           (list :name "*ws:01 enkan:/tmp/*" :directory "/tmp/" :status 'dead)))
          (result (enkan-repl--format-numbered-sessions sessions)))
     (should (string-match-p "1\\. .+enkan:/home/user/.+ — Directory: /home/user/, Status: alive" result))
     (should (string-match-p "2\\. .+enkan:/tmp/.+ — Directory: /tmp/, Status: dead" result))))
@@ -29,7 +29,7 @@
   "Test formatting single session."
   (let* ((sessions
           (list
-           (list :name "*enkan:/root/*" :directory "/root/" :status 'alive)))
+           (list :name "*ws:01 enkan:/root/*" :directory "/root/" :status 'alive)))
          (result (enkan-repl--format-numbered-sessions sessions)))
     (should (string-match-p "1\\. .+enkan:/root/.+ — Directory: /root/, Status: alive" result))
     ;; Should not have a second item
@@ -39,9 +39,9 @@
   "Test that sessions are numbered sequentially."
   (let* ((sessions
           (list
-           (list :name "*enkan:/a/*" :directory "/a/" :status 'alive)
-           (list :name "*enkan:/b/*" :directory "/b/" :status 'alive)
-           (list :name "*enkan:/c/*" :directory "/c/" :status 'alive)))
+           (list :name "*ws:01 enkan:/a/*" :directory "/a/" :status 'alive)
+           (list :name "*ws:01 enkan:/b/*" :directory "/b/" :status 'alive)
+           (list :name "*ws:01 enkan:/c/*" :directory "/c/" :status 'alive)))
          (result (enkan-repl--format-numbered-sessions sessions)))
     (should (string-match-p "1\\. .+enkan:/a/.+ — " result))
     (should (string-match-p "2\\. .+enkan:/b/.+ — " result))
@@ -51,7 +51,7 @@
   "Test that formatting is consistent."
   (let* ((sessions
           (list
-           (list :name "*enkan:/test/*" :directory "/test/" :status 'dead)))
+           (list :name "*ws:01 enkan:/test/*" :directory "/test/" :status 'dead)))
          (result (enkan-repl--format-numbered-sessions sessions))
          (lines (split-string result "\n")))
     ;; Check formatting structure - single line format
