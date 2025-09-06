@@ -269,6 +269,39 @@ for subsequent workspace implementation.")
   "Return workspace token string like \"ws:<id>\" for buffer naming."
   (format "ws:%s" (enkan-repl--ws-id)))
 
+;; Workspace accessors: stable API for state access (no behavior change)
+(defun enkan-repl--ws-current-project ()
+  "Getter: current project name for the active workspace."
+  enkan-repl--current-project)
+
+(defun enkan-repl--ws-session-list ()
+  "Getter: session list for the active workspace."
+  enkan-repl-session-list)
+
+(defun enkan-repl--ws-session-counter ()
+  "Getter: session counter for the active workspace."
+  enkan-repl--session-counter)
+
+(defun enkan-repl--ws-project-aliases ()
+  "Getter: project aliases for the active workspace."
+  enkan-repl-project-aliases)
+
+(defun enkan-repl--ws-set-current-project (value)
+  "Setter: set current project name to VALUE."
+  (setq enkan-repl--current-project value))
+
+(defun enkan-repl--ws-set-session-list (value)
+  "Setter: set session list to VALUE."
+  (setq enkan-repl-session-list value))
+
+(defun enkan-repl--ws-set-session-counter (value)
+  "Setter: set session counter to VALUE."
+  (setq enkan-repl--session-counter value))
+
+(defun enkan-repl--ws-set-project-aliases (value)
+  "Setter: set project aliases to VALUE."
+  (setq enkan-repl-project-aliases value))
+
 (defun enkan-repl--ws-state->plist ()
   "Collect current global session-related variables into a plist.
 This function does not change behavior; it only mirrors current globals."
@@ -871,7 +904,7 @@ Category: Session Controller"
       (if (enkan-repl--is-center-file-path enkan-repl-center-file enkan-repl-projects)
           ;; Center file mode implementation
           (let ((buffer-name "*ENKAN-REPL Finish Sessions*"))
-            (if (null enkan-repl-session-list)
+            (if (null (enkan-repl--ws-session-list))
                 (message "No registered sessions to terminate")
               (with-output-to-temp-buffer buffer-name
                 (princ "=== ENKAN-REPL FINISH ALL SESSIONS ===\n\n")
@@ -879,13 +912,13 @@ Category: Session Controller"
                 (princ "🔧 Current state before termination:\n")
                 (princ (enkan-repl--format-session-state-display
                         (enkan-repl--get-current-session-state-info
-                         enkan-repl--current-project
-                         enkan-repl-session-list
-                         enkan-repl--session-counter
-                         enkan-repl-project-aliases)))
+                         (enkan-repl--ws-current-project)
+                         (enkan-repl--ws-session-list)
+                         (enkan-repl--ws-session-counter)
+                         (enkan-repl--ws-project-aliases))))
                 (princ "\n")
                 (let ((terminated-count 0)
-                      (original-session-list enkan-repl-session-list)) ; Capture for y-or-n-p
+                      (original-session-list (enkan-repl--ws-session-list))) ; Capture for y-or-n-p
                   (when (y-or-n-p (format "Terminate all %d registered sessions? "
                                           (length original-session-list)))
                     (princ "🚫 Terminating sessions:\n")
@@ -917,10 +950,10 @@ Category: Session Controller"
                     (princ "\n🧹 Configuration reset:\n")
                     (princ (enkan-repl--format-session-state-display
                             (enkan-repl--get-current-session-state-info
-                             enkan-repl--current-project
-                             enkan-repl-session-list
-                             enkan-repl--session-counter
-                             enkan-repl-project-aliases)))
+                             (enkan-repl--ws-current-project)
+                             (enkan-repl--ws-session-list)
+                             (enkan-repl--ws-session-counter)
+                             (enkan-repl--ws-project-aliases))))
                     (princ (format "\n✅ Terminated %d sessions, cleared session list and reset project configuration.\n" terminated-count))
                     (princ "\n=== END FINISH SESSIONS ===\n"))))))
         (message "Not in standard file or center file mode")))))
@@ -1044,9 +1077,9 @@ Category: Session Controller"
       (if (enkan-repl--is-center-file-path enkan-repl-center-file enkan-repl-projects)
           (let ((project-name (hmenu "Project:" (mapcar #'car enkan-repl-projects)))
                 (buffer-name "*ENKAN-REPL Auto Setup*")
-                (old-state (list enkan-repl--current-project
-                                 (copy-tree enkan-repl-session-list)
-                                 enkan-repl--session-counter)))
+                (old-state (list (enkan-repl--ws-current-project)
+                                 (copy-tree (enkan-repl--ws-session-list))
+                                 (enkan-repl--ws-session-counter))))
             (with-output-to-temp-buffer buffer-name
               (princ (format "=== ENKAN-REPL AUTO SETUP: %s ===\n\n" project-name))
               (condition-case err
@@ -1451,7 +1484,7 @@ Resolution priority: prefix-arg → alias → nil (for interactive selection)."
       (nth (1- pfx) buffers)))
    ;; Priority 2: alias based selection
    ((and alias (stringp alias) (not (string= "" alias)))
-    (let ((alias-entry (assoc alias enkan-repl-project-aliases)))
+    (let ((alias-entry (assoc alias (enkan-repl--ws-project-aliases))))
       (when alias-entry
         (let* ((resolved-project (cdr alias-entry))
                (matching-buffers (seq-filter
@@ -1514,7 +1547,7 @@ Returns t on success, nil on failure."
     (let* ((resolution (enkan-repl--resolve-send-target
                         pfx
                         resolved-alias
-                        enkan-repl--current-project
+                        (enkan-repl--ws-current-project)
                         enkan-repl-projects
                         enkan-repl-target-directories))
            (status (plist-get resolution :status))
@@ -1642,7 +1675,7 @@ With prefix argument (C-u), select from available buffers.
 Category: Center File Multi-buffer Access"
   (interactive "P")
   (let ((result (enkan-repl--target-directory-info
-                 enkan-repl--current-project
+                 (enkan-repl--ws-current-project)
                  enkan-repl-projects
                  enkan-repl-target-directories
                  "Select project directory to open:"
@@ -1773,7 +1806,7 @@ With prefix argument (C-u), select from available buffers.
 Category: Center File Operations"
   (interactive "P")
   (let ((result (enkan-repl--target-directory-info
-                 enkan-repl--current-project
+                 (enkan-repl--ws-current-project)
                  enkan-repl-projects
                  enkan-repl-target-directories
                  "Select project for magit:"
@@ -1817,14 +1850,14 @@ Category: Debugging"
                            (cdr (cdr entry)))))
         (princ "  <empty>\n"))
       (princ "\nProject aliases:\n")
-      (if enkan-repl-project-aliases
-          (dolist (alias enkan-repl-project-aliases)
+      (if (enkan-repl--ws-project-aliases)
+          (dolist (alias (enkan-repl--ws-project-aliases))
             (princ (format "  %s -> %s\n" (car alias) (cdr alias))))
         (princ "  <empty>\n"))
       (princ "\nCurrent session state:\n")
-      (princ (format "  Current project: %s\n" (or enkan-repl--current-project "<none>")))
-      (princ (format "  Session list: %s\n" (or enkan-repl-session-list "<empty>")))
-      (princ (format "  Session counter: %d\n" enkan-repl--session-counter))
+      (princ (format "  Current project: %s\n" (or (enkan-repl--ws-current-project) "<none>")))
+      (princ (format "  Session list: %s\n" (or (enkan-repl--ws-session-list) "<empty>")))
+      (princ (format "  Session counter: %d\n" (enkan-repl--ws-session-counter)))
       (princ "\n=== END DEBUG ===\n"))))
 
 (provide 'enkan-repl)
