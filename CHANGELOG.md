@@ -1,3 +1,10 @@
+## [0.14.1](https://github.com/phasetr/enkan-repl/compare/v0.14.0...v0.14.1) (2025-09-06)
+
+
+### Bug Fixes
+
+* workspace-scoped session filtering and regex cleanup ([948db4f](https://github.com/phasetr/enkan-repl/commit/948db4f5e55486008a4a70cec62bd3b73ab5093d))
+
 # [0.14.0](https://github.com/phasetr/enkan-repl/compare/v0.13.4...v0.14.0) (2025-09-06)
 
 
