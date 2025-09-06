@@ -37,7 +37,7 @@ Returns cons (window . buffer-name) or nil if session not registered."
       (let ((project-path (enkan-repl--get-project-path-from-directories project-name project-registry)))
         (when project-path
           (let* ((expanded-path (expand-file-name project-path))
-                 (buffer-name (format "*enkan:%s*" expanded-path)))
+                 (buffer-name (format "*ws:01 enkan:%s*" expanded-path)))
             (cons window buffer-name)))))))
 
 ;;;; Window Layout Variables

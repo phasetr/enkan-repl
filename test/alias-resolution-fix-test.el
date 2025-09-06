@@ -7,8 +7,8 @@
 
 (ert-deftest test-alias-resolution-exact-match ()
   "Test that alias resolution uses exact match instead of partial match."
-  (let ((test-buffer-er (generate-new-buffer "*enkan:/Users/sekine/dev/self/enkan-repl*"))
-        (test-buffer-pt (generate-new-buffer "*enkan:/Users/sekine/pt-tools*"))
+  (let ((test-buffer-er (generate-new-buffer "*ws:01 enkan:/Users/sekine/dev/self/enkan-repl*"))
+        (test-buffer-pt (generate-new-buffer "*ws:01 enkan:/Users/sekine/pt-tools*"))
         (enkan-repl-project-aliases '(("er" . "enkan-repl") ("pt" . "pt-tools"))))
     
     (unwind-protect
@@ -16,12 +16,12 @@
           ;; Test er alias should resolve to enkan-repl buffer exactly
           (let ((resolved-buffer (enkan-repl--resolve-target-buffer nil "er" enkan-buffers)))
             (should (eq resolved-buffer test-buffer-er))
-            (should (string= (buffer-name resolved-buffer) "*enkan:/Users/sekine/dev/self/enkan-repl*")))
+            (should (string= (buffer-name resolved-buffer) "*ws:01 enkan:/Users/sekine/dev/self/enkan-repl*")))
           
           ;; Test pt alias should resolve to pt-tools buffer exactly
           (let ((resolved-buffer (enkan-repl--resolve-target-buffer nil "pt" enkan-buffers)))
             (should (eq resolved-buffer test-buffer-pt))
-            (should (string= (buffer-name resolved-buffer) "*enkan:/Users/sekine/pt-tools*")))
+            (should (string= (buffer-name resolved-buffer) "*ws:01 enkan:/Users/sekine/pt-tools*")))
           
           ;; Test non-existent alias
           (should (null (enkan-repl--resolve-target-buffer nil "nonexistent" enkan-buffers))))
@@ -32,8 +32,8 @@
 
 (ert-deftest test-extract-project-name-functionality ()
   "Test that enkan-repl--extract-project-name works correctly."
-  (should (string= (enkan-repl--extract-project-name "*enkan:/Users/sekine/dev/self/enkan-repl*") "enkan-repl"))
-  (should (string= (enkan-repl--extract-project-name "*enkan:/Users/sekine/pt-tools*") "pt-tools"))
-  (should (string= (enkan-repl--extract-project-name "*enkan:/path/to/some-project*") "some-project")))
+  (should (string= (enkan-repl--extract-project-name "*ws:01 enkan:/Users/sekine/dev/self/enkan-repl*") "enkan-repl"))
+  (should (string= (enkan-repl--extract-project-name "*ws:01 enkan:/Users/sekine/pt-tools*") "pt-tools"))
+  (should (string= (enkan-repl--extract-project-name "*ws:01 enkan:/path/to/some-project*") "some-project")))
 
 ;;; alias-resolution-fix-test.el ends here

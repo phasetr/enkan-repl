@@ -39,8 +39,8 @@
     (should (string-match-p "No active enkan sessions" (plist-get result :message))))
   
   ;; Test with prefix-arg resolving to buffer
-  (let* ((buffer1 (get-buffer-create "*enkan:/path/1*"))
-         (buffer2 (get-buffer-create "*enkan:/path/2*"))
+  (let* ((buffer1 (get-buffer-create "*ws:01 enkan:/path/1*"))
+         (buffer2 (get-buffer-create "*ws:01 enkan:/path/2*"))
          (result (enkan-repl--resolve-send-target
                   1 nil "test-project"
                   '(("test-project" . ("alias1" "alias2")))
@@ -52,7 +52,7 @@
     (kill-buffer buffer2))
   
   ;; Test with alias resolving to buffer
-  (let* ((buffer1 (get-buffer-create "*enkan:/path/to/proj1*"))
+  (let* ((buffer1 (get-buffer-create "*ws:01 enkan:/path/to/proj1*"))
          (result (enkan-repl--resolve-send-target
                   nil "alias1" "test-project" 
                   '(("test-project" . ("alias1")))
@@ -62,7 +62,7 @@
     (kill-buffer buffer1))
   
   ;; Test with alias not found (but buffer exists for other aliases)
-  (let* ((buffer1 (get-buffer-create "*enkan:/path/to/proj1*"))
+  (let* ((buffer1 (get-buffer-create "*ws:01 enkan:/path/to/proj1*"))
          (result (enkan-repl--resolve-send-target
                   nil "nonexistent" "test-project"
                   '(("test-project" . ("alias1")))
@@ -72,7 +72,7 @@
     (kill-buffer buffer1))
   
   ;; Test with single buffer auto-selection
-  (let* ((buffer1 (get-buffer-create "*enkan:/single/path*"))
+  (let* ((buffer1 (get-buffer-create "*ws:01 enkan:/single/path*"))
          (result (enkan-repl--resolve-send-target
                   nil nil "test-project"
                   '(("test-project" . ("alias1")))
@@ -82,8 +82,8 @@
     (kill-buffer buffer1))
   
   ;; Test requiring interactive selection
-  (let* ((buffer1 (get-buffer-create "*enkan:/path/1*"))
-         (buffer2 (get-buffer-create "*enkan:/path/2*"))
+  (let* ((buffer1 (get-buffer-create "*ws:01 enkan:/path/1*"))
+         (buffer2 (get-buffer-create "*ws:01 enkan:/path/2*"))
          (result (enkan-repl--resolve-send-target
                   nil nil "test-project"
                   '(("test-project" . ("alias1" "alias2")))

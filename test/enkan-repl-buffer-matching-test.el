@@ -25,11 +25,11 @@
   (should (null (enkan-repl--buffer-matches-directory (list "test") "/test")))
   
   ;; Test non-string target-directory
-  (should (null (enkan-repl--buffer-matches-directory "*enkan:/test*" nil)))
-  (should (null (enkan-repl--buffer-matches-directory "*enkan:/test*" 123)))
-  (should (null (enkan-repl--buffer-matches-directory "*enkan:/test*" (list "/test"))))
+  (should (null (enkan-repl--buffer-matches-directory "*ws:01 enkan:/test*" nil)))
+  (should (null (enkan-repl--buffer-matches-directory "*ws:01 enkan:/test*" 123)))
+  (should (null (enkan-repl--buffer-matches-directory "*ws:01 enkan:/test*" (list "/test"))))
   
-  ;; Test buffer name that doesn't start with "*enkan:"
+  ;; Test buffer name that doesn't start with "*ws:XX enkan:"
   (should (null (enkan-repl--buffer-matches-directory "*eat:/test*" "/test")))
   (should (null (enkan-repl--buffer-matches-directory "enkan:/test*" "/test")))
   (should (null (enkan-repl--buffer-matches-directory "*shell:/test*" "/test")))
@@ -38,41 +38,41 @@
   ;; Test successful prefix matching
   (let ((test-dir (expand-file-name "/Users/test/project")))
     (should (enkan-repl--buffer-matches-directory
-             (format "*enkan:%s*" test-dir)
+             (format "*ws:01 enkan:%s*" test-dir)
              "/Users/test/project")))
   
   ;; Test successful prefix matching with tilde expansion
   (let ((home-dir (expand-file-name "~")))
     (should (enkan-repl--buffer-matches-directory
-             (format "*enkan:%s/project*" home-dir)
+             (format "*ws:01 enkan:%s/project*" home-dir)
              "~/project")))
   
   ;; Test failed prefix matching
   (should (null (enkan-repl--buffer-matches-directory
-                 "*enkan:/Users/test/project1*"
+                 "*ws:01 enkan:/Users/test/project1*"
                  "/Users/test/project2")))
   
   ;; Test edge case: exact directory name in buffer but different path
   (should (null (enkan-repl--buffer-matches-directory
-                 "*enkan:/different/project*"
+                 "*ws:01 enkan:/different/project*"
                  "/other/project")))
   
   ;; Test complex paths
   (let ((complex-path (expand-file-name "/complex/path/with spaces/project")))
     (should (enkan-repl--buffer-matches-directory
-             (format "*enkan:%s*" complex-path)
+             (format "*ws:01 enkan:%s*" complex-path)
              "/complex/path/with spaces/project"))))
 
 (ert-deftest test-enkan-repl--buffer-matches-directory-edge-cases ()
   "Test edge cases for the actual buffer matching function."
   ;; Empty strings (should fail due to non-matching pattern)
   (should (null (enkan-repl--buffer-matches-directory "" "")))
-  (should (null (enkan-repl--buffer-matches-directory "*enkan:*" "")))
+  (should (null (enkan-repl--buffer-matches-directory "*ws:01 enkan:*" "")))
   (should (null (enkan-repl--buffer-matches-directory "" "/path")))
   
   ;; Malformed enkan buffer names
-  (should (null (enkan-repl--buffer-matches-directory "*enkan:" "/test")))
-  (should (null (enkan-repl--buffer-matches-directory "*enkan/test*" "/test")))
+  (should (null (enkan-repl--buffer-matches-directory "*ws:01 enkan:" "/test")))
+  (should (null (enkan-repl--buffer-matches-directory "*ws:01 enkan/test*" "/test")))
   (should (null (enkan-repl--buffer-matches-directory "enkan:/test*" "/test")))
   
   ;; Buffer names that start with enkan but are not exact pattern
