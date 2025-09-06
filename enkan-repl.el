@@ -81,6 +81,8 @@
 (declare-function enkan-repl--get-project-info-from-directories "enkan-repl-utils" (alias target-directories))
 (declare-function enkan-repl--get-project-path-from-directories "enkan-repl-utils" (project-name target-directories))
 (declare-function enkan-repl--send-primitive "enkan-repl-utils" (text special-key-type))
+(declare-function enkan-repl--buffer-name-matches-workspace "enkan-repl-utils" (name workspace-id))
+(declare-function enkan-repl--extract-workspace-id "enkan-repl-utils" (name))
 (declare-function magit-status "magit" (&optional directory))
 
 ;; Declare external functions from hmenu to silence byte-compiler when not loaded
@@ -609,9 +611,11 @@ Returns: Directory path or nil"
 
 (defun enkan-repl--get-buffer-for-directory (&optional directory)
   "Get the eat buffer for DIRECTORY if it exists and is live.
-If DIRECTORY is nil, use current `default-directory'."
+If DIRECTORY is nil, use current `default-directory'.
+Only returns buffers that belong to the current workspace."
   (let
       ((target-dir (or directory default-directory))
+       (current-ws enkan-repl--current-workspace)
        (matching-buffer nil))
     (cl-block search-buffers
       (dolist (buf (buffer-list))
@@ -623,6 +627,8 @@ If DIRECTORY is nil, use current `default-directory'."
           (when
               (and (buffer-live-p buf)
                    name     ; Ensure name is not nil
+                   ;; Check workspace match
+                   (enkan-repl--buffer-name-matches-workspace name current-ws)
                    ;; Check for directory-specific enkan buffer using the buffer-name matcher
                    (enkan-repl--buffer-matches-directory name target-dir))
             (setq matching-buffer buf)
@@ -1459,16 +1465,20 @@ Returns plist with :buffer, :name, :live-p, :has-process, :process."
 (defun enkan-repl--get-available-buffers (buffer-list)
   "Pure function to get available enkan buffers from BUFFER-LIST.
 Consolidates buffer collection and filtering into single function.
-Returns list of valid enkan buffers with active eat processes."
-  (seq-filter (lambda (buffer)
-                (and (bufferp buffer)
-                     (buffer-name buffer)
-                     (string-match-p "^\\*ws:[0-9]\\{2\\} enkan:" (buffer-name buffer))
-                     (with-current-buffer buffer
-                       (and (boundp 'eat--process)
-                            eat--process
-                            (process-live-p eat--process)))))
-              buffer-list))
+Returns list of valid enkan buffers with active eat processes.
+Only returns buffers that belong to the current workspace."
+  (let ((current-ws enkan-repl--current-workspace))
+    (seq-filter (lambda (buffer)
+                  (and (bufferp buffer)
+                       (buffer-name buffer)
+                       ;; Check workspace match
+                       (enkan-repl--buffer-name-matches-workspace 
+                        (buffer-name buffer) current-ws)
+                       (with-current-buffer buffer
+                         (and (boundp 'eat--process)
+                              eat--process
+                              (process-live-p eat--process)))))
+                buffer-list)))
 
 (defun enkan-repl--resolve-target-buffer (pfx alias buffers)
   "Pure function to resolve target buffer from multiple inputs.

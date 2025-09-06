@@ -43,6 +43,20 @@ Returns buffer name in format *ws:01 enkan:<expanded-path>*.
 Always uses workspace ID 01 for now (single workspace mode)."
   (format "*ws:01 enkan:%s*" (expand-file-name path)))
 
+(defun enkan-repl--buffer-name-matches-workspace (name workspace-id)
+  "Check if buffer NAME belongs to WORKSPACE-ID.
+Returns t if the buffer name has the correct workspace prefix."
+  (and (stringp name)
+       (stringp workspace-id)
+       (string-match-p (format "^\\*ws:%s enkan:" workspace-id) name)))
+
+(defun enkan-repl--extract-workspace-id (name)
+  "Extract workspace ID from buffer NAME.
+Returns workspace ID string (e.g., \"01\") or nil if not an enkan buffer."
+  (when (and (stringp name)
+             (string-match "^\\*ws:\\([0-9]\\{2\\}\\) enkan:" name))
+    (match-string 1 name)))
+
 ;;;; Session List Pure Functions
 
 (defun enkan-repl--extract-project-name (buffer-name-or-path)
