@@ -885,7 +885,8 @@ Category: Session Controller"
 (defun enkan-repl-teardown ()
   "Terminate eat session(s) based on context.
 - Standard input file: terminate single eat session for current directory
-- Center file: terminate all registered sessions
+  in current workspace
+- Center file: terminate all registered sessions in current workspace
 
 Category: Session Controller"
   (interactive)
@@ -908,7 +909,7 @@ Category: Session Controller"
                       (y-or-n-p (format "Terminate eat session in %s? " target-dir)))
               (kill-buffer existing-buffer)
               (message "Terminated eat session in: %s" target-dir)))))
-      ;; Center file mode: terminate all sessions
+      ;; Center file mode: terminate all sessions in current workspace
       (if (enkan-repl--is-center-file-path enkan-repl-center-file enkan-repl-projects)
           ;; Center file mode implementation
           (let ((buffer-name "*ENKAN-REPL Finish Sessions*"))
@@ -1061,8 +1062,9 @@ Implemented as pure function, side effects are handled by upper functions."
 (defun enkan-repl-setup ()
   "Set up window layout based on context.
 - Standard input file: basic window layout with project input file on
-  left and eat session on right
+  left and eat session on right in current workspace
 - Center file: auto start eat sessions using project configuration
+  in current workspace
 
 Category: Session Controller"
   (interactive)
@@ -1396,6 +1398,7 @@ Returns a plist with :status and other relevant keys."
 
 (defun enkan-repl--terminate-all-session-buffers (session-list target-directories)
   "Terminate all buffers associated with sessions in SESSION-LIST.
+Only terminates buffers in the current workspace.
 TARGET-DIRECTORIES is a list of directories to search for project paths.
 Returns an alist of (terminated-count . session-termination-results).
 SESSION-TERMINATION-RESULTS is a list of alists, each containing
