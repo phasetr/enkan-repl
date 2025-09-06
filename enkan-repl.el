@@ -331,13 +331,14 @@ This function restores workspace state from the given plist."
 When WORKSPACE-ID is nil, use `enkan-repl--current-workspace'.
 Returns the saved plist for verification."
   (let* ((ws (or workspace-id enkan-repl--current-workspace))
-         (plist (enkan-repl--ws-state->plist))
-         ;; Remove existing entry if present
-         (existing (cl-remove-if (lambda (entry)
-                                   (string= (car entry) ws))
-                                 enkan-repl--workspaces)))
+         (plist (enkan-repl--ws-state->plist)))
+    ;; Remove ALL existing entries with same ID (defensive programming)
     (setq enkan-repl--workspaces
-          (cons (cons ws plist) existing))
+          (cl-remove-if (lambda (entry)
+                          (string= (car entry) ws))
+                        enkan-repl--workspaces))
+    ;; Add single new entry
+    (push (cons ws plist) enkan-repl--workspaces)
     plist))
 
 (defun enkan-repl--load-workspace-state (&optional workspace-id)
@@ -401,9 +402,10 @@ Returns updated alist without the specified workspace."
 
 (defun enkan-repl--list-workspace-ids (workspaces)
   "List all workspace IDs from WORKSPACES alist.
-Returns sorted list of ID strings."
+Returns sorted list of unique ID strings."
   (when workspaces
-    (sort (mapcar #'car workspaces) #'string<)))
+    (let ((ids (mapcar #'car workspaces)))
+      (sort (cl-remove-duplicates ids :test #'string=) #'string<))))
 
 ;;;; Core Functions
 
@@ -1935,16 +1937,18 @@ Category: Debugging"
   "Create a new workspace and switch to it.
 The workspace ID is automatically generated."
   (interactive)
-  (let* ((new-id (enkan-repl--create-workspace-state enkan-repl--workspaces))
-         (updated (enkan-repl--add-workspace enkan-repl--workspaces new-id)))
+  (let* ((new-id (enkan-repl--create-workspace-state enkan-repl--workspaces)))
     ;; Save current workspace state before switching
     (enkan-repl--save-workspace-state)
-    ;; Update global workspace list
-    (setq enkan-repl--workspaces updated)
-    ;; Switch to new workspace
+    ;; Create new workspace entry directly with save-workspace-state
     (setq enkan-repl--current-workspace new-id)
-    ;; Load empty state for new workspace
-    (enkan-repl--load-workspace-state new-id)
+    ;; Reset globals for new workspace
+    (setq enkan-repl--current-project nil)
+    (setq enkan-repl-session-list nil)
+    (setq enkan-repl--session-counter 0)
+    (setq enkan-repl-project-aliases nil)
+    ;; Save the new empty workspace
+    (enkan-repl--save-workspace-state)
     (message "Created and switched to workspace %s" new-id)))
 
 ;;;###autoload
