@@ -249,11 +249,11 @@ Example: \\='((1 . \"project1\") (2 . \"project2\") (3 . \"project3\") (4 . \"pr
   "Currently selected project name.
 When nil, executes normal setup behavior.")
 
-;;;; Workspace State (skeleton — no behavior change)
+;;;; Workspace State
 
 (defvar enkan-repl--current-workspace "01"
   "Current workspace ID as a zero-padded numeric string (e.g., \"01\").
-This skeleton introduces a workspace-first model without changing behavior.")
+All buffers and sessions are scoped to this workspace.")
 
 (defvar enkan-repl--workspaces nil
   "Alist of workspace states keyed by workspace ID string.
@@ -262,8 +262,8 @@ Each value is a plist containing the following keys:
   :session-list      (alist (number . project-name))
   :session-counter   (integer)
   :project-aliases   (alist (alias . project-name))
-This variable is currently unused by the runtime and serves as a staging area
-for subsequent workspace implementation.")
+Workspace states are saved/restored via `enkan-repl--save-workspace-state'
+and `enkan-repl--load-workspace-state'.")
 
 (defun enkan-repl--ws-id ()
   "Return current workspace ID string (zero-padded numeric)."
@@ -317,7 +317,7 @@ This function does not change behavior; it only mirrors current globals."
 (defun enkan-repl--plist->ws-state (state)
   "Set current global session-related variables from STATE plist.
 Keys: :current-project, :session-list, :session-counter, :project-aliases.
-This is a skeleton setter and does not get invoked by runtime yet."
+This function restores workspace state from the given plist."
   (when (plist-member state :current-project)
     (setq enkan-repl--current-project (plist-get state :current-project)))
   (when (plist-member state :session-list)
@@ -330,7 +330,7 @@ This is a skeleton setter and does not get invoked by runtime yet."
 (defun enkan-repl--save-workspace-state (&optional workspace-id)
   "Save current globals into `enkan-repl--workspaces' under WORKSPACE-ID.
 When WORKSPACE-ID is nil, use `enkan-repl--current-workspace'.
-This function has no effect on runtime selection yet (skeleton only)."
+Returns the saved plist for verification."
   (let* ((ws (or workspace-id enkan-repl--current-workspace))
          (ws-sym (intern ws))
          (plist (enkan-repl--ws-state->plist))
@@ -343,7 +343,8 @@ This function has no effect on runtime selection yet (skeleton only)."
 (defun enkan-repl--load-workspace-state (&optional workspace-id)
   "Load state from `enkan-repl--workspaces' into globals for WORKSPACE-ID.
 When WORKSPACE-ID is nil, use `enkan-repl--current-workspace'.
-If no state is found, globals remain unchanged. Skeleton only."
+If no state is found, globals remain unchanged.
+Returns the loaded plist, or nil if no state was found."
   (let* ((ws (or workspace-id enkan-repl--current-workspace))
          (entry (assoc (intern ws) enkan-repl--workspaces))
          (plist (cdr entry)))
