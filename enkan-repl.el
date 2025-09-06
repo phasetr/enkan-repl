@@ -355,6 +355,24 @@ Returns the loaded plist, or nil if no state was found."
 
 ;;;; Workspace Management Pure Functions
 
+(defun enkan-repl--initialize-default-workspace ()
+  "Initialize default workspace '01' with first available project.
+Returns t if initialized, nil if already exists."
+  (unless enkan-repl--workspaces
+    (let ((default-project (when enkan-repl-projects
+                             (caar enkan-repl-projects))))
+      ;; Save current state first
+      (let ((saved-project enkan-repl--current-project))
+        ;; Set default project temporarily if available
+        (when default-project
+          (setq enkan-repl--current-project default-project))
+        ;; Save workspace state
+        (enkan-repl--save-workspace-state "01")
+        ;; Restore original project if no default was set
+        (unless default-project
+          (setq enkan-repl--current-project saved-project)))
+      t)))
+
 (defun enkan-repl--generate-next-workspace-id (workspaces)
   "Generate next workspace ID from WORKSPACES alist.
 Returns zero-padded numeric string (e.g., \"01\", \"02\")."
@@ -1124,10 +1142,8 @@ Implemented as pure function, side effects are handled by upper functions."
 
 Category: Session Controller"
   (interactive)
-  ;; Ensure default workspace exists
-  (unless enkan-repl--workspaces
-    ;; Initialize workspace "01" if no workspaces exist
-    (enkan-repl--save-workspace-state "01"))
+  ;; Ensure default workspace exists with project
+  (enkan-repl--initialize-default-workspace)
   ;; Check if current buffer filename matches standard input file format
   (let* ((current-file (buffer-file-name))
          (is-standard-file (enkan-repl--is-standard-file-path current-file default-directory)))

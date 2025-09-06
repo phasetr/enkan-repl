@@ -151,5 +151,39 @@
     ;; Should return nil for non-existent workspace
     (should-not (enkan-repl--get-workspace-state workspaces "02"))))
 
+(ert-deftest test-enkan-repl--initialize-default-workspace ()
+  "Test default workspace initialization."
+  ;; Test initialization when no workspaces exist
+  (let ((enkan-repl--workspaces nil)
+        (enkan-repl--current-project nil)
+        (enkan-repl--session-counter 0)
+        (enkan-repl-session-list nil)
+        (enkan-repl-project-aliases nil)
+        (enkan-repl-projects '(("project1" ("alias1" . "/path1"))
+                              ("project2" ("alias2" . "/path2")))))
+    ;; Should initialize with first project
+    (should (enkan-repl--initialize-default-workspace))
+    (should enkan-repl--workspaces)
+    (let ((ws-state (cdr (assoc "01" enkan-repl--workspaces #'string=))))
+      (should ws-state)
+      (should (equal "project1" (plist-get ws-state :current-project)))))
+  
+  ;; Test when workspaces already exist
+  (let ((enkan-repl--workspaces '(("01" :current-project "existing"))))
+    (should-not (enkan-repl--initialize-default-workspace)))
+  
+  ;; Test when no projects defined
+  (let ((enkan-repl--workspaces nil)
+        (enkan-repl--current-project nil)
+        (enkan-repl--session-counter 0)
+        (enkan-repl-session-list nil)
+        (enkan-repl-project-aliases nil)
+        (enkan-repl-projects nil))
+    (should (enkan-repl--initialize-default-workspace))
+    (should enkan-repl--workspaces)
+    (let ((ws-state (cdr (assoc "01" enkan-repl--workspaces #'string=))))
+      (should ws-state)
+      (should (null (plist-get ws-state :current-project))))))
+
 (provide 'enkan-repl-workspace-management-test)
 ;;; enkan-repl-workspace-management-test.el ends here
