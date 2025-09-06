@@ -53,8 +53,9 @@
 
 (require 'cl-lib)
 
-;; Load horizontal menu interface
-(require 'hmenu)
+;; Load horizontal menu interface if available (avoid compile-time hard fail)
+(when (locate-library "hmenu")
+  (require 'hmenu))
 
 ;; Load utility functions (require for template generation and cheat-sheet)
 (when (locate-library "enkan-repl-utils")
@@ -69,8 +70,21 @@
 (declare-function enkan-repl--find-session-buffer "enkan-repl-utils" (selected-name buffer-info-list))
 (declare-function enkan-repl--collect-sessions "enkan-repl-utils" (buffer-info-list))
 (declare-function enkan-repl--format-numbered-sessions "enkan-repl-utils" (sessions))
+(declare-function enkan-repl--format-session-state-display "enkan-repl-utils" (state-info &optional prefix))
+(declare-function enkan-repl--get-current-session-state-info "enkan-repl-utils" (current-project session-list session-counter project-aliases))
 (declare-function enkan-repl-utils--encode-full-path "enkan-repl-utils" (path prefix separator))
 (declare-function enkan-repl-utils--decode-full-path "enkan-repl-utils" (encoded-name prefix separator))
+(declare-function enkan-repl--make-buffer-name "enkan-repl-utils" (path))
+(declare-function enkan-repl--buffer-matches-directory "enkan-repl-utils" (buffer-name target-directory))
+(declare-function enkan-repl--extract-directory-from-buffer-name "enkan-repl-utils" (buffer-name))
+(declare-function enkan-repl--extract-project-name "enkan-repl-utils" (buffer-name-or-path))
+(declare-function enkan-repl--get-project-info-from-directories "enkan-repl-utils" (alias target-directories))
+(declare-function enkan-repl--get-project-path-from-directories "enkan-repl-utils" (project-name target-directories))
+(declare-function enkan-repl--send-primitive "enkan-repl-utils" (text special-key-type))
+(declare-function magit-status "magit" (&optional directory))
+
+;; Declare external functions from hmenu to silence byte-compiler when not loaded
+(declare-function hmenu "hmenu" (prompt choices))
 
 ;; Declare external functions to avoid byte-compiler warnings
 (declare-function eat "eat" (&optional program))
@@ -114,6 +128,10 @@ This structure is used for documentation generation and organization.")
 ;; Declare external variable from constants file
 (defvar enkan-repl-cheat-sheet-candidates nil
   "Precompiled list of cheat-sheet candidates from constants file.")
+
+;; Forward declaration for minor mode to silence byte-compiler before definition
+(defvar enkan-repl-global-minor-mode nil
+  "Non-nil if `enkan-repl-global-minor-mode' is enabled.")
 
 (defun enkan-repl--find-template-directory ()
   "Find directory containing default template file.
@@ -230,7 +248,7 @@ When nil, executes normal setup behavior.")
 ;;;; Workspace State (skeleton — no behavior change)
 
 (defvar enkan-repl--current-workspace "01"
-  "Current workspace ID as a zero-padded numeric string (e.g., \="01\=").
+  "Current workspace ID as a zero-padded numeric string (e.g., \"01\").
 This skeleton introduces a workspace-first model without changing behavior.")
 
 (defvar enkan-repl--workspaces nil
@@ -248,7 +266,7 @@ for subsequent workspace implementation.")
   enkan-repl--current-workspace)
 
 (defun enkan-repl--ws-token ()
-  "Return workspace token string like \="ws:<id>\=" for buffer naming."
+  "Return workspace token string like \"ws:<id>\" for buffer naming."
   (format "ws:%s" (enkan-repl--ws-id)))
 
 (defun enkan-repl--ws-state->plist ()
@@ -602,7 +620,7 @@ Otherwise, use current `default-directory'."
 ;;;; Public API - Send Functions
 
 ;;;###autoload
-(defun enkan-repl-send-region (start end &optional prefix-arg)
+(defun enkan-repl-send-region (start end &optional pfx)
   "Send region text (from START to END) to enkan session buffer.
 - From enkan buffer: Send to current buffer
 - From other buffer without prefix: Interactive buffer selection
@@ -613,10 +631,10 @@ Uses unified backend with smart buffer detection.
 Category: Text Sender"
   (interactive "r\nP")
   (enkan-repl--send-unified
-   (buffer-substring-no-properties start end) prefix-arg nil))
+   (buffer-substring-no-properties start end) pfx nil))
 
 ;;;###autoload
-(defun enkan-repl-send-line (&optional prefix-arg)
+(defun enkan-repl-send-line (&optional pfx)
   "Send current line to enkan session buffer.
 - From enkan buffer: Send to current buffer
 - From other buffer without prefix: Interactive buffer selection
@@ -627,10 +645,10 @@ Uses unified backend with smart buffer detection.
 Category: Text Sender"
   (interactive "P")
   (enkan-repl--send-unified
-   (buffer-substring-no-properties (line-beginning-position) (line-end-position)) prefix-arg nil))
+   (buffer-substring-no-properties (line-beginning-position) (line-end-position)) pfx nil))
 
 ;;;###autoload
-(defun enkan-repl-send-enter (&optional prefix-arg)
+(defun enkan-repl-send-enter (&optional pfx)
   "Send enter key to enkan session buffer.
 - From enkan buffer: Send to current buffer
 - From other buffer without prefix: Interactive buffer selection
@@ -640,10 +658,10 @@ Uses unified backend with smart buffer detection.
 
 Category: Text Sender"
   (interactive "P")
-  (enkan-repl--send-unified "" prefix-arg :enter))
+  (enkan-repl--send-unified "" pfx :enter))
 
 ;;;###autoload
-(defun enkan-repl-send-1 (&optional prefix-arg)
+(defun enkan-repl-send-1 (&optional pfx)
   "Send \\='1\\=' to enkan session buffer for numbered choice prompt.
 - From enkan buffer: Send to current buffer
 - From other buffer without prefix: Interactive buffer selection
@@ -653,10 +671,10 @@ Uses unified backend with smart buffer detection.
 
 Category: Text Sender"
   (interactive "P")
-  (enkan-repl--send-unified "" prefix-arg 1))
+  (enkan-repl--send-unified "" pfx 1))
 
 ;;;###autoload
-(defun enkan-repl-send-2 (&optional prefix-arg)
+(defun enkan-repl-send-2 (&optional pfx)
   "Send \\='2\\=' to enkan session buffer for numbered choice prompt.
 - From enkan buffer: Send to current buffer
 - From other buffer without prefix: Interactive buffer selection
@@ -666,10 +684,10 @@ Uses unified backend with smart buffer detection.
 
 Category: Text Sender"
   (interactive "P")
-  (enkan-repl--send-unified "" prefix-arg 2))
+  (enkan-repl--send-unified "" pfx 2))
 
 ;;;###autoload
-(defun enkan-repl-send-3 (&optional prefix-arg)
+(defun enkan-repl-send-3 (&optional pfx)
   "Send \\='3\\=' to enkan session buffer for numbered choice prompt.
 - From enkan buffer: Send to current buffer
 - From other buffer without prefix: Interactive buffer selection
@@ -679,10 +697,10 @@ Uses unified backend with smart buffer detection.
 
 Category: Text Sender"
   (interactive "P")
-  (enkan-repl--send-unified "" prefix-arg 3))
+  (enkan-repl--send-unified "" pfx 3))
 
 ;;;###autoload
-(defun enkan-repl-send-4 (&optional prefix-arg)
+(defun enkan-repl-send-4 (&optional pfx)
   "Send \\='4\\=' to enkan session buffer for numbered choice prompt.
 - From enkan buffer: Send to current buffer
 - From other buffer without prefix: Interactive buffer selection
@@ -692,10 +710,10 @@ Uses unified backend with smart buffer detection.
 
 Category: Text Sender"
   (interactive "P")
-  (enkan-repl--send-unified "" prefix-arg 4))
+  (enkan-repl--send-unified "" pfx 4))
 
 ;;;###autoload
-(defun enkan-repl-send-5 (&optional prefix-arg)
+(defun enkan-repl-send-5 (&optional pfx)
   "Send \\='5\\=' to enkan session buffer for numbered choice prompt.
 - From enkan buffer: Send to current buffer
 - From other buffer without prefix: Interactive buffer selection
@@ -705,7 +723,7 @@ Uses unified backend with smart buffer detection.
 
 Category: Text Sender"
   (interactive "P")
-  (enkan-repl--send-unified "" prefix-arg 5))
+  (enkan-repl--send-unified "" pfx 5))
 
 
 ;;;###autoload
@@ -801,7 +819,7 @@ RESTART-FUNC is a zero-argument function to call for restart.
       (message "Removed dead eat session buffer in: %s" target-dir))))
 
 ;;;###autoload
-(defun enkan-repl-start-eat (&optional force)
+(defun enkan-repl-start-eat (&optional _force)
   "Start eat terminal emulator session in current directory.
 Simplified version for use within setup functions only.
 FORCE parameter ignored - always starts new session.
@@ -920,9 +938,9 @@ Category: Session Controller"
        projects))
 
 (defun enkan-repl--setup-log-state (buffer-name state-type layout sessions counter)
-  "Log current or final state to BUFFER-NAME.
-STATE-TYPE: 'Current' or 'Final'
-PROJECT: current project
+  "Log state to BUFFER-NAME for setup/teardown.
+STATE-TYPE: Current or Final
+LAYOUT: current project/layout name
 SESSIONS: session list
 COUNTER: session counter"
   (with-current-buffer buffer-name
@@ -946,8 +964,8 @@ COUNTER: session counter"
   (with-current-buffer buffer-name
     (princ "🧹 Reset previous configuration\n\n")))
 
-(defun enkan-repl--setup-set-project-aliases (project-name alias-list buffer-name)
-  "Set project aliases from ALIAS-LIST for PROJECT-NAME and log to BUFFER-NAME."
+(defun enkan-repl--setup-set-project-aliases (_project-name alias-list buffer-name)
+  "Set project aliases from ALIAS-LIST and log to BUFFER-NAME."
   (let ((project-aliases '()))
     (dolist (alias alias-list)
       (let ((project-info (enkan-repl--get-project-info-from-directories alias enkan-repl-target-directories)))
@@ -970,7 +988,6 @@ Includes error handling for individual session failures."
       (condition-case err
           (let ((project-info (enkan-repl--setup-project-session alias)))
             (let ((project-name (car project-info))
-                  (project-path (expand-file-name (cdr project-info)))
                   (default-directory (expand-file-name (cdr project-info))))
               ;; Register session
               (enkan-repl--register-session session-number project-name)
@@ -1000,7 +1017,8 @@ Implemented as pure function, side effects are handled by upper functions."
 ;;;###autoload
 (defun enkan-repl-setup ()
   "Set up window layout based on context.
-- Standard input file: basic window layout with project input file on left and eat session on right
+- Standard input file: basic window layout with project input file on
+  left and eat session on right
 - Center file: auto start eat sessions using project configuration
 
 Category: Session Controller"
@@ -1051,8 +1069,10 @@ Category: Session Controller"
                     (setq enkan-repl--current-project project-name)
                     (princ (format "\n✅ Setup completed for project: %s\n" project-name))
                     (princ "Arrange your preferred window configuration!\n\n")
-                    (princ "=== END SETUP ===\n")))))
-        (message "Center file not configured or no projects defined")))))
+                    (princ "=== END SETUP ===\n"))
+                (error
+                 (princ (format "\n❌ Setup failed: %s\n" (error-message-string err))))))
+            (message "Center file not configured or no projects defined"))))))
 
 ;;; Debug and Utility Functions
 
@@ -1126,7 +1146,8 @@ Category: Command Palette"
   :group 'enkan-repl)
 
 (defun enkan-repl--refresh-global-minor-map ()
-  "Rebuild `enkan-repl-global-minor-mode-map' from `enkan-repl-global-minor-bindings'."
+  "Rebuild `enkan-repl-global-minor-mode-map' from
+`enkan-repl-global-minor-bindings'."
   (setq enkan-repl-global-minor-mode-map
         (enkan-repl--build-map enkan-repl-global-minor-bindings)))
 
@@ -1166,9 +1187,9 @@ Returns a list of (alias . path) pairs."
              when project-info
              collect (cons alias (cdr project-info)))))
 
-(defun enkan-repl--resolve-send-target (prefix-arg resolved-alias current-project projects target-directories)
-  "Resolve send target buffer based on PREFIX-ARG, RESOLVED-ALIAS, and project config.
-PREFIX-ARG: numeric prefix for buffer selection (optional)
+(defun enkan-repl--resolve-send-target (pfx resolved-alias current-project projects target-directories)
+  "Resolve target buffer from prefix/alias and project config.
+PREFIX-ARG (PFX): numeric prefix for buffer selection (optional)
 RESOLVED-ALIAS: resolved alias from command parsing (optional)
 CURRENT-PROJECT: current project name
 PROJECTS: project configuration
@@ -1198,13 +1219,13 @@ Returns a plist with :status and other keys."
         ;; Resolve based on prefix-arg or alias
         (cond
          ;; Priority 1: prefix-arg based selection
-         ((and prefix-arg (numberp prefix-arg) (> prefix-arg 0))
-          (if (<= prefix-arg (length active-pairs))
+         ((and pfx (numberp pfx) (> pfx 0))
+          (if (<= pfx (length active-pairs))
               (list :status 'selected
-                    :buffer (cdr (nth (1- prefix-arg) active-pairs)))
+                    :buffer (cdr (nth (1- pfx) active-pairs)))
             (list :status 'invalid
                   :message (format "Invalid prefix arg: %d (only %d buffers available)"
-                                   prefix-arg (length active-pairs)))))
+                                   pfx (length active-pairs)))))
          ;; Priority 2: alias based selection
          ((and resolved-alias (stringp resolved-alias) (not (string= "" resolved-alias)))
           (let ((matching-pair (assoc resolved-alias active-pairs)))
@@ -1222,7 +1243,7 @@ Returns a plist with :status and other keys."
           (list :status 'needs-selection
                 :buffers (mapcar #'cdr active-pairs))))))))
 
-(defun enkan-repl--select-project (project-paths current-project prompt action-fn validation-fn)
+(defun enkan-repl--select-project (project-paths current-project prompt _action-fn validation-fn)
   "Handle project selection based on PROJECT-PATHS.
 CURRENT-PROJECT is the current project name.
 PROMPT is the hmenu prompt for multiple projects.
@@ -1265,7 +1286,7 @@ Returns a plist with :status and other relevant keys."
                       :alias (car selected-entry))))
           (list :status 'cancelled)))))))
 
-(defun enkan-repl--target-directory-info (current-project projects target-directories prompt validation-fn &optional prefix-arg)
+(defun enkan-repl--target-directory-info (current-project projects target-directories prompt validation-fn &optional pfx)
   "Get target directory info for CURRENT-PROJECT.
 PROJECTS is the project configuration.
 TARGET-DIRECTORIES is the directory configuration.
@@ -1274,8 +1295,8 @@ VALIDATION-FN is an optional validation function.
 PREFIX-ARG if provided, select from existing buffers instead.
 Returns a plist with :status and other relevant keys."
   ;; If prefix-arg is provided, use buffer resolution
-  (if prefix-arg
-      (let* ((numeric-prefix (prefix-numeric-value prefix-arg))
+  (if pfx
+      (let* ((numeric-prefix (prefix-numeric-value pfx))
              (resolution (enkan-repl--resolve-send-target
                           numeric-prefix
                           nil
@@ -1414,7 +1435,7 @@ Returns list of valid enkan buffers with active eat processes."
                             (process-live-p eat--process)))))
               buffer-list))
 
-(defun enkan-repl--resolve-target-buffer (prefix-arg alias buffers)
+(defun enkan-repl--resolve-target-buffer (pfx alias buffers)
   "Pure function to resolve target buffer from multiple inputs.
 PREFIX-ARG: numeric prefix for index-based selection
 ALIAS: alias string for alias-based selection
@@ -1423,9 +1444,9 @@ Returns resolved buffer or nil if no match.
 Resolution priority: prefix-arg → alias → nil (for interactive selection)."
   (cond
    ;; Priority 1: prefix-arg based selection
-   ((and prefix-arg (numberp prefix-arg) (> prefix-arg 0))
-    (when (and (<= prefix-arg (length buffers)))
-      (nth (1- prefix-arg) buffers)))
+   ((and pfx (numberp pfx) (> pfx 0))
+    (when (and (<= pfx (length buffers)))
+      (nth (1- pfx) buffers)))
    ;; Priority 2: alias based selection
    ((and alias (stringp alias) (not (string= "" alias)))
     (let ((alias-entry (assoc alias enkan-repl-project-aliases)))
@@ -1458,7 +1479,7 @@ Returns t on success, nil on failure."
               (eat--send-string eat--process "\r"))
             t))))))
 
-(defun enkan-repl--send-unified (text &optional prefix-arg special-key-type)
+(defun enkan-repl--send-unified (text &optional pfx special-key-type)
   "Unified backend for all send commands.
 TEXT: text content to send
 PREFIX-ARG: numeric prefix for buffer selection (optional)
@@ -1489,7 +1510,7 @@ Returns t on success, nil on failure."
             (setq final-text ""))))))
     ;; Resolve target buffer using new unified function
     (let* ((resolution (enkan-repl--resolve-send-target
-                        prefix-arg
+                        pfx
                         resolved-alias
                         enkan-repl--current-project
                         enkan-repl-projects
@@ -1529,14 +1550,14 @@ Returns list of cons cells (display-name . buffer) for selection UI."
                     buffer)))
           buffers))
 
-(defun enkan-repl--parse-prefix-arg (prefix-arg)
+(defun enkan-repl--parse-prefix-arg (pfx)
   "Pure function to parse PREFIX-ARG into action type.
 Returns plist with :action and :index."
   (cond
-   ((null prefix-arg)
+   ((null pfx)
     (list :action 'select :index nil))
-   ((integerp prefix-arg)
-    (list :action 'index :index prefix-arg))
+   ((integerp pfx)
+    (list :action 'index :index pfx))
    (t
     (list :action 'invalid :index nil))))
 
@@ -1594,7 +1615,7 @@ Sends text followed by carriage return, with cursor positioning."
       t)))
 
 ;;;###autoload
-(defun enkan-repl-send-escape (&optional prefix-arg)
+(defun enkan-repl-send-escape (&optional pfx)
   "Send ESC key to eat session buffer from center file or current enkan buffer.
 - If called from enkan buffer: Send ESC to current buffer
 - If called from center file without prefix: Select from available enkan buffers
@@ -1609,10 +1630,10 @@ Category: Center File Multi-buffer Access"
       (enkan-repl--send-primitive-action (current-buffer) send-data)))
    ;; Otherwise use unified backend
    (t
-    (enkan-repl--send-unified "" prefix-arg :escape))))
+    (enkan-repl--send-unified "" pfx :escape))))
 
 ;;;###autoload
-(defun enkan-repl-open-project-directory (&optional prefix-arg)
+(defun enkan-repl-open-project-directory (&optional pfx)
   "Open project directory in dired from enkan-repl-projects.
 With prefix argument (C-u), select from available buffers.
 
@@ -1624,7 +1645,7 @@ Category: Center File Multi-buffer Access"
                  enkan-repl-target-directories
                  "Select project directory to open:"
                  #'file-directory-p
-                 prefix-arg)))
+                 pfx)))
     (pcase (plist-get result :status)
       ((or 'no-project 'no-paths 'no-buffers)
        (message (plist-get result :message)))
@@ -1638,7 +1659,7 @@ Category: Center File Multi-buffer Access"
        (message "Selection cancelled")))))
 
 ;;;###autoload
-(defun enkan-repl--analyze-send-content (content prefix-arg)
+(defun enkan-repl--analyze-send-content (content pfx)
   "Pure function to analyze send content and determine action.
 CONTENT is the text content to analyze.
 PREFIX-ARG is the numeric prefix argument.
@@ -1646,8 +1667,8 @@ Returns plist with :action and :data."
   (let ((trimmed-content (string-trim content)))
     (cond
      ;; Numeric prefix argument takes priority
-     ((and (numberp prefix-arg) (<= 1 prefix-arg 2))
-      (list :action 'prefix-number :data prefix-arg))
+     ((and (numberp pfx) (<= 1 pfx 2))
+      (list :action 'prefix-number :data pfx))
      ;; Check if content contains only :esc
      ((string= trimmed-content ":esc")
       (list :action 'escape-directly))
@@ -1743,7 +1764,7 @@ Category: Center File Operations"
 
 ;; Pure functions for magit project selection (used by enkan-repl-magit)
 
-(defun enkan-repl-magit (&optional prefix-arg)
+(defun enkan-repl-magit (&optional pfx)
   "Open magit for selected project from enkan-repl-projects.
 With prefix argument (C-u), select from available buffers.
 
@@ -1755,7 +1776,7 @@ Category: Center File Operations"
                  enkan-repl-target-directories
                  "Select project for magit:"
                  #'file-directory-p
-                 prefix-arg)))
+                 pfx)))
     (pcase (plist-get result :status)
       ((or 'no-project 'no-paths 'no-buffers)
        (message (plist-get result :message)))

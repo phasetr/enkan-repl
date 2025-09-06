@@ -5,8 +5,8 @@
 (require 'enkan-repl)
 
 (ert-deftest enkan-ws-skeleton-default-id ()
-  "Default workspace ID is zero-padded numeric string (e.g., \="01\=")."
-  (should (string-match-p "^[0-9]{2}$" (enkan-repl--ws-id)))
+  "Default workspace ID is a zero-padded 2-digit numeric string (e.g., \"01\")."
+  (should (string-match-p "^[0-9]\\{2\\}$" (enkan-repl--ws-id)))
   (should (string= (enkan-repl--ws-token) (concat "ws:" (enkan-repl--ws-id)))))
 
 (ert-deftest enkan-ws-skeleton-save-load-roundtrip ()
@@ -42,4 +42,3 @@
       (setq enkan-repl-session-list orig-list)
       (setq enkan-repl--session-counter orig-counter)
       (setq enkan-repl-project-aliases orig-aliases))))
-
