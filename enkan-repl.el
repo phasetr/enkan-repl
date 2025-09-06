@@ -255,7 +255,7 @@ When nil, executes normal setup behavior.")
 All buffers and sessions are scoped to this workspace.")
 
 (defvar enkan-repl--workspaces nil
-  "Alist of workspace states keyed by workspace ID string.
+  "Alist of workspace states keyed by workspace ID string (not symbol).
 Each value is a plist containing the following keys:
   :current-project   (string or nil)
   :session-list      (alist (number . project-name))
@@ -331,12 +331,13 @@ This function restores workspace state from the given plist."
 When WORKSPACE-ID is nil, use `enkan-repl--current-workspace'.
 Returns the saved plist for verification."
   (let* ((ws (or workspace-id enkan-repl--current-workspace))
-         (ws-sym (intern ws))
          (plist (enkan-repl--ws-state->plist))
-         ;; build updated list non-destructively to avoid mutating the original
-         (existing (assoc-delete-all ws-sym (copy-alist enkan-repl--workspaces))))
+         ;; Remove existing entry if present
+         (existing (cl-remove-if (lambda (entry)
+                                   (string= (car entry) ws))
+                                 enkan-repl--workspaces)))
     (setq enkan-repl--workspaces
-          (cons (cons ws-sym plist) existing))
+          (cons (cons ws plist) existing))
     plist))
 
 (defun enkan-repl--load-workspace-state (&optional workspace-id)
@@ -345,7 +346,7 @@ When WORKSPACE-ID is nil, use `enkan-repl--current-workspace'.
 If no state is found, globals remain unchanged.
 Returns the loaded plist, or nil if no state was found."
   (let* ((ws (or workspace-id enkan-repl--current-workspace))
-         (entry (assoc (intern ws) enkan-repl--workspaces))
+         (entry (assoc ws enkan-repl--workspaces #'string=))
          (plist (cdr entry)))
     (when plist
       (enkan-repl--plist->ws-state plist))
@@ -382,13 +383,13 @@ Returns updated alist with new workspace."
 (defun enkan-repl--get-workspace-state (workspaces workspace-id)
   "Get state plist for WORKSPACE-ID from WORKSPACES alist.
 Returns plist or nil if not found."
-  (cdr (assoc workspace-id workspaces)))
+  (cdr (assoc workspace-id workspaces #'string=)))
 
 (defun enkan-repl--can-delete-workspace (workspace-id workspaces)
   "Check if WORKSPACE-ID can be deleted from WORKSPACES.
 Cannot delete if it's the only workspace or doesn't exist."
   (and (> (length workspaces) 1)
-       (assoc workspace-id workspaces)
+       (assoc workspace-id workspaces #'string=)
        t))
 
 (defun enkan-repl--delete-workspace (workspaces workspace-id)
