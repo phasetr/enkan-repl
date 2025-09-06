@@ -77,16 +77,16 @@
 ;;;; Compatibility tests - verify old and new APIs return same results
 
 (ert-deftest test-enkan-repl-name-api-compatibility ()
-  "Test that old wrapper functions still work with new format."
-  ;; Test enkan-repl--extract-directory-from-buffer-name with new format
+  "Test that new API functions work correctly with new format."
+  ;; Test enkan-repl--buffer-name->path with new format
   (let* ((buffer-name "*ws:01 enkan:/home/user/project*")
-         (result (enkan-repl--extract-directory-from-buffer-name buffer-name)))
+         (result (enkan-repl--buffer-name->path buffer-name)))
     (should (stringp result))
     (should (string-match "/home/user/project/$" result)))
   
-  ;; Test enkan-repl--make-buffer-name generates new format
+  ;; Test enkan-repl--path->buffer-name generates new format
   (let* ((path "/home/user/project")
-         (result (enkan-repl--make-buffer-name path)))
+         (result (enkan-repl--path->buffer-name path)))
     (should (string-prefix-p "*ws:01 enkan:" result))
     (should (string-match "\\*ws:01 enkan:/home/user/project\\*" result)))
   
