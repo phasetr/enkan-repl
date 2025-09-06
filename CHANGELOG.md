@@ -1,3 +1,10 @@
+## [0.14.2](https://github.com/phasetr/enkan-repl/compare/v0.14.1...v0.14.2) (2025-09-06)
+
+
+### Bug Fixes
+
+* workspace-scoped setup/teardown operations ([88b4f81](https://github.com/phasetr/enkan-repl/commit/88b4f81916f4ca86355efd4ac39ba4a5d381af67))
+
 ## [0.14.1](https://github.com/phasetr/enkan-repl/compare/v0.14.0...v0.14.1) (2025-09-06)
 
 
