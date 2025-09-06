@@ -14,6 +14,8 @@
 
 ;;; Code:
 
+(require 'enkan-repl)
+
 ;;;; Pure Functions for Project Path Resolution
 
 (defun enkan-repl--get-session-project-path-pure (session-number session-list project-registry)
@@ -59,7 +61,7 @@ Returns cons (window . buffer-name) or nil if session not registered."
 (defun enkan-repl--setup-session-eat-buffer (window session-number)
   "Setup eat buffer for SESSION-NUMBER in WINDOW."
   (let ((eat-setup (enkan-repl--setup-window-eat-buffer-pure
-                     window session-number enkan-repl-session-list enkan-repl-target-directories)))
+                     window session-number (enkan-repl--ws-session-list) enkan-repl-target-directories)))
     (if eat-setup
       (let ((buffer (get-buffer (cdr eat-setup))))
         (if buffer
@@ -100,7 +102,7 @@ Category: Utilities"
     (find-file enkan-repl-center-file)
     (message "✅ Window 1: Opened center file %s" enkan-repl-center-file))
   ;; Setup eat buffers in session windows (1, 2 for multi-project order)
-  (when (and (boundp 'enkan-repl-session-list) enkan-repl-session-list)
+  (when (enkan-repl--ws-session-list)
     (enkan-repl--setup-session-eat-buffer enkan-repl--window-2 1))
   ;; Always select the center file window (Window 1) at the end
   (when enkan-repl--window-1
@@ -140,7 +142,7 @@ Category: Utilities"
     (find-file enkan-repl-center-file)
     (message "✅ Window 1: Opened center file %s" enkan-repl-center-file))
   ;; Setup eat buffers in session windows (1, 2 for multi-project order)
-  (when (and (boundp 'enkan-repl-session-list) enkan-repl-session-list)
+  (when (enkan-repl--ws-session-list)
     (enkan-repl--setup-session-eat-buffer enkan-repl--window-2 1)
     (enkan-repl--setup-session-eat-buffer enkan-repl--window-3 2))
   ;; Always select the center file window (Window 1) at the end
@@ -184,7 +186,7 @@ Category: Utilities"
     (find-file enkan-repl-center-file)
     (message "✅ Window 1: Opened center file %s" enkan-repl-center-file))
   ;; Setup eat buffers in session windows (4, 5, 6 in multi-project order)
-  (when (and (boundp 'enkan-repl-session-list) enkan-repl-session-list)
+  (when (enkan-repl--ws-session-list)
     (enkan-repl--setup-session-eat-buffer enkan-repl--window-2 1)
     (enkan-repl--setup-session-eat-buffer enkan-repl--window-3 2)
     (enkan-repl--setup-session-eat-buffer enkan-repl--window-4 3))
@@ -233,7 +235,7 @@ Category: Utilities"
     (find-file enkan-repl-center-file)
     (message "✅ Window 1: Opened center file %s" enkan-repl-center-file))
   ;; Setup eat buffers in session windows (4, 5, 6, 7 in multi-project order)
-  (when (and (boundp 'enkan-repl-session-list) enkan-repl-session-list)
+  (when (enkan-repl--ws-session-list)
     (enkan-repl--setup-session-eat-buffer enkan-repl--window-2 1)
     (enkan-repl--setup-session-eat-buffer enkan-repl--window-3 2)
     (enkan-repl--setup-session-eat-buffer enkan-repl--window-4 3)
@@ -251,28 +253,27 @@ Uses enkan-repl--current-project to determine which layout to apply.
 
 Category: Utilities"
   (interactive)
-  (unless (and (boundp 'enkan-repl--current-project)
-            enkan-repl--current-project)
+  (unless (enkan-repl--ws-current-project)
     (error "No current project active. Run enkan-repl-setup first"))
-  (let ((alias-list (cdr (assoc enkan-repl--current-project enkan-repl-projects))))
+  (let ((alias-list (cdr (assoc (enkan-repl--ws-current-project) enkan-repl-projects))))
     (unless alias-list
-      (error "Project '%s' not found in enkan-repl-projects" enkan-repl--current-project))
+      (error "Project '%s' not found in enkan-repl-projects" (enkan-repl--ws-current-project)))
     (let ((session-count (length alias-list)))
       (message "Setting up layout for %d sessions from '%s' configuration..."
-        session-count enkan-repl--current-project)
+        session-count (enkan-repl--ws-current-project))
       (cond
         ((= session-count 1)
           (enkan-repl-setup-1session-layout)
-          (message "✅ Applied 1-session layout for '%s'" enkan-repl--current-project))
+          (message "✅ Applied 1-session layout for '%s'" (enkan-repl--ws-current-project)))
         ((= session-count 2)
           (enkan-repl-setup-2session-layout)
-          (message "✅ Applied 2-session layout for '%s'" enkan-repl--current-project))
+          (message "✅ Applied 2-session layout for '%s'" (enkan-repl--ws-current-project)))
         ((= session-count 3)
           (enkan-repl-setup-3session-layout)
-          (message "✅ Applied 3-session layout for '%s'" enkan-repl--current-project))
+          (message "✅ Applied 3-session layout for '%s'" (enkan-repl--ws-current-project)))
         ((= session-count 4)
           (enkan-repl-setup-4session-layout)
-          (message "✅ Applied 4-session layout for '%s'" enkan-repl--current-project))
+          (message "✅ Applied 4-session layout for '%s'" (enkan-repl--ws-current-project)))
         (t
           (error "Unsupported session count: %d (supported: 1-4 sessions)" session-count))))))
 
