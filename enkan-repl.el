@@ -74,9 +74,7 @@
 (declare-function enkan-repl--get-current-session-state-info "enkan-repl-utils" (current-project session-list session-counter project-aliases))
 (declare-function enkan-repl-utils--encode-full-path "enkan-repl-utils" (path prefix separator))
 (declare-function enkan-repl-utils--decode-full-path "enkan-repl-utils" (encoded-name prefix separator))
-(declare-function enkan-repl--make-buffer-name "enkan-repl-utils" (path))
 (declare-function enkan-repl--buffer-matches-directory "enkan-repl-utils" (buffer-name target-directory))
-(declare-function enkan-repl--extract-directory-from-buffer-name "enkan-repl-utils" (buffer-name))
 (declare-function enkan-repl--extract-project-name "enkan-repl-utils" (buffer-name-or-path))
 (declare-function enkan-repl--is-enkan-buffer-name "enkan-repl-utils" (name))
 (declare-function enkan-repl--buffer-name->path "enkan-repl-utils" (name))
@@ -610,7 +608,7 @@ Returns: Directory path or nil"
                    (string-equal project-name
                                  (enkan-repl--extract-project-name (buffer-name))))
           (cl-return-from search-buffers
-            (enkan-repl--extract-directory-from-buffer-name (buffer-name))))))))
+            (enkan-repl--buffer-name->path (buffer-name))))))))
 
 (defun enkan-repl--get-buffer-for-directory (&optional directory)
   "Get the eat buffer for DIRECTORY if it exists and is live.
@@ -874,7 +872,7 @@ Category: Session Controller"
   (require 'eat)
   ;; Always start new eat session in current directory
   (let* ((target-dir default-directory)
-         (buffer-name (enkan-repl--make-buffer-name target-dir))
+         (buffer-name (enkan-repl--path->buffer-name target-dir))
          (eat-buffer (eat)))
     ;; Simple buffer renaming - no error handling
     (when eat-buffer
@@ -1246,7 +1244,7 @@ Returns a plist with :status and other keys."
                            current-project projects target-directories)))
          ;; Helper function to convert path to buffer
          (path-to-buffer (lambda (path)
-                           (get-buffer (enkan-repl--make-buffer-name path))))
+                           (get-buffer (enkan-repl--path->buffer-name path))))
          ;; Helper function to check if buffer exists
          (get-active-buffers (lambda (paths)
                                (cl-loop for (alias . path) in paths
