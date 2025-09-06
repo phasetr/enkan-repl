@@ -1,3 +1,10 @@
+## [0.14.4](https://github.com/phasetr/enkan-repl/compare/v0.14.3...v0.14.4) (2025-09-06)
+
+
+### Bug Fixes
+
+* implement workspace state save/restore functions ([f0c60b5](https://github.com/phasetr/enkan-repl/commit/f0c60b51bd8192e695b40ee3e595d263070b0a2d))
+
 ## [0.14.3](https://github.com/phasetr/enkan-repl/compare/v0.14.2...v0.14.3) (2025-09-06)
 
 
