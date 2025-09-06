@@ -362,15 +362,21 @@ Returns t if initialized, nil if already exists."
     (let ((default-project (when enkan-repl-projects
                              (caar enkan-repl-projects))))
       ;; Save current state first
-      (let ((saved-project enkan-repl--current-project))
-        ;; Set default project temporarily if available
+      (let ((saved-project enkan-repl--current-project)
+            (saved-aliases enkan-repl-project-aliases))
+        ;; Set default project and its aliases if available
         (when default-project
-          (setq enkan-repl--current-project default-project))
+          (setq enkan-repl--current-project default-project)
+          ;; Set project aliases from enkan-repl-projects
+          (let ((project-config (assoc default-project enkan-repl-projects)))
+            (when project-config
+              (setq enkan-repl-project-aliases (cdr project-config)))))
         ;; Save workspace state
         (enkan-repl--save-workspace-state "01")
-        ;; Restore original project if no default was set
+        ;; Restore original state if no default was set
         (unless default-project
-          (setq enkan-repl--current-project saved-project)))
+          (setq enkan-repl--current-project saved-project)
+          (setq enkan-repl-project-aliases saved-aliases)))
       t)))
 
 (defun enkan-repl--generate-next-workspace-id (workspaces)
