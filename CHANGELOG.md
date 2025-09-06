@@ -1,3 +1,10 @@
+## [0.14.3](https://github.com/phasetr/enkan-repl/compare/v0.14.2...v0.14.3) (2025-09-06)
+
+
+### Bug Fixes
+
+* abolish direct references to legacy global variables ([f459707](https://github.com/phasetr/enkan-repl/commit/f4597076d3aaade715db7135a79c4fb9a9c7aba7))
+
 ## [0.14.2](https://github.com/phasetr/enkan-repl/compare/v0.14.1...v0.14.2) (2025-09-06)
 
 
