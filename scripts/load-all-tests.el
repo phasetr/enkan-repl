@@ -15,6 +15,8 @@
 ;;; Code:
 
 (require 'cl-lib)
+;; Prefer newer source over stale .elc in CI
+(setq load-prefer-newer t)
 (add-to-list 'load-path (expand-file-name "../" (file-name-directory load-file-name)))
 (add-to-list 'load-path (expand-file-name "../test" (file-name-directory load-file-name)))
 
