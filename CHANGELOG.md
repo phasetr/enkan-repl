@@ -1,3 +1,10 @@
+## [0.14.5](https://github.com/phasetr/enkan-repl/compare/v0.14.4...v0.14.5) (2025-09-06)
+
+
+### Bug Fixes
+
+* remove legacy wrapper functions ([a1ae5e1](https://github.com/phasetr/enkan-repl/commit/a1ae5e1ba8cc85f2a125be2d83ad6107e6f07b81))
+
 ## [0.14.4](https://github.com/phasetr/enkan-repl/compare/v0.14.3...v0.14.4) (2025-09-06)
 
 
