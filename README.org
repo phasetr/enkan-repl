@@ -228,6 +228,12 @@ The generated project file includes template functions and usage instructions.
 - =enkan-repl-recenter-bottom= - Recenter all enkan terminal buffers at bottom.
 - =enkan-repl-toggle-global-mode= - Toggle enkan-repl global mode on/off.
 
+*** Workspace Support (Experimental)
+- All sessions are now scoped to a single workspace (ID: =01=)
+- Buffer naming format: =*ws:01 enkan:/path/to/directory*=
+- Session operations (setup/teardown) are workspace-isolated
+- Future versions will support multiple concurrent workspaces
+
 ** Configuration
 
 *** Template Customization
