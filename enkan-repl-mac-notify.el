@@ -111,9 +111,9 @@ This function is called when Claude Code sends a bell character."
   "Set up or re-setup the completion notification handler.
 Use this if system notifications aren't working after starting a session."
   (interactive)
-  ;; Find eat buffer matching pattern *enkan:*
+  ;; Find eat buffer matching pattern *ws:XX enkan:*
   (let ((eat-buffer (seq-find (lambda (buf)
-                                (string-match-p "^\\*enkan:.*\\*$" (buffer-name buf)))
+                                (string-match-p "^\\*ws:[0-9]\\{2\\} enkan:.*\\*$" (buffer-name buf)))
                               (buffer-list))))
     (when eat-buffer
       (with-current-buffer eat-buffer
