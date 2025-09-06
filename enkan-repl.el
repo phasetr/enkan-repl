@@ -295,10 +295,12 @@ This is a skeleton setter and does not get invoked by runtime yet."
 When WORKSPACE-ID is nil, use `enkan-repl--current-workspace'.
 This function has no effect on runtime selection yet (skeleton only)."
   (let* ((ws (or workspace-id enkan-repl--current-workspace))
+         (ws-sym (intern ws))
          (plist (enkan-repl--ws-state->plist))
-         (existing (assq-delete-all (intern ws) enkan-repl--workspaces)))
+         ;; build updated list non-destructively to avoid mutating the original
+         (existing (assoc-delete-all ws-sym (copy-alist enkan-repl--workspaces))))
     (setq enkan-repl--workspaces
-          (cons (cons (intern ws) plist) existing))
+          (cons (cons ws-sym plist) existing))
     plist))
 
 (defun enkan-repl--load-workspace-state (&optional workspace-id)
