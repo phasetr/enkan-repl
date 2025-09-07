@@ -3,7 +3,7 @@
 ;; Copyright (C) 2025 [phasetr]
 
 ;; Author: [phasetr] <phasetr@gmail.com>
-;; Version: 0.15.1
+;; Version: 0.15.2
 ;; Package-Requires: ((emacs "28.2") (eat "0.9.4"))
 ;; Keywords: enkan ai tools convenience
 ;; URL: https://github.com/phasetr/enkan-repl
@@ -460,7 +460,7 @@ Returns the new workspace ID."
   (let* ((new-id (enkan-repl--generate-next-workspace-id enkan-repl--workspaces)))
     ;; Add new workspace to global state
     (setq enkan-repl--workspaces
-      (enkan-repl--add-workspace enkan-repl--workspaces new-id))
+          (enkan-repl--add-workspace enkan-repl--workspaces new-id))
     ;; Set as current workspace
     (setq enkan-repl--current-workspace new-id)
     ;; Clear workspace-specific globals for new workspace
@@ -474,11 +474,11 @@ Returns the new workspace ID."
     (enkan-repl--load-workspace-state new-id)
     ;; Configure project based on file type
     (if is-standard-file
-      ;; Standard file: use current directory as project
-      (let ((dir-name (file-name-nondirectory
-                        (directory-file-name default-directory))))
-        ;; Set project name in workspace
-        (enkan-repl--ws-set-current-project dir-name))
+        ;; Standard file: use current directory as project
+        (let ((dir-name (file-name-nondirectory
+                         (directory-file-name default-directory))))
+          ;; Set project name in workspace
+          (enkan-repl--ws-set-current-project dir-name))
       ;; Center file: use provided project name
       (when project-name
         ;; Set project name and aliases
@@ -1247,33 +1247,33 @@ Category: Session Controller"
                                    (copy-tree (enkan-repl--ws-session-list))
                                    (enkan-repl--ws-session-counter))))
               (with-output-to-temp-buffer buffer-name
-              (princ (format "=== ENKAN-REPL AUTO SETUP: %s ===\n\n" project-name))
-              (condition-case err
-                  (progn
-                    ;; Log initial state
-                    (enkan-repl--setup-log-state buffer-name "Current"
-                                                 (nth 0 old-state)
-                                                 (nth 1 old-state)
-                                                 (nth 2 old-state))
-                    ;; Enable global mode
-                    (enkan-repl--setup-enable-global-mode buffer-name)
-                    ;; Reset configuration
-                    (enkan-repl--setup-reset-config buffer-name)
-                    ;; Set project aliases
-                    (let ((alias-list (cdr (assoc project-name enkan-repl-projects))))
-                      (unless alias-list
-                        (error "Project '%s' not found" project-name))
-                      (enkan-repl--setup-set-project-aliases project-name alias-list buffer-name)
-                      ;; Start sessions
-                      (enkan-repl--setup-start-sessions alias-list buffer-name))
-                    ;; Set final project configuration
-                    (enkan-repl--ws-set-current-project project-name)
-                    (princ (format "\n✅ Setup completed for project: %s\n" project-name))
-                    (princ "Arrange your preferred window configuration!\n\n")
-                    (princ "=== END SETUP ===\n"))
-                (error
-                 (princ (format "\n❌ Setup failed: %s\n" (error-message-string err))))))
-            (message "Center file setup complete with workspace %s" enkan-repl--current-workspace)))
+                (princ (format "=== ENKAN-REPL AUTO SETUP: %s ===\n\n" project-name))
+                (condition-case err
+                    (progn
+                      ;; Log initial state
+                      (enkan-repl--setup-log-state buffer-name "Current"
+                                                   (nth 0 old-state)
+                                                   (nth 1 old-state)
+                                                   (nth 2 old-state))
+                      ;; Enable global mode
+                      (enkan-repl--setup-enable-global-mode buffer-name)
+                      ;; Reset configuration
+                      (enkan-repl--setup-reset-config buffer-name)
+                      ;; Set project aliases
+                      (let ((alias-list (cdr (assoc project-name enkan-repl-projects))))
+                        (unless alias-list
+                          (error "Project '%s' not found" project-name))
+                        (enkan-repl--setup-set-project-aliases project-name alias-list buffer-name)
+                        ;; Start sessions
+                        (enkan-repl--setup-start-sessions alias-list buffer-name))
+                      ;; Set final project configuration
+                      (enkan-repl--ws-set-current-project project-name)
+                      (princ (format "\n✅ Setup completed for project: %s\n" project-name))
+                      (princ "Arrange your preferred window configuration!\n\n")
+                      (princ "=== END SETUP ===\n"))
+                  (error
+                   (princ (format "\n❌ Setup failed: %s\n" (error-message-string err))))))
+              (message "Center file setup complete with workspace %s" enkan-repl--current-workspace)))
         (message "Center file not configured or no projects defined")))))
 
 ;;; Debug and Utility Functions

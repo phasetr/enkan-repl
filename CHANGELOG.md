@@ -1,3 +1,10 @@
+## [0.15.2](https://github.com/phasetr/enkan-repl/compare/v0.15.1...v0.15.2) (2025-09-07)
+
+
+### Bug Fixes
+
+* workspace layout uses actual buffers instead of session list state ([73e1fe4](https://github.com/phasetr/enkan-repl/commit/73e1fe42096dd773fcf787f42115250a3c23d8ee))
+
 ## [0.15.1](https://github.com/phasetr/enkan-repl/compare/v0.15.0...v0.15.1) (2025-09-07)
 
 
