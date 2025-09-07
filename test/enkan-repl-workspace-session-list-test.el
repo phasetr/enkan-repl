@@ -82,7 +82,7 @@
         
         (should result)
         (should (eq 'test-window (car result)))
-        (should (string-match-p "\\*ws:01 enkan:/path/to/er\\*" (cdr result)))))))
+        (should (string-match-p "\\*ws:01 enkan:/path/to/er/\\*" (cdr result)))))))
 
 (ert-deftest test-workspace-session-after-switch ()
   "Test session handling after workspace switch."
