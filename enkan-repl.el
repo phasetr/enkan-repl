@@ -350,10 +350,38 @@ Returns the loaded plist, or nil if no state was found."
          (entry (assoc ws enkan-repl--workspaces #'string=))
          (plist (cdr entry)))
     (when plist
-      (enkan-repl--plist->ws-state plist))
+      (enkan-repl--plist->ws-state plist)
+      ;; Update target directories based on restored project aliases
+      (when enkan-repl-project-aliases
+        (enkan-repl--update-target-directories-for-workspace)))
     plist))
 
 ;;;; Workspace Management Pure Functions
+
+(defun enkan-repl--update-target-directories-for-workspace ()
+  "Update enkan-repl-target-directories based on current workspace's project.
+This ensures that directory lookups work correctly after workspace switch."
+  (when (and enkan-repl--current-project enkan-repl-project-aliases)
+    ;; Find project directories from files in standard locations
+    (let ((dirs '()))
+      ;; Check standard project locations
+      (dolist (alias enkan-repl-project-aliases)
+        ;; Try to find project directory from standard locations
+        (let* ((home-dir (expand-file-name "~"))
+               (common-paths (list
+                              (expand-file-name (format "dev/self/%s" enkan-repl--current-project) home-dir)
+                              (expand-file-name (format "dev/%s" enkan-repl--current-project) home-dir)
+                              (expand-file-name (format "Documents/%s" enkan-repl--current-project) home-dir)
+                              (expand-file-name (format "projects/%s" enkan-repl--current-project) home-dir)
+                              (expand-file-name enkan-repl--current-project default-directory))))
+          ;; Find first existing directory
+          (dolist (path common-paths)
+            (when (and (not (assoc alias dirs))
+                       (file-directory-p path))
+              (push (cons alias (cons enkan-repl--current-project path)) dirs)))))
+      ;; Update enkan-repl-target-directories if we found directories
+      (when dirs
+        (setq enkan-repl-target-directories dirs)))))
 
 (defun enkan-repl--initialize-default-workspace ()
   "Initialize default workspace '01' with first available project.
@@ -423,6 +451,40 @@ Returns updated alist without the specified workspace."
   (cl-remove-if (lambda (ws)
                   (string= (car ws) workspace-id))
                 workspaces))
+
+(defun enkan-repl--setup-create-workspace-with-project (is-standard-file project-name)
+  "Create new workspace and configure it with project.
+IS-STANDARD-FILE t for standard file, nil for center file.
+PROJECT-NAME is the project name to associate (for center files) or nil.
+Returns the new workspace ID."
+  (let* ((new-id (enkan-repl--generate-next-workspace-id enkan-repl--workspaces)))
+    ;; Add new workspace to global state
+    (setq enkan-repl--workspaces
+      (enkan-repl--add-workspace enkan-repl--workspaces new-id))
+    ;; Set as current workspace
+    (setq enkan-repl--current-workspace new-id)
+    ;; Save to workspace state
+    (enkan-repl--save-workspace-state new-id)
+    ;; Load the new workspace state
+    (enkan-repl--load-workspace-state new-id)
+    ;; Configure project based on file type
+    (if is-standard-file
+      ;; Standard file: use current directory as project
+      (let ((dir-name (file-name-nondirectory
+                        (directory-file-name default-directory))))
+        ;; Set project name in workspace
+        (enkan-repl--ws-set-current-project dir-name))
+      ;; Center file: use provided project name
+      (when project-name
+        ;; Set project name and aliases
+        (enkan-repl--ws-set-current-project project-name)
+        (let ((alias-list (cdr (assoc project-name enkan-repl-projects))))
+          (when alias-list
+            (enkan-repl--ws-set-project-aliases alias-list)))))
+    ;; Save updated state
+    (enkan-repl--save-workspace-state new-id)
+    ;; Return the new workspace ID
+    new-id))
 
 (defun enkan-repl--list-workspace-ids (workspaces)
   "List all workspace IDs from WORKSPACES alist.
@@ -1148,14 +1210,14 @@ Implemented as pure function, side effects are handled by upper functions."
 
 Category: Session Controller"
   (interactive)
-  ;; Ensure default workspace exists with project
-  (enkan-repl--initialize-default-workspace)
   ;; Check if current buffer filename matches standard input file format
   (let* ((current-file (buffer-file-name))
          (is-standard-file (enkan-repl--is-standard-file-path current-file default-directory)))
     (if is-standard-file
         ;; Standard input file mode: simple window layout
         (progn
+          ;; Create workspace with project BEFORE starting eat session
+          (enkan-repl--setup-create-workspace-with-project t nil)
           (delete-other-windows)
           (split-window-right)
           ;; Move to right window and start eat session
@@ -1164,15 +1226,17 @@ Category: Session Controller"
           ;; Move back to left window and open project input file
           (other-window -1)
           (enkan-repl-open-project-input-file)
-          (message "Basic window layout setup complete"))
+          (message "Basic window layout setup complete with workspace %s" enkan-repl--current-workspace))
       ;; Center file mode: check if center file is specified as non-empty string
       (if (enkan-repl--is-center-file-path enkan-repl-center-file enkan-repl-projects)
           (let ((project-name (hmenu "Project:" (mapcar #'car enkan-repl-projects)))
-                (buffer-name "*ENKAN-REPL Auto Setup*")
-                (old-state (list (enkan-repl--ws-current-project)
-                                 (copy-tree (enkan-repl--ws-session-list))
-                                 (enkan-repl--ws-session-counter))))
-            (with-output-to-temp-buffer buffer-name
+                (buffer-name "*ENKAN-REPL Auto Setup*"))
+            ;; Create workspace with project BEFORE starting sessions
+            (enkan-repl--setup-create-workspace-with-project nil project-name)
+            (let ((old-state (list (enkan-repl--ws-current-project)
+                                   (copy-tree (enkan-repl--ws-session-list))
+                                   (enkan-repl--ws-session-counter))))
+              (with-output-to-temp-buffer buffer-name
               (princ (format "=== ENKAN-REPL AUTO SETUP: %s ===\n\n" project-name))
               (condition-case err
                   (progn
@@ -1199,7 +1263,8 @@ Category: Session Controller"
                     (princ "=== END SETUP ===\n"))
                 (error
                  (princ (format "\n❌ Setup failed: %s\n" (error-message-string err))))))
-            (message "Center file not configured or no projects defined"))))))
+            (message "Center file setup complete with workspace %s" enkan-repl--current-workspace)))
+        (message "Center file not configured or no projects defined")))))
 
 ;;; Debug and Utility Functions
 
