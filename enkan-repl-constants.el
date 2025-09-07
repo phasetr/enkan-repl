@@ -11,31 +11,35 @@
 ;;; Code:
 
 (defconst enkan-repl-cheat-sheet-candidates
-  '(("enkan-repl-send-region" . "Send region text (from START to END) to enkan session buffer. - From enkan buffer: Send to current buffer - From other buffer without prefix: Interactive buffer selection - With numeric prefix: Send to buffer at index (1-based)  Uses unified backend with smart buffer detection.  Category: Text Sender")
-    ("enkan-repl-send-line" . "Send current line to enkan session buffer. - From enkan buffer: Send to current buffer - From other buffer without prefix: Interactive buffer selection - With numeric prefix: Send to buffer at index (1-based)  Uses unified backend with smart buffer detection.  Category: Text Sender")
-    ("enkan-repl-send-enter" . "Send enter key to enkan session buffer. - From enkan buffer: Send to current buffer - From other buffer without prefix: Interactive buffer selection - With numeric prefix: Send to buffer at index (1-based)  Uses unified backend with smart buffer detection.  Category: Text Sender")
-    ("enkan-repl-send-1" . "Send \\\\='1\\\\=' to enkan session buffer for numbered choice prompt. - From enkan buffer: Send to current buffer - From other buffer without prefix: Interactive buffer selection - With numeric prefix: Send to buffer at index (1-based)  Uses unified backend with smart buffer detection.  Category: Text Sender")
-    ("enkan-repl-send-2" . "Send \\\\='2\\\\=' to enkan session buffer for numbered choice prompt. - From enkan buffer: Send to current buffer - From other buffer without prefix: Interactive buffer selection - With numeric prefix: Send to buffer at index (1-based)  Uses unified backend with smart buffer detection.  Category: Text Sender")
-    ("enkan-repl-send-3" . "Send \\\\='3\\\\=' to enkan session buffer for numbered choice prompt. - From enkan buffer: Send to current buffer - From other buffer without prefix: Interactive buffer selection - With numeric prefix: Send to buffer at index (1-based)  Uses unified backend with smart buffer detection.  Category: Text Sender")
-    ("enkan-repl-send-4" . "Send \\\\='4\\\\=' to enkan session buffer for numbered choice prompt. - From enkan buffer: Send to current buffer - From other buffer without prefix: Interactive buffer selection - With numeric prefix: Send to buffer at index (1-based)  Uses unified backend with smart buffer detection.  Category: Text Sender")
-    ("enkan-repl-send-5" . "Send \\\\='5\\\\=' to enkan session buffer for numbered choice prompt. - From enkan buffer: Send to current buffer - From other buffer without prefix: Interactive buffer selection - With numeric prefix: Send to buffer at index (1-based)  Uses unified backend with smart buffer detection.  Category: Text Sender")
+  '(("enkan-repl-send-region" . "Send region text (from START to END) to enkan session buffer with optional PFX. - From enkan buffer: Send to current buffer - From other buffer without prefix: Interactive buffer selection - With numeric prefix: Send to buffer at index (1-based)  Uses unified backend with smart buffer detection.  Category: Text Sender")
+    ("enkan-repl-send-line" . "Send current line to enkan session buffer with optional PFX. - From enkan buffer: Send to current buffer - From other buffer without prefix: Interactive buffer selection - With numeric prefix: Send to buffer at index (1-based)  Uses unified backend with smart buffer detection.  Category: Text Sender")
+    ("enkan-repl-send-enter" . "Send enter key to enkan session buffer with optional PFX. - From enkan buffer: Send to current buffer - From other buffer without prefix: Interactive buffer selection - With numeric prefix: Send to buffer at index (1-based)  Uses unified backend with smart buffer detection.  Category: Text Sender")
+    ("enkan-repl-send-1" . "Send \\\\='1\\\\=' to enkan session buffer with optional PFX. - From enkan buffer: Send to current buffer - From other buffer without prefix: Interactive buffer selection - With numeric prefix: Send to buffer at index (1-based)  Uses unified backend with smart buffer detection.  Category: Text Sender")
+    ("enkan-repl-send-2" . "Send \\\\='2\\\\=' to enkan session buffer with optional PFX. - From enkan buffer: Send to current buffer - From other buffer without prefix: Interactive buffer selection - With numeric prefix: Send to buffer at index (1-based)  Uses unified backend with smart buffer detection.  Category: Text Sender")
+    ("enkan-repl-send-3" . "Send \\\\='3\\\\=' to enkan session buffer with optional PFX. - From enkan buffer: Send to current buffer - From other buffer without prefix: Interactive buffer selection - With numeric prefix: Send to buffer at index (1-based)  Uses unified backend with smart buffer detection.  Category: Text Sender")
+    ("enkan-repl-send-4" . "Send \\\\='4\\\\=' to enkan session buffer with optional PFX. - From enkan buffer: Send to current buffer - From other buffer without prefix: Interactive buffer selection - With numeric prefix: Send to buffer at index (1-based)  Uses unified backend with smart buffer detection.  Category: Text Sender")
+    ("enkan-repl-send-5" . "Send \\\\='5\\\\=' to enkan session buffer with optional PFX. - From enkan buffer: Send to current buffer - From other buffer without prefix: Interactive buffer selection - With numeric prefix: Send to buffer at index (1-based)  Uses unified backend with smart buffer detection.  Category: Text Sender")
     ("enkan-repl-recenter-bottom" . "Recenter all enkan terminal buffers at bottom.  Category: Utilities")
     ("enkan-repl-open-project-input-file" . "Open or create project input file for DIRECTORY. If DIRECTORY is nil, use current `default-directory'. If project input file exists, open it directly. If not exists, create from template then open.  Category: Utilities")
     ("enkan-repl-start-eat" . "Start eat terminal emulator session in current directory. Simplified version for use within setup functions only. FORCE parameter ignored - always starts new session.  Category: Session Controller")
     ("enkan-repl-teardown" . "Terminate eat session(s) based on context. - Standard input file: terminate single eat session for current directory in current workspace - Center file: terminate all registered sessions in current workspace  Category: Session Controller")
     ("enkan-repl-setup" . "Set up window layout based on context. - Standard input file: basic window layout with project input file on left and eat session on right in current workspace - Center file: auto start eat sessions using project configuration in current workspace  Category: Session Controller")
-    ("enkan-repl-cheat-sheet" . "Display interactive cheat-sheet for enkan-repl commands.  Category: Command Palette")
+    ("enkan-repl-cheat-sheet" . "Display interactive `cheat-sheet' for enkan-repl commands.  Category: Command Palette")
     ("enkan-repl-toggle-global-mode" . "Toggle enkan-repl global mode on/off.")
-    ("enkan-repl-send-escape" . "Send ESC key to eat session buffer from center file or current enkan buffer. - If called from enkan buffer: Send ESC to current buffer - If called from center file without prefix: Select from available enkan buffers - With numeric prefix: Send to buffer at that index (1-based)  Category: Center File Multi-buffer Access")
-    ("enkan-repl-open-project-directory" . "Open project directory in dired from enkan-repl-projects. With prefix argument (C-u), select from available buffers.  Category: Center File Multi-buffer Access")
+    ("enkan-repl-send-escape" . "Send ESC key to eat session buffer with optional PFX. - If called from enkan buffer: Send ESC to current buffer - If called from center file without prefix: Select from available enkan buffers - With numeric prefix: Send to buffer at that index (1-based)  Category: Center File Multi-buffer Access")
+    ("enkan-repl-open-project-directory" . "Open project directory in Dired from enkan-repl-projects with optional PFX. With prefix argument (\\\\[universal-argument]), select from available buffers.  Category: Center File Multi-buffer Access")
     ("enkan-repl-open-center-file" . "Open or create the center file based on enkan-repl-center-file configuration.  Category: Center File Operations")
-    ("enkan-repl-magit" . "Open magit for selected project from enkan-repl-projects. With prefix argument (C-u), select from available buffers.  Category: Center File Operations")
-    ("enkan-repl-print-setup-to-buffer" . "Print current setup variables for debugging. Displays enkan-repl-projects, enkan-repl-target-directories, enkan-repl-project-aliases, and current session state.  Category: Debugging"))
+    ("enkan-repl-magit" . "Open magit for selected project from enkan-repl-projects with optional PFX. With prefix argument (\\\\[universal-argument]), select from available buffers.  Category: Center File Operations")
+    ("enkan-repl-print-setup-to-buffer" . "Print current setup variables for debugging. Displays enkan-repl-projects, enkan-repl-target-directories, enkan-repl-project-aliases, and current session state.  Category: Debugging")
+    ("enkan-repl-workspace-create" . "Create a new workspace and switch to it. The workspace ID is automatically generated.")
+    ("enkan-repl-workspace-switch" . "Switch to another workspace.")
+    ("enkan-repl-workspace-delete" . "Delete a workspace. Cannot delete the current workspace or the only workspace.")
+    ("enkan-repl-workspace-list" . "List all workspaces with their status."))
   "Precompiled list of cheat-sheet candidates.
 Each element is a cons cell (FUNCTION-NAME . DESCRIPTION).")
 
 (defconst enkan-repl-cheat-sheet-function-count
-  20
+  24
   "Number of functions in cheat-sheet.")
 
 (provide 'enkan-repl-constants)

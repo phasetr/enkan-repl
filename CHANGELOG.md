@@ -1,3 +1,100 @@
+# [0.15.0](https://github.com/phasetr/enkan-repl/compare/v0.14.5...v0.15.0) (2025-09-07)
+
+
+### Features
+
+* Workspace functionality implementation ([#38](https://github.com/phasetr/enkan-repl/issues/38)) ([9bc49b6](https://github.com/phasetr/enkan-repl/commit/9bc49b645ce7ef651d300c1b47c76cf787af0ce1))
+
+
+### BREAKING CHANGES
+
+* Buffer naming format changed from '*enkan:/path*' to '*ws:01 enkan:/path*'
+
+* docs: add migration guide and update documentation for workspace feature
+
+- Add comprehensive migration guide for breaking changes
+- Update README with workspace support section
+- Consolidate workspaces.md documentation
+- Document new buffer naming format and APIs
+
+* fix: resolve all byte-compile and checkdoc warnings
+
+- Add function declarations for workspace API functions
+- Fix checkdoc warnings about quotes and argument documentation
+- Shorten lines over 80 columns
+- Fix docstring formatting issues
+
+* feat: implement multiple workspace management functions
+
+- Add pure functions for workspace creation, switching, and deletion
+- Implement interactive commands for workspace management
+- Add comprehensive test coverage for all workspace functions
+- Support automatic workspace ID generation
+- Enable workspace state save/restore on switch
+
+Functions implemented:
+- enkan-repl-workspace-create: Create new workspace
+- enkan-repl-workspace-switch: Switch between workspaces
+- enkan-repl-workspace-delete: Delete workspace
+- enkan-repl-workspace-list: List all workspaces
+
+* fix: use string keys consistently for workspace alist
+
+- Fix workspace state save/load to use string keys instead of symbols
+- Update assoc calls to use string= for comparison
+- Fix all related tests to match string key implementation
+- Prevent duplicate workspace entries in alist
+
+* fix: prevent duplicate workspace entries in list
+
+- Fixed enkan-repl-workspace-create to avoid duplicate entries
+  - Removed use of enkan-repl--add-workspace which was causing duplicates
+  - Now uses enkan-repl--save-workspace-state exclusively for consistency
+- Enhanced enkan-repl--save-workspace-state to be more defensive
+  - Ensures complete removal of existing entries before adding new ones
+- Added duplicate removal to enkan-repl--list-workspace-ids as safety measure
+- All workspace operations now handle string keys consistently
+
+This fixes the issue where 'Workspace 01' and 'Workspace 02' appeared twice
+in workspace list, with one showing 'project eronly' and other showing '<none>'.
+
+* feat: auto-initialize default workspace on setup
+
+- Added automatic workspace initialization in enkan-repl-setup
+- When no workspaces exist, workspace '01' is automatically created
+- Ensures consistent initial state for users
+
+This prevents undefined behavior when enkan-repl-setup is called
+without any existing workspaces.
+
+* feat: auto-assign first project to default workspace
+
+- Added enkan-repl--initialize-default-workspace function
+  - Automatically assigns first available project from enkan-repl-projects
+  - Falls back to nil if no projects defined
+- Updated enkan-repl-setup to use the new initialization function
+- Added comprehensive tests for initialization behavior
+
+This ensures that when enkan-repl-setup is called without existing workspaces,
+the default workspace '01' is created with a meaningful project assignment
+rather than remaining unassociated.
+
+* fix: initialize workspace with project aliases
+
+- Updated enkan-repl--initialize-default-workspace to set project aliases
+  - When a project is assigned, its aliases are also loaded
+  - This ensures workspace shows correct aliases count in workspace-list
+- Added test coverage for alias initialization
+
+This fixes the issue where workspace-list showed 'Aliases: 0' even when
+a project with aliases was assigned to the workspace.
+
+* add a sample keybinding.
+
+* feat(workspace): buffer naming reflects current workspace id
+
+* delete unnecessary spaces
+
 ## [0.14.5](https://github.com/phasetr/enkan-repl/compare/v0.14.4...v0.14.5) (2025-09-06)
 
 

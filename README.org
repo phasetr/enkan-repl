@@ -231,8 +231,8 @@ See [[file:docs/migration-guide.md][Migration Guide]] for upgrade instructions.
 - =enkan-repl-send-line= - Send current line only
 - =enkan-repl-send-enter= - Send enter key
 - =enkan-repl-send-1/2/3= - Send numbered choices for AI prompts
-- =enkan-repl-send-4= - Send \\='4\\=' to enkan session buffer for numbered choice prompt. - From enkan buffer: Send to current buffer - From other buffer without prefix: Interactive buffer selection - With numeric prefix: Send to buffer at index (1-based)  Uses unified backend with smart buffer detection.
-- =enkan-repl-send-5= - Send \\='5\\=' to enkan session buffer for numbered choice prompt. - From enkan buffer: Send to current buffer - From other buffer without prefix: Interactive buffer selection - With numeric prefix: Send to buffer at index (1-based)  Uses unified backend with smart buffer detection.
+- =enkan-repl-send-4= - Send \\='4\\=' to enkan session buffer with optional PFX. - From enkan buffer: Send to current buffer - From other buffer without prefix: Interactive buffer selection - With numeric prefix: Send to buffer at index (1-based)  Uses unified backend with smart buffer detection.
+- =enkan-repl-send-5= - Send \\='5\\=' to enkan session buffer with optional PFX. - From enkan buffer: Send to current buffer - From other buffer without prefix: Interactive buffer selection - With numeric prefix: Send to buffer at index (1-based)  Uses unified backend with smart buffer detection.
 
 *** Session Control
 - =enkan-repl-start-eat= - Start eat terminal emulator session in current directory. Simplified version for use within setup functions only. FORCE parameter ignored - always starts new session.
@@ -242,6 +242,10 @@ See [[file:docs/migration-guide.md][Migration Guide]] for upgrade instructions.
 *** Utilities
 - =enkan-repl-recenter-bottom= - Recenter all enkan terminal buffers at bottom.
 - =enkan-repl-toggle-global-mode= - Toggle enkan-repl global mode on/off.
+- =enkan-repl-workspace-create= - Create a new workspace and switch to it. The workspace ID is automatically generated.
+- =enkan-repl-workspace-switch= - Switch to another workspace.
+- =enkan-repl-workspace-delete= - Delete a workspace. Cannot delete the current workspace or the only workspace.
+- =enkan-repl-workspace-list= - List all workspaces with their status.
 
 ** Configuration
 
