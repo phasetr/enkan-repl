@@ -463,9 +463,14 @@ Returns the new workspace ID."
       (enkan-repl--add-workspace enkan-repl--workspaces new-id))
     ;; Set as current workspace
     (setq enkan-repl--current-workspace new-id)
-    ;; Save to workspace state
+    ;; Clear workspace-specific globals for new workspace
+    (setq enkan-repl-session-list nil)
+    (setq enkan-repl--session-counter 0)
+    (setq enkan-repl--current-project nil)
+    (setq enkan-repl-project-aliases nil)
+    ;; Save initial empty state
     (enkan-repl--save-workspace-state new-id)
-    ;; Load the new workspace state
+    ;; Load the new workspace state (should be empty)
     (enkan-repl--load-workspace-state new-id)
     ;; Configure project based on file type
     (if is-standard-file
