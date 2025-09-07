@@ -39,7 +39,17 @@ Returns cons (window . buffer-name) or nil if session not registered."
       (let ((project-path (enkan-repl--get-project-path-from-directories project-name project-registry)))
         (when project-path
           (let* ((expanded-path (expand-file-name project-path))
-                 (buffer-name (format "*ws:01 enkan:%s*" expanded-path)))
+                 ;; Ensure path ends with / for consistency with eat buffer names
+                 (normalized-path (if (string-suffix-p "/" expanded-path)
+                                      expanded-path
+                                    (concat expanded-path "/")))
+                 ;; Use current workspace ID from global variable
+                 (ws-id (if (and (boundp 'enkan-repl--current-workspace)
+                                 enkan-repl--current-workspace
+                                 (stringp enkan-repl--current-workspace))
+                            enkan-repl--current-workspace
+                          "01"))
+                 (buffer-name (format "*ws:%s enkan:%s*" ws-id normalized-path)))
             (cons window buffer-name)))))))
 
 ;;;; Window Layout Variables
@@ -101,9 +111,14 @@ Category: Utilities"
     (select-window enkan-repl--window-1)
     (find-file enkan-repl-center-file)
     (message "✅ Window 1: Opened center file %s" enkan-repl-center-file))
-  ;; Setup eat buffers in session windows (1, 2 for multi-project order)
-  (when (enkan-repl--ws-session-list)
-    (enkan-repl--setup-session-eat-buffer enkan-repl--window-2 1))
+  ;; Setup eat buffers in session windows - use actual living buffers
+  (let ((available-buffers (enkan-repl--get-available-buffers (buffer-list))))
+    (when (and available-buffers (> (length available-buffers) 0))
+      ;; Use first available buffer in window 2
+      (when enkan-repl--window-2
+        (select-window enkan-repl--window-2)
+        (switch-to-buffer (car available-buffers))
+        (message "✅ Window 2: Opened eat buffer %s" (buffer-name (car available-buffers))))))
   ;; Always select the center file window (Window 1) at the end
   (when enkan-repl--window-1
     (select-window enkan-repl--window-1)))
@@ -141,10 +156,19 @@ Category: Utilities"
     (select-window enkan-repl--window-1)
     (find-file enkan-repl-center-file)
     (message "✅ Window 1: Opened center file %s" enkan-repl-center-file))
-  ;; Setup eat buffers in session windows (1, 2 for multi-project order)
-  (when (enkan-repl--ws-session-list)
-    (enkan-repl--setup-session-eat-buffer enkan-repl--window-2 1)
-    (enkan-repl--setup-session-eat-buffer enkan-repl--window-3 2))
+  ;; Setup eat buffers in session windows - use actual living buffers
+  (let ((available-buffers (enkan-repl--get-available-buffers (buffer-list))))
+    (when (and available-buffers (> (length available-buffers) 0))
+      ;; Place first buffer in window 2
+      (when enkan-repl--window-2
+        (select-window enkan-repl--window-2)
+        (switch-to-buffer (car available-buffers))
+        (message "✅ Window 2: Opened eat buffer %s" (buffer-name (car available-buffers))))
+      ;; Place second buffer in window 3 if exists
+      (when (and (> (length available-buffers) 1) enkan-repl--window-3)
+        (select-window enkan-repl--window-3)
+        (switch-to-buffer (cadr available-buffers))
+        (message "✅ Window 3: Opened eat buffer %s" (buffer-name (cadr available-buffers))))))
   ;; Always select the center file window (Window 1) at the end
   (when enkan-repl--window-1
     (select-window enkan-repl--window-1)))
@@ -185,11 +209,24 @@ Category: Utilities"
     (select-window enkan-repl--window-1)
     (find-file enkan-repl-center-file)
     (message "✅ Window 1: Opened center file %s" enkan-repl-center-file))
-  ;; Setup eat buffers in session windows (4, 5, 6 in multi-project order)
-  (when (enkan-repl--ws-session-list)
-    (enkan-repl--setup-session-eat-buffer enkan-repl--window-2 1)
-    (enkan-repl--setup-session-eat-buffer enkan-repl--window-3 2)
-    (enkan-repl--setup-session-eat-buffer enkan-repl--window-4 3))
+  ;; Setup eat buffers in session windows - use actual living buffers
+  (let ((available-buffers (enkan-repl--get-available-buffers (buffer-list))))
+    (when (and available-buffers (> (length available-buffers) 0))
+      ;; Place first buffer in window 2
+      (when enkan-repl--window-2
+        (select-window enkan-repl--window-2)
+        (switch-to-buffer (car available-buffers))
+        (message "✅ Window 2: Opened eat buffer %s" (buffer-name (car available-buffers))))
+      ;; Place second buffer in window 3 if exists
+      (when (and (> (length available-buffers) 1) enkan-repl--window-3)
+        (select-window enkan-repl--window-3)
+        (switch-to-buffer (cadr available-buffers))
+        (message "✅ Window 3: Opened eat buffer %s" (buffer-name (cadr available-buffers))))
+      ;; Place third buffer in window 4 if exists
+      (when (and (> (length available-buffers) 2) enkan-repl--window-4)
+        (select-window enkan-repl--window-4)
+        (switch-to-buffer (caddr available-buffers))
+        (message "✅ Window 4: Opened eat buffer %s" (buffer-name (caddr available-buffers))))))
   ;; Always select the center file window (Window 1) at the end
   (when enkan-repl--window-1
     (select-window enkan-repl--window-1)))
@@ -234,12 +271,29 @@ Category: Utilities"
     (select-window enkan-repl--window-1)
     (find-file enkan-repl-center-file)
     (message "✅ Window 1: Opened center file %s" enkan-repl-center-file))
-  ;; Setup eat buffers in session windows (4, 5, 6, 7 in multi-project order)
-  (when (enkan-repl--ws-session-list)
-    (enkan-repl--setup-session-eat-buffer enkan-repl--window-2 1)
-    (enkan-repl--setup-session-eat-buffer enkan-repl--window-3 2)
-    (enkan-repl--setup-session-eat-buffer enkan-repl--window-4 3)
-    (enkan-repl--setup-session-eat-buffer enkan-repl--window-5 4))
+  ;; Setup eat buffers in session windows - use actual living buffers
+  (let ((available-buffers (enkan-repl--get-available-buffers (buffer-list))))
+    (when (and available-buffers (> (length available-buffers) 0))
+      ;; Place first buffer in window 2
+      (when enkan-repl--window-2
+        (select-window enkan-repl--window-2)
+        (switch-to-buffer (car available-buffers))
+        (message "✅ Window 2: Opened eat buffer %s" (buffer-name (car available-buffers))))
+      ;; Place second buffer in window 3 if exists
+      (when (and (> (length available-buffers) 1) enkan-repl--window-3)
+        (select-window enkan-repl--window-3)
+        (switch-to-buffer (cadr available-buffers))
+        (message "✅ Window 3: Opened eat buffer %s" (buffer-name (cadr available-buffers))))
+      ;; Place third buffer in window 4 if exists
+      (when (and (> (length available-buffers) 2) enkan-repl--window-4)
+        (select-window enkan-repl--window-4)
+        (switch-to-buffer (caddr available-buffers))
+        (message "✅ Window 4: Opened eat buffer %s" (buffer-name (caddr available-buffers))))
+      ;; Place fourth buffer in window 5 if exists
+      (when (and (> (length available-buffers) 3) enkan-repl--window-5)
+        (select-window enkan-repl--window-5)
+        (switch-to-buffer (cadddr available-buffers))
+        (message "✅ Window 5: Opened eat buffer %s" (buffer-name (cadddr available-buffers))))))
   ;; Always select the center file window (Window 1) at the end
   (when enkan-repl--window-1
     (select-window enkan-repl--window-1)))
@@ -249,33 +303,37 @@ Category: Utilities"
 ;;;###autoload
 (defun enkan-repl-setup-current-project-layout ()
   "Setup window layout for the currently active project.
-Uses enkan-repl--current-project to determine which layout to apply.
+Uses actual living buffers in current workspace to determine layout.
 
 Category: Utilities"
   (interactive)
   (unless (enkan-repl--ws-current-project)
     (error "No current project active. Run enkan-repl-setup first"))
-  (let ((alias-list (cdr (assoc (enkan-repl--ws-current-project) enkan-repl-projects))))
-    (unless alias-list
-      (error "Project '%s' not found in enkan-repl-projects" (enkan-repl--ws-current-project)))
-    (let ((session-count (length alias-list)))
-      (message "Setting up layout for %d sessions from '%s' configuration..."
-        session-count (enkan-repl--ws-current-project))
-      (cond
-        ((= session-count 1)
-          (enkan-repl-setup-1session-layout)
-          (message "✅ Applied 1-session layout for '%s'" (enkan-repl--ws-current-project)))
-        ((= session-count 2)
-          (enkan-repl-setup-2session-layout)
-          (message "✅ Applied 2-session layout for '%s'" (enkan-repl--ws-current-project)))
-        ((= session-count 3)
-          (enkan-repl-setup-3session-layout)
-          (message "✅ Applied 3-session layout for '%s'" (enkan-repl--ws-current-project)))
-        ((= session-count 4)
-          (enkan-repl-setup-4session-layout)
-          (message "✅ Applied 4-session layout for '%s'" (enkan-repl--ws-current-project)))
-        (t
-          (error "Unsupported session count: %d (supported: 1-4 sessions)" session-count))))))
+  (unless enkan-repl--current-workspace
+    (error "No current workspace active"))
+  ;; Count actual living buffers for current workspace
+  (let ((session-count (enkan-repl--get-workspace-buffer-count-pure 
+                        (buffer-list) 
+                        enkan-repl--current-workspace)))
+    (message "Setting up layout for %d actual sessions in workspace '%s' for project '%s'..."
+      session-count enkan-repl--current-workspace (enkan-repl--ws-current-project))
+    (cond
+      ((= session-count 0)
+        (message "⚠️  No active sessions found in workspace '%s'" enkan-repl--current-workspace))
+      ((= session-count 1)
+        (enkan-repl-setup-1session-layout)
+        (message "✅ Applied 1-session layout for workspace '%s'" enkan-repl--current-workspace))
+      ((= session-count 2)
+        (enkan-repl-setup-2session-layout)
+        (message "✅ Applied 2-session layout for workspace '%s'" enkan-repl--current-workspace))
+      ((= session-count 3)
+        (enkan-repl-setup-3session-layout)
+        (message "✅ Applied 3-session layout for workspace '%s'" enkan-repl--current-workspace))
+      ((= session-count 4)
+        (enkan-repl-setup-4session-layout)
+        (message "✅ Applied 4-session layout for workspace '%s'" enkan-repl--current-workspace))
+      (t
+        (error "Unsupported session count: %d (supported: 1-4 sessions)" session-count)))))
 
 (provide 'window-layouts)
 ;;; window-layouts.el ends here
