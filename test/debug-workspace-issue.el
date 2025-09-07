@@ -98,7 +98,7 @@
           (message "setup-window-eat-buffer-pure result: %s" result)
           (should result)
           (when result
-            (should (string-match-p "\\*ws:01 enkan:/path/to/er\\*" (cdr result)))))))))
+            (should (string-match-p "\\*ws:01 enkan:/path/to/er/\\*" (cdr result)))))))))
 
 (provide 'debug-workspace-issue)
 ;;; debug-workspace-issue.el ends here

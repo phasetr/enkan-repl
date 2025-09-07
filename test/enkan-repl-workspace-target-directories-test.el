@@ -53,7 +53,7 @@
                      '((1 . "er"))
                      enkan-repl-target-directories)))
         (should result)
-        (should (string-match-p "\\*ws:01 enkan:/path/to/er\\*" (cdr result))))
+        (should (string-match-p "\\*ws:01 enkan:/path/to/er/\\*" (cdr result))))
       
       ;; Create workspace 02 with project-b
       (setq test-ws2 "02")
@@ -78,7 +78,7 @@
                        '((1 . "project-b"))
                        enkan-repl-target-directories)))
           (should result)
-          (should (string-match-p "\\*ws:02 enkan:/path/to/project-b\\*" (cdr result))))
+          (should (string-match-p "\\*ws:02 enkan:/path/to/project-b/\\*" (cdr result))))
         
         ;; Now switch back to ws:01
         (setq enkan-repl--current-workspace test-ws1)
@@ -100,7 +100,7 @@
                          '((1 . "er"))
                          enkan-repl-target-directories)))
             (should result)
-            (should (string-match-p "\\*ws:01 enkan:/path/to/er\\*" (cdr result)))))))))
+            (should (string-match-p "\\*ws:01 enkan:/path/to/er/\\*" (cdr result)))))))))
 
 (ert-deftest test-workspace-missing-eat-buffer-selection ()
   "Test that missing eat buffers are handled correctly when switching workspaces."
@@ -128,7 +128,7 @@
                      enkan-repl-target-directories)))
         ;; Should still return the buffer name even if buffer doesn't exist
         (should result)
-        (should (string-match-p "\\*ws:01 enkan:/path/to/er\\*" (cdr result)))))))
+        (should (string-match-p "\\*ws:01 enkan:/path/to/er/\\*" (cdr result)))))))
 
 (provide 'enkan-repl-workspace-target-directories-test)
 ;;; enkan-repl-workspace-target-directories-test.el ends here

@@ -106,7 +106,7 @@
         (should (eq (car result) 'dummy-window))
         (setq test-buffer-name (cdr result))
         (should (stringp test-buffer-name))
-        (should (string-match-p "\\*ws:01 enkan:/path/to/er\\*" test-buffer-name))))
+        (should (string-match-p "\\*ws:01 enkan:/path/to/er/\\*" test-buffer-name))))
     
     ;; Test: When buffer doesn't exist, get-buffer returns nil
     (cl-letf (((symbol-function 'get-buffer)

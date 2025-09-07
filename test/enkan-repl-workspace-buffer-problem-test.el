@@ -93,7 +93,7 @@ the second buffer gets named with <2> suffix instead of using the workspace ID."
         ;; Should return buffer info, not nil
         (should result)
         (should (consp result))
-        (should (string-match-p "\\*ws:01 enkan:/path/to/er\\*" (cdr result)))))))
+        (should (string-match-p "\\*ws:01 enkan:/path/to/er/\\*" (cdr result)))))))
 
 (ert-deftest test-setup-session-eat-buffer-returns-nil ()
   "Test that setup-session-eat-buffer behaves correctly when session list is empty."

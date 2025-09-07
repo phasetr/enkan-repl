@@ -39,13 +39,17 @@ Returns cons (window . buffer-name) or nil if session not registered."
       (let ((project-path (enkan-repl--get-project-path-from-directories project-name project-registry)))
         (when project-path
           (let* ((expanded-path (expand-file-name project-path))
+                 ;; Ensure path ends with / for consistency with eat buffer names
+                 (normalized-path (if (string-suffix-p "/" expanded-path)
+                                      expanded-path
+                                    (concat expanded-path "/")))
                  ;; Use current workspace ID from global variable
                  (ws-id (if (and (boundp 'enkan-repl--current-workspace)
                                  enkan-repl--current-workspace
                                  (stringp enkan-repl--current-workspace))
                             enkan-repl--current-workspace
                           "01"))
-                 (buffer-name (format "*ws:%s enkan:%s*" ws-id expanded-path)))
+                 (buffer-name (format "*ws:%s enkan:%s*" ws-id normalized-path)))
             (cons window buffer-name)))))))
 
 ;;;; Window Layout Variables
