@@ -2015,9 +2015,6 @@ Category: Debugging"
 
 ;;;; Workspace Management Interactive Commands
 
-
-;;;###autoload
-;;;###autoload
 ;;;###autoload
 (defun enkan-repl-workspace-switch ()
   "Switch to another workspace.
