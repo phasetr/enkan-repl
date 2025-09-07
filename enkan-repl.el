@@ -2095,37 +2095,6 @@ Cannot delete the current workspace or the only workspace."
                 (message "Deleted workspace %s" target-id))
             (message "Cannot delete workspace %s" target-id)))))))
 
-;;;###autoload
-(defun enkan-repl-workspace-list ()
-  "List all workspaces with their status."
-  (interactive)
-  ;; Save current workspace state before displaying (only if workspace exists)
-  (when enkan-repl--current-workspace
-    (enkan-repl--save-workspace-state))
-  ;; Clean up any nil workspace that might have been created
-  (setq enkan-repl--workspaces 
-        (cl-remove-if (lambda (entry)
-                        (null (car entry)))
-                      enkan-repl--workspaces))
-  (let ((workspace-ids (enkan-repl--list-workspace-ids enkan-repl--workspaces))
-        (buffer-name "*Workspace List*"))
-    (with-output-to-temp-buffer buffer-name
-      (princ "=== ENKAN-REPL WORKSPACES ===\n\n")
-      (if workspace-ids
-          (dolist (ws-id workspace-ids)
-            (let ((state (enkan-repl--get-workspace-state enkan-repl--workspaces ws-id))
-                  (current-marker (if (string= ws-id enkan-repl--current-workspace)
-                                      " [CURRENT]" "")))
-              (princ (format "Workspace %s%s:\n" ws-id current-marker))
-              (when state
-                (princ (format "  Project: %s\n"
-                               (or (plist-get state :current-project) "<none>")))
-                (princ (format "  Sessions: %d\n"
-                               (length (plist-get state :session-list))))
-                (princ (format "  Aliases: %d\n"
-                               (length (plist-get state :project-aliases)))))
-              (princ "\n")))
-        (princ "No workspaces found\n")))))
 
 
 (defun enkan-repl--teardown-delete-current-workspace-pure ()

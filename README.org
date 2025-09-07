@@ -244,7 +244,7 @@ See [[file:docs/migration-guide.md][Migration Guide]] for upgrade instructions.
 - =enkan-repl-toggle-global-mode= - Toggle enkan-repl global mode on/off.
 - =enkan-repl-workspace-switch= - Switch to another workspace.
 - =enkan-repl-workspace-delete= - Delete a workspace. Cannot delete the current workspace or the only workspace.
-- =enkan-repl-workspace-list= - List all workspaces with their status.
+  
 
 ** Configuration
 
