@@ -1021,6 +1021,11 @@ Category: Session Controller"
     (when eat-buffer
       (with-current-buffer eat-buffer
         (rename-buffer buffer-name t))
+      ;; Register session and save workspace state
+      (when enkan-repl--current-project
+        (setq enkan-repl--session-counter (1+ enkan-repl--session-counter))
+        (enkan-repl--register-session enkan-repl--session-counter enkan-repl--current-project)
+        (enkan-repl--save-workspace-state))
       (message "Started eat session in: %s" target-dir))))
 
 ;;;###autoload
@@ -2097,6 +2102,8 @@ Cannot delete the current workspace or the only workspace."
 (defun enkan-repl-workspace-list ()
   "List all workspaces with their status."
   (interactive)
+  ;; Save current workspace state before displaying
+  (enkan-repl--save-workspace-state)
   (let ((workspace-ids (enkan-repl--list-workspace-ids enkan-repl--workspaces))
         (buffer-name "*Workspace List*"))
     (with-output-to-temp-buffer buffer-name
