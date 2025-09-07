@@ -1,3 +1,10 @@
+## [0.15.1](https://github.com/phasetr/enkan-repl/compare/v0.15.0...v0.15.1) (2025-09-07)
+
+
+### Bug Fixes
+
+* correct PR reference link in changelog ([213bb05](https://github.com/phasetr/enkan-repl/commit/213bb0558ba757c81f2eebe22bd75a93f7ce390a))
+
 # [0.15.0](https://github.com/phasetr/enkan-repl/compare/v0.14.5...v0.15.0) (2025-09-07)
 
 
