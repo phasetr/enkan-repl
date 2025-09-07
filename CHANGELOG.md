@@ -3,6 +3,14 @@
 
 ### Bug Fixes
 
+* workspace deletion and switching in teardown ([01f8b97](https://github.com/phasetr/enkan-repl/commit/01f8b97df141224f0372a237bc770c7863c0b721))
+* **workspace:** hmenu-based switch/delete, remove create/list, move magit to examples ([907f778](https://github.com/phasetr/enkan-repl/commit/907f77878a0bbf7347da605f9ada71851ea0b066))
+
+## [0.15.3](https://github.com/phasetr/enkan-repl/compare/v0.15.2...v0.15.3) (2025-09-07)
+
+
+### Bug Fixes
+
 * workspace deletion and switching in teardown ([3b8f025](https://github.com/phasetr/enkan-repl/commit/3b8f02540b456bf47a3ddbc9fa155b3a8075d599))
 
 ## [0.15.2](https://github.com/phasetr/enkan-repl/compare/v0.15.1...v0.15.2) (2025-09-07)

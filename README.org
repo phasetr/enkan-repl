@@ -242,9 +242,8 @@ See [[file:docs/migration-guide.md][Migration Guide]] for upgrade instructions.
 *** Utilities
 - =enkan-repl-recenter-bottom= - Recenter all enkan terminal buffers at bottom.
 - =enkan-repl-toggle-global-mode= - Toggle enkan-repl global mode on/off.
-- =enkan-repl-workspace-switch= - Switch to another workspace.
-- =enkan-repl-workspace-delete= - Delete a workspace. Cannot delete the current workspace or the only workspace.
-  
+- =enkan-repl-workspace-switch= - Switch to another workspace. Uses `hmenu' if available to show workspace ID with its project.
+- =enkan-repl-workspace-delete= - Delete a workspace. Cannot delete the current workspace or the only workspace. Uses `hmenu' if available to show workspace ID with its project.
 
 ** Configuration
 

@@ -30,8 +30,8 @@
     ("enkan-repl-open-project-directory" . "Open project directory in Dired from enkan-repl-projects with optional PFX. With prefix argument (\\\\[universal-argument]), select from available buffers.  Category: Center File Multi-buffer Access")
     ("enkan-repl-open-center-file" . "Open or create the center file based on enkan-repl-center-file configuration.  Category: Center File Operations")
     ("enkan-repl-print-setup-to-buffer" . "Print current setup variables for debugging. Displays enkan-repl-projects, enkan-repl-target-directories, enkan-repl-project-aliases, and current session state.  Category: Debugging")
-    ("enkan-repl-workspace-switch" . "Switch to another workspace.")
-    ("enkan-repl-workspace-delete" . "Delete a workspace. Cannot delete the current workspace or the only workspace."))
+    ("enkan-repl-workspace-switch" . "Switch to another workspace. Uses `hmenu' if available to show workspace ID with its project.")
+    ("enkan-repl-workspace-delete" . "Delete a workspace. Cannot delete the current workspace or the only workspace. Uses `hmenu' if available to show workspace ID with its project."))
   "Precompiled list of cheat-sheet candidates.
 Each element is a cons cell (FUNCTION-NAME . DESCRIPTION).")
 
