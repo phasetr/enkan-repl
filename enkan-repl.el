@@ -1064,7 +1064,10 @@ Category: Session Controller"
               (kill-buffer existing-buffer)
               (message "Terminated eat session in: %s" target-dir)
               ;; Delete current workspace after session termination
-              (enkan-repl--teardown-delete-current-workspace-pure)))))
+              (enkan-repl--teardown-delete-current-workspace-pure)
+              ;; Switch to another workspace if available
+              (when (enkan-repl--list-workspace-ids enkan-repl--workspaces)
+                (enkan-repl-workspace-switch))))))
       ;; Center file mode: terminate all sessions in current workspace
       (if (enkan-repl--is-center-file-path enkan-repl-center-file enkan-repl-projects)
           ;; Center file mode implementation
@@ -1108,6 +1111,9 @@ Category: Session Controller"
                             (princ (format "  ❌ Session %d: %s (project path not found)\n" session-number project-name)))))))
                     ;; Reset global configuration and delete current workspace
                     (enkan-repl--teardown-delete-current-workspace-pure)
+                    ;; Switch to another workspace if available
+                    (when (enkan-repl--list-workspace-ids enkan-repl--workspaces)
+                      (enkan-repl-workspace-switch))
                     ;; Auto-disable global center file mode
                     ;; (when (enkan-repl--disable-global-minor-mode-if-active)
                     ;;   (princ "\n🔄 Auto-disabled center file global mode\n"))
