@@ -384,9 +384,9 @@ Returns t if initialized, nil if already exists."
 Returns zero-padded numeric string (e.g., \"01\", \"02\")."
   (if (null workspaces)
       "01"
-    (let ((ids (mapcar (lambda (ws) 
-                        (string-to-number (car ws)))
-                      workspaces)))
+    (let ((ids (mapcar (lambda (ws)
+                         (string-to-number (car ws)))
+                       workspaces)))
       (format "%02d" (1+ (apply #'max ids))))))
 
 (defun enkan-repl--create-workspace-state (workspaces)
@@ -398,7 +398,7 @@ Returns the new workspace ID string."
 (defun enkan-repl--add-workspace (workspaces new-id)
   "Add new workspace with NEW-ID to WORKSPACES alist.
 Returns updated alist with new workspace."
-  (cons (cons new-id 
+  (cons (cons new-id
               (list :current-project nil
                     :session-list nil
                     :session-counter 0
@@ -1984,11 +1984,11 @@ The workspace ID is automatically generated."
   (let ((workspace-ids (enkan-repl--list-workspace-ids enkan-repl--workspaces)))
     (if (< (length workspace-ids) 2)
         (message "No other workspaces to switch to")
-      (let ((target-id (completing-read 
-                       (format "Switch to workspace (current: %s): " 
-                               enkan-repl--current-workspace)
-                       (cl-remove enkan-repl--current-workspace workspace-ids)
-                       nil t)))
+      (let ((target-id (completing-read
+                        (format "Switch to workspace (current: %s): "
+                                enkan-repl--current-workspace)
+                        (cl-remove enkan-repl--current-workspace workspace-ids)
+                        nil t)))
         (when (and target-id (not (string= target-id enkan-repl--current-workspace)))
           ;; Save current workspace state
           (enkan-repl--save-workspace-state)
@@ -2006,24 +2006,24 @@ Cannot delete the current workspace or the only workspace."
   (let ((workspace-ids (enkan-repl--list-workspace-ids enkan-repl--workspaces)))
     (if (< (length workspace-ids) 2)
         (message "Cannot delete the only workspace")
-      (let ((target-id (completing-read 
-                       "Delete workspace: "
-                       (cl-remove enkan-repl--current-workspace workspace-ids)
-                       nil t)))
+      (let ((target-id (completing-read
+                        "Delete workspace: "
+                        (cl-remove enkan-repl--current-workspace workspace-ids)
+                        nil t)))
         (when target-id
           (if (enkan-repl--can-delete-workspace target-id enkan-repl--workspaces)
               (progn
                 ;; Terminate all sessions in the workspace to delete
-                (let ((state (enkan-repl--get-workspace-state 
-                             enkan-repl--workspaces target-id)))
+                (let ((state (enkan-repl--get-workspace-state
+                              enkan-repl--workspaces target-id)))
                   (when state
                     (let ((session-list (plist-get state :session-list)))
                       (when session-list
-                        (enkan-repl--terminate-all-session-buffers 
-                         session-list 
+                        (enkan-repl--terminate-all-session-buffers
+                         session-list
                          enkan-repl-target-directories)))))
                 ;; Delete the workspace
-                (setq enkan-repl--workspaces 
+                (setq enkan-repl--workspaces
                       (enkan-repl--delete-workspace enkan-repl--workspaces target-id))
                 (message "Deleted workspace %s" target-id))
             (message "Cannot delete workspace %s" target-id)))))))
@@ -2040,15 +2040,15 @@ Cannot delete the current workspace or the only workspace."
           (dolist (ws-id workspace-ids)
             (let ((state (enkan-repl--get-workspace-state enkan-repl--workspaces ws-id))
                   (current-marker (if (string= ws-id enkan-repl--current-workspace)
-                                     " [CURRENT]" "")))
+                                      " [CURRENT]" "")))
               (princ (format "Workspace %s%s:\n" ws-id current-marker))
               (when state
-                (princ (format "  Project: %s\n" 
-                              (or (plist-get state :current-project) "<none>")))
-                (princ (format "  Sessions: %d\n" 
-                              (length (plist-get state :session-list))))
-                (princ (format "  Aliases: %d\n" 
-                              (length (plist-get state :project-aliases)))))
+                (princ (format "  Project: %s\n"
+                               (or (plist-get state :current-project) "<none>")))
+                (princ (format "  Sessions: %d\n"
+                               (length (plist-get state :session-list))))
+                (princ (format "  Aliases: %d\n"
+                               (length (plist-get state :project-aliases)))))
               (princ "\n")))
         (princ "No workspaces found\n")))))
 
