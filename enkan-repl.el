@@ -2045,66 +2045,7 @@ Category: Debugging"
 
 
 ;;;###autoload
-(defun enkan-repl-workspace-switch--legacy ()
-  "Switch to another workspace.
-Uses `hmenu' if available to show workspace ID with its project."
-  (interactive)
-  (let* ((workspace-ids (enkan-repl--list-workspace-ids enkan-repl--workspaces))
-         (candidates (cl-remove enkan-repl--current-workspace workspace-ids :test #'string=)))
-    (if (< (length workspace-ids) 2)
-        (message "No other workspaces to switch to")
-      (let* ((items (mapcar (lambda (ws-id)
-                              (let* ((state (enkan-repl--get-workspace-state enkan-repl--workspaces ws-id))
-                                     (proj (or (plist-get state :current-project) "<none>")))
-                                (cons (format "%s [%s]" ws-id proj) ws-id)))
-                            candidates))
-             (prompt (format "Switch to workspace (current: %s):" enkan-repl--current-workspace))
-             (display (if (and (fboundp 'hmenu) items)
-                          (hmenu prompt (mapcar #'car items))
-                        (completing-read prompt (mapcar #'car items) nil t)))
-             (target-id (cdr (assoc display items #'string=))))
-        (when (and target-id (not (string= target-id enkan-repl--current-workspace)))
-          ;; Save current workspace state
-          (enkan-repl--save-workspace-state)
-          ;; Switch workspace
-          (setq enkan-repl--current-workspace target-id)
-          ;; Load target workspace state
-          (enkan-repl--load-workspace-state target-id)
-          (message "Switched to workspace %s" target-id))))))
-
 ;;;###autoload
-(defun enkan-repl-workspace-delete--legacy ()
-  "Delete a workspace.
-Cannot delete the current workspace or the only workspace."
-  (interactive)
-  (let ((workspace-ids (enkan-repl--list-workspace-ids enkan-repl--workspaces)))
-    (if (< (length workspace-ids) 2)
-        (message "Cannot delete the only workspace")
-      (let ((target-id (completing-read
-                        "Delete workspace: "
-                        (cl-remove enkan-repl--current-workspace workspace-ids)
-                        nil t)))
-        (when target-id
-          (if (enkan-repl--can-delete-workspace target-id enkan-repl--workspaces)
-              (progn
-                ;; Terminate all sessions in the workspace to delete
-                (let ((state (enkan-repl--get-workspace-state
-                              enkan-repl--workspaces target-id)))
-                  (when state
-                    (let ((session-list (plist-get state :session-list)))
-                      (when session-list
-                        (enkan-repl--terminate-all-session-buffers
-                         session-list
-                         enkan-repl-target-directories)))))
-                ;; Delete the workspace
-                (setq enkan-repl--workspaces
-                      (enkan-repl--delete-workspace enkan-repl--workspaces target-id))
-                (message "Deleted workspace %s" target-id))
-            (message "Cannot delete workspace %s" target-id)))))))
-
-
-
-;; Refactor: hmenu-based workspace switch/delete (overrides earlier defs)
 ;;;###autoload
 (defun enkan-repl-workspace-switch ()
   "Switch to another workspace.
