@@ -31,7 +31,6 @@
     ("enkan-repl-open-center-file" . "Open or create the center file based on enkan-repl-center-file configuration.  Category: Center File Operations")
     ("enkan-repl-magit" . "Open magit for selected project from enkan-repl-projects with optional PFX. With prefix argument (\\\\[universal-argument]), select from available buffers.  Category: Center File Operations")
     ("enkan-repl-print-setup-to-buffer" . "Print current setup variables for debugging. Displays enkan-repl-projects, enkan-repl-target-directories, enkan-repl-project-aliases, and current session state.  Category: Debugging")
-    ("enkan-repl-workspace-create" . "Create a new workspace and switch to it. The workspace ID is automatically generated.")
     ("enkan-repl-workspace-switch" . "Switch to another workspace.")
     ("enkan-repl-workspace-delete" . "Delete a workspace. Cannot delete the current workspace or the only workspace.")
     ("enkan-repl-workspace-list" . "List all workspaces with their status."))
@@ -39,7 +38,7 @@
 Each element is a cons cell (FUNCTION-NAME . DESCRIPTION).")
 
 (defconst enkan-repl-cheat-sheet-function-count
-  24
+  23
   "Number of functions in cheat-sheet.")
 
 (provide 'enkan-repl-constants)

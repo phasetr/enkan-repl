@@ -2043,24 +2043,6 @@ Category: Debugging"
 
 ;;;; Workspace Management Interactive Commands
 
-;;;###autoload
-(defun enkan-repl-workspace-create ()
-  "Create a new workspace and switch to it.
-The workspace ID is automatically generated."
-  (interactive)
-  (let* ((new-id (enkan-repl--create-workspace-state enkan-repl--workspaces)))
-    ;; Save current workspace state before switching
-    (enkan-repl--save-workspace-state)
-    ;; Create new workspace entry directly with save-workspace-state
-    (setq enkan-repl--current-workspace new-id)
-    ;; Reset globals for new workspace
-    (setq enkan-repl--current-project nil)
-    (setq enkan-repl-session-list nil)
-    (setq enkan-repl--session-counter 0)
-    (setq enkan-repl-project-aliases nil)
-    ;; Save the new empty workspace
-    (enkan-repl--save-workspace-state)
-    (message "Created and switched to workspace %s" new-id)))
 
 ;;;###autoload
 (defun enkan-repl-workspace-switch ()
