@@ -84,7 +84,6 @@
 (declare-function enkan-repl--send-primitive "enkan-repl-utils" (text special-key-type))
 (declare-function enkan-repl--buffer-name-matches-workspace "enkan-repl-utils" (name workspace-id))
 (declare-function enkan-repl--extract-workspace-id "enkan-repl-utils" (name))
-(declare-function magit-status "magit" (&optional directory))
 
 ;; Declare external functions from hmenu to silence byte-compiler when not loaded
 (declare-function hmenu "hmenu" (prompt choices))
@@ -1978,33 +1977,6 @@ Category: Center File Operations"
           (find-file enkan-repl-center-file))
       (error "%s" (plist-get result :message)))))
 
-;; Pure functions for magit project selection (used by enkan-repl-magit)
-
-(defun enkan-repl-magit (&optional pfx)
-  "Open magit for selected project from enkan-repl-projects with optional PFX.
-With prefix argument (\\[universal-argument]), select from available buffers.
-
-Category: Center File Operations"
-  (interactive "P")
-  (let ((result (enkan-repl--target-directory-info
-                 (enkan-repl--ws-current-project)
-                 enkan-repl-projects
-                 enkan-repl-target-directories
-                 "Select project for magit:"
-                 #'file-directory-p
-                 pfx)))
-    (pcase (plist-get result :status)
-      ((or 'no-project 'no-paths 'no-buffers)
-       (message (plist-get result :message)))
-      ('invalid
-       (message "Directory does not exist: %s" (plist-get result :path)))
-      ((or 'single 'selected)
-       (let ((path (plist-get result :path)))
-         (when (and path (file-directory-p path))
-           (let ((default-directory path))
-             (magit-status)))))
-      ('cancelled
-       (message "Selection cancelled")))))
 
 ;;;###autoload
 (defun enkan-repl-print-setup-to-buffer ()
@@ -2044,57 +2016,50 @@ Category: Debugging"
 ;;;; Workspace Management Interactive Commands
 
 ;;;###autoload
-(defun enkan-repl-workspace-create ()
-  "Create a new workspace and switch to it.
-The workspace ID is automatically generated."
-  (interactive)
-  (let* ((new-id (enkan-repl--create-workspace-state enkan-repl--workspaces)))
-    ;; Save current workspace state before switching
-    (enkan-repl--save-workspace-state)
-    ;; Create new workspace entry directly with save-workspace-state
-    (setq enkan-repl--current-workspace new-id)
-    ;; Reset globals for new workspace
-    (setq enkan-repl--current-project nil)
-    (setq enkan-repl-session-list nil)
-    (setq enkan-repl--session-counter 0)
-    (setq enkan-repl-project-aliases nil)
-    ;; Save the new empty workspace
-    (enkan-repl--save-workspace-state)
-    (message "Created and switched to workspace %s" new-id)))
-
-;;;###autoload
 (defun enkan-repl-workspace-switch ()
-  "Switch to another workspace."
+  "Switch to another workspace.
+Uses `hmenu' if available to show workspace ID with its project."
   (interactive)
-  (let ((workspace-ids (enkan-repl--list-workspace-ids enkan-repl--workspaces)))
+  (let* ((workspace-ids (enkan-repl--list-workspace-ids enkan-repl--workspaces))
+         (candidates (cl-remove enkan-repl--current-workspace workspace-ids :test #'string=)))
     (if (< (length workspace-ids) 2)
         (message "No other workspaces to switch to")
-      (let ((target-id (completing-read
-                        (format "Switch to workspace (current: %s): "
-                                enkan-repl--current-workspace)
-                        (cl-remove enkan-repl--current-workspace workspace-ids)
-                        nil t)))
+      (let* ((items (mapcar (lambda (ws-id)
+                              (let* ((state (enkan-repl--get-workspace-state enkan-repl--workspaces ws-id))
+                                     (proj (or (plist-get state :current-project) "<none>")))
+                                (cons (format "%s [%s]" ws-id proj) ws-id)))
+                            candidates))
+             (prompt (format "Switch to workspace (current: %s):" enkan-repl--current-workspace))
+             (display (if (and (fboundp 'hmenu) items)
+                          (hmenu prompt (mapcar #'car items))
+                        (completing-read prompt (mapcar #'car items) nil t)))
+             (target-id (cdr (assoc display items #'string=))))
         (when (and target-id (not (string= target-id enkan-repl--current-workspace)))
-          ;; Save current workspace state
           (enkan-repl--save-workspace-state)
-          ;; Switch workspace
           (setq enkan-repl--current-workspace target-id)
-          ;; Load target workspace state
           (enkan-repl--load-workspace-state target-id)
           (message "Switched to workspace %s" target-id))))))
 
 ;;;###autoload
 (defun enkan-repl-workspace-delete ()
   "Delete a workspace.
-Cannot delete the current workspace or the only workspace."
+Cannot delete the current workspace or the only workspace.
+Uses `hmenu' if available to show workspace ID with its project."
   (interactive)
-  (let ((workspace-ids (enkan-repl--list-workspace-ids enkan-repl--workspaces)))
+  (let* ((workspace-ids (enkan-repl--list-workspace-ids enkan-repl--workspaces))
+         (candidates (cl-remove enkan-repl--current-workspace workspace-ids :test #'string=)))
     (if (< (length workspace-ids) 2)
         (message "Cannot delete the only workspace")
-      (let ((target-id (completing-read
-                        "Delete workspace: "
-                        (cl-remove enkan-repl--current-workspace workspace-ids)
-                        nil t)))
+      (let* ((items (mapcar (lambda (ws-id)
+                              (let* ((state (enkan-repl--get-workspace-state enkan-repl--workspaces ws-id))
+                                     (proj (or (plist-get state :current-project) "<none>")))
+                                (cons (format "%s [%s]" ws-id proj) ws-id)))
+                            candidates))
+             (prompt "Delete workspace:")
+             (display (if (and (fboundp 'hmenu) items)
+                          (hmenu prompt (mapcar #'car items))
+                        (completing-read prompt (mapcar #'car items) nil t)))
+             (target-id (cdr (assoc display items #'string=))))
         (when target-id
           (if (enkan-repl--can-delete-workspace target-id enkan-repl--workspaces)
               (progn
@@ -2112,39 +2077,6 @@ Cannot delete the current workspace or the only workspace."
                       (enkan-repl--delete-workspace enkan-repl--workspaces target-id))
                 (message "Deleted workspace %s" target-id))
             (message "Cannot delete workspace %s" target-id)))))))
-
-;;;###autoload
-(defun enkan-repl-workspace-list ()
-  "List all workspaces with their status."
-  (interactive)
-  ;; Save current workspace state before displaying (only if workspace exists)
-  (when enkan-repl--current-workspace
-    (enkan-repl--save-workspace-state))
-  ;; Clean up any nil workspace that might have been created
-  (setq enkan-repl--workspaces 
-        (cl-remove-if (lambda (entry)
-                        (null (car entry)))
-                      enkan-repl--workspaces))
-  (let ((workspace-ids (enkan-repl--list-workspace-ids enkan-repl--workspaces))
-        (buffer-name "*Workspace List*"))
-    (with-output-to-temp-buffer buffer-name
-      (princ "=== ENKAN-REPL WORKSPACES ===\n\n")
-      (if workspace-ids
-          (dolist (ws-id workspace-ids)
-            (let ((state (enkan-repl--get-workspace-state enkan-repl--workspaces ws-id))
-                  (current-marker (if (string= ws-id enkan-repl--current-workspace)
-                                      " [CURRENT]" "")))
-              (princ (format "Workspace %s%s:\n" ws-id current-marker))
-              (when state
-                (princ (format "  Project: %s\n"
-                               (or (plist-get state :current-project) "<none>")))
-                (princ (format "  Sessions: %d\n"
-                               (length (plist-get state :session-list))))
-                (princ (format "  Aliases: %d\n"
-                               (length (plist-get state :project-aliases)))))
-              (princ "\n")))
-        (princ "No workspaces found\n")))))
-
 
 (defun enkan-repl--teardown-delete-current-workspace-pure ()
   "Delete current workspace and reset session variables.

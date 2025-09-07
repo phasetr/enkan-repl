@@ -17,6 +17,38 @@
 (require 'enkan-repl)
 (require 'window-layouts)
 
+;; Optional integration: magit helper
+;; This is provided as an example-only command so that core does not depend on magit.
+;; Copy/adapt as needed if you use magit.
+(declare-function magit-status "magit" (&optional directory))
+
+(defun enkan-repl-magit (&optional pfx)
+  "Open magit for selected project from enkan-repl-projects with optional PFX.
+With prefix arg, select from existing enkan buffers.
+Requires magit to be installed."
+  (interactive "P")
+  (unless (fboundp 'magit-status)
+    (user-error "magit is not available. Please install magit."))
+  (let ((result (enkan-repl--target-directory-info
+                 (enkan-repl--ws-current-project)
+                 enkan-repl-projects
+                 enkan-repl-target-directories
+                 "Select project for magit:"
+                 #'file-directory-p
+                 pfx)))
+    (pcase (plist-get result :status)
+      ((or 'no-project 'no-paths 'no-buffers)
+       (message (plist-get result :message)))
+      ('invalid
+       (message "Directory does not exist: %s" (plist-get result :path)))
+      ((or 'single 'selected)
+       (let ((path (plist-get result :path)))
+         (when (and path (file-directory-p path))
+           (let ((default-directory path))
+             (magit-status)))))
+      ('cancelled
+       (message "Selection cancelled")))))
+
 ;; Set your center file path
 (setq enkan-repl-center-file "~/enkan-center.org")
 (enkan-repl-global-minor-mode 1)

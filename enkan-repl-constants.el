@@ -29,17 +29,14 @@
     ("enkan-repl-send-escape" . "Send ESC key to eat session buffer with optional PFX. - If called from enkan buffer: Send ESC to current buffer - If called from center file without prefix: Select from available enkan buffers - With numeric prefix: Send to buffer at that index (1-based)  Category: Center File Multi-buffer Access")
     ("enkan-repl-open-project-directory" . "Open project directory in Dired from enkan-repl-projects with optional PFX. With prefix argument (\\\\[universal-argument]), select from available buffers.  Category: Center File Multi-buffer Access")
     ("enkan-repl-open-center-file" . "Open or create the center file based on enkan-repl-center-file configuration.  Category: Center File Operations")
-    ("enkan-repl-magit" . "Open magit for selected project from enkan-repl-projects with optional PFX. With prefix argument (\\\\[universal-argument]), select from available buffers.  Category: Center File Operations")
     ("enkan-repl-print-setup-to-buffer" . "Print current setup variables for debugging. Displays enkan-repl-projects, enkan-repl-target-directories, enkan-repl-project-aliases, and current session state.  Category: Debugging")
-    ("enkan-repl-workspace-create" . "Create a new workspace and switch to it. The workspace ID is automatically generated.")
     ("enkan-repl-workspace-switch" . "Switch to another workspace.")
-    ("enkan-repl-workspace-delete" . "Delete a workspace. Cannot delete the current workspace or the only workspace.")
-    ("enkan-repl-workspace-list" . "List all workspaces with their status."))
+    ("enkan-repl-workspace-delete" . "Delete a workspace. Cannot delete the current workspace or the only workspace."))
   "Precompiled list of cheat-sheet candidates.
 Each element is a cons cell (FUNCTION-NAME . DESCRIPTION).")
 
 (defconst enkan-repl-cheat-sheet-function-count
-  24
+  21
   "Number of functions in cheat-sheet.")
 
 (provide 'enkan-repl-constants)
