@@ -330,16 +330,18 @@ This function restores workspace state from the given plist."
   "Save current globals into `enkan-repl--workspaces' under WORKSPACE-ID.
 When WORKSPACE-ID is nil, use `enkan-repl--current-workspace'.
 Returns the saved plist for verification."
-  (let* ((ws (or workspace-id enkan-repl--current-workspace))
-         (plist (enkan-repl--ws-state->plist)))
-    ;; Remove ALL existing entries with same ID (defensive programming)
-    (setq enkan-repl--workspaces
-          (cl-remove-if (lambda (entry)
-                          (string= (car entry) ws))
-                        enkan-repl--workspaces))
-    ;; Add single new entry
-    (push (cons ws plist) enkan-repl--workspaces)
-    plist))
+  (let* ((ws (or workspace-id enkan-repl--current-workspace)))
+    ;; Only save if workspace ID is not nil
+    (when ws
+      (let ((plist (enkan-repl--ws-state->plist)))
+        ;; Remove ALL existing entries with same ID (defensive programming)
+        (setq enkan-repl--workspaces
+              (cl-remove-if (lambda (entry)
+                              (string= (car entry) ws))
+                            enkan-repl--workspaces))
+        ;; Add single new entry
+        (push (cons ws plist) enkan-repl--workspaces)
+        plist))))
 
 (defun enkan-repl--load-workspace-state (&optional workspace-id)
   "Load state from `enkan-repl--workspaces' into globals for WORKSPACE-ID.
@@ -1060,7 +1062,9 @@ Category: Session Controller"
             (when (or (not can-send)
                       (y-or-n-p (format "Terminate eat session in %s? " target-dir)))
               (kill-buffer existing-buffer)
-              (message "Terminated eat session in: %s" target-dir)))))
+              (message "Terminated eat session in: %s" target-dir)
+              ;; Delete current workspace after session termination
+              (enkan-repl--teardown-delete-current-workspace-pure)))))
       ;; Center file mode: terminate all sessions in current workspace
       (if (enkan-repl--is-center-file-path enkan-repl-center-file enkan-repl-projects)
           ;; Center file mode implementation
@@ -1102,8 +1106,8 @@ Category: Session Controller"
                             (princ (format "  ⚠️ Session %d: %s (buffer not found)\n" session-number project-name)))
                            ((eq status 'project-path-not-found)
                             (princ (format "  ❌ Session %d: %s (project path not found)\n" session-number project-name)))))))
-                    ;; Reset global configuration
-                    (enkan-repl--reset-global-session-variables)
+                    ;; Reset global configuration and delete current workspace
+                    (enkan-repl--teardown-delete-current-workspace-pure)
                     ;; Auto-disable global center file mode
                     ;; (when (enkan-repl--disable-global-minor-mode-if-active)
                     ;;   (princ "\n🔄 Auto-disabled center file global mode\n"))
@@ -2107,8 +2111,14 @@ Cannot delete the current workspace or the only workspace."
 (defun enkan-repl-workspace-list ()
   "List all workspaces with their status."
   (interactive)
-  ;; Save current workspace state before displaying
-  (enkan-repl--save-workspace-state)
+  ;; Save current workspace state before displaying (only if workspace exists)
+  (when enkan-repl--current-workspace
+    (enkan-repl--save-workspace-state))
+  ;; Clean up any nil workspace that might have been created
+  (setq enkan-repl--workspaces 
+        (cl-remove-if (lambda (entry)
+                        (null (car entry)))
+                      enkan-repl--workspaces))
   (let ((workspace-ids (enkan-repl--list-workspace-ids enkan-repl--workspaces))
         (buffer-name "*Workspace List*"))
     (with-output-to-temp-buffer buffer-name
@@ -2128,6 +2138,20 @@ Cannot delete the current workspace or the only workspace."
                                (length (plist-get state :project-aliases)))))
               (princ "\n")))
         (princ "No workspaces found\n")))))
+
+
+(defun enkan-repl--teardown-delete-current-workspace-pure ()
+  "Delete current workspace and reset session variables.
+Pure function with side effects limited to global state modification."
+  (when enkan-repl--current-workspace
+    (let ((current-ws enkan-repl--current-workspace))
+      ;; Reset session variables first
+      (enkan-repl--reset-global-session-variables)
+      ;; Delete current workspace from workspaces list
+      (setq enkan-repl--workspaces (enkan-repl--delete-workspace enkan-repl--workspaces current-ws))
+      ;; Set current workspace to nil
+      (setq enkan-repl--current-workspace nil)
+      (princ (format "\n🗑️ Deleted workspace: %s\n" current-ws)))))
 
 (provide 'enkan-repl)
 
