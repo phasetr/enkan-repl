@@ -3,7 +3,7 @@
 
 ### Features
 
-* Workspace functionality implementation ([#38](https://github.com/phasetr/enkan-repl/issues/38)) ([9bc49b6](https://github.com/phasetr/enkan-repl/commit/9bc49b645ce7ef651d300c1b47c76cf787af0ce1))
+* Workspace functionality implementation ([#38](https://github.com/phasetr/enkan-repl/pull/38)) ([9bc49b6](https://github.com/phasetr/enkan-repl/commit/9bc49b645ce7ef651d300c1b47c76cf787af0ce1))
 
 
 ### BREAKING CHANGES
