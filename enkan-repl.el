@@ -84,7 +84,6 @@
 (declare-function enkan-repl--send-primitive "enkan-repl-utils" (text special-key-type))
 (declare-function enkan-repl--buffer-name-matches-workspace "enkan-repl-utils" (name workspace-id))
 (declare-function enkan-repl--extract-workspace-id "enkan-repl-utils" (name))
-(declare-function magit-status "magit" (&optional directory))
 
 ;; Declare external functions from hmenu to silence byte-compiler when not loaded
 (declare-function hmenu "hmenu" (prompt choices))
@@ -1978,33 +1977,6 @@ Category: Center File Operations"
           (find-file enkan-repl-center-file))
       (error "%s" (plist-get result :message)))))
 
-;; Pure functions for magit project selection (used by enkan-repl-magit)
-
-(defun enkan-repl-magit (&optional pfx)
-  "Open magit for selected project from enkan-repl-projects with optional PFX.
-With prefix argument (\\[universal-argument]), select from available buffers.
-
-Category: Center File Operations"
-  (interactive "P")
-  (let ((result (enkan-repl--target-directory-info
-                 (enkan-repl--ws-current-project)
-                 enkan-repl-projects
-                 enkan-repl-target-directories
-                 "Select project for magit:"
-                 #'file-directory-p
-                 pfx)))
-    (pcase (plist-get result :status)
-      ((or 'no-project 'no-paths 'no-buffers)
-       (message (plist-get result :message)))
-      ('invalid
-       (message "Directory does not exist: %s" (plist-get result :path)))
-      ((or 'single 'selected)
-       (let ((path (plist-get result :path)))
-         (when (and path (file-directory-p path))
-           (let ((default-directory path))
-             (magit-status)))))
-      ('cancelled
-       (message "Selection cancelled")))))
 
 ;;;###autoload
 (defun enkan-repl-print-setup-to-buffer ()
