@@ -1,3 +1,10 @@
+## [0.15.3](https://github.com/phasetr/enkan-repl/compare/v0.15.2...v0.15.3) (2025-09-07)
+
+
+### Bug Fixes
+
+* workspace deletion and switching in teardown ([3b8f025](https://github.com/phasetr/enkan-repl/commit/3b8f02540b456bf47a3ddbc9fa155b3a8075d599))
+
 ## [0.15.2](https://github.com/phasetr/enkan-repl/compare/v0.15.1...v0.15.2) (2025-09-07)
 
 
