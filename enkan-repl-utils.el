@@ -63,6 +63,24 @@ Returns workspace ID string (e.g., \"01\") or nil if not an enkan buffer."
              (string-match "^\\*ws:\\([0-9]\\{2\\}\\) enkan:" name))
     (match-string 1 name)))
 
+;;;; Workspace Buffer Count Pure Functions
+
+(defun enkan-repl--get-workspace-buffer-count-pure (buffer-list workspace-id)
+  "Pure function to count living eat buffers for WORKSPACE-ID in BUFFER-LIST.
+Returns the number of valid enkan buffers with active eat processes that belong to the workspace."
+  (let ((count 0))
+    (dolist (buffer buffer-list)
+      (when (and (bufferp buffer)
+                 (buffer-name buffer)
+                 (enkan-repl--buffer-name-matches-workspace
+                  (buffer-name buffer) workspace-id)
+                 (with-current-buffer buffer
+                   (and (boundp 'eat--process)
+                        eat--process
+                        (process-live-p eat--process))))
+        (setq count (1+ count))))
+    count))
+
 ;;;; Session List Pure Functions
 
 (defun enkan-repl--extract-project-name (buffer-name-or-path)
