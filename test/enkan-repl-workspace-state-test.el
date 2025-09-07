@@ -52,7 +52,7 @@
       (should (equal (plist-get saved-plist :session-counter) 1))
       (should (equal (plist-get saved-plist :project-aliases) '(("s1" . "sp1"))))
       ;; Check stored in workspaces
-      (let ((stored (assoc (intern "01") enkan-repl--workspaces)))
+      (let ((stored (assoc "01" enkan-repl--workspaces #'string=)))
         (should stored)
         (let ((stored-plist (cdr stored)))
           (should (equal (plist-get stored-plist :current-project) "save-test"))
@@ -71,7 +71,7 @@
     ;; Save to workspace "02"
     (enkan-repl--save-workspace-state "02")
     ;; Check stored in workspaces under "02"
-    (let ((stored (assoc (intern "02") enkan-repl--workspaces)))
+    (let ((stored (assoc "02" enkan-repl--workspaces #'string=)))
       (should stored)
       (let ((stored-plist (cdr stored)))
         (should (equal (plist-get stored-plist :current-project) "ws02-test"))
@@ -155,7 +155,7 @@
     ;; Save new state
     (enkan-repl--save-workspace-state)
     ;; Check old state was replaced
-    (let ((stored (assoc (intern "01") enkan-repl--workspaces)))
+    (let ((stored (assoc "01" enkan-repl--workspaces #'string=)))
       (should stored)
       (let ((stored-plist (cdr stored)))
         (should (equal (plist-get stored-plist :current-project) "new"))

@@ -39,9 +39,15 @@ Now supports workspace-prefixed format *ws:01 enkan:/path*."
 
 (defun enkan-repl--path->buffer-name (path)
   "Generate buffer name from PATH.
-Returns buffer name in format *ws:01 enkan:<expanded-path>*.
-Always uses workspace ID 01 for now (single workspace mode)."
-  (format "*ws:01 enkan:%s*" (expand-file-name path)))
+Returns buffer name in format *ws:<id> enkan:<expanded-path>*.
+Workspace ID is taken from `enkan-repl--current-workspace' when available; otherwise falls back to "01"."
+  (let* ((ws (when (boundp 'enkan-repl--current-workspace)
+               enkan-repl--current-workspace))
+         (ws-id (if (and (stringp ws)
+                         (string-match-p "^[0-9][0-9]$" ws))
+                    ws
+                  "01")))
+    (format "*ws:%s enkan:%s*" ws-id (expand-file-name path))))
 
 (defun enkan-repl--buffer-name-matches-workspace (name workspace-id)
   "Check if buffer NAME belongs to WORKSPACE-ID.
