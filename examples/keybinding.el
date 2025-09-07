@@ -40,6 +40,7 @@
        ("C-M-o"   . enkan-repl-open-center-file)
        ("C-M-s"   . enkan-repl-setup)
        ("C-M-t"   . enkan-repl-teardown)
+       ("C-M-w"   . enkan-repl-workspace-switch)
        ("C-M-l"   . enkan-repl-setup-current-project-layout))))
 
 ;; Refresh keymap after setting bindings
