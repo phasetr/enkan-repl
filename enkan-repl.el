@@ -1394,7 +1394,11 @@ When enabled, some keybindings are available across all buffers."
   ;; This avoids overriding critical keybindings like M-x
   (message (if enkan-repl-global-minor-mode
                "✅ global mode enabled"
-             "❌ global mode disabled")))
+             "❌ global mode disabled"))
+  (enkan-repl--log 'info "%s"
+                   (if enkan-repl-global-minor-mode
+                       "✅ global mode enabled"
+                     "❌ global mode disabled")))
 
 ;;;###autoload
 (defun enkan-repl-toggle-global-mode ()
@@ -1752,9 +1756,11 @@ Returns t on success, nil on failure."
       (pcase status
         ('no-buffers
          (message (plist-get resolution :message))
+         (enkan-repl--log 'info "%s" (plist-get resolution :message))
          nil)
         ('invalid
          (message (plist-get resolution :message))
+         (enkan-repl--log 'info "%s" (plist-get resolution :message))
          nil)
         ((or 'selected 'single)
          (setq target-buffer (plist-get resolution :buffer)))
@@ -1880,15 +1886,18 @@ Category: Center File Multi-buffer Access"
                  pfx)))
     (pcase (plist-get result :status)
       ((or 'no-project 'no-paths 'no-buffers)
-       (message (plist-get result :message)))
+       (message (plist-get result :message))
+       (enkan-repl--log 'info "%s" (plist-get result :message)))
       ('invalid
-       (message "Directory does not exist: %s" (plist-get result :path)))
+       (message "Directory does not exist: %s" (plist-get result :path))
+       (enkan-repl--log 'info "Directory does not exist: %s" (plist-get result :path)))
       ((or 'single 'selected)
        (let ((path (plist-get result :path)))
          (when (and path (file-directory-p path))
            (dired path))))
       ('cancelled
-       (message "Selection cancelled")))))
+       (message "Selection cancelled")
+       (enkan-repl--log 'info "Selection cancelled")))))
 
 (defun enkan-repl--analyze-send-content (content pfx)
   "Pure function to analyze CONTENT with PFX and determine action.
@@ -1991,6 +2000,7 @@ Category: Center File Operations"
     (if (plist-get result :valid)
         (progn
           (message "%s" (plist-get result :message))
+          (enkan-repl--log 'info "%s" (plist-get result :message))
           (find-file enkan-repl-center-file))
       (error "%s" (plist-get result :message)))))
 
