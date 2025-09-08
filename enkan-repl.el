@@ -1957,7 +1957,7 @@ Returns plist with :valid, :alias, :command, :text, :message."
     (list :valid nil :message "Invalid format. Use: :alias [text|esc|:ret]"))))
 
 ;; Pure functions for global operations
-(defun enkan-repl-validate-path (file-path)
+(defun enkan-repl--validate-path (file-path)
   "Validate center FILE-PATH for opening.
 Returns plist with :valid, :message."
   (cond
@@ -1970,19 +1970,19 @@ Returns plist with :valid, :message."
    (t
     (list :valid t :message "Valid center file path"))))
 
-(defun enkan-repl-center-file-check-exists (file-path)
+(defun enkan-repl--center-file-check-exists (file-path)
   "Check if center FILE-PATH exists.
 Returns plist with :exists, :action."
   (if (file-exists-p file-path)
       (list :exists t :action "open")
     (list :exists nil :action "create")))
 
-(defun enkan-repl-determine-action (file-path)
+(defun enkan-repl--determine-action (file-path)
   "Determine action to take for center FILE-PATH.
 Returns plist with :valid, :action, :message."
-  (let ((validation (enkan-repl-validate-path file-path)))
+  (let ((validation (enkan-repl--validate-path file-path)))
     (if (plist-get validation :valid)
-        (let ((exists-check (enkan-repl-center-file-check-exists file-path)))
+        (let ((exists-check (enkan-repl--center-file-check-exists file-path)))
           (list :valid t
                 :action (plist-get exists-check :action)
                 :message (if (plist-get exists-check :exists)
@@ -1996,7 +1996,7 @@ Returns plist with :valid, :action, :message."
 
 Category: Center File Operations"
   (interactive)
-  (let ((result (enkan-repl-determine-action enkan-repl-center-file)))
+  (let ((result (enkan-repl--determine-action enkan-repl-center-file)))
     (if (plist-get result :valid)
         (progn
           (message "%s" (plist-get result :message))
