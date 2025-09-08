@@ -1,3 +1,10 @@
+## [0.15.4](https://github.com/phasetr/enkan-repl/compare/v0.15.3...v0.15.4) (2025-09-08)
+
+
+### Bug Fixes
+
+* docstring/header normalization (ASCII quoting) ([4216905](https://github.com/phasetr/enkan-repl/commit/42169050fe42820bd930e85e311af5a45f2d41a8))
+
 ## [0.15.3](https://github.com/phasetr/enkan-repl/compare/v0.15.2...v0.15.3) (2025-09-07)
 
 
