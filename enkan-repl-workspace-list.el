@@ -22,11 +22,11 @@
 (declare-function enkan-repl--get-workspace-state "enkan-repl-workspace" (workspaces workspace-id))
 (declare-function enkan-repl--save-workspace-state "enkan-repl" ())
 (declare-function enkan-repl--load-workspace-state "enkan-repl" (workspace-id))
-(declare-function enkan-repl--get-project-info-from-directories "enkan-repl-utils" (alias target-directories))
-(declare-function enkan-repl--get-project-path-from-directories "enkan-repl-utils" (project-name target-directories))
+(declare-function enkan-repl--get-project-paths-for-current "enkan-repl" (current-project projects target-directories))
 
 ;; Declare external variables
 (defvar enkan-repl--current-workspace)
+(defvar enkan-repl-projects)
 
 (defvar enkan-repl-workspace-list-mode-map
   (let ((map (make-sparse-keymap)))
@@ -55,19 +55,15 @@ TARGET-DIRECTORIES is the list of target directories."
           (current-project (plist-get state :current-project))
           (project-aliases (plist-get state :project-aliases))
           (is-current (string= workspace-id current-workspace))
-          ;; Get project info by alias (current-project should be an alias like "er", "os")
-          (project-info (when current-project
-                          (enkan-repl--get-project-info-from-directories
-                            current-project target-directories)))
-          (project-dir (cond
-                         ;; project-info is (project-name . project-path)
-                         ((and (consp project-info) (stringp (cdr project-info)))
-                          (cdr project-info))
-                         ;; project-info is just a string (path or domain)
-                         ((stringp project-info)
-                          project-info)
-                         ;; Not found
-                         (t nil))))
+          ;; Get project paths using existing function
+          (project-paths (when current-project
+                           (enkan-repl--get-project-paths-for-current
+                             current-project 
+                             (bound-and-true-p enkan-repl-projects)
+                             target-directories)))
+          ;; Use first path if available
+          (project-dir (when project-paths
+                         (cdr (car project-paths)))))
     (propertize
       (format "%s%s - %s: %s"
         (if is-current "▶ " "  ")
