@@ -61,6 +61,10 @@
 (when (locate-library "enkan-repl-utils")
   (require 'enkan-repl-utils))
 
+;; Load workspace management functions
+(when (locate-library "enkan-repl-workspace")
+  (require 'enkan-repl-workspace))
+
 ;; Load macOS specific notifications if on macOS
 (when (and (eq system-type 'darwin) (locate-library "enkan-repl-mac-notify"))
   (require 'enkan-repl-mac-notify))
@@ -84,6 +88,15 @@
 (declare-function enkan-repl--send-primitive "enkan-repl-utils" (text special-key-type))
 (declare-function enkan-repl--buffer-name-matches-workspace "enkan-repl-utils" (name workspace-id))
 (declare-function enkan-repl--extract-workspace-id "enkan-repl-utils" (name))
+
+;; Declare external functions from enkan-repl-workspace
+(declare-function enkan-repl--generate-next-workspace-id "enkan-repl-workspace" (workspaces))
+(declare-function enkan-repl--create-workspace-state "enkan-repl-workspace" (workspaces))
+(declare-function enkan-repl--add-workspace "enkan-repl-workspace" (workspaces new-id))
+(declare-function enkan-repl--get-workspace-state "enkan-repl-workspace" (workspaces workspace-id))
+(declare-function enkan-repl--can-delete-workspace "enkan-repl-workspace" (workspace-id workspaces))
+(declare-function enkan-repl--delete-workspace "enkan-repl-workspace" (workspaces workspace-id))
+(declare-function enkan-repl--list-workspace-ids "enkan-repl-workspace" (workspaces))
 
 ;; Declare external functions from hmenu to silence byte-compiler when not loaded
 (declare-function hmenu "hmenu" (prompt choices))
@@ -426,50 +439,6 @@ Returns t if initialized, nil if already exists."
           (setq enkan-repl-project-aliases saved-aliases)))
       t)))
 
-(defun enkan-repl--generate-next-workspace-id (workspaces)
-  "Generate next workspace ID from WORKSPACES alist.
-Returns zero-padded numeric string (e.g., \"01\", \"02\")."
-  (if (null workspaces)
-      "01"
-    (let ((ids (mapcar (lambda (ws)
-                         (string-to-number (car ws)))
-                       workspaces)))
-      (format "%02d" (1+ (apply #'max ids))))))
-
-(defun enkan-repl--create-workspace-state (workspaces)
-  "Create new workspace and return its ID.
-WORKSPACES is the current workspace alist.
-Returns the new workspace ID string."
-  (enkan-repl--generate-next-workspace-id workspaces))
-
-(defun enkan-repl--add-workspace (workspaces new-id)
-  "Add new workspace with NEW-ID to WORKSPACES alist.
-Returns updated alist with new workspace."
-  (cons (cons new-id
-              (list :current-project nil
-                    :session-list nil
-                    :session-counter 0
-                    :project-aliases nil))
-        workspaces))
-
-(defun enkan-repl--get-workspace-state (workspaces workspace-id)
-  "Get state plist for WORKSPACE-ID from WORKSPACES alist.
-Returns plist or nil if not found."
-  (cdr (assoc workspace-id workspaces #'string=)))
-
-(defun enkan-repl--can-delete-workspace (workspace-id workspaces)
-  "Check if WORKSPACE-ID can be deleted from WORKSPACES.
-Cannot delete if it's the only workspace or doesn't exist."
-  (and (> (length workspaces) 1)
-       (assoc workspace-id workspaces #'string=)
-       t))
-
-(defun enkan-repl--delete-workspace (workspaces workspace-id)
-  "Remove WORKSPACE-ID from WORKSPACES alist.
-Returns updated alist without the specified workspace."
-  (cl-remove-if (lambda (ws)
-                  (string= (car ws) workspace-id))
-                workspaces))
 
 (defun enkan-repl--setup-create-workspace-with-project (is-standard-file project-name)
   "Create new workspace and configure it with project.
@@ -510,12 +479,6 @@ Returns the new workspace ID."
     ;; Return the new workspace ID
     new-id))
 
-(defun enkan-repl--list-workspace-ids (workspaces)
-  "List all workspace IDs from WORKSPACES alist.
-Returns sorted list of unique ID strings."
-  (when workspaces
-    (let ((ids (mapcar #'car workspaces)))
-      (sort (cl-remove-duplicates ids :test #'string=) #'string<))))
 
 ;;;; Core Functions
 
