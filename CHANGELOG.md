@@ -1,3 +1,10 @@
+## [0.15.10](https://github.com/phasetr/enkan-repl/compare/v0.15.9...v0.15.10) (2025-09-08)
+
+
+### Bug Fixes
+
+* add private prefix to internal helpers and optimize variable scope ([2e67b3b](https://github.com/phasetr/enkan-repl/commit/2e67b3b5140636d00f6ae762b9121238ab1ce472))
+
 ## [0.15.9](https://github.com/phasetr/enkan-repl/compare/v0.15.8...v0.15.9) (2025-09-08)
 
 
