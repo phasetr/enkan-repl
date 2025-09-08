@@ -71,7 +71,9 @@ TARGET-DIRECTORIES is the list of target directories."
         (if is-current "▶ " "  ")
         workspace-id
         (or current-project "<none>")
-        (or project-dir "<no directory>"))
+        (if current-project
+            (or project-dir "<not found>")
+          "<no project>"))
       'workspace-id workspace-id)))
 
 (defun enkan-repl-workspace-list--get-workspace-at-point ()
