@@ -1608,8 +1608,8 @@ This function has the side effect of modifying global variables:
   (enkan-repl--ws-set-project-aliases nil))
 
 (defun enkan-repl--disable-global-minor-mode-if-active ()
-  "Disable `enkan-repl-global-minor-mode` if it is active.
-This function has the side effect of calling `enkan-repl-global-minor-mode`.
+  "Disable `enkan-repl-global-minor-mode' if it is active.
+This function has the side effect of calling `enkan-repl-global-minor-mode'.
 Returns t if mode was disabled, nil otherwise."
   (when enkan-repl-global-minor-mode
     (enkan-repl-global-minor-mode -1)
