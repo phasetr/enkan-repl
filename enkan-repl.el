@@ -94,6 +94,24 @@
 (defvar eat--process)
 (defvar eat-mode)
 
+;;;; Logging (stub)
+
+(defconst enkan-repl--log-levels '((error . 0) (warn . 1) (info . 2) (debug . 3))
+  "Internal log level mapping for `enkan-repl--log'.")
+
+(defvar enkan-repl--log-level 'error
+  "Current internal log level for enkan-repl private logging.
+One of the symbols: `error', `warn', `info', or `debug'.")
+
+(defun enkan-repl--log (level fmt &rest args)
+  "Internal logging helper.
+LEVEL is one of `error', `warn', `info', or `debug'.  Format FMT with ARGS
+and route via `message' only when LEVEL is enabled by `enkan-repl--log-level'."
+  (when (let* ((lvl (cdr (assq level enkan-repl--log-levels)))
+               (cur (cdr (assq enkan-repl--log-level enkan-repl--log-levels))))
+          (and lvl cur (<= lvl cur)))
+    (apply #'message fmt args)))
+
 ;;;; Custom Variables
 
 (defgroup enkan-repl nil
