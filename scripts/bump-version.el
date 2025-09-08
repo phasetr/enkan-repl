@@ -14,7 +14,7 @@
 
 ;;; Code:
 
-(defun enkan-repl-update-version (new-version)
+(defun enkan-repl--update-version (new-version)
   "Update the version string in `enkan-repl.el` to NEW-VERSION."
   (let* ((script-dir (file-name-directory (or load-file-name buffer-file-name)))
          (project-root (file-name-directory (directory-file-name script-dir)))
@@ -51,7 +51,7 @@
 
       (if version-arg
           (progn
-            (enkan-repl-update-version version-arg)
+            (enkan-repl--update-version version-arg)
             (message "Version updated to: %s" version-arg))
         (error "No valid version string found in arguments: %S" command-line-args)))))
 
