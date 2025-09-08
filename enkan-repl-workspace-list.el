@@ -59,7 +59,7 @@ TARGET-DIRECTORIES is the list of target directories."
                             current-project target-directories)))
           (project-dir (cond
                          ;; project-info is (project-name . project-path)
-                         ((and (consp project-info) (consp (cdr project-info)))
+                         ((and (consp project-info) (stringp (cdr project-info)))
                           (cdr project-info))
                          ;; project-info is just a string (path or domain)
                          ((stringp project-info)
