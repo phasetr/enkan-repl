@@ -68,8 +68,8 @@ TARGET-DIRECTORIES is the list of target directories."
                                      ", ")
                         nil)))
     (propertize
-      (format "%s%s - %s: %s"
-        (if is-current "▶ " "  ")
+      (format "  %s %s - %s: %s"
+        (if is-current "▶" " ")
         workspace-id
         (or current-project "<none>")
         (if current-project

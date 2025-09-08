@@ -35,6 +35,8 @@
     (let ((formatted (enkan-repl-workspace-list--format-workspace-info
                       "01" enkan-repl--workspaces "01" enkan-repl-target-directories)))
       (should (string-match-p "▶" formatted))
+      ;; Check proper alignment
+      (should (string-match-p "  ▶ 01" formatted))
       (should (string-match-p "config-a" formatted))
       (should (string-match-p "/home/user/project-a/" formatted)))
     
@@ -42,6 +44,8 @@
     (let ((formatted (enkan-repl-workspace-list--format-workspace-info
                       "02" enkan-repl--workspaces "01" enkan-repl-target-directories)))
       (should-not (string-match-p "▶" formatted))
+      ;; Check proper alignment for inactive workspace
+      (should (string-match-p "    02" formatted))
       (should (string-match-p "config-b" formatted))
       (should (string-match-p "/home/user/project-b/" formatted)))))
 
