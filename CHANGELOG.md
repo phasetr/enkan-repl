@@ -1,3 +1,10 @@
+## [0.15.5](https://github.com/phasetr/enkan-repl/compare/v0.15.4...v0.15.5) (2025-09-08)
+
+
+### Bug Fixes
+
+* normalize autoload cookies (public-only) ([1b6e867](https://github.com/phasetr/enkan-repl/commit/1b6e867af6bb2e4b0b156b07ffd9ff7b9a049825))
+
 ## [0.15.4](https://github.com/phasetr/enkan-repl/compare/v0.15.3...v0.15.4) (2025-09-08)
 
 
