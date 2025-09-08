@@ -8,7 +8,7 @@
 (require 'ert)
 
 ;; Pure function to validate center file path
-(defun enkan-center-file-validate-path-test (file-path)
+(defun enkan-repl--center-file-validate-path-test (file-path)
   "Validate center FILE-PATH for opening.
 Returns plist with :valid, :message."
   (cond
@@ -22,7 +22,7 @@ Returns plist with :valid, :message."
     (list :valid t :message "Valid center file path"))))
 
 ;; Pure function to check if center file exists
-(defun enkan-center-file-check-exists-test (file-path)
+(defun enkan-repl--center-file-check-exists-test (file-path)
   "Check if center FILE-PATH exists.
 Returns plist with :exists, :action."
   (if (file-exists-p file-path)
@@ -30,12 +30,12 @@ Returns plist with :exists, :action."
     (list :exists nil :action "create")))
 
 ;; Pure function to determine open action
-(defun enkan-center-file-determine-action-test (file-path)
+(defun enkan-repl--center-file-determine-action-test (file-path)
   "Determine action to take for center FILE-PATH.
 Returns plist with :valid, :action, :message."
-  (let ((validation (enkan-center-file-validate-path-test file-path)))
+  (let ((validation (enkan-repl--center-file-validate-path-test file-path)))
     (if (plist-get validation :valid)
-        (let ((exists-check (enkan-center-file-check-exists-test file-path)))
+        (let ((exists-check (enkan-repl--center-file-check-exists-test file-path)))
           (list :valid t
                 :action (plist-get exists-check :action)
                 :message (if (plist-get exists-check :exists)
@@ -46,10 +46,10 @@ Returns plist with :valid, :action, :message."
 ;; Test path validation
 (ert-deftest test-enkan-center-file-validate-path ()
   "Test center file path validation."
-  (should-not (plist-get (enkan-center-file-validate-path-test nil) :valid))
-  (should-not (plist-get (enkan-center-file-validate-path-test 123) :valid))
-  (should-not (plist-get (enkan-center-file-validate-path-test "") :valid))
-  (should (plist-get (enkan-center-file-validate-path-test "/valid/path.org") :valid)))
+  (should-not (plist-get (enkan-repl--center-file-validate-path-test nil) :valid))
+  (should-not (plist-get (enkan-repl--center-file-validate-path-test 123) :valid))
+  (should-not (plist-get (enkan-repl--center-file-validate-path-test "") :valid))
+  (should (plist-get (enkan-repl--center-file-validate-path-test "/valid/path.org") :valid)))
 
 ;; Test file existence check
 (ert-deftest test-enkan-center-file-exists-check ()
@@ -57,43 +57,43 @@ Returns plist with :valid, :action, :message."
   (let ((temp-file (make-temp-file "center-test" nil ".org")))
     (unwind-protect
         (progn
-          (should (plist-get (enkan-center-file-check-exists-test temp-file) :exists))
-          (should (equal (plist-get (enkan-center-file-check-exists-test temp-file) :action) "open")))
+          (should (plist-get (enkan-repl--center-file-check-exists-test temp-file) :exists))
+          (should (equal (plist-get (enkan-repl--center-file-check-exists-test temp-file) :action) "open")))
       (when (file-exists-p temp-file)
         (delete-file temp-file))))
   
-  (should-not (plist-get (enkan-center-file-check-exists-test "/nonexistent/file.org") :exists))
-  (should (equal (plist-get (enkan-center-file-check-exists-test "/nonexistent/file.org") :action) "create")))
+  (should-not (plist-get (enkan-repl--center-file-check-exists-test "/nonexistent/file.org") :exists))
+  (should (equal (plist-get (enkan-repl--center-file-check-exists-test "/nonexistent/file.org") :action) "create")))
 
 ;; Test action determination
 (ert-deftest test-enkan-center-file-determine-action ()
   "Test center file action determination."
   ;; Invalid paths
-  (should-not (plist-get (enkan-center-file-determine-action-test nil) :valid))
-  (should-not (plist-get (enkan-center-file-determine-action-test "") :valid))
+  (should-not (plist-get (enkan-repl--center-file-determine-action-test nil) :valid))
+  (should-not (plist-get (enkan-repl--center-file-determine-action-test "") :valid))
   
   ;; Valid path for existing file
   (let ((temp-file (make-temp-file "center-test" nil ".org")))
     (unwind-protect
-        (let ((result (enkan-center-file-determine-action-test temp-file)))
+        (let ((result (enkan-repl--center-file-determine-action-test temp-file)))
           (should (plist-get result :valid))
           (should (equal (plist-get result :action) "open")))
       (when (file-exists-p temp-file)
         (delete-file temp-file))))
   
   ;; Valid path for nonexistent file
-  (let ((result (enkan-center-file-determine-action-test "/nonexistent/test.org")))
+  (let ((result (enkan-repl--center-file-determine-action-test "/nonexistent/test.org")))
     (should (plist-get result :valid))
     (should (equal (plist-get result :action) "create"))))
 
 ;; Test error cases
 (ert-deftest test-enkan-center-file-error-cases ()
   "Test error cases for center file operations."
-  (let ((result (enkan-center-file-validate-path-test nil)))
+  (let ((result (enkan-repl--center-file-validate-path-test nil)))
     (should-not (plist-get result :valid))
     (should (string-match-p "not configured" (plist-get result :message))))
   
-  (let ((result (enkan-center-file-validate-path-test "")))
+  (let ((result (enkan-repl--center-file-validate-path-test "")))
     (should-not (plist-get result :valid))
     (should (string-match-p "empty" (plist-get result :message)))))
 
