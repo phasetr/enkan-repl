@@ -518,7 +518,9 @@ Return (project-name . project-path) or nil if not found."
 (defun enkan-repl--get-project-path-from-directories (project-name target-directories)
   "Pure function to get project path from directories by project name."
   (let ((project-info (cl-find-if (lambda (entry)
-                                    (string= (car (cdr entry)) project-name))
+                                    (let ((value (cdr entry)))
+                                      (and (consp value)
+                                           (string= (car value) project-name))))
                                   target-directories)))
     (when project-info
       (cdr (cdr project-info)))))

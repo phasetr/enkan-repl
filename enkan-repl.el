@@ -65,6 +65,10 @@
 (when (locate-library "enkan-repl-workspace")
   (require 'enkan-repl-workspace))
 
+;; Load workspace list display functions
+(when (locate-library "enkan-repl-workspace-list")
+  (require 'enkan-repl-workspace-list))
+
 ;; Load macOS specific notifications if on macOS
 (when (and (eq system-type 'darwin) (locate-library "enkan-repl-mac-notify"))
   (require 'enkan-repl-mac-notify))
