@@ -191,7 +191,7 @@ Returns the directory path where default.org is located."
    ;; Final fallback to current directory
    default-directory))
 
-(defvar enkan-repl--package-directory
+(defconst enkan-repl--package-directory
   (enkan-repl--find-template-directory)
   "Package directory determined at load time.")
 
