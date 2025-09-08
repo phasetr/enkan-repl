@@ -1615,7 +1615,7 @@ Returns t if mode was disabled, nil otherwise."
     (enkan-repl-global-minor-mode -1)
     t))
 
-;;;###autoload
+;; Private; do not autoload
 (defun enkan-repl--get-buffer-process-info (buffer)
   "Pure function to get process info for BUFFER.
 Returns plist with :buffer, :name, :live-p, :has-process, :process."
@@ -1873,7 +1873,7 @@ Category: Center File Multi-buffer Access"
       ('cancelled
        (message "Selection cancelled")))))
 
-;;;###autoload
+;; Private; do not autoload
 (defun enkan-repl--analyze-send-content (content pfx)
   "Pure function to analyze CONTENT with PFX and determine action.
 CONTENT is the text content to analyze.
@@ -1965,6 +1965,7 @@ Returns plist with :valid, :action, :message."
                            "Creating new center file")))
       validation)))
 
+;;;###autoload
 (defun enkan-repl-open-center-file ()
   "Open or create the center file based on enkan-repl-center-file configuration.
 
