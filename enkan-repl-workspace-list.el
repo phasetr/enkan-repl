@@ -51,33 +51,36 @@ WORKSPACES is the global workspace data structure.
 CURRENT-WORKSPACE is the currently active workspace ID.
 TARGET-DIRECTORIES is the list of target directories."
   (let* ((state (enkan-repl--get-workspace-state workspaces workspace-id))
-         (current-project (plist-get state :current-project))
-         (project-aliases (plist-get state :project-aliases))
-         (session-list (plist-get state :session-list))
-         (session-counter (plist-get state :session-counter))
-         (is-current (string= workspace-id current-workspace))
-         (active-sessions (length (cl-remove-if-not
-                                   (lambda (entry)
-                                     (buffer-live-p (get-buffer (cdr entry))))
-                                   session-list)))
-         (total-sessions (length session-list))
-         (project-info (when current-project
-                         (enkan-repl--get-project-info-from-directories
-                          current-project target-directories))))
+          (current-project (plist-get state :current-project))
+          (project-aliases (plist-get state :project-aliases))
+          (session-list (plist-get state :session-list))
+          (session-counter (plist-get state :session-counter))
+          (is-current (string= workspace-id current-workspace))
+          (active-sessions (length (cl-remove-if-not
+                                     (lambda (entry)
+                                       (buffer-live-p (get-buffer (cdr entry))))
+                                     session-list)))
+          (total-sessions (length session-list))
+          (project-info (when current-project
+                          (enkan-repl--get-project-info-from-directories
+                            current-project target-directories)))
+          (project-dir (if (consp project-info)
+                         (cdr project-info)
+                       project-info)))
     (propertize
-     (format "%s%s [%s] - Project: %s (%s) - Sessions: %d/%d (counter: %d) - Dir: %s"
-             (if is-current "▶ " "  ")
-             workspace-id
-             (if is-current "ACTIVE" "inactive")
-             (or current-project "<none>")
-             (if project-aliases
-                 (mapconcat #'identity project-aliases ", ")
-               "no aliases")
-             active-sessions
-             total-sessions
-             (or session-counter 0)
-             (or project-info "<no directory>"))
-     'workspace-id workspace-id)))
+      (format "%s%s [%s] - Project: %s (%s) - Sessions: %d/%d (counter: %d) - Dir: %s"
+        (if is-current "▶ " "  ")
+        workspace-id
+        (if is-current "ACTIVE" "inactive")
+        (or current-project "<none>")
+        (if project-aliases
+          (mapconcat #'identity project-aliases ", ")
+          "no aliases")
+        active-sessions
+        total-sessions
+        (or session-counter 0)
+        (or project-dir "<no directory>"))
+      'workspace-id workspace-id)))
 
 (defun enkan-repl-workspace-list--get-workspace-at-point ()
   "Get the workspace ID at the current point."
@@ -90,7 +93,7 @@ TARGET-DIRECTORIES is the list of target directories."
     (when workspace-id
       (let ((current-workspace (bound-and-true-p enkan-repl--current-workspace)))
         (if (string= workspace-id current-workspace)
-            (message "Already in workspace %s" workspace-id)
+          (message "Already in workspace %s" workspace-id)
           ;; Close the list buffer first
           (quit-window)
           ;; Save current workspace state
@@ -113,29 +116,26 @@ Shows workspace ID, current/inactive status, associated project,
 aliases, session counts, and target directories."
   (interactive)
   (let* ((workspaces (bound-and-true-p enkan-repl--workspaces))
-         (current-workspace (bound-and-true-p enkan-repl--current-workspace))
-         (target-directories (bound-and-true-p enkan-repl-target-directories))
-         (workspace-ids (when workspaces
-                          (enkan-repl--list-workspace-ids workspaces)))
-         (buffer-name "*Enkan Workspace List*"))
+          (current-workspace (bound-and-true-p enkan-repl--current-workspace))
+          (target-directories (bound-and-true-p enkan-repl-target-directories))
+          (workspace-ids (when workspaces
+                           (enkan-repl--list-workspace-ids workspaces)))
+          (buffer-name "*Enkan Workspace List*"))
     (if (not workspace-ids)
-        (message "No workspaces found")
+      (message "No workspaces found")
       (with-current-buffer (get-buffer-create buffer-name)
         (let ((inhibit-read-only t))
           (erase-buffer)
           (insert "Enkan REPL Workspaces\n")
           (insert "=====================\n\n")
           (insert "Keys: RET - switch to workspace, g - refresh, q - quit\n\n")
-          
           ;; Sort workspace IDs to ensure consistent display
           (setq workspace-ids (sort workspace-ids #'string<))
-          
           ;; Display each workspace
           (dolist (ws-id workspace-ids)
             (insert (enkan-repl-workspace-list--format-workspace-info
-                     ws-id workspaces current-workspace target-directories))
+                      ws-id workspaces current-workspace target-directories))
             (insert "\n"))
-          
           (goto-char (point-min))
           ;; Move to first workspace line
           (forward-line 5)
