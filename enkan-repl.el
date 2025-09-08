@@ -61,6 +61,9 @@
 (when (locate-library "enkan-repl-utils")
   (require 'enkan-repl-utils))
 
+;; Load backend modules
+(require 'enkan-repl-backend-eat)
+
 ;; Load macOS specific notifications if on macOS
 (when (and (eq system-type 'darwin) (locate-library "enkan-repl-mac-notify"))
   (require 'enkan-repl-mac-notify))
@@ -88,11 +91,6 @@
 ;; Declare external functions from hmenu to silence byte-compiler when not loaded
 (declare-function hmenu "hmenu" (prompt choices))
 
-;; Declare external functions to avoid byte-compiler warnings
-(declare-function eat "eat" (&optional program))
-(declare-function eat--send-string "eat" (process string))
-(defvar eat--process)
-(defvar eat-mode)
 
 ;;;; Logging (stub)
 
@@ -787,11 +785,7 @@ Only returns buffers that belong to the current workspace."
        (matching-buffer nil))
     (cl-block search-buffers
       (dolist (buf (buffer-list))
-        (let
-            ((name (buffer-name buf))
-             (eat-mode
-              (with-current-buffer buf
-                (and (boundp 'eat-mode) eat-mode))))
+        (let ((name (buffer-name buf)))
           (when
               (and (buffer-live-p buf)
                    name     ; Ensure name is not nil
@@ -819,12 +813,7 @@ Only returns buffers that belong to the current workspace."
 If DIRECTORY is provided, check for eat session in that directory.
 Otherwise, use current `default-directory'."
   (let ((session-buffer (enkan-repl--get-buffer-for-directory directory)))
-    (when session-buffer
-      (with-current-buffer session-buffer
-        (and
-         (boundp 'eat--process)
-         eat--process
-         (process-live-p eat--process))))))
+    (enkan-repl--backend-eat-process-live-p session-buffer)))
 
 ;;;; Public API - Send Functions
 
@@ -1035,12 +1024,10 @@ FORCE parameter ignored - always starts new session.
 
 Category: Session Controller"
   (interactive)
-  ;; Simple eat package loading - fail fast if not available
-  (require 'eat)
   ;; Always start new eat session in current directory
   (let* ((target-dir default-directory)
          (buffer-name (enkan-repl--path->buffer-name target-dir))
-         (eat-buffer (eat)))
+         (eat-buffer (enkan-repl--backend-eat-start)))
     ;; Simple buffer renaming - no error handling
     (when eat-buffer
       (with-current-buffer eat-buffer
@@ -1704,16 +1691,12 @@ SEND-DATA: plist from enkan-repl--send-primitive
 Returns t on success, nil on failure."
   (when (and buffer (buffer-live-p buffer))
     (with-current-buffer buffer
-      (when (and (boundp 'eat--process)
-                 eat--process
-                 (process-live-p eat--process))
-        (let ((content (plist-get send-data :content)))
-          (when content
-            (eat--send-string eat--process content)
-            ;; For text content, also send carriage return
-            (when (eq (plist-get send-data :action) 'text)
-              (eat--send-string eat--process "\r"))
-            t))))))
+      (let ((content (plist-get send-data :content))
+            (action (plist-get send-data :action)))
+        (when content
+          (if (eq action 'text)
+              (enkan-repl--backend-eat-send-text buffer content)
+            (enkan-repl--backend-eat-send-string buffer content)))))))
 
 (defun enkan-repl--send-unified (text &optional pfx special-key-type)
   "Unified backend for all send commands.
@@ -1835,22 +1818,16 @@ Returns plist with :valid, :number, :message."
   "Center file specific function to send TEXT to BUFFER.
 Sends text followed by carriage return, with cursor positioning."
   (when (and (bufferp buffer)
-             (buffer-live-p buffer)
-             (with-current-buffer buffer
-               (and (boundp 'eat--process)
-                    eat--process
-                    (process-live-p eat--process))))
-    (with-current-buffer buffer
-      (eat--send-string eat--process text)
-      (eat--send-string eat--process "\r")
-      ;; Move cursor to bottom after eat processes the output
-      (run-at-time 0.01 nil
-                   (lambda (buf)
-                     (when (buffer-live-p buf)
-                       (with-current-buffer buf
-                         (goto-char (point-max)))))
-                   buffer)
-      t)))
+             (enkan-repl--backend-eat-process-live-p buffer))
+    (enkan-repl--backend-eat-send-text buffer text)
+    ;; Move cursor to bottom after eat processes the output
+    (run-at-time 0.01 nil
+                 (lambda (buf)
+                   (when (buffer-live-p buf)
+                     (with-current-buffer buf
+                       (goto-char (point-max)))))
+                 buffer)
+    t))
 
 ;;;###autoload
 (defun enkan-repl-send-escape (&optional pfx)

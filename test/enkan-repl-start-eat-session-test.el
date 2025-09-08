@@ -30,7 +30,7 @@
     (setq enkan-repl--current-project "er")
     
     ;; Mock eat function to return a buffer
-    (cl-letf (((symbol-function 'eat)
+    (cl-letf (((symbol-function 'enkan-repl--backend-eat-start)
                (lambda ()
                  (setq mock-eat-buffer (generate-new-buffer "*eat*"))
                  mock-eat-buffer))
@@ -71,7 +71,7 @@
     (setq enkan-repl--current-project "er")
     
     ;; Mock eat function
-    (cl-letf (((symbol-function 'eat)
+    (cl-letf (((symbol-function 'enkan-repl--backend-eat-start)
                (lambda ()
                  (let ((buf (generate-new-buffer "*eat*")))
                    (push buf mock-buffers)

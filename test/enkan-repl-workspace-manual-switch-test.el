@@ -67,7 +67,7 @@
     (should (string= "01" enkan-repl--current-workspace))
     
     ;; Mock eat start WITHOUT automatic save
-    (cl-letf (((symbol-function 'eat)
+    (cl-letf (((symbol-function 'enkan-repl--backend-eat-start)
                (lambda ()
                  (setq mock-eat-buffer (generate-new-buffer "*eat*"))
                  mock-eat-buffer))

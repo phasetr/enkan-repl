@@ -12,7 +12,7 @@
         (renamed-buffers '())
         (existing-buffers '()))
     ;; Mock functions
-    (cl-letf* (((symbol-function 'eat)
+    (cl-letf* (((symbol-function 'enkan-repl--backend-eat-start)
                 (lambda ()
                   (let ((buf (generate-new-buffer "*eat*")))
                     (push buf created-buffers)

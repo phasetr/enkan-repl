@@ -29,7 +29,7 @@
     (message "WS 01 created, ID: %s" enkan-repl--current-workspace)
     
     ;; User starts eat session with C-M-s
-    (cl-letf (((symbol-function 'eat)
+    (cl-letf (((symbol-function 'enkan-repl--backend-eat-start)
                (lambda () (generate-new-buffer "*eat*")))
               ((symbol-function 'require)
                (lambda (_) t)))
@@ -42,7 +42,7 @@
     (message "WS 02 created, ID: %s" enkan-repl--current-workspace)
     
     ;; User starts eat session with C-M-s
-    (cl-letf (((symbol-function 'eat)
+    (cl-letf (((symbol-function 'enkan-repl--backend-eat-start)
                (lambda () (generate-new-buffer "*eat*")))
               ((symbol-function 'require)
                (lambda (_) t)))
@@ -81,7 +81,7 @@
     (enkan-repl--setup-create-workspace-with-project t nil)
     
     ;; Now user starts eat in WS 02
-    (cl-letf (((symbol-function 'eat)
+    (cl-letf (((symbol-function 'enkan-repl--backend-eat-start)
                (lambda () (generate-new-buffer "*eat*")))
               ((symbol-function 'require)
                (lambda (_) t)))
