@@ -1,3 +1,10 @@
+## [0.15.8](https://github.com/phasetr/enkan-repl/compare/v0.15.7...v0.15.8) (2025-09-08)
+
+
+### Bug Fixes
+
+* Phase 0 - add private logging stub (no call-site changes) ([a7de2a7](https://github.com/phasetr/enkan-repl/commit/a7de2a7e73291ef504c2dd118e3a1fb4b8ae36f0))
+
 ## [0.15.7](https://github.com/phasetr/enkan-repl/compare/v0.15.6...v0.15.7) (2025-09-08)
 
 
