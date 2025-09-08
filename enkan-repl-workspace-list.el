@@ -53,7 +53,6 @@ CURRENT-WORKSPACE is the currently active workspace ID.
 TARGET-DIRECTORIES is the list of target directories."
   (let* ((state (enkan-repl--get-workspace-state workspaces workspace-id))
           (current-project (plist-get state :current-project))
-          (project-aliases (plist-get state :project-aliases))
           (is-current (string= workspace-id current-workspace))
           ;; Get project paths using existing function
           (project-paths (when current-project

@@ -13,18 +13,21 @@
   "Test formatting of workspace information."
   (let* ((enkan-repl--workspaces nil)
          (enkan-repl--current-workspace "01")
+         (enkan-repl-projects
+          '(("config-a" . ("alias-a"))
+            ("config-b" . ("alias-b"))))
          (enkan-repl-target-directories
-          '(("proj-a" . ("project-a" . "/home/user/project-a/"))
-            ("proj-b" . ("project-b" . "/home/user/project-b/"))))
-         (test-state '(:current-project "proj-a"
-                       :project-aliases ("alias1" "alias2")
+          '(("alias-a" . ("project-a" . "/home/user/project-a/"))
+            ("alias-b" . ("project-b" . "/home/user/project-b/"))))
+         (test-state '(:current-project "config-a"
+                       :project-aliases ("alias-a")
                        :session-list (("eat-1" . "*eat-1*"))
                        :session-counter 3)))
     ;; Setup workspace
     (setq enkan-repl--workspaces
           (list (cons "01" test-state)
-                (cons "02" '(:current-project "proj-b"
-                             :project-aliases ("alias3")
+                (cons "02" '(:current-project "config-b"
+                             :project-aliases ("alias-b")
                              :session-list ()
                              :session-counter 0))))
     
@@ -32,26 +35,28 @@
     (let ((formatted (enkan-repl-workspace-list--format-workspace-info
                       "01" enkan-repl--workspaces "01" enkan-repl-target-directories)))
       (should (string-match-p "▶" formatted))
-      (should (string-match-p "proj-a" formatted))
+      (should (string-match-p "config-a" formatted))
       (should (string-match-p "/home/user/project-a/" formatted)))
     
     ;; Test formatting for inactive workspace
     (let ((formatted (enkan-repl-workspace-list--format-workspace-info
                       "02" enkan-repl--workspaces "01" enkan-repl-target-directories)))
       (should-not (string-match-p "▶" formatted))
-      (should (string-match-p "proj-b" formatted))
+      (should (string-match-p "config-b" formatted))
       (should (string-match-p "/home/user/project-b/" formatted)))))
 
 (ert-deftest test-workspace-list-buffer-creation ()
   "Test creation of workspace list buffer."
   (let* ((enkan-repl--workspaces nil)
          (enkan-repl--current-workspace "01")
+         (enkan-repl-projects
+          '(("config-a" . ("alias-a"))))
          (enkan-repl-target-directories
-          '(("proj-a" . ("project-a" . "/home/user/project-a/")))))
+          '(("alias-a" . ("project-a" . "/home/user/project-a/")))))
     ;; Setup workspace
     (setq enkan-repl--workspaces
-          (list (cons "01" '(:current-project "proj-a"
-                             :project-aliases ("alias1")
+          (list (cons "01" '(:current-project "config-a"
+                             :project-aliases ("alias-a")
                              :session-list ()
                              :session-counter 1))))
     
@@ -62,7 +67,7 @@
       ;; Check buffer content
       (should (string-match-p "Enkan REPL Workspaces" (buffer-string)))
       (should (string-match-p "01" (buffer-string)))
-      (should (string-match-p "proj-a" (buffer-string)))
+      (should (string-match-p "config-a" (buffer-string)))
       
       ;; Check mode
       (should (eq major-mode 'enkan-repl-workspace-list-mode))
