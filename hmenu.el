@@ -5,6 +5,7 @@
 ;; Author: phasetr <phasetr@gmail.com>
 ;; Keywords: convenience, interface
 ;; Version: 1.0.0
+;; URL: https://github.com/phasetr/enkan-repl
 
 ;; This file is not part of GNU Emacs.
 
