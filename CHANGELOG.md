@@ -1,3 +1,10 @@
+## [0.15.6](https://github.com/phasetr/enkan-repl/compare/v0.15.5...v0.15.6) (2025-09-08)
+
+
+### Bug Fixes
+
+* Phase 0 - utils header metadata only (no formatting changes) ([b8d9bd5](https://github.com/phasetr/enkan-repl/commit/b8d9bd5b2c6105c9fd61b6317a8d429f5b15a436))
+
 ## [0.15.5](https://github.com/phasetr/enkan-repl/compare/v0.15.4...v0.15.5) (2025-09-08)
 
 
