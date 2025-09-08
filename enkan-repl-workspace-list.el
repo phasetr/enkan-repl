@@ -23,6 +23,7 @@
 (declare-function enkan-repl--save-workspace-state "enkan-repl" ())
 (declare-function enkan-repl--load-workspace-state "enkan-repl" (workspace-id))
 (declare-function enkan-repl--get-project-info-from-directories "enkan-repl-utils" (alias target-directories))
+(declare-function enkan-repl--get-project-path-from-directories "enkan-repl-utils" (project-name target-directories))
 
 ;; Declare external variables
 (defvar enkan-repl--current-workspace)
@@ -54,17 +55,24 @@ TARGET-DIRECTORIES is the list of target directories."
           (current-project (plist-get state :current-project))
           (project-aliases (plist-get state :project-aliases))
           (is-current (string= workspace-id current-workspace))
-          (project-info (when current-project
-                          (enkan-repl--get-project-info-from-directories
-                            current-project target-directories)))
+          ;; First try to find by alias (for cases like "er", "os")
+          (project-info-by-alias (when current-project
+                                    (enkan-repl--get-project-info-from-directories
+                                      current-project target-directories)))
+          ;; If not found by alias, try to find by project name (for cases like "eronly", "ofonly")
+          (project-path-by-name (when (and current-project (not project-info-by-alias))
+                                   (enkan-repl--get-project-path-from-directories
+                                     current-project target-directories)))
           (project-dir (cond
-                         ;; project-info is (project-name . project-path)
-                         ((and (consp project-info) (stringp (cdr project-info)))
-                          (cdr project-info))
-                         ;; project-info is just a string (path or domain)
-                         ((stringp project-info)
-                          project-info)
-                         ;; project-info is some other format
+                         ;; Found by alias - could be (project-name . path) or string
+                         ((and project-info-by-alias (consp project-info-by-alias) (stringp (cdr project-info-by-alias)))
+                          (cdr project-info-by-alias))
+                         ((stringp project-info-by-alias)
+                          project-info-by-alias)
+                         ;; Found by project name
+                         (project-path-by-name
+                          project-path-by-name)
+                         ;; Not found
                          (t nil))))
     (propertize
       (format "%s%s - %s: %s"
