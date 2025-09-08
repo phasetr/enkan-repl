@@ -1,3 +1,10 @@
+# [0.16.0](https://github.com/phasetr/enkan-repl/compare/v0.15.10...v0.16.0) (2025-09-08)
+
+
+### Features
+
+* add workspace list display command ([#54](https://github.com/phasetr/enkan-repl/issues/54)) ([7fc628e](https://github.com/phasetr/enkan-repl/commit/7fc628e6c8e2ed45ad06e766979bc5a873fb847d))
+
 ## [0.15.10](https://github.com/phasetr/enkan-repl/compare/v0.15.9...v0.15.10) (2025-09-08)
 
 
