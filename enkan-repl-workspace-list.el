@@ -60,16 +60,20 @@ TARGET-DIRECTORIES is the list of target directories."
                              current-project 
                              (bound-and-true-p enkan-repl-projects)
                              target-directories)))
-          ;; Use first path if available
-          (project-dir (when project-paths
-                         (cdr (car project-paths)))))
+          ;; Format all paths when multiple targets exist
+          (project-dirs (if project-paths
+                          (mapconcat (lambda (pair)
+                                       (cdr pair))
+                                     project-paths
+                                     ", ")
+                        nil)))
     (propertize
       (format "%s%s - %s: %s"
         (if is-current "▶ " "  ")
         workspace-id
         (or current-project "<none>")
         (if current-project
-            (or project-dir "<not found>")
+            (or project-dirs "<not found>")
           "<no project>"))
       'workspace-id workspace-id)))
 

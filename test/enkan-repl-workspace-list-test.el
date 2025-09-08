@@ -142,6 +142,31 @@
     ;; Should not create buffer when no workspaces
     (should-not (get-buffer "*Enkan Workspace List*"))))
 
+(ert-deftest test-workspace-list-multiple-targets ()
+  "Test formatting with multiple target directories in a project."
+  (let* ((enkan-repl--workspaces nil)
+         (enkan-repl--current-workspace "01")
+         (enkan-repl-projects
+          '(("multi-project" . ("alias-a" "alias-b" "alias-c"))))
+         (enkan-repl-target-directories
+          '(("alias-a" . ("project-a" . "/home/user/project-a/"))
+            ("alias-b" . ("project-b" . "/home/user/project-b/"))
+            ("alias-c" . ("project-c" . "/home/user/project-c/")))))
+    ;; Setup workspace with multiple targets
+    (setq enkan-repl--workspaces
+          (list (cons "01" '(:current-project "multi-project"
+                             :project-aliases ("alias-a" "alias-b" "alias-c")
+                             :session-list ()
+                             :session-counter 0))))
+    
+    ;; Test formatting shows all paths
+    (let ((formatted (enkan-repl-workspace-list--format-workspace-info
+                      "01" enkan-repl--workspaces "01" enkan-repl-target-directories)))
+      (should (string-match-p "multi-project" formatted))
+      (should (string-match-p "/home/user/project-a/" formatted))
+      (should (string-match-p "/home/user/project-b/" formatted))
+      (should (string-match-p "/home/user/project-c/" formatted)))))
+
 (provide 'enkan-repl-workspace-list-test)
 
 ;;; enkan-repl-workspace-list-test.el ends here
