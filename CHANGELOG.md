@@ -1,3 +1,10 @@
+## [0.15.7](https://github.com/phasetr/enkan-repl/compare/v0.15.6...v0.15.7) (2025-09-08)
+
+
+### Bug Fixes
+
+* Phase 0 - header metadata alignment (hmenu, mac-notify) ([2153691](https://github.com/phasetr/enkan-repl/commit/21536913f4bdec15f74e1286f6af294e70eeee85))
+
 ## [0.15.6](https://github.com/phasetr/enkan-repl/compare/v0.15.5...v0.15.6) (2025-09-08)
 
 
