@@ -57,19 +57,18 @@ TARGET-DIRECTORIES is the list of target directories."
           ;; Get project paths using existing function
           (project-paths (when current-project
                            (enkan-repl--get-project-paths-for-current
-                             current-project 
+                             current-project
                              (bound-and-true-p enkan-repl-projects)
                              target-directories)))
           ;; Format all paths when multiple targets exist
           (project-dirs (if project-paths
-                          (mapconcat (lambda (pair)
-                                       (cdr pair))
-                                     project-paths
-                                     ", ")
-                        nil)))
+                          (mapconcat (lambda (pair) (cdr pair))
+                            project-paths
+                            ", ")
+                          nil)))
     (propertize
-      (format "  %s %s - %s: %s"
-        (if is-current "▶" " ")
+      (format "%s %s - %s: %s"
+        (if is-current "▶" "  ")
         workspace-id
         (or current-project "<none>")
         (if current-project
