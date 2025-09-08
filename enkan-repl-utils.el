@@ -2,7 +2,8 @@
 
 ;; Copyright (C) 2025 [phasetr]
 
-;; Author: [phasetr] <phasetr@gmail.com>
+;; Author: phasetr <phasetr@gmail.com>
+;; URL: https://github.com/phasetr/enkan-repl
 ;; Keywords: tools
 ;; Package-Requires: ((emacs "28.2") (cl-lib "0.5"))
 
