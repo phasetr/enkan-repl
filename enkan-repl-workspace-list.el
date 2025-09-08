@@ -53,32 +53,24 @@ TARGET-DIRECTORIES is the list of target directories."
   (let* ((state (enkan-repl--get-workspace-state workspaces workspace-id))
           (current-project (plist-get state :current-project))
           (project-aliases (plist-get state :project-aliases))
-          (session-list (plist-get state :session-list))
-          (session-counter (plist-get state :session-counter))
           (is-current (string= workspace-id current-workspace))
-          (active-sessions (length (cl-remove-if-not
-                                     (lambda (entry)
-                                       (buffer-live-p (get-buffer (cdr entry))))
-                                     session-list)))
-          (total-sessions (length session-list))
           (project-info (when current-project
                           (enkan-repl--get-project-info-from-directories
                             current-project target-directories)))
-          (project-dir (if (consp project-info)
-                         (cdr project-info)
-                       project-info)))
+          (project-dir (cond
+                         ;; project-info is (project-name . project-path)
+                         ((and (consp project-info) (consp (cdr project-info)))
+                          (cdr project-info))
+                         ;; project-info is just a string (path or domain)
+                         ((stringp project-info)
+                          project-info)
+                         ;; project-info is some other format
+                         (t nil))))
     (propertize
-      (format "%s%s [%s] - Project: %s (%s) - Sessions: %d/%d (counter: %d) - Dir: %s"
+      (format "%s%s - %s: %s"
         (if is-current "▶ " "  ")
         workspace-id
-        (if is-current "ACTIVE" "inactive")
         (or current-project "<none>")
-        (if project-aliases
-          (mapconcat #'identity project-aliases ", ")
-          "no aliases")
-        active-sessions
-        total-sessions
-        (or session-counter 0)
         (or project-dir "<no directory>"))
       'workspace-id workspace-id)))
 
