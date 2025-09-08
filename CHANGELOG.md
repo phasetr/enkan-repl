@@ -1,3 +1,10 @@
+## [0.15.9](https://github.com/phasetr/enkan-repl/compare/v0.15.8...v0.15.9) (2025-09-08)
+
+
+### Bug Fixes
+
+* Phase 0 - migrate selected messages to private logging (batch 1) ([2608661](https://github.com/phasetr/enkan-repl/commit/2608661eb68912ee3dfaeb136f9e3291bd94b07a))
+
 ## [0.15.8](https://github.com/phasetr/enkan-repl/compare/v0.15.7...v0.15.8) (2025-09-08)
 
 
