@@ -1,3 +1,10 @@
+## [0.16.1](https://github.com/phasetr/enkan-repl/compare/v0.16.0...v0.16.1) (2025-09-09)
+
+
+### Bug Fixes
+
+* remove unused enkan-repl-default-session-projects variable ([d7c4f13](https://github.com/phasetr/enkan-repl/commit/d7c4f13c29dbe3eb03c5d37262fa9cfededc15d3))
+
 # [0.16.0](https://github.com/phasetr/enkan-repl/compare/v0.15.10...v0.16.0) (2025-09-08)
 
 
