@@ -140,9 +140,8 @@ and the cheat-sheet ensures you never miss useful functionality.
 ** Installation
 
 *** Prerequisites
-- Emacs 28.1 or later
-- [[https://github.com/cpoile/claudemacs][claudemacs]] package installed and configured
-- [[https://github.com/anthropics/claude-code][Claude Code CLI]] properly set up
+- Emacs 28.2 or later
+- [[https://github.com/akib/emacs-eat][eat]] (0.9.4 or later)
 
 *Note*: This package has been developed and tested exclusively on macOS with GNU Emacs 30.1.
 While it should work on other platforms and Emacs versions (28.1+),
@@ -207,7 +206,6 @@ Currently operates with a single fixed workspace (=ws:01=), with multi-workspace
 
 *** Breaking Changes
 *Important*: Buffer naming format has changed from =*enkan:/path*= to =*ws:01 enkan:/path*=.
-See [[file:docs/migration-guide.md][Migration Guide]] for upgrade instructions.
 
 *** Workspace Behavior
 - All sessions are scoped to workspace =ws:01=
@@ -224,28 +222,56 @@ See [[file:docs/migration-guide.md][Migration Guide]] for upgrade instructions.
   - No need to memorize function names
 
 *** File Management
-- =enkan-repl-open-project-input-file= - Create/open persistent input file for current directory
+- =enkan-repl-open-project-input-file= - Open or create project input file for directory
+- =enkan-repl-open-center-file= - Open or create the center file based on enkan-repl-center-file configuration
+- =enkan-repl-open-project-directory= - Open project directory in Dired from enkan-repl-projects
 
 *** Text Sending
-- =enkan-repl-send-region= - Send selected text (the author most commonly used)
-- =enkan-repl-send-line= - Send current line only
-- =enkan-repl-send-enter= - Send enter key
-- =enkan-repl-send-1/2/3= - Send numbered choices for AI prompts
-- =enkan-repl-send-4= - Send \\='4\\=' to enkan session buffer with optional PFX. - From enkan buffer: Send to current buffer - From other buffer without prefix: Interactive buffer selection - With numeric prefix: Send to buffer at index (1-based)  Uses unified backend with smart buffer detection.
-- =enkan-repl-send-5= - Send \\='5\\=' to enkan session buffer with optional PFX. - From enkan buffer: Send to current buffer - From other buffer without prefix: Interactive buffer selection - With numeric prefix: Send to buffer at index (1-based)  Uses unified backend with smart buffer detection.
+- =enkan-repl-send-region= - Send region text to enkan session buffer
+- =enkan-repl-send-line= - Send current line to enkan session buffer
+- =enkan-repl-send-enter= - Send enter key to enkan session buffer
+- =enkan-repl-send-escape= - Send ESC key to eat session buffer
+- =enkan-repl-send-1= - Send '1' to enkan session buffer
+- =enkan-repl-send-2= - Send '2' to enkan session buffer
+- =enkan-repl-send-3= - Send '3' to enkan session buffer
+- =enkan-repl-send-4= - Send '4' to enkan session buffer
+- =enkan-repl-send-5= - Send '5' to enkan session buffer
 
 *** Session Control
-- =enkan-repl-start-eat= - Start eat terminal emulator session in current directory. Simplified version for use within setup functions only. FORCE parameter ignored - always starts new session.
-- =enkan-repl-teardown= - Terminate eat session(s) based on context. - Standard input file: terminate single eat session for current directory in current workspace - Center file: terminate all registered sessions in current workspace
-- =enkan-repl-setup= - Arrange windows for (the author's) optimal workflow
+- =enkan-repl-start-eat= - Start eat terminal emulator session in current directory
+- =enkan-repl-teardown= - Terminate eat session(s) based on context
+- =enkan-repl-setup= - Set up window layout based on context
+
+*** Workspace
+- =enkan-repl-workspace-switch= - Switch to another workspace
+- =enkan-repl-workspace-delete= - Delete a workspace
+- =enkan-repl-workspace-list= - Display a list of all workspaces with their information
 
 *** Utilities
-- =enkan-repl-recenter-bottom= - Recenter all enkan terminal buffers at bottom.
-- =enkan-repl-toggle-global-mode= - Toggle enkan-repl global mode on/off.
-- =enkan-repl-workspace-switch= - Switch to another workspace. Uses `hmenu' if available to show workspace ID with its project.
-- =enkan-repl-workspace-delete= - Delete a workspace. Cannot delete the current workspace or the only workspace. Uses `hmenu' if available to show workspace ID with its project.
+- =enkan-repl-recenter-bottom= - Recenter all enkan terminal buffers at bottom
+- =enkan-repl-toggle-global-mode= - Toggle enkan-repl global mode on/off
+- =enkan-repl-print-setup-to-buffer= - Print current setup variables for debugging
 
 ** Configuration
+
+*** Center File and Multi-Project Management
+The center file enables management of multiple projects simultaneously:
+
+#+begin_src elisp
+;; Set center file path (enables multi-project functionality)
+(setq enkan-repl-center-file "~/my-projects/center.org")
+
+;; Define project directories with aliases
+(setq enkan-repl-target-directories
+      '(("pt" . ("pt-tools" . "/path/to/pt-tools/"))
+        ("er" . ("enkan-repl" . "/path/to/enkan-repl/"))
+        ("eat" . ("emacs-eat" . "/path/to/emacs-eat/"))))
+
+;; Configuration list for frequently used simultaneous project startup
+(setq enkan-repl-projects
+      '(("web-dev" . ("er" "pt" "cc"))
+        ("data-analysis" . ("pt" "jupyter" "postgres"))))
+#+end_src
 
 *** Template Customization
 #+begin_src elisp

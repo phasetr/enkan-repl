@@ -267,12 +267,6 @@ Example: \\='((1 . \"pt-tools\") (2 . \"enkan-repl\"))"
   :type '(alist :key-type integer :value-type string)
   :group 'enkan-repl)
 
-(defcustom enkan-repl-default-session-projects nil
-  "Alist of default session projects to open.
-Example: \\='((1 . \"project1\") (2 . \"project2\") (3 . \"project3\") (4 . \"project4\"))."
-  :type '(alist :key-type integer :value-type string)
-  :group 'enkan-repl)
-
 ;;;; Multi-buffer access variables (continued)
 
 (defvar enkan-repl--session-counter 0
