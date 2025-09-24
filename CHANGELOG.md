@@ -1,3 +1,10 @@
+# [0.17.0](https://github.com/phasetr/enkan-repl/compare/v0.16.1...v0.17.0) (2025-09-24)
+
+
+### Features
+
+* allow deletion of last workspace and add workspace list delete feature ([e364d85](https://github.com/phasetr/enkan-repl/commit/e364d859724ea7fbd48b45fd1ac344d556f2cd75))
+
 ## [0.16.1](https://github.com/phasetr/enkan-repl/compare/v0.16.0...v0.16.1) (2025-09-09)
 
 
