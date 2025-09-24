@@ -16,6 +16,7 @@
 ;;; Code:
 
 (require 'cl-lib)
+(require 'enkan-repl-workspace)
 
 ;; Declare external functions to avoid byte-compile warnings
 (declare-function enkan-repl--list-workspace-ids "enkan-repl-workspace" (workspaces))
@@ -111,11 +112,13 @@ TARGET-DIRECTORIES is the list of target directories."
   "Delete the workspace at point."
   (interactive)
   (let ((workspace-id (enkan-repl-workspace-list--get-workspace-at-point)))
-    (when workspace-id
+    (if (not workspace-id)
+        (message "No workspace at point")
       (if (string= workspace-id enkan-repl--current-workspace)
           (when (y-or-n-p (format "Delete current workspace %s? This will switch to another workspace or create a new one. " workspace-id))
             ;; Save current state before deletion
-            (enkan-repl--save-workspace-state)
+            (when (fboundp 'enkan-repl--save-workspace-state)
+              (enkan-repl--save-workspace-state))
             ;; Delete the workspace
             (setq enkan-repl--workspaces (enkan-repl--delete-workspace enkan-repl--workspaces workspace-id))
             ;; Check if there are remaining workspaces
@@ -124,12 +127,20 @@ TARGET-DIRECTORIES is the list of target directories."
                   ;; Switch to the first available workspace
                   (progn
                     (setq enkan-repl--current-workspace (car remaining-workspaces))
-                    (enkan-repl--load-workspace-state enkan-repl--current-workspace)
+                    (when (fboundp 'enkan-repl--load-workspace-state)
+                      (enkan-repl--load-workspace-state enkan-repl--current-workspace))
                     (message "Deleted workspace %s, switched to %s" workspace-id enkan-repl--current-workspace))
                 ;; No workspaces remain, create a new default workspace
                 (progn
                   (setq enkan-repl--current-workspace nil)
-                  (enkan-repl-setup)
+                  ;; Create new workspace directly without calling enkan-repl-setup to avoid dependencies
+                  (let ((new-id "01"))
+                    (setq enkan-repl--workspaces
+                          (list (cons new-id '(:current-project nil
+                                               :project-aliases nil
+                                               :session-list nil
+                                               :session-counter 0))))
+                    (setq enkan-repl--current-workspace new-id))
                   (message "Deleted workspace %s, created new workspace %s" workspace-id enkan-repl--current-workspace))))
             ;; Refresh the list
             (enkan-repl-workspace-list-refresh))
