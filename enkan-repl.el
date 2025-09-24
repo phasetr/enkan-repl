@@ -2071,7 +2071,12 @@ Uses `hmenu' if available to show workspace ID with its project."
                 ;; Delete the workspace
                 (setq enkan-repl--workspaces
                       (enkan-repl--delete-workspace enkan-repl--workspaces target-id))
-                (message "Deleted workspace %s" target-id))
+                ;; If no workspaces remain, create a new one
+                (unless enkan-repl--workspaces
+                  (enkan-repl-setup)
+                  (message "Deleted workspace %s and created new workspace" target-id))
+                (when enkan-repl--workspaces
+                  (message "Deleted workspace %s" target-id)))
             (message "Cannot delete workspace %s" target-id)))))))
 
 (defun enkan-repl--teardown-delete-current-workspace-pure ()
