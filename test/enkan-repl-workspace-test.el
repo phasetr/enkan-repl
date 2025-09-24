@@ -69,13 +69,13 @@
     ;; Can delete when multiple workspaces exist
     (should (enkan-repl--can-delete-workspace "01" workspaces))
     (should (enkan-repl--can-delete-workspace "02" workspaces))
-    
+
     ;; Cannot delete non-existing workspace
     (should-not (enkan-repl--can-delete-workspace "03" workspaces))
-    
-    ;; Cannot delete when only one workspace
+
+    ;; Can delete when only one workspace (new behavior)
     (let ((single-ws '(("01" . nil))))
-      (should-not (enkan-repl--can-delete-workspace "01" single-ws)))))
+      (should (enkan-repl--can-delete-workspace "01" single-ws)))))
 
 (ert-deftest test-enkan-repl--delete-workspace ()
   "Test workspace deletion."
