@@ -54,9 +54,8 @@ Returns plist or nil if not found."
 
 (defun enkan-repl--can-delete-workspace (workspace-id workspaces)
   "Check if WORKSPACE-ID can be deleted from WORKSPACES.
-Cannot delete if it's the only workspace or doesn't exist."
-  (and (> (length workspaces) 1)
-       (assoc workspace-id workspaces #'string=)
+Cannot delete if it doesn't exist. Allows deletion of the last workspace."
+  (and (assoc workspace-id workspaces #'string=)
        t))
 
 (defun enkan-repl--delete-workspace (workspaces workspace-id)

@@ -1044,8 +1044,12 @@ Category: Session Controller"
               ;; Delete current workspace after session termination
               (enkan-repl--teardown-delete-current-workspace-pure)
               ;; Switch to another workspace if available
-              (when (enkan-repl--list-workspace-ids enkan-repl--workspaces)
-                (enkan-repl-workspace-switch))))))
+              (let ((remaining-workspaces (enkan-repl--list-workspace-ids enkan-repl--workspaces)))
+                (when remaining-workspaces
+                  (enkan-repl-workspace-switch))
+                ;; If no workspaces remain, create a new default workspace
+                (unless remaining-workspaces
+                  (enkan-repl-setup)))))))
       ;; Center file mode: terminate all sessions in current workspace
       (if (enkan-repl--is-center-file-path enkan-repl-center-file enkan-repl-projects)
           ;; Center file mode implementation
@@ -1090,8 +1094,12 @@ Category: Session Controller"
                     ;; Reset global configuration and delete current workspace
                     (enkan-repl--teardown-delete-current-workspace-pure)
                     ;; Switch to another workspace if available
-                    (when (enkan-repl--list-workspace-ids enkan-repl--workspaces)
-                      (enkan-repl-workspace-switch))
+                    (let ((remaining-workspaces (enkan-repl--list-workspace-ids enkan-repl--workspaces)))
+                      (when remaining-workspaces
+                        (enkan-repl-workspace-switch))
+                      ;; If no workspaces remain, create a new default workspace
+                      (unless remaining-workspaces
+                        (enkan-repl-setup)))
                     ;; Auto-disable global center file mode
                     ;; (when (enkan-repl--disable-global-minor-mode-if-active)
                     ;;   (princ "\n🔄 Auto-disabled center file global mode\n"))
@@ -2063,7 +2071,12 @@ Uses `hmenu' if available to show workspace ID with its project."
                 ;; Delete the workspace
                 (setq enkan-repl--workspaces
                       (enkan-repl--delete-workspace enkan-repl--workspaces target-id))
-                (message "Deleted workspace %s" target-id))
+                ;; If no workspaces remain, create a new one
+                (unless enkan-repl--workspaces
+                  (enkan-repl-setup)
+                  (message "Deleted workspace %s and created new workspace" target-id))
+                (when enkan-repl--workspaces
+                  (message "Deleted workspace %s" target-id)))
             (message "Cannot delete workspace %s" target-id)))))))
 
 (defun enkan-repl--teardown-delete-current-workspace-pure ()

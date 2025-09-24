@@ -91,18 +91,18 @@
 
 (ert-deftest test-enkan-repl--can-delete-workspace ()
   "Test workspace deletion validation."
-  ;; Cannot delete if only one workspace
-  (should-not (enkan-repl--can-delete-workspace "01" '(("01" . (:current-project nil)))))
-  
+  ;; Can delete if only one workspace (new behavior)
+  (should (enkan-repl--can-delete-workspace "01" '(("01" . (:current-project nil)))))
+
   ;; Can delete if multiple workspaces exist
-  (should (enkan-repl--can-delete-workspace 
-           "01" 
+  (should (enkan-repl--can-delete-workspace
+           "01"
            '(("01" . (:current-project nil))
              ("02" . (:current-project nil)))))
-  
+
   ;; Cannot delete non-existent workspace
-  (should-not (enkan-repl--can-delete-workspace 
-                "03" 
+  (should-not (enkan-repl--can-delete-workspace
+                "03"
                 '(("01" . (:current-project nil))
                   ("02" . (:current-project nil))))))
 

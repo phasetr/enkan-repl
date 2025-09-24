@@ -16,6 +16,7 @@
 ;;; Code:
 
 (require 'cl-lib)
+(require 'enkan-repl-workspace)
 
 ;; Declare external functions to avoid byte-compile warnings
 (declare-function enkan-repl--list-workspace-ids "enkan-repl-workspace" (workspaces))
@@ -23,10 +24,13 @@
 (declare-function enkan-repl--save-workspace-state "enkan-repl" ())
 (declare-function enkan-repl--load-workspace-state "enkan-repl" (workspace-id))
 (declare-function enkan-repl--get-project-paths-for-current "enkan-repl" (current-project projects target-directories))
+(declare-function enkan-repl--delete-workspace "enkan-repl-workspace" (workspaces workspace-id))
+(declare-function enkan-repl-setup "enkan-repl" ())
 
 ;; Declare external variables
 (defvar enkan-repl--current-workspace)
 (defvar enkan-repl-projects)
+(defvar enkan-repl--workspaces)
 
 (defvar enkan-repl-workspace-list-mode-map
   (let ((map (make-sparse-keymap)))
@@ -35,6 +39,7 @@
     (define-key map (kbd "q") 'quit-window)
     (define-key map (kbd "n") 'next-line)
     (define-key map (kbd "p") 'previous-line)
+    (define-key map (kbd "d") 'enkan-repl-workspace-list-delete-workspace)
     map)
   "Keymap for `enkan-repl-workspace-list-mode'.")
 
@@ -103,6 +108,48 @@ TARGET-DIRECTORIES is the list of target directories."
   (interactive)
   (enkan-repl-workspace-list))
 
+(defun enkan-repl-workspace-list-delete-workspace ()
+  "Delete the workspace at point."
+  (interactive)
+  (let ((workspace-id (enkan-repl-workspace-list--get-workspace-at-point)))
+    (if (not workspace-id)
+        (message "No workspace at point")
+      (if (string= workspace-id enkan-repl--current-workspace)
+          (when (y-or-n-p (format "Delete current workspace %s? This will switch to another workspace or create a new one. " workspace-id))
+            ;; Save current state before deletion
+            (when (fboundp 'enkan-repl--save-workspace-state)
+              (enkan-repl--save-workspace-state))
+            ;; Delete the workspace
+            (setq enkan-repl--workspaces (enkan-repl--delete-workspace enkan-repl--workspaces workspace-id))
+            ;; Check if there are remaining workspaces
+            (let ((remaining-workspaces (enkan-repl--list-workspace-ids enkan-repl--workspaces)))
+              (if remaining-workspaces
+                  ;; Switch to the first available workspace
+                  (progn
+                    (setq enkan-repl--current-workspace (car remaining-workspaces))
+                    (when (fboundp 'enkan-repl--load-workspace-state)
+                      (enkan-repl--load-workspace-state enkan-repl--current-workspace))
+                    (message "Deleted workspace %s, switched to %s" workspace-id enkan-repl--current-workspace))
+                ;; No workspaces remain, create a new default workspace
+                (progn
+                  (setq enkan-repl--current-workspace nil)
+                  ;; Create new workspace directly without calling enkan-repl-setup to avoid dependencies
+                  (let ((new-id "01"))
+                    (setq enkan-repl--workspaces
+                          (list (cons new-id '(:current-project nil
+                                               :project-aliases nil
+                                               :session-list nil
+                                               :session-counter 0))))
+                    (setq enkan-repl--current-workspace new-id))
+                  (message "Deleted workspace %s, created new workspace %s" workspace-id enkan-repl--current-workspace))))
+            ;; Refresh the list
+            (enkan-repl-workspace-list-refresh))
+        ;; Not the current workspace - simpler deletion
+        (when (y-or-n-p (format "Delete workspace %s? " workspace-id))
+          (setq enkan-repl--workspaces (enkan-repl--delete-workspace enkan-repl--workspaces workspace-id))
+          (message "Deleted workspace %s" workspace-id)
+          (enkan-repl-workspace-list-refresh))))))
+
 ;;;###autoload
 (defun enkan-repl-workspace-list ()
   "Display a list of all workspaces with their information.
@@ -122,7 +169,7 @@ aliases, session counts, and target directories."
           (erase-buffer)
           (insert "Enkan REPL Workspaces\n")
           (insert "=====================\n\n")
-          (insert "Keys: RET - switch to workspace, g - refresh, q - quit\n\n")
+          (insert "Keys: RET - switch to workspace, d - delete workspace, g - refresh, q - quit\n\n")
           ;; Sort workspace IDs to ensure consistent display
           (setq workspace-ids (sort workspace-ids #'string<))
           ;; Display each workspace
