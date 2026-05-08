@@ -778,14 +778,14 @@ Only returns buffers that belong to the current workspace."
 (defun enkan-repl--can-send-text (&optional directory)
   "Check if text can actually be sent to eat session (strict check).
 If DIRECTORY is provided, check for eat session in that directory.
-Otherwise, use current `default-directory'."
+Otherwise, use current `default-directory'.
+Falls back to `get-buffer-process' when `eat--process' is unbound or nil."
   (let ((session-buffer (enkan-repl--get-buffer-for-directory directory)))
     (when session-buffer
       (with-current-buffer session-buffer
-        (and
-         (boundp 'eat--process)
-         eat--process
-         (process-live-p eat--process))))))
+        (let ((proc (or (and (boundp 'eat--process) eat--process)
+                        (get-buffer-process session-buffer))))
+          (and proc (process-live-p proc)))))))
 
 ;;;; Public API - Send Functions
 
@@ -1673,19 +1673,20 @@ Resolution priority: `prefix-arg' → alias → nil (for interactive selection).
   "Side-effect function to execute send action to BUFFER.
 BUFFER: target buffer with eat process
 SEND-DATA: plist from enkan-repl--send-primitive
-Returns t on success, nil on failure."
+Returns t on success, nil on failure.
+Falls back to `get-buffer-process' when `eat--process' is unbound or nil."
   (when (and buffer (buffer-live-p buffer))
     (with-current-buffer buffer
-      (when (and (boundp 'eat--process)
-                 eat--process
-                 (process-live-p eat--process))
-        (let ((content (plist-get send-data :content)))
-          (when content
-            (eat--send-string eat--process content)
-            ;; For text content, also send carriage return
-            (when (eq (plist-get send-data :action) 'text)
-              (eat--send-string eat--process "\r"))
-            t))))))
+      (let ((proc (or (and (boundp 'eat--process) eat--process)
+                      (get-buffer-process buffer))))
+        (when (and proc (process-live-p proc))
+          (let ((content (plist-get send-data :content)))
+            (when content
+              (eat--send-string proc content)
+              ;; For text content, also send carriage return
+              (when (eq (plist-get send-data :action) 'text)
+                (eat--send-string proc "\r"))
+              t)))))))
 
 (defun enkan-repl--send-unified (text &optional pfx special-key-type)
   "Unified backend for all send commands.
@@ -1805,16 +1806,19 @@ Returns plist with :valid, :number, :message."
 
 (defun enkan-repl--send-text-to-buffer (text buffer)
   "Center file specific function to send TEXT to BUFFER.
-Sends text followed by carriage return, with cursor positioning."
+Sends text followed by carriage return, with cursor positioning.
+Falls back to `get-buffer-process' when `eat--process' is unbound or nil."
   (when (and (bufferp buffer)
              (buffer-live-p buffer)
              (with-current-buffer buffer
-               (and (boundp 'eat--process)
-                    eat--process
-                    (process-live-p eat--process))))
+               (let ((proc (or (and (boundp 'eat--process) eat--process)
+                               (get-buffer-process buffer))))
+                 (and proc (process-live-p proc)))))
     (with-current-buffer buffer
-      (eat--send-string eat--process text)
-      (eat--send-string eat--process "\r")
+      (let ((proc (or (and (boundp 'eat--process) eat--process)
+                      (get-buffer-process buffer))))
+        (eat--send-string proc text)
+        (eat--send-string proc "\r"))
       ;; Move cursor to bottom after eat processes the output
       (run-at-time 0.01 nil
                    (lambda (buf)
