@@ -68,7 +68,10 @@ Returns workspace ID string (e.g., \"01\") or nil if not an enkan buffer."
 
 (defun enkan-repl--get-workspace-buffer-count-pure (buffer-list workspace-id)
   "Pure function to count living eat buffers for WORKSPACE-ID in BUFFER-LIST.
-Returns the number of valid enkan buffers with active eat processes that belong to the workspace."
+Returns the number of valid enkan buffers with active eat processes that belong to the workspace.
+Falls back to `get-buffer-process' when `eat--process' is unbound or nil,
+which can happen if the buffer-local variable was reset while the OS process
+remained attached to the buffer."
   (let ((count 0))
     (dolist (buffer buffer-list)
       (when (and (bufferp buffer)
@@ -76,9 +79,9 @@ Returns the number of valid enkan buffers with active eat processes that belong 
                  (enkan-repl--buffer-name-matches-workspace
                   (buffer-name buffer) workspace-id)
                  (with-current-buffer buffer
-                   (and (boundp 'eat--process)
-                        eat--process
-                        (process-live-p eat--process))))
+                   (let ((proc (or (and (boundp 'eat--process) eat--process)
+                                   (get-buffer-process buffer))))
+                     (and proc (process-live-p proc)))))
         (setq count (1+ count))))
     count))
 
