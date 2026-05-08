@@ -1626,7 +1626,10 @@ Returns plist with :buffer, :name, :live-p, :has-process, :process."
   "Pure function to get available enkan buffers from BUFFER-LIST.
 Consolidates buffer collection and filtering into single function.
 Returns list of valid enkan buffers with active eat processes.
-Only returns buffers that belong to the current workspace."
+Only returns buffers that belong to the current workspace.
+Falls back to `get-buffer-process' when `eat--process' is unbound or nil,
+which can happen if the buffer-local variable was reset while the OS process
+remained attached to the buffer."
   (let ((current-ws enkan-repl--current-workspace))
     (seq-filter (lambda (buffer)
                   (and (bufferp buffer)
@@ -1635,9 +1638,9 @@ Only returns buffers that belong to the current workspace."
                        (enkan-repl--buffer-name-matches-workspace
                         (buffer-name buffer) current-ws)
                        (with-current-buffer buffer
-                         (and (boundp 'eat--process)
-                              eat--process
-                              (process-live-p eat--process)))))
+                         (let ((proc (or (and (boundp 'eat--process) eat--process)
+                                         (get-buffer-process buffer))))
+                           (and proc (process-live-p proc))))))
                 buffer-list)))
 
 (defun enkan-repl--resolve-target-buffer (pfx alias buffers)
