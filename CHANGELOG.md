@@ -1,3 +1,10 @@
+## [0.17.1](https://github.com/phasetr/enkan-repl/compare/v0.17.0...v0.17.1) (2026-05-08)
+
+
+### Bug Fixes
+
+* fallback to get-buffer-process when eat--process is unbound ([#57](https://github.com/phasetr/enkan-repl/issues/57)) ([aab2da5](https://github.com/phasetr/enkan-repl/commit/aab2da5813acf90a07125354c42ea7dd58b7c6f8))
+
 # [0.17.0](https://github.com/phasetr/enkan-repl/compare/v0.16.1...v0.17.0) (2025-09-24)
 
 
