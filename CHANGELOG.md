@@ -1,3 +1,10 @@
+## [0.17.2](https://github.com/phasetr/enkan-repl/compare/v0.17.1...v0.17.2) (2026-05-08)
+
+
+### Bug Fixes
+
+* extend get-buffer-process fallback to send paths ([#58](https://github.com/phasetr/enkan-repl/issues/58)) ([35d7082](https://github.com/phasetr/enkan-repl/commit/35d70820e35d0660416fd12fc76173152d89fc61))
+
 ## [0.17.1](https://github.com/phasetr/enkan-repl/compare/v0.17.0...v0.17.1) (2026-05-08)
 
 
