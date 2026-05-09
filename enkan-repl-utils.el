@@ -32,23 +32,43 @@ Now supports workspace-prefixed format *ws:01 enkan:/path*."
 (defun enkan-repl--buffer-name->path (name)
   "Extract expanded directory path from enkan buffer NAME.
 Returns expanded directory path ending with '/', or nil if invalid format.
-Now supports workspace-prefixed format *ws:01 enkan:/path*."
+Supports workspace-prefixed format *ws:01 enkan:/path*, including the
+optional Emacs UNIQUE suffix *ws:01 enkan:/path*<2>, *<3>, ... created by
+`rename-buffer' when multiple sessions are opened for the same path."
   (when (and (stringp name)
-             (string-match "^\\*ws:[0-9]\\{2\\} enkan:\\(.*\\)\\*$" name))
+             (string-match
+              "^\\*ws:[0-9]\\{2\\} enkan:\\(.+\\)\\*\\(?:<[0-9]+>\\)?$"
+              name))
     (let ((raw-path (match-string 1 name)))
       (file-name-as-directory (expand-file-name raw-path)))))
 
-(defun enkan-repl--path->buffer-name (path)
-  "Generate buffer name from PATH.
-Returns buffer name in format *ws:<id> enkan:<expanded-path>*.
-Workspace ID is taken from `enkan-repl--current-workspace' when available; otherwise falls back to "01"."
+(defun enkan-repl--buffer-name->instance (name)
+  "Return the multi-instance index of enkan buffer NAME (1-based).
+Returns 1 when NAME has no <N> suffix.  Returns nil when NAME is not an
+enkan buffer name."
+  (when (and (stringp name)
+             (string-match
+              "^\\*ws:[0-9]\\{2\\} enkan:.+\\*\\(?:<\\([0-9]+\\)>\\)?$"
+              name))
+    (let ((suffix (match-string 1 name)))
+      (if suffix (string-to-number suffix) 1))))
+
+(defun enkan-repl--path->buffer-name (path &optional instance)
+  "Generate buffer name from PATH, optionally with INSTANCE suffix.
+Returns buffer name in format *ws:<id> enkan:<expanded-path>* (instance 1
+or unspecified) or *ws:<id> enkan:<expanded-path>*<N> (instance >= 2).
+Workspace ID is taken from `enkan-repl--current-workspace' when available;
+otherwise falls back to \"01\"."
   (let* ((ws (when (boundp 'enkan-repl--current-workspace)
                enkan-repl--current-workspace))
          (ws-id (if (and (stringp ws)
                          (string-match-p "^[0-9][0-9]$" ws))
                     ws
-                  "01")))
-    (format "*ws:%s enkan:%s*" ws-id (expand-file-name path))))
+                  "01"))
+         (base (format "*ws:%s enkan:%s*" ws-id (expand-file-name path))))
+    (if (and instance (integerp instance) (> instance 1))
+        (format "%s<%d>" base instance)
+      base)))
 
 (defun enkan-repl--buffer-name-matches-workspace (name workspace-id)
   "Check if buffer NAME belongs to WORKSPACE-ID.
@@ -121,13 +141,23 @@ Example: \='enkan--Users--project\=' + \='enkan\=' + \='--\=' -> \='/Users/proje
       (concat (replace-regexp-in-string (regexp-quote separator) "/" path-part) "/"))))
 
 
-(defun enkan-repl--buffer-matches-directory (buffer-name target-directory)
+(defun enkan-repl--buffer-matches-directory (buffer-name target-directory &optional instance)
   "Pure function to check if buffer name matches target directory.
-Returns t if buffer is enkan buffer for target directory, nil otherwise."
+Returns t if BUFFER-NAME is an enkan buffer for TARGET-DIRECTORY, nil
+otherwise.  When INSTANCE is non-nil (an integer), additionally requires
+the buffer's multi-instance index to equal INSTANCE.  When INSTANCE is
+nil, any instance for that directory matches."
   (and (stringp buffer-name)
        (stringp target-directory)
        (enkan-repl--is-enkan-buffer-name buffer-name)
-       (string= buffer-name (enkan-repl--path->buffer-name target-directory))))
+       (let ((buf-path (enkan-repl--buffer-name->path buffer-name))
+             (tgt-path (file-name-as-directory
+                        (expand-file-name target-directory))))
+         (and (stringp buf-path)
+              (string= buf-path tgt-path)
+              (or (null instance)
+                  (eql instance
+                       (enkan-repl--buffer-name->instance buffer-name)))))))
 
 (defun enkan-repl--extract-session-info (buffer-name buffer-live-p has-eat-process process-live-p)
   "Pure function to extract session info from buffer properties.
