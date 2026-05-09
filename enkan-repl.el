@@ -98,8 +98,9 @@
 (declare-function enkan-repl--buffer-matches-directory "enkan-repl-utils" (buffer-name target-directory &optional instance))
 (declare-function enkan-repl--buffer-alive-as-terminal-p "enkan-repl-utils" (buffer))
 (declare-function enkan-repl--terminal-tmux-alive-p "enkan-repl-terminal" (id))
-(declare-function enkan-repl--terminal-tmux--mirror-make "enkan-repl-terminal" (id))
+(declare-function enkan-repl--terminal-tmux--mirror-make "enkan-repl-terminal" (id &optional defer-refresh))
 (declare-function enkan-repl--terminal-tmux-kill-workspace "enkan-repl-terminal" (workspace-id))
+(declare-function enkan-repl-tmux-refresh-workspace "enkan-repl-terminal" (&optional quiet))
 (defvar enkan-repl--tmux-mirror-id)
 (defvar enkan-repl-terminal-backend)
 (declare-function enkan-repl--session-entry-project "enkan-repl-utils" (entry-value))
@@ -115,6 +116,7 @@
 (declare-function enkan-repl--terminal-display "enkan-repl-terminal" (id))
 (declare-function enkan-repl--terminal-id-instance "enkan-repl-terminal" (id))
 (declare-function enkan-repl-state-save "enkan-repl-state" (&optional file))
+(declare-function enkan-repl-state-tmux-reconcile "enkan-repl-state" (&optional file))
 (declare-function enkan-repl--extract-project-name "enkan-repl-utils" (buffer-name-or-path))
 (declare-function enkan-repl--is-enkan-buffer-name "enkan-repl-utils" (name))
 (declare-function enkan-repl--path->buffer-name "enkan-repl-utils" (path))
@@ -431,6 +433,88 @@ Returns the loaded plist, or nil if no state was found."
       (when enkan-repl-project-aliases
         (enkan-repl--update-target-directories-for-workspace)))
     plist))
+
+(defun enkan-repl--tmux-reattach-already-current-p (loaded-workspaces current-id)
+  "Return non-nil when LOADED-WORKSPACES and CURRENT-ID match current state."
+  (and current-id
+       (string= current-id enkan-repl--current-workspace)
+       (equal loaded-workspaces enkan-repl--workspaces)))
+
+(defun enkan-repl--tmux-ensure-restored-workspaces (workspace-ids)
+  "Ensure tmux mirror buffers exist for WORKSPACE-IDS without force-refreshing.
+Returns the total number of mirror buffers ensured."
+  (let ((previous-workspace enkan-repl--current-workspace)
+        (total 0))
+    (unwind-protect
+        (dolist (workspace-id workspace-ids total)
+          (setq enkan-repl--current-workspace workspace-id)
+          (dolist (id (or (enkan-repl--terminal-list) nil))
+            (when (enkan-repl--terminal-tmux--mirror-make id t)
+              (setq total (1+ total)))))
+      (setq enkan-repl--current-workspace previous-workspace))))
+
+;;;###autoload
+(defun enkan-repl-tmux-reattach (&optional file)
+  "Reconnect Emacs state to live tmux sessions using persisted workspace state.
+FILE defaults to `enkan-repl-state-file'.  The command reconciles the saved
+workspace state with live tmux sessions, restores the matching workspaces,
+selects the saved current workspace when possible, and recreates tmux mirror
+buffers for the restored workspaces.
+
+This command is intentionally manual; enkan-repl does not reattach on load."
+  (interactive)
+  (unless (eq enkan-repl-terminal-backend 'tmux)
+    (user-error "Current terminal backend is not tmux: %S"
+                enkan-repl-terminal-backend))
+  (unless (fboundp 'enkan-repl-state-tmux-reconcile)
+    (user-error "Enkan-repl-state is not loaded"))
+  (let* ((result (enkan-repl-state-tmux-reconcile file))
+         (loaded-workspaces (plist-get result :loaded-workspaces))
+         (restored-ids (plist-get result :restored))
+         (saved-current (plist-get result :current))
+         (current-id (cond
+                      ((and saved-current
+                            (member saved-current restored-ids))
+                       saved-current)
+                      ((and enkan-repl--current-workspace
+                            (member enkan-repl--current-workspace restored-ids))
+                       enkan-repl--current-workspace)
+                      (t (car restored-ids)))))
+    (unless result
+      (user-error "No persisted enkan-repl state was loaded"))
+    (unless loaded-workspaces
+      (user-error "No persisted workspace matched a live tmux session"))
+    (if (enkan-repl--tmux-reattach-already-current-p
+         loaded-workspaces current-id)
+        (progn
+          (message "Already reattached to %d workspace(s); no refresh needed"
+                   (length loaded-workspaces))
+          result)
+      (setq enkan-repl--workspaces loaded-workspaces)
+      (setq enkan-repl--current-workspace current-id)
+      (enkan-repl--load-workspace-state current-id)
+      (let ((ensured (enkan-repl--tmux-ensure-restored-workspaces
+                      restored-ids)))
+        (setq enkan-repl--current-workspace current-id)
+        (enkan-repl--load-workspace-state current-id)
+        (when (fboundp 'enkan-repl-state-save)
+          (ignore-errors (enkan-repl-state-save file)))
+        (message
+         "Reattached %d workspace(s), ensured %d tmux mirror buffer(s)%s"
+         (length loaded-workspaces)
+         ensured
+         (let ((dropped (plist-get result :dropped))
+               (orphans (plist-get result :orphan-tmux)))
+           (concat
+            (if dropped
+                (format ", dropped state-only: %s"
+                        (mapconcat #'identity dropped ", "))
+              "")
+            (if orphans
+                (format ", ignored orphan tmux: %s"
+                        (mapconcat #'identity orphans ", "))
+              ""))))
+        result))))
 
 ;;;; Workspace Management Pure Functions
 

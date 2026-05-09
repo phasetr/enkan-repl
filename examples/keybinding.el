@@ -73,6 +73,8 @@ Requires magit to be installed."
        ("C-M-s"   . enkan-repl-setup)
        ("C-M-t"   . enkan-repl-workspace-delete)
        ("C-M-w"   . enkan-repl-workspace-switch)
+       ("C-M-g" . enkan-repl-tmux-refresh-workspace)
+       ("C-M-r" . enkan-repl-tmux-reattach)
        ("C-M-l"   . enkan-repl-setup-current-project-layout))))
 
 ;; Refresh keymap after setting bindings

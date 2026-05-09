@@ -146,6 +146,25 @@ documented opt-in alternative; see README."
                      (enkan-repl--terminal-tmux--mirror-buffer-name
                       "enkan-01:lat")))))
 
+(ert-deftest test-enkan-repl-tmux-refresh-workspace ()
+  "Refresh command creates or updates mirrors for current tmux windows."
+  (let ((enkan-repl-terminal-backend 'tmux)
+        (enkan-repl-tmux-mirror t)
+        (enkan-repl--current-workspace "01")
+        refreshed)
+    (cl-letf (((symbol-function 'enkan-repl--terminal-tmux-list)
+               (lambda () '("enkan-01:a" "enkan-01:b")))
+              ((symbol-function 'enkan-repl--terminal-tmux--mirror-make)
+               (lambda (id &optional defer-refresh)
+                 (should defer-refresh)
+                 id))
+              ((symbol-function 'enkan-repl--terminal-tmux--mirror-refresh)
+               (lambda (buffer &optional force)
+                 (push (list buffer force) refreshed))))
+      (should (= 2 (enkan-repl-tmux-refresh-workspace t)))
+      (should (equal '(("enkan-01:b" t) ("enkan-01:a" t))
+                     refreshed)))))
+
 ;;;; tmux mirror buffer refresh scrolling
 
 (defun test-enkan-repl-terminal--lines (from to)
@@ -177,10 +196,10 @@ documented opt-in alternative; see README."
           (goto-char (point-max))
           (recenter -1)
           (redisplay t)
-          (cl-letf (((symbol-function 'enkan-repl--terminal-tmux-alive-p)
-                     (lambda (_id) t))
-                    ((symbol-function 'enkan-repl--terminal-tmux--capture-pane)
-                     (lambda (_id _lines) updated-content)))
+          (cl-letf (((symbol-function 'enkan-repl--terminal-tmux--capture-pane-async)
+                     (lambda (id _lines callback)
+                       (funcall callback updated-content 0)
+                       nil)))
             (enkan-repl--terminal-tmux--mirror-refresh buf))
           (redisplay t)
           (should (= (window-point) (point-max)))
@@ -208,27 +227,25 @@ documented opt-in alternative; see README."
           (test-enkan-repl-terminal--goto-line 35)
           (set-window-point nil (point))
           (redisplay t)
-          (cl-letf (((symbol-function 'enkan-repl--terminal-tmux-alive-p)
-                     (lambda (_id) t))
-                    ((symbol-function 'enkan-repl--terminal-tmux--capture-pane)
-                     (lambda (_id _lines) updated-content)))
+          (cl-letf (((symbol-function 'enkan-repl--terminal-tmux--capture-pane-async)
+                     (lambda (id _lines callback)
+                       (funcall callback updated-content 0)
+                       nil)))
             (enkan-repl--terminal-tmux--mirror-refresh buf))
           (should (= 30 (line-number-at-pos (window-start) t)))
           (should (= 35 (line-number-at-pos (window-point) t))))
       (kill-buffer buf))))
 
 (ert-deftest test-enkan-repl--terminal-tmux--mirror-refresh-skips-hidden ()
-  "A hidden tmux mirror should not run synchronous tmux capture."
+  "A hidden tmux mirror should not start tmux capture."
   (let ((buf (generate-new-buffer "*tmux mirror hidden*"))
         (capture-count 0))
     (unwind-protect
         (progn
           (with-current-buffer buf
             (setq-local enkan-repl--tmux-mirror-id "enkan-01:p"))
-          (cl-letf (((symbol-function 'enkan-repl--terminal-tmux-alive-p)
-                     (lambda (_id) t))
-                    ((symbol-function 'enkan-repl--terminal-tmux--capture-pane)
-                     (lambda (_id _lines)
+          (cl-letf (((symbol-function 'enkan-repl--terminal-tmux--capture-pane-async)
+                     (lambda (_id _lines _callback)
                        (setq capture-count (1+ capture-count))
                        "hidden content")))
             (enkan-repl--terminal-tmux--mirror-refresh buf)
@@ -237,22 +254,59 @@ documented opt-in alternative; see README."
             (should (eq enkan-repl--tmux-mirror-state 'hidden)))))
       (kill-buffer buf))))
 
+(ert-deftest test-enkan-repl--terminal-tmux--mirror-refresh-skips-minibuffer ()
+  "Timer refresh should not run while minibuffer completion is active."
+  (let ((buf (generate-new-buffer "*tmux mirror minibuffer*"))
+        (capture-called nil))
+    (unwind-protect
+        (progn
+          (with-current-buffer buf
+            (setq-local enkan-repl--tmux-mirror-id "enkan-01:p"))
+          (cl-letf (((symbol-function 'active-minibuffer-window)
+                     (lambda () 'mock-minibuffer-window))
+                    ((symbol-function 'enkan-repl--terminal-tmux--capture-pane-async)
+                     (lambda (&rest _args)
+                       (setq capture-called t)
+                       "")))
+            (should (eq 'deferred
+                        (enkan-repl--terminal-tmux--mirror-refresh buf)))
+            (should-not capture-called)))
+      (kill-buffer buf))))
+
 (ert-deftest test-enkan-repl--terminal-tmux--mirror-refresh-shows-refreshing ()
-  "A tmux mirror should enter `refreshing' before synchronous capture starts."
+  "A tmux mirror should enter `refreshing' before capture completes."
   (let ((buf (generate-new-buffer "*tmux mirror status*"))
         observed-state)
     (unwind-protect
         (with-current-buffer buf
           (setq-local enkan-repl--tmux-mirror-id "enkan-01:p")
-          (cl-letf (((symbol-function 'enkan-repl--terminal-tmux-alive-p)
-                     (lambda (_id) t))
-                    ((symbol-function 'enkan-repl--terminal-tmux--capture-pane)
-                     (lambda (_id _lines)
+          (cl-letf (((symbol-function 'enkan-repl--terminal-tmux--capture-pane-async)
+                     (lambda (_id _lines callback)
                        (setq observed-state enkan-repl--tmux-mirror-state)
-                       "status content")))
+                       (funcall callback "status content" 0)
+                       nil)))
             (enkan-repl--terminal-tmux--mirror-refresh buf t)
             (should (eq observed-state 'refreshing))
             (should (eq enkan-repl--tmux-mirror-state 'fresh))))
+      (kill-buffer buf))))
+
+(ert-deftest test-enkan-repl--terminal-tmux--mirror-refresh-starts-async ()
+  "Refresh should return after starting capture without waiting for content."
+  (let ((buf (generate-new-buffer "*tmux mirror async*"))
+        callback-started)
+    (unwind-protect
+        (with-current-buffer buf
+          (setq-local enkan-repl--tmux-mirror-id "enkan-01:p")
+          (cl-letf (((symbol-function
+                      'enkan-repl--terminal-tmux--capture-pane-async)
+                     (lambda (_id _lines callback)
+                       (setq callback-started callback)
+                       nil)))
+            (should (eq 'refreshing
+                        (enkan-repl--terminal-tmux--mirror-refresh buf t)))
+            (should callback-started)
+            (should (eq enkan-repl--tmux-mirror-state 'refreshing))
+            (should (= (point-min) (point-max)))))
       (kill-buffer buf))))
 
 (ert-deftest test-enkan-repl--terminal-tmux-refresh-current-forces-hidden ()
@@ -262,12 +316,11 @@ documented opt-in alternative; see README."
     (unwind-protect
         (with-current-buffer buf
           (setq-local enkan-repl--tmux-mirror-id "enkan-01:p")
-          (cl-letf (((symbol-function 'enkan-repl--terminal-tmux-alive-p)
-                     (lambda (_id) t))
-                    ((symbol-function 'enkan-repl--terminal-tmux--capture-pane)
-                     (lambda (_id _lines)
+          (cl-letf (((symbol-function 'enkan-repl--terminal-tmux--capture-pane-async)
+                     (lambda (_id _lines callback)
                        (setq capture-count (1+ capture-count))
-                       "manual content"))
+                       (funcall callback "manual content" 0)
+                       nil))
                     ((symbol-function 'message) (lambda (&rest _) nil)))
             (enkan-repl-tmux-refresh-current)
             (should (= 1 capture-count))

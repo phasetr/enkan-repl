@@ -301,14 +301,23 @@ same user-facing send / layout commands (=enkan-repl-send-line=,
 - A read-only mirror buffer is updated via =tmux capture-pane= so the
   layout / send-line code can find sessions via the usual
   =buffer-list= mechanism.  Visible mirrors refresh every
-  =enkan-repl-tmux-mirror-interval= seconds (default =5.0=).  Hidden
-  mirrors do not run capture until displayed or manually refreshed.
+  =enkan-repl-tmux-mirror-interval= seconds (default =5.0=).  The
+  =capture-pane= process runs asynchronously so tmux capture itself does
+  not block Emacs's main thread.  Hidden mirrors do not run capture until
+  displayed or manually refreshed.
+  Timer refresh is also deferred while the minibuffer is active, so
+  completion UIs such as =consult-buffer= do not trigger mirror capture
+  just because they temporarily preview a mirror buffer.
   Disable mirroring with =(setq enkan-repl-tmux-mirror nil)= if not
   desired.
 - Mirror buffers show refresh state in the header line
   (=refreshing=, =hidden=, =fresh=, =unchanged=, =closed=).  Press =g=
   in a mirror buffer, or run =M-x enkan-repl-tmux-refresh-current=, to
   force an immediate refresh.
+- Run =M-x enkan-repl-tmux-refresh-workspace= to recreate or force
+  refresh all tmux mirror buffers for the currently selected workspace.
+  This is useful when tmux windows exist but the Emacs-side mirrors are
+  stale or missing.
 - =M-x enkan-repl-tmux-attach= launches an external terminal app and
   attaches to the current workspace's tmux session.  The attach
   command is configurable via =enkan-repl-tmux-attach-command= (a
@@ -316,10 +325,17 @@ same user-facing send / layout commands (=enkan-repl-send-line=,
 - =M-x enkan-repl-tmux-kill-session= kills a single =enkan-*= session;
   =M-x enkan-repl-tmux-kill-all-enkan= confirms then kills all of them.
 - Persistent state is stored at =enkan-repl-state-file=
-  (=~/.emacs.d/enkan-repl-state.eld= by default).  On Emacs restart the
-  state is reconciled with the live tmux server according to
-  =enkan-repl-state-recovery-policy= (=reattach= / =recreate= /
-  =prompt= / =ignore=, default =reattach=).
+  (=~/.emacs.d/enkan-repl-state.eld= by default).  enkan-repl does not
+  automatically reconnect Emacs to live tmux sessions on startup.  Run
+  =M-x enkan-repl-tmux-reattach= when you want to manually reconcile the
+  saved workspace state with the live tmux server.  The reconciliation
+  policy is controlled by =enkan-repl-state-recovery-policy=
+  (=reattach= / =recreate= / =prompt= / =ignore=, default =reattach=).
+  In the default policy, only workspaces present in both the saved state
+  and the live tmux server are restored.  Reattach ensures mirror buffers
+  exist, but it avoids force-refreshing every restored workspace; use
+  =enkan-repl-tmux-refresh-workspace= when you explicitly want to refresh
+  the current workspace's mirror contents.
 
 **** eat backend specifics
 

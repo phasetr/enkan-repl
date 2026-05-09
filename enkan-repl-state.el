@@ -203,7 +203,8 @@ Behavior is governed by `enkan-repl-state-recovery-policy':
 - `ignore'  : do nothing.
 
 Returns a plist describing the reconciliation result:
-  (:loaded-workspaces ALIST :restored IDS :dropped IDS :orphan-tmux SESSIONS)."
+  (:loaded-workspaces ALIST :restored IDS :dropped IDS :orphan-tmux SESSIONS
+   :current CURRENT)."
   (interactive)
   (let ((payload (enkan-repl-state-load file)))
     (when (and payload (not (eq enkan-repl-state-recovery-policy 'ignore)))
@@ -231,7 +232,8 @@ Returns a plist describing the reconciliation result:
           (list :loaded-workspaces restored
                 :restored keep-ids
                 :dropped dropped
-                :orphan-tmux tmux-only))))))
+                :orphan-tmux tmux-only
+                :current (plist-get payload :current)))))))
 
 (provide 'enkan-repl-state)
 ;;; enkan-repl-state.el ends here

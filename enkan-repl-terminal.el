@@ -434,6 +434,9 @@ Applies to every active tmux mirror buffer."
 (defvar-local enkan-repl--tmux-mirror-timer nil
   "Buffer-local: idle timer driving capture-pane refreshes.")
 
+(defvar-local enkan-repl--tmux-mirror-refresh-process nil
+  "Buffer-local asynchronous `tmux capture-pane' process.")
+
 (defvar-local enkan-repl--tmux-mirror-state 'idle
   "Buffer-local refresh state for the tmux mirror buffer.")
 
@@ -613,6 +616,75 @@ LINES is the maximum scrollback to include (negative numbers per
        t)
       ""))
 
+(defun enkan-repl--terminal-tmux--capture-pane-async (id lines callback)
+  "Capture tmux ID asynchronously and call CALLBACK with content and status.
+LINES is the maximum scrollback to include.  CALLBACK receives two
+arguments: CONTENT, or nil on failure, and the tmux process exit status."
+  (unless (executable-find enkan-repl-tmux-executable)
+    (user-error "Tmux executable not found: %s" enkan-repl-tmux-executable))
+  (let* ((capture-buffer (generate-new-buffer " *enkan-repl tmux async capture*"))
+         (command (list enkan-repl-tmux-executable
+                        "capture-pane" "-p" "-J" "-S"
+                        (format "-%d" (max 0 lines))
+                        "-t" id)))
+    (make-process
+     :name (format "enkan-tmux-capture %s" id)
+     :buffer capture-buffer
+     :command command
+     :connection-type 'pipe
+     :noquery t
+     :sentinel
+     (lambda (process _event)
+       (when (memq (process-status process) '(exit signal))
+         (let ((status (process-exit-status process))
+               (content (when (buffer-live-p capture-buffer)
+                          (with-current-buffer capture-buffer
+                            (buffer-substring-no-properties
+                             (point-min) (point-max))))))
+           (when (buffer-live-p capture-buffer)
+             (kill-buffer capture-buffer))
+           (funcall callback
+                    (and (zerop status) content)
+                    status)))))))
+
+(defun enkan-repl--terminal-tmux--mirror-mark-closed ()
+  "Mark current tmux mirror buffer as closed."
+  (enkan-repl--terminal-tmux--mirror-stop (current-buffer))
+  (enkan-repl--terminal-tmux--mirror-set-state 'closed)
+  (let ((inhibit-read-only t))
+    (goto-char (point-max))
+    (insert "\n[tmux pane closed]\n")))
+
+(defun enkan-repl--terminal-tmux--mirror-apply-content
+    (buffer id started content status)
+  "Apply async tmux capture CONTENT to BUFFER for ID.
+STARTED is the capture start time.  STATUS is the tmux process exit status."
+  (ignore status)
+  (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      (when (equal enkan-repl--tmux-mirror-id id)
+        (setq enkan-repl--tmux-mirror-refresh-process nil)
+        (if (null content)
+            (enkan-repl--terminal-tmux--mirror-mark-closed)
+          (let* ((content-hash (secure-hash 'sha1 content))
+                 (window-state (enkan-repl--terminal-tmux--mirror-window-state
+                                buffer))
+                 (inhibit-read-only t))
+            (setq enkan-repl--tmux-mirror-last-refresh-time (current-time))
+            (setq enkan-repl--tmux-mirror-last-refresh-duration
+                  (float-time
+                   (time-subtract enkan-repl--tmux-mirror-last-refresh-time
+                                  started)))
+            (setq enkan-repl--tmux-mirror-last-refresh-bytes
+                  (string-bytes content))
+            (if (equal content-hash enkan-repl--tmux-mirror-last-content-hash)
+                (enkan-repl--terminal-tmux--mirror-set-state 'unchanged)
+              (setq enkan-repl--tmux-mirror-last-content-hash content-hash)
+              (enkan-repl--terminal-tmux--replace-mirror-content content)
+              (enkan-repl--terminal-tmux--restore-window-state
+               buffer window-state)
+              (enkan-repl--terminal-tmux--mirror-set-state 'fresh))))))))
+
 (defun enkan-repl--terminal-tmux--mirror-refresh (buffer &optional force)
   "Refresh mirror BUFFER by capturing current tmux pane content.
 Skips when BUFFER is dead, hidden, has no bound id, or the tmux pane is gone.
@@ -624,41 +696,29 @@ When FORCE is non-nil, refresh even when BUFFER is hidden."
         (cond
          ((null id))
          ((and (not force)
+               (active-minibuffer-window))
+          (enkan-repl--terminal-tmux--mirror-set-state 'deferred)
+          'deferred)
+         ((and (not force)
                (not (enkan-repl--terminal-tmux--mirror-visible-p buffer)))
           (enkan-repl--terminal-tmux--mirror-set-state 'hidden)
           'hidden)
-         (t
+         ((and enkan-repl--tmux-mirror-refresh-process
+               (process-live-p enkan-repl--tmux-mirror-refresh-process))
           (enkan-repl--terminal-tmux--mirror-set-state 'refreshing)
-          (if (not (enkan-repl--terminal-tmux-alive-p id))
-              (progn
-                ;; Pane is gone -- stop polling and surface a marker.
-                (enkan-repl--terminal-tmux--mirror-stop buffer)
-                (enkan-repl--terminal-tmux--mirror-set-state 'closed)
-                (let ((inhibit-read-only t))
-                  (goto-char (point-max))
-                  (insert "\n[tmux pane closed]\n")))
-            (let* ((started (current-time))
-                   (content (enkan-repl--terminal-tmux--capture-pane
-                             id enkan-repl-tmux-mirror-history-lines))
-                   (content-hash (secure-hash 'sha1 content))
-                   (window-state (enkan-repl--terminal-tmux--mirror-window-state
-                                  buffer))
-                   (inhibit-read-only t))
-              (setq enkan-repl--tmux-mirror-last-refresh-time (current-time))
-              (setq enkan-repl--tmux-mirror-last-refresh-duration
-                    (float-time (time-subtract
-                                 enkan-repl--tmux-mirror-last-refresh-time
-                                 started)))
-              (setq enkan-repl--tmux-mirror-last-refresh-bytes
-                    (string-bytes content))
-              (if (equal content-hash enkan-repl--tmux-mirror-last-content-hash)
-                  (enkan-repl--terminal-tmux--mirror-set-state 'unchanged)
-                (setq enkan-repl--tmux-mirror-last-content-hash content-hash)
-                (enkan-repl--terminal-tmux--replace-mirror-content content)
-                (enkan-repl--terminal-tmux--restore-window-state
-                 buffer window-state)
-                (enkan-repl--terminal-tmux--mirror-set-state 'fresh))
-              enkan-repl--tmux-mirror-state))))))))
+          'refreshing)
+         (t
+          (let ((started (current-time))
+                (target-buffer buffer)
+                (target-id id))
+            (enkan-repl--terminal-tmux--mirror-set-state 'refreshing)
+            (setq enkan-repl--tmux-mirror-refresh-process
+                  (enkan-repl--terminal-tmux--capture-pane-async
+                   id enkan-repl-tmux-mirror-history-lines
+                   (lambda (content status)
+                     (enkan-repl--terminal-tmux--mirror-apply-content
+                      target-buffer target-id started content status))))
+            'refreshing)))))))
 
 (defun enkan-repl--terminal-tmux--mirror-stop (buffer)
   "Cancel mirror refresh timer for BUFFER (if any)."
@@ -668,8 +728,9 @@ When FORCE is non-nil, refresh even when BUFFER is hidden."
         (cancel-timer enkan-repl--tmux-mirror-timer)
         (setq enkan-repl--tmux-mirror-timer nil)))))
 
-(defun enkan-repl--terminal-tmux--mirror-make (id)
-  "Get or create the mirror buffer for tmux ID, set up timer, return it."
+(defun enkan-repl--terminal-tmux--mirror-make (id &optional defer-refresh)
+  "Get or create the mirror buffer for tmux ID, set up timer, return it.
+When DEFER-REFRESH is non-nil, do not immediately refresh the mirror content."
   (let ((buf (get-buffer-create
               (enkan-repl--terminal-tmux--mirror-buffer-name id))))
     (with-current-buffer buf
@@ -684,7 +745,8 @@ When FORCE is non-nil, refresh even when BUFFER is hidden."
                #'enkan-repl--terminal-tmux--mirror-refresh buf)))
       ;; First refresh immediately for instant feedback when visible.  Hidden
       ;; mirrors stay cheap until manually refreshed or displayed.
-      (enkan-repl--terminal-tmux--mirror-refresh buf)
+      (unless defer-refresh
+        (enkan-repl--terminal-tmux--mirror-refresh buf))
       ;; Stop the timer when buffer is killed.
       (add-hook 'kill-buffer-hook
                 (lambda ()
@@ -703,10 +765,37 @@ externally via `enkan-repl-tmux-attach'."
                      " or set `enkan-repl-tmux-mirror' to t."))
     nil)
    (t
-    (let ((buf (enkan-repl--terminal-tmux--mirror-make id)))
+    (let ((buf (enkan-repl--terminal-tmux--mirror-make id t)))
       (pop-to-buffer-same-window buf)
       (enkan-repl--terminal-tmux--mirror-refresh buf t)
       buf))))
+
+;;;###autoload
+(defun enkan-repl-tmux-refresh-workspace (&optional quiet)
+  "Refresh tmux mirror buffers for the current workspace.
+Mirror buffers are created for live tmux windows that do not yet have one.
+When QUIET is non-nil, suppress the status message.
+Returns the number of refreshed mirror buffers."
+  (interactive)
+  (unless (eq enkan-repl-terminal-backend 'tmux)
+    (user-error "Current terminal backend is not tmux: %S"
+                enkan-repl-terminal-backend))
+  (unless enkan-repl-tmux-mirror
+    (user-error "Tmux mirror is disabled"))
+  (let ((ids (enkan-repl--terminal-tmux-list))
+        (count 0))
+    (dolist (id ids)
+      (let ((buf (enkan-repl--terminal-tmux--mirror-make id t)))
+        (when buf
+          (enkan-repl--terminal-tmux--mirror-refresh buf t)
+          (setq count (1+ count)))))
+    (unless quiet
+      (message "Refreshed %d tmux mirror buffer(s) for workspace %s"
+               count
+               (or (and (boundp 'enkan-repl--current-workspace)
+                        enkan-repl--current-workspace)
+                   "<none>")))
+    count))
 
 ;;;###autoload
 (defun enkan-repl-tmux-refresh-current ()

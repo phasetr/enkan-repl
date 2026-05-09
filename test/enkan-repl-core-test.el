@@ -71,6 +71,86 @@
     (enkan-repl--register-session 1 "project-c")
     (should (equal enkan-repl-session-list '((1 . "project-c") (2 . "project-b"))))))
 
+(ert-deftest test-enkan-repl-tmux-reattach-restores-state ()
+  "Manual tmux reattach restores reconciled workspace state."
+  (let ((enkan-repl-terminal-backend 'tmux)
+        (enkan-repl--workspaces nil)
+        (enkan-repl--current-workspace "01")
+        (enkan-repl--current-project nil)
+        (enkan-repl-session-list nil)
+        (enkan-repl--session-counter 0)
+        (enkan-repl-project-aliases nil)
+        ensured-workspaces)
+    (cl-letf (((symbol-function 'enkan-repl-state-tmux-reconcile)
+               (lambda (&optional _file)
+                 '(:loaded-workspaces
+                   (("01" :current-project "old"
+                          :session-list ((1 . "old"))
+                          :session-counter 1
+                          :project-aliases nil)
+                    ("02" :current-project "proj"
+                          :session-list ((1 . "proj"))
+                          :session-counter 1
+                          :project-aliases (("p" . "proj"))))
+                   :restored ("01" "02")
+                   :dropped nil
+                   :orphan-tmux nil
+                   :current "02")))
+              ((symbol-function 'enkan-repl--terminal-list)
+               (lambda ()
+                 (list (format "enkan-%s:window"
+                               enkan-repl--current-workspace))))
+              ((symbol-function 'enkan-repl--terminal-tmux--mirror-make)
+               (lambda (id &optional defer-refresh)
+                 (push (list enkan-repl--current-workspace id defer-refresh)
+                       ensured-workspaces)
+                 id))
+              ((symbol-function 'enkan-repl-state-save)
+               (lambda (&optional _file) t)))
+      (let ((result (enkan-repl-tmux-reattach)))
+        (should result)
+        (should (equal "02" enkan-repl--current-workspace))
+        (should (equal "proj" enkan-repl--current-project))
+        (should (equal '((1 . "proj")) enkan-repl-session-list))
+        (should (equal '(("02" "enkan-02:window" t)
+                         ("01" "enkan-01:window" t))
+                       ensured-workspaces))))))
+
+(ert-deftest test-enkan-repl-tmux-reattach-skips-already-current-state ()
+  "Manual tmux reattach does not force-refresh when state is already current."
+  (let* ((saved-workspaces
+          '(("01" :current-project "old"
+                   :session-list ((1 . "old"))
+                   :session-counter 1
+                   :project-aliases nil)
+            ("02" :current-project "proj"
+                   :session-list ((1 . "proj"))
+                   :session-counter 1
+                   :project-aliases nil)))
+         (enkan-repl-terminal-backend 'tmux)
+         (enkan-repl--workspaces saved-workspaces)
+         (enkan-repl--current-workspace "02"))
+    (cl-letf (((symbol-function 'enkan-repl-state-tmux-reconcile)
+               (lambda (&optional _file)
+                 (list :loaded-workspaces saved-workspaces
+                       :restored '("01" "02")
+                       :dropped nil
+                       :orphan-tmux nil
+                       :current "02")))
+              ((symbol-function 'enkan-repl--terminal-list)
+               (lambda ()
+                 (error "Should not list tmux windows when already current")))
+              ((symbol-function 'enkan-repl--terminal-tmux--mirror-make)
+               (lambda (_id &optional _defer-refresh)
+                 (error "Should not create mirrors when already current")))
+              ((symbol-function 'enkan-repl-state-save)
+               (lambda (&optional _file)
+                 (error "Should not save when already current"))))
+      (let ((result (enkan-repl-tmux-reattach)))
+        (should result)
+        (should (eq saved-workspaces enkan-repl--workspaces))
+        (should (string= "02" enkan-repl--current-workspace))))))
+
 ;; Tests for enkan-repl--get-package-directory
 (ert-deftest test-enkan-repl--get-package-directory ()
   "Test package directory detection."
