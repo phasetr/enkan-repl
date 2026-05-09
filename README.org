@@ -258,15 +258,14 @@ Currently operates with a single fixed workspace (=ws:01=), with multi-workspace
 - =enkan-repl-send-5= - Send \\='5\\=' to enkan session buffer with optional PFX. - From enkan buffer: Send to current buffer - From other buffer without prefix: Interactive buffer selection - With numeric prefix: Send to buffer at index (1-based)  Uses unified backend with smart buffer detection.
 
 *** Session Control
-- =enkan-repl-workspace-delete= - Delete a workspace and stop all associated terminal resources.
 - =enkan-repl-setup= - Arrange windows for (the author's) optimal workflow
+- =enkan-repl-workspace-delete= - Delete a workspace and stop all associated terminal resources. This is the only interactive workspace deletion command.  In `enkan-repl-workspace-list-mode', delete the workspace at point; otherwise delete the current workspace.  With prefix ARG, prompt for a workspace. Noninteractive string ARG deletes that workspace ID.  All paths use `enkan-repl--delete-workspace-completely'.
 
 *** Utilities
 - =enkan-repl-recenter-bottom= - Recenter all enkan terminal buffers at bottom.
 - =enkan-repl-start-eat= - 
 - =enkan-repl-toggle-global-mode= - Toggle enkan-repl global mode on/off.
 - =enkan-repl-workspace-switch= - Switch to another workspace. Uses `hmenu' if available to show workspace ID with its project.
-- =enkan-repl-workspace-delete= - Delete the current workspace, or prompt for a workspace with a prefix argument.
 
 ** Configuration
 

@@ -1,3 +1,10 @@
+## [0.18.1](https://github.com/phasetr/enkan-repl/compare/v0.18.0...v0.18.1) (2026-05-09)
+
+
+### Bug Fixes
+
+* unify workspace deletion and tmux mirror refresh ([6228f2a](https://github.com/phasetr/enkan-repl/commit/6228f2aa88ba23bab45dd81dbbbe2bc28f13b416))
+
 # [0.18.0](https://github.com/phasetr/enkan-repl/compare/v0.17.2...v0.18.0) (2026-05-09)
 
 
