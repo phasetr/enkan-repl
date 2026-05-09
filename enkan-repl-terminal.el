@@ -373,9 +373,134 @@ When NEWLINE is non-nil, follow with an Enter key.  Returns t on success."
   (when id
     (enkan-repl--terminal-tmux--call (list "kill-window" "-t" id))))
 
-(defun enkan-repl--terminal-tmux-display (_id)
-  "tmux backend: display is not yet implemented (mirror buffer comes later)."
-  (user-error "tmux backend display (mirror buffer) is not implemented yet"))
+;;;;; tmux mirror buffer
+
+(defcustom enkan-repl-tmux-mirror t
+  "When non-nil, tmux backend keeps a read-only Emacs buffer mirroring
+the live pane content via periodic `tmux capture-pane'."
+  :type 'boolean
+  :group 'enkan-repl-terminal)
+
+(defcustom enkan-repl-tmux-mirror-interval 1.0
+  "Idle interval (seconds) between `tmux capture-pane' refreshes for
+mirror buffers."
+  :type 'number
+  :group 'enkan-repl-terminal)
+
+(defcustom enkan-repl-tmux-mirror-history-lines 500
+  "Number of scrollback lines to capture per refresh tick."
+  :type 'integer
+  :group 'enkan-repl-terminal)
+
+(defvar-local enkan-repl--tmux-mirror-id nil
+  "Buffer-local: tmux target id this mirror buffer is bound to.")
+
+(defvar-local enkan-repl--tmux-mirror-timer nil
+  "Buffer-local: idle timer driving capture-pane refreshes.")
+
+(defun enkan-repl--terminal-tmux--mirror-buffer-name (id)
+  "Return mirror buffer name for tmux ID.
+Form: \"*tmux <session>:<window>*\"."
+  (format "*tmux %s*" id))
+
+(defun enkan-repl--terminal-tmux--capture-pane (id lines)
+  "Return current pane content of tmux ID as a string (best effort).
+LINES is the maximum scrollback to include (negative numbers per
+`tmux capture-pane -S' semantics)."
+  (or (enkan-repl--terminal-tmux--call
+       (list "capture-pane" "-p" "-J" "-S" (format "-%d" (max 0 lines))
+             "-t" id)
+       t)
+      ""))
+
+(defun enkan-repl--terminal-tmux--mirror-refresh (buffer)
+  "Refresh mirror BUFFER by capturing current tmux pane content.
+Skips when BUFFER is dead, has no bound id, or the tmux pane is gone."
+  (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      (let ((id enkan-repl--tmux-mirror-id))
+        (cond
+         ((null id))
+         ((not (enkan-repl--terminal-tmux-alive-p id))
+          ;; Pane is gone -- stop polling and surface a marker.
+          (enkan-repl--terminal-tmux--mirror-stop buffer)
+          (let ((inhibit-read-only t))
+            (goto-char (point-max))
+            (insert "\n[tmux pane closed]\n")))
+         (t
+          (let ((content (enkan-repl--terminal-tmux--capture-pane
+                          id enkan-repl-tmux-mirror-history-lines))
+                (inhibit-read-only t))
+            (erase-buffer)
+            (insert content))))))))
+
+(defun enkan-repl--terminal-tmux--mirror-stop (buffer)
+  "Cancel mirror refresh timer for BUFFER (if any)."
+  (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      (when enkan-repl--tmux-mirror-timer
+        (cancel-timer enkan-repl--tmux-mirror-timer)
+        (setq enkan-repl--tmux-mirror-timer nil)))))
+
+(defun enkan-repl--terminal-tmux--mirror-make (id)
+  "Get or create the mirror buffer for tmux ID, set up timer, return it."
+  (let ((buf (get-buffer-create
+              (enkan-repl--terminal-tmux--mirror-buffer-name id))))
+    (with-current-buffer buf
+      (setq buffer-read-only t)
+      (setq enkan-repl--tmux-mirror-id id)
+      (unless enkan-repl--tmux-mirror-timer
+        (setq enkan-repl--tmux-mirror-timer
+              (run-with-idle-timer
+               enkan-repl-tmux-mirror-interval t
+               #'enkan-repl--terminal-tmux--mirror-refresh buf)))
+      ;; First refresh immediately for instant feedback.
+      (enkan-repl--terminal-tmux--mirror-refresh buf)
+      ;; Stop the timer when buffer is killed.
+      (add-hook 'kill-buffer-hook
+                (lambda ()
+                  (enkan-repl--terminal-tmux--mirror-stop buf))
+                nil t))
+    buf))
+
+(defun enkan-repl--terminal-tmux-display (id)
+  "tmux backend: present ID as a read-only mirror buffer in the current window.
+When `enkan-repl-tmux-mirror' is nil, instead message a hint to attach
+externally via `enkan-repl-tmux-attach'."
+  (cond
+   ((not enkan-repl-tmux-mirror)
+    (message (concat "tmux mirror is disabled. "
+                     "Run M-x enkan-repl-tmux-attach to attach in a terminal,"
+                     " or set `enkan-repl-tmux-mirror' to t."))
+    nil)
+   (t
+    (let ((buf (enkan-repl--terminal-tmux--mirror-make id)))
+      (pop-to-buffer-same-window buf)
+      buf))))
+
+;;;;; tmux attach helper
+
+(defcustom enkan-repl-tmux-attach-command nil
+  "Command used to attach to a tmux session in an external terminal.
+
+When nil, a sensible default is chosen per system-type:
+  darwin -> Terminal.app
+  other  -> the value of `shell-file-name' as a fallback (no real attach)
+
+When non-nil, must be either:
+  - a string: a shell command in which '%s' will be replaced by the
+    target tmux session name (e.g. \"open -a iTerm 'tmux attach -t %s'\")
+  - a function of one argument (the session name)."
+  :type '(choice (const :tag "Auto" nil) string function)
+  :group 'enkan-repl-terminal)
+
+(defun enkan-repl--tmux-attach--default-command (session)
+  "Return a shell command string to attach SESSION using a sensible default."
+  (pcase system-type
+    ('darwin
+     (format "osascript -e 'tell application \"Terminal\" to do script \"tmux attach -t %s\"'"
+             session))
+    (_ (format "%s -ic 'tmux attach -t %s'" shell-file-name session))))
 
 (defun enkan-repl--terminal-tmux-id-instance (id)
   "tmux backend: derive instance index from ID's window name suffix.
@@ -386,6 +511,34 @@ Returns 1 when no \"-N\" suffix is present."
      ((string-match "-\\([0-9]+\\)$" win)
       (string-to-number (match-string 1 win)))
      (t 1))))
+
+;;;###autoload
+(defun enkan-repl-tmux-attach (&optional ws-id)
+  "Attach to enkan tmux session for WS-ID in an external terminal.
+
+WS-ID defaults to `enkan-repl--current-workspace'.  Uses
+`enkan-repl-tmux-attach-command' to construct the attach invocation;
+falls back to a system-appropriate default when nil."
+  (interactive)
+  (let* ((ws (or ws-id
+                 (and (boundp 'enkan-repl--current-workspace)
+                      enkan-repl--current-workspace)
+                 (user-error "No current workspace")))
+         (session (concat enkan-repl-tmux-session-prefix ws)))
+    (unless (enkan-repl--terminal-tmux--has-session session)
+      (user-error "tmux session %s does not exist" session))
+    (cond
+     ((functionp enkan-repl-tmux-attach-command)
+      (funcall enkan-repl-tmux-attach-command session))
+     ((stringp enkan-repl-tmux-attach-command)
+      (start-process-shell-command
+       "enkan-tmux-attach" nil
+       (format-spec enkan-repl-tmux-attach-command (list (cons ?s session)))))
+     (t
+      (start-process-shell-command
+       "enkan-tmux-attach" nil
+       (enkan-repl--tmux-attach--default-command session))))
+    (message "Launched terminal to attach tmux session: %s" session)))
 
 (provide 'enkan-repl-terminal)
 ;;; enkan-repl-terminal.el ends here

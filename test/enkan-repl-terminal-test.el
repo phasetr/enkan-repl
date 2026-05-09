@@ -111,5 +111,28 @@
         (should (= 3 (enkan-repl--terminal-eat-id-instance buf)))
       (kill-buffer buf))))
 
+;;;; tmux mirror buffer naming
+
+(ert-deftest test-enkan-repl--terminal-tmux--mirror-buffer-name ()
+  (should (string= "*tmux enkan-01:lat*"
+                   (enkan-repl--terminal-tmux--mirror-buffer-name "enkan-01:lat")))
+  (should (string= "*tmux enkan-99:my-proj-3*"
+                   (enkan-repl--terminal-tmux--mirror-buffer-name "enkan-99:my-proj-3"))))
+
+;;;; attach helper default command (per-system shape)
+
+(ert-deftest test-enkan-repl--tmux-attach--default-command ()
+  ;; macOS path: should embed an osascript invocation containing the session.
+  (let ((system-type 'darwin))
+    (let ((cmd (enkan-repl--tmux-attach--default-command "enkan-01")))
+      (should (stringp cmd))
+      (should (string-match-p "Terminal" cmd))
+      (should (string-match-p "tmux attach -t enkan-01" cmd))))
+  ;; Non-darwin fallback: shell command containing tmux attach.
+  (let ((system-type 'gnu/linux)
+        (shell-file-name "/bin/sh"))
+    (let ((cmd (enkan-repl--tmux-attach--default-command "enkan-02")))
+      (should (string-match-p "tmux attach -t enkan-02" cmd)))))
+
 (provide 'enkan-repl-terminal-test)
 ;;; enkan-repl-terminal-test.el ends here
