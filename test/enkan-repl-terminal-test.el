@@ -16,8 +16,9 @@
 ;;;; Default backend
 
 (ert-deftest test-enkan-repl-terminal-default-backend ()
-  "Default backend must be `eat' so existing setups behave unchanged."
-  (should (eq enkan-repl-terminal-backend 'eat)))
+  "Default backend is `tmux' (heavy TUI safe).  `eat' remains as a
+documented opt-in alternative; see README."
+  (should (eq enkan-repl-terminal-backend 'tmux)))
 
 ;;;; tmux identifier helpers (pure)
 

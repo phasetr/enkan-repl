@@ -27,7 +27,9 @@ workspace starts at instance 1."
 (ert-deftest test-start-eat-registers-session ()
   "Test that enkan-repl-start-eat registers session and saves workspace."
   (enkan-repl-test--kill-stale-enkan-buffers)
-  (let ((enkan-repl--workspaces '())
+  ;; Exercises the eat backend explicitly (mocks `eat').
+  (let ((enkan-repl-terminal-backend 'eat)
+        (enkan-repl--workspaces '())
         (enkan-repl--current-workspace nil)
         (enkan-repl-session-list nil)
         (enkan-repl--session-counter 0)
@@ -70,7 +72,9 @@ workspace starts at instance 1."
 (ert-deftest test-multiple-eat-sessions-in-workspace ()
   "Test that multiple eat sessions are properly registered."
   (enkan-repl-test--kill-stale-enkan-buffers)
-  (let ((enkan-repl--workspaces '())
+  ;; Exercises the eat backend explicitly (mocks `eat').
+  (let ((enkan-repl-terminal-backend 'eat)
+        (enkan-repl--workspaces '())
         (enkan-repl--current-workspace nil)
         (enkan-repl-session-list nil)
         (enkan-repl--session-counter 0)

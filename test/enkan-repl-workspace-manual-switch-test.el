@@ -60,7 +60,9 @@
       (when (and (stringp name)
                  (string-match-p "^\\*ws:[0-9]\\{2\\} enkan:" name))
         (kill-buffer buf))))
-  (let ((enkan-repl--workspaces '())
+  ;; Exercises the eat backend explicitly (mocks `eat').
+  (let ((enkan-repl-terminal-backend 'eat)
+        (enkan-repl--workspaces '())
         (enkan-repl--current-workspace nil)
         (enkan-repl-session-list nil)
         (enkan-repl--session-counter 0)

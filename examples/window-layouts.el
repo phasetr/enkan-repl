@@ -110,7 +110,7 @@ suffix."
 Category: Utilities"
   (interactive)
   (delete-other-windows)
-  (split-window-right (floor (* (window-width) 0.35)))
+  (split-window-right)
   ;; Set window variables - direct assignment by position
   ;; Currently at rightmost window, go back to leftmost
   (setq enkan-repl--window-1 (selected-window))

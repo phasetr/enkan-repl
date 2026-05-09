@@ -1698,7 +1698,7 @@ Returns plist with :buffer, :name, :live-p, :has-process, :process."
   "Pure function to get available enkan buffers from BUFFER-LIST.
 Returns the buffers that belong to the current workspace and represent a
 live terminal session per `enkan-repl--buffer-alive-as-terminal-p'
-(backend agnostic: covers eat process-attached buffers and tmux mirror
+\(backend agnostic: covers eat process-attached buffers and tmux mirror
 buffers)."
   (let ((current-ws enkan-repl--current-workspace))
     (seq-filter (lambda (buffer)

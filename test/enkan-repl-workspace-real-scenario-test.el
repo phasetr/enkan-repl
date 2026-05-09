@@ -14,7 +14,9 @@
 
 (ert-deftest test-real-scenario-ws02-zero-sessions ()
   "Test the exact scenario: WS 02 shows 0 sessions after switch."
-  (let ((enkan-repl--workspaces '())
+  ;; Exercises the eat backend explicitly (mocks `eat').
+  (let ((enkan-repl-terminal-backend 'eat)
+        (enkan-repl--workspaces '())
         (enkan-repl--current-workspace nil)
         (enkan-repl-session-list nil)
         (enkan-repl--session-counter 0)
@@ -67,7 +69,9 @@
 
 (ert-deftest test-workspace-switch-timing-issue ()
   "Test if there's a timing issue with workspace creation and session start."
-  (let ((enkan-repl--workspaces '())
+  ;; Exercises the eat backend explicitly (mocks `eat').
+  (let ((enkan-repl-terminal-backend 'eat)
+        (enkan-repl--workspaces '())
         (enkan-repl--current-workspace nil)
         (enkan-repl-session-list nil)
         (enkan-repl--session-counter 0)

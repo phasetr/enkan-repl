@@ -6,7 +6,9 @@
 (ert-deftest test-enkan-repl-eat-buffer-naming-with-same-project ()
   "Test that eat buffers for same project in different workspaces have correct names."
   ;; Mock eat and rename-buffer functions to track actual behavior
-  (let ((enkan-repl--workspaces nil)
+  ;; This test exercises the eat backend explicitly.
+  (let ((enkan-repl-terminal-backend 'eat)
+        (enkan-repl--workspaces nil)
         (enkan-repl--current-workspace nil)
         (created-buffers '())
         (renamed-buffers '())

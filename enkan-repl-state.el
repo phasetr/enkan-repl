@@ -96,7 +96,7 @@ Returns a plist of (:schema-version :saved-at :current :workspaces)."
         :workspaces (copy-tree workspaces)))
 
 (defun enkan-repl-state--validate-payload (payload)
-  "Return PAYLOAD if it looks like a valid persisted state plist, else nil.
+  "Return PAYLOAD if it look like a valid persisted state plist, else nil.
 Required keys: :schema-version (integer), :workspaces (alist)."
   (and (listp payload)
        (integerp (plist-get payload :schema-version))
@@ -180,8 +180,8 @@ Returns a plist with three lists:
           :tmux-only (nreverse tmux-only))))
 
 (defun enkan-repl-state--list-live-tmux-sessions (prefix)
-  "Return list of tmux session names beginning with PREFIX, or nil if
-tmux is unavailable / has no server running."
+  "Return list of tmux session names beginning with PREFIX.
+Returns nil when tmux is unavailable or no server is running."
   (when (and (fboundp 'enkan-repl--terminal-tmux--call))
     (let ((out (ignore-errors
                  (funcall (intern "enkan-repl--terminal-tmux--call")
@@ -193,7 +193,7 @@ tmux is unavailable / has no server running."
          (split-string out "\n" t))))))
 
 (defun enkan-repl-state-tmux-reconcile (&optional file)
-  "Load persisted state and reconcile with the live tmux server.
+  "Load persisted state from FILE and reconcile with the live tmux server.
 
 Behavior is governed by `enkan-repl-state-recovery-policy':
 - `reattach': restore only workspaces present in both state and tmux.
@@ -210,7 +210,6 @@ Returns a plist describing the reconciliation result:
       (let* ((state-ws (plist-get payload :workspaces))
              (cls (enkan-repl-state--classify state-ws))
              (both (plist-get cls :both))
-             (state-only (plist-get cls :state-only))
              (tmux-only (plist-get cls :tmux-only))
              (keep-ids
               (pcase enkan-repl-state-recovery-policy

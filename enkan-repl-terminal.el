@@ -40,16 +40,22 @@
   "Terminal backend selection for enkan-repl."
   :group 'enkan-repl)
 
-(defcustom enkan-repl-terminal-backend 'eat
+(defcustom enkan-repl-terminal-backend 'tmux
   "Terminal backend used by enkan-repl.
 
-`eat'  -- in-Emacs terminal emulator (current default; rollback path).
-`tmux' -- external tmux server (heavy TUIs run outside Emacs).
+`tmux' (default) -- external tmux server.  Heavy TUIs (claude code CLI,
+                    codex, etc.) run outside Emacs and cannot block
+                    Emacs's main loop with repaint storms.  Sessions
+                    survive Emacs restart and can be attached from any
+                    terminal application via `enkan-repl-tmux-attach'.
+`eat'            -- in-Emacs terminal emulator (legacy / rollback path).
+                    Available for users who prefer eat or whose workflow
+                    does not involve heavy TUIs.
 
 The value is read at session-creation time; existing sessions are not
 migrated when the value changes."
-  :type '(choice (const :tag "eat (in-Emacs)" eat)
-                 (const :tag "tmux (external)" tmux))
+  :type '(choice (const :tag "tmux (external; default)" tmux)
+                 (const :tag "eat (in-Emacs; legacy)" eat))
   :group 'enkan-repl-terminal)
 
 ;;;; Forward declarations
@@ -61,6 +67,8 @@ migrated when the value changes."
 (declare-function enkan-repl--buffer-name->instance "enkan-repl-utils" (name))
 (declare-function enkan-repl--buffer-name-matches-workspace
                   "enkan-repl-utils" (name workspace-id))
+(declare-function enkan-repl-state--list-live-tmux-sessions
+                  "enkan-repl-state" (prefix))
 (defvar eat--process)
 (defvar enkan-repl--current-workspace)
 
@@ -172,7 +180,7 @@ Returns 1 when ID has no explicit instance suffix."
 ;;;; eat backend
 
 (defun enkan-repl--terminal-eat-start (dir)
-  "eat backend: create eat session in DIR and rename to enkan buffer name.
+  "Eat backend: create eat session in DIR and rename to enkan buffer name.
 Return the eat buffer."
   (require 'eat)
   (let* ((default-directory (file-name-as-directory dir))
@@ -187,7 +195,8 @@ Return the eat buffer."
     eat-buffer))
 
 (defun enkan-repl--terminal-eat-send (id text &optional newline)
-  "eat backend: send TEXT to buffer ID, optionally appending CR."
+  "Eat backend: send TEXT to buffer ID, optionally appending CR.
+NEWLINE non-nil appends a CR after TEXT."
   (when (and id (buffer-live-p id))
     (with-current-buffer id
       (let ((proc (or (and (boundp 'eat--process) eat--process)
@@ -206,7 +215,7 @@ Return the eat buffer."
           t)))))
 
 (defun enkan-repl--terminal-eat-send-key (id key)
-  "eat backend: send special KEY to buffer ID."
+  "Eat backend: send special KEY to buffer ID."
   (let ((s (pcase key
              ('escape "\e")
              ('enter  "\r")
@@ -215,14 +224,14 @@ Return the eat buffer."
     (enkan-repl--terminal-eat-send id s nil)))
 
 (defun enkan-repl--terminal-eat-alive-p (id)
-  "eat backend: t if buffer ID has a live process."
+  "Eat backend: t if buffer ID has a live process."
   (and id
        (buffer-live-p id)
        (let ((proc (get-buffer-process id)))
          (and proc (process-live-p proc)))))
 
 (defun enkan-repl--terminal-eat-list ()
-  "eat backend: list of live enkan buffers in current workspace."
+  "Eat backend: list of live enkan buffers in current workspace."
   (let ((current-ws (and (boundp 'enkan-repl--current-workspace)
                          enkan-repl--current-workspace)))
     (when current-ws
@@ -237,18 +246,18 @@ Return the eat buffer."
        (buffer-list)))))
 
 (defun enkan-repl--terminal-eat-kill (id)
-  "eat backend: kill buffer ID."
+  "Eat backend: kill buffer ID."
   (when (and id (buffer-live-p id))
     (kill-buffer id)
     t))
 
 (defun enkan-repl--terminal-eat-display (id)
-  "eat backend: pop to buffer ID in same window (no split)."
+  "Eat backend: pop to buffer ID in same window (no split)."
   (when (and id (buffer-live-p id))
     (pop-to-buffer-same-window id)))
 
 (defun enkan-repl--terminal-eat-id-instance (id)
-  "eat backend: derive instance index from buffer ID's name (1 if no <N>)."
+  "Eat backend: derive instance index from buffer ID's name (1 if no <N>)."
   (when (and id (buffer-live-p id))
     (or (enkan-repl--buffer-name->instance (buffer-name id)) 1)))
 
@@ -260,8 +269,9 @@ Return the eat buffer."
   :group 'enkan-repl-terminal)
 
 (defcustom enkan-repl-tmux-session-prefix "enkan-"
-  "Prefix for tmux session names.  The workspace ID (e.g. \"01\") is appended,
-yielding session names like \"enkan-01\"."
+  "Prefix for tmux session names.
+The workspace ID (e.g. \"01\") is appended, yielding session names
+like \"enkan-01\"."
   :type 'string
   :group 'enkan-repl-terminal)
 
@@ -276,7 +286,7 @@ yielding session names like \"enkan-01\"."
 When CAPTURE is non-nil, return stdout as a string (trailing newline stripped),
 or nil on non-zero exit.  Otherwise return t on zero exit, nil on non-zero."
   (unless (executable-find enkan-repl-tmux-executable)
-    (user-error "tmux executable not found: %s" enkan-repl-tmux-executable))
+    (user-error "Tmux executable not found: %s" enkan-repl-tmux-executable))
   (with-temp-buffer
     (let ((status (apply #'call-process
                          enkan-repl-tmux-executable
@@ -334,8 +344,10 @@ Tries BASE, then BASE-2, BASE-3, ... until an unused name is found."
     (match-string 1 id)))
 
 (defun enkan-repl--terminal-tmux-start (dir)
-  "tmux backend: ensure session for current workspace exists, then add a
-window for DIR.  Return the tmux target identifier (e.g. \"enkan-01:lat\")."
+  "Tmux backend: start a new session/window in DIR for current workspace.
+Ensures the workspace's tmux session exists (creating it on demand) and
+then adds a window for DIR with a non-colliding name.  Returns the tmux
+target identifier (e.g. \"enkan-01:lat\")."
   (let* ((session (or (enkan-repl--terminal-tmux--workspace-session)
                       (user-error "No current workspace; cannot start tmux session")))
          (base (enkan-repl--terminal-tmux--derive-base-name dir))
@@ -345,18 +357,18 @@ window for DIR.  Return the tmux target identifier (e.g. \"enkan-01:lat\")."
      ((not (enkan-repl--terminal-tmux--has-session session))
       (unless (enkan-repl--terminal-tmux--call
                (list "new-session" "-d" "-s" session "-c" cdir "-n" base))
-        (user-error "tmux new-session failed for %s" session))
+        (user-error "Tmux new-session failed for %s" session))
       (enkan-repl--terminal-tmux--make-id session base))
      ;; Session exists: add a new window with a non-colliding name.
      (t
       (let ((win (enkan-repl--terminal-tmux--next-instance-name session base)))
         (unless (enkan-repl--terminal-tmux--call
                  (list "new-window" "-t" session "-n" win "-c" cdir))
-          (user-error "tmux new-window failed for %s:%s" session win))
+          (user-error "Tmux new-window failed for %s:%s" session win))
         (enkan-repl--terminal-tmux--make-id session win))))))
 
 (defun enkan-repl--terminal-tmux-send (id text &optional newline)
-  "tmux backend: send TEXT to ID via send-keys -l.
+  "Tmux backend: send TEXT to ID via send-keys -l.
 When NEWLINE is non-nil, follow with an Enter key.  Returns t on success."
   (when (and id text)
     (and (enkan-repl--terminal-tmux--call
@@ -366,7 +378,7 @@ When NEWLINE is non-nil, follow with an Enter key.  Returns t on success."
               (list "send-keys" "-t" id "Enter"))))))
 
 (defun enkan-repl--terminal-tmux-send-key (id key)
-  "tmux backend: send special KEY (`escape', `enter', integer 1..9) to ID."
+  "Tmux backend: send special KEY (`escape', `enter', integer 1..9) to ID."
   (let ((arg (pcase key
                ('escape "Escape")
                ('enter  "Enter")
@@ -375,7 +387,7 @@ When NEWLINE is non-nil, follow with an Enter key.  Returns t on success."
     (enkan-repl--terminal-tmux--call (list "send-keys" "-t" id arg))))
 
 (defun enkan-repl--terminal-tmux-alive-p (id)
-  "tmux backend: t if SESSION:WINDOW described by ID still exists."
+  "Tmux backend: t if SESSION:WINDOW described by ID still exists."
   (when id
     (let ((session (enkan-repl--terminal-tmux--id-session id))
           (window  (enkan-repl--terminal-tmux--id-window id)))
@@ -385,28 +397,29 @@ When NEWLINE is non-nil, follow with an Enter key.  Returns t on success."
            t))))
 
 (defun enkan-repl--terminal-tmux-list ()
-  "tmux backend: list all window identifiers in the current workspace's session."
+  "Tmux backend: list all window identifiers in the current workspace's session."
   (let ((session (enkan-repl--terminal-tmux--workspace-session)))
     (when (and session (enkan-repl--terminal-tmux--has-session session))
       (mapcar (lambda (w) (enkan-repl--terminal-tmux--make-id session w))
               (enkan-repl--terminal-tmux--list-windows session)))))
 
 (defun enkan-repl--terminal-tmux-kill (id)
-  "tmux backend: kill the window described by ID."
+  "Tmux backend: kill the window described by ID."
   (when id
     (enkan-repl--terminal-tmux--call (list "kill-window" "-t" id))))
 
 ;;;;; tmux mirror buffer
 
 (defcustom enkan-repl-tmux-mirror t
-  "When non-nil, tmux backend keeps a read-only Emacs buffer mirroring
-the live pane content via periodic `tmux capture-pane'."
+  "Whether tmux backend mirrors pane content to a read-only Emacs buffer.
+When non-nil, a periodic `tmux capture-pane' refresh is scheduled per
+mirror buffer."
   :type 'boolean
   :group 'enkan-repl-terminal)
 
 (defcustom enkan-repl-tmux-mirror-interval 1.0
-  "Idle interval (seconds) between `tmux capture-pane' refreshes for
-mirror buffers."
+  "Idle interval (seconds) between `tmux capture-pane' refreshes.
+Applies to every active tmux mirror buffer."
   :type 'number
   :group 'enkan-repl-terminal)
 
@@ -504,7 +517,7 @@ Skips when BUFFER is dead, has no bound id, or the tmux pane is gone."
     buf))
 
 (defun enkan-repl--terminal-tmux-display (id)
-  "tmux backend: present ID as a read-only mirror buffer in the current window.
+  "Tmux backend: present ID as a read-only mirror buffer in the current window.
 When `enkan-repl-tmux-mirror' is nil, instead message a hint to attach
 externally via `enkan-repl-tmux-attach'."
   (cond
@@ -528,9 +541,9 @@ When nil, a sensible default is chosen per system-type:
   other  -> the value of `shell-file-name' as a fallback (no real attach)
 
 When non-nil, must be either:
-  - a string: a shell command in which '%s' will be replaced by the
-    target tmux session name (e.g. \"open -a iTerm 'tmux attach -t %s'\")
-  - a function of one argument (the session name)."
+- a string: a shell command in which \\='%s\\=' is replaced by the
+  target tmux session name (e.g. \"open -a iTerm \\='tmux attach -t %s\\='\")
+- a function of one argument (the session name)."
   :type '(choice (const :tag "Auto" nil) string function)
   :group 'enkan-repl-terminal)
 
@@ -543,7 +556,7 @@ When non-nil, must be either:
     (_ (format "%s -ic 'tmux attach -t %s'" shell-file-name session))))
 
 (defun enkan-repl--terminal-tmux-id-instance (id)
-  "tmux backend: derive instance index from ID's window name suffix.
+  "Tmux backend: derive instance index from ID's window name suffix.
 Returns 1 when no \"-N\" suffix is present."
   (let ((win (enkan-repl--terminal-tmux--id-window id)))
     (cond
@@ -567,7 +580,7 @@ sessions whose name starts with `enkan-repl-tmux-session-prefix'."
        ((= 1 (length live)) (car live))
        (t (completing-read "Kill tmux session: " live nil t))))))
   (unless (enkan-repl--terminal-tmux--has-session session)
-    (user-error "tmux session not found: %s" session))
+    (user-error "Tmux session not found: %s" session))
   (when (enkan-repl--terminal-tmux--call (list "kill-session" "-t" session))
     (message "Killed tmux session: %s" session)
     t))
@@ -604,7 +617,7 @@ falls back to a system-appropriate default when nil."
                  (user-error "No current workspace")))
          (session (concat enkan-repl-tmux-session-prefix ws)))
     (unless (enkan-repl--terminal-tmux--has-session session)
-      (user-error "tmux session %s does not exist" session))
+      (user-error "Tmux session %s does not exist" session))
     (cond
      ((functionp enkan-repl-tmux-attach-command)
       (funcall enkan-repl-tmux-attach-command session))
