@@ -99,6 +99,7 @@
 (declare-function enkan-repl--buffer-alive-as-terminal-p "enkan-repl-utils" (buffer))
 (declare-function enkan-repl--terminal-tmux-alive-p "enkan-repl-terminal" (id))
 (declare-function enkan-repl--terminal-tmux--mirror-make "enkan-repl-terminal" (id))
+(declare-function enkan-repl--terminal-tmux-kill-workspace "enkan-repl-terminal" (workspace-id))
 (defvar enkan-repl--tmux-mirror-id)
 (defvar enkan-repl-terminal-backend)
 (declare-function enkan-repl--session-entry-project "enkan-repl-utils" (entry-value))
@@ -123,6 +124,10 @@
 (declare-function enkan-repl--send-primitive "enkan-repl-utils" (text special-key-type))
 (declare-function enkan-repl--buffer-name-matches-workspace "enkan-repl-utils" (name workspace-id))
 (declare-function enkan-repl--extract-workspace-id "enkan-repl-utils" (name))
+(declare-function enkan-repl-workspace-list--get-workspace-at-point
+                  "enkan-repl-workspace-list" ())
+(declare-function enkan-repl-workspace-list-refresh
+                  "enkan-repl-workspace-list" ())
 
 ;; Declare external functions from enkan-repl-workspace
 (declare-function enkan-repl--generate-next-workspace-id "enkan-repl-workspace" (workspaces))
@@ -1079,108 +1084,6 @@ Category: Session Controller"
         (enkan-repl--save-workspace-state))
       (message "Started eat session in: %s" target-dir))))
 
-;;;###autoload
-(defun enkan-repl-teardown ()
-  "Terminate eat session(s) based on context.
-- Standard input file: terminate single eat session for current directory
-  in current workspace
-- Center file: terminate all registered sessions in current workspace
-
-Category: Session Controller"
-  (interactive)
-  ;; Check if current buffer filename matches standard input file format
-  (let* ((current-file (buffer-file-name))
-         (is-standard-file (enkan-repl--is-standard-file-path current-file default-directory)))
-    (if is-standard-file
-        ;; Standard input file mode: terminate single session
-        (let* ((session-info (enkan-repl--get-session-info))
-               (target-dir (nth 0 session-info))
-               (existing-buffer (nth 1 session-info))
-               (can-send (nth 2 session-info)))
-          (cond
-           ;; No session found
-           ((not existing-buffer)
-            (message "No eat session found for directory: %s" target-dir))
-           ;; Active or dead session - terminate
-           (t
-            (when (or (not can-send)
-                      (y-or-n-p (format "Terminate eat session in %s? " target-dir)))
-              (kill-buffer existing-buffer)
-              (message "Terminated eat session in: %s" target-dir)
-              ;; Delete current workspace after session termination
-              (enkan-repl--teardown-delete-current-workspace-pure)
-              ;; Switch to another workspace if available
-              (let ((remaining-workspaces (enkan-repl--list-workspace-ids enkan-repl--workspaces)))
-                (when remaining-workspaces
-                  (enkan-repl-workspace-switch))
-                ;; If no workspaces remain, create a new default workspace
-                (unless remaining-workspaces
-                  (enkan-repl-setup)))))))
-      ;; Center file mode: terminate all sessions in current workspace
-      (if (enkan-repl--is-center-file-path enkan-repl-center-file enkan-repl-projects)
-          ;; Center file mode implementation
-          (let ((buffer-name "*ENKAN-REPL Finish Sessions*"))
-            (if (null (enkan-repl--ws-session-list))
-                (message "No registered sessions to terminate")
-              (with-output-to-temp-buffer buffer-name
-                (princ "=== ENKAN-REPL FINISH ALL SESSIONS ===\n\n")
-                ;; Display current state before termination
-                (princ "🔧 Current state before termination:\n")
-                (princ (enkan-repl--format-session-state-display
-                        (enkan-repl--get-current-session-state-info
-                         (enkan-repl--ws-current-project)
-                         (enkan-repl--ws-session-list)
-                         (enkan-repl--ws-session-counter)
-                         (enkan-repl--ws-project-aliases))))
-                (princ "\n")
-                (let ((terminated-count 0)
-                      (original-session-list (enkan-repl--ws-session-list))) ; Capture for y-or-n-p
-                  (when (y-or-n-p (format "Terminate all %d registered sessions? "
-                                          (length original-session-list)))
-                    (princ "🚫 Terminating sessions:\n")
-                    ;; Terminate all session buffers
-                    (let* ((termination-result (enkan-repl--terminate-all-session-buffers
-                                                original-session-list
-                                                enkan-repl-target-directories))
-                           (actual-terminated-count (car termination-result))
-                           (session-termination-details (cdr termination-result)))
-                      (setq terminated-count actual-terminated-count)
-                      ;; Display termination results
-                      (dolist (detail session-termination-details)
-                        (let ((session-number (cdr (assoc :session-number detail)))
-                              (project-name (cdr (assoc :project-name detail)))
-                              (status (cdr (assoc :status detail))))
-                          (cond
-                           ((eq status 'terminated)
-                            (princ (format "  ✅ Session %d: %s (terminated)\n" session-number project-name)))
-                           ((eq status 'buffer-not-found)
-                            (princ (format "  ⚠️ Session %d: %s (buffer not found)\n" session-number project-name)))
-                           ((eq status 'project-path-not-found)
-                            (princ (format "  ❌ Session %d: %s (project path not found)\n" session-number project-name)))))))
-                    ;; Reset global configuration and delete current workspace
-                    (enkan-repl--teardown-delete-current-workspace-pure)
-                    ;; Switch to another workspace if available
-                    (let ((remaining-workspaces (enkan-repl--list-workspace-ids enkan-repl--workspaces)))
-                      (when remaining-workspaces
-                        (enkan-repl-workspace-switch))
-                      ;; If no workspaces remain, create a new default workspace
-                      (unless remaining-workspaces
-                        (enkan-repl-setup)))
-                    ;; Auto-disable global center file mode
-                    ;; (when (enkan-repl--disable-global-minor-mode-if-active)
-                    ;;   (princ "\n🔄 Auto-disabled center file global mode\n"))
-                    ;; Display final state
-                    (princ "\n🧹 Configuration reset:\n")
-                    (princ (enkan-repl--format-session-state-display
-                            (enkan-repl--get-current-session-state-info
-                             (enkan-repl--ws-current-project)
-                             (enkan-repl--ws-session-list)
-                             (enkan-repl--ws-session-counter)
-                             (enkan-repl--ws-project-aliases))))
-                    (princ (format "\n✅ Terminated %d sessions, cleared session list and reset project configuration.\n" terminated-count))
-                    (princ "\n=== END FINISH SESSIONS ===\n"))))))
-        (message "Not in standard file or center file mode")))))
-
 (defun enkan-repl--is-standard-file-path (file-path directory-name)
   "Check if FILE-PATH is a standard input file for DIRECTORY-NAME."
   (when file-path
@@ -1196,7 +1099,7 @@ Category: Session Controller"
        projects))
 
 (defun enkan-repl--setup-log-state (buffer-name state-type layout sessions counter)
-  "Log state to BUFFER-NAME for setup/teardown.
+  "Log state to BUFFER-NAME for setup/delete workflows.
 STATE-TYPE: Current or Final
 LAYOUT: current project/layout name
 SESSIONS: session list
@@ -1619,46 +1522,73 @@ Returns a plist with :status and other relevant keys."
 
 ;;; Functions with side effects
 
-(defun enkan-repl--terminate-all-session-buffers (session-list target-directories)
-  "Terminate all buffers associated with sessions in SESSION-LIST.
-Only terminates buffers in the current workspace.
-TARGET-DIRECTORIES is a list of directories to search for project paths.
-Returns an alist of (terminated-count . session-termination-results).
-SESSION-TERMINATION-RESULTS is a list of alists, each containing
-\(:session-number N :project-name S :status STATUS).
-STATUS can be terminated, buffer-not-found, or project-path-not-found.
-This function has the side effect of killing buffers.
+(defun enkan-repl--workspace-terminal-buffers (workspace-id)
+  "Return enkan terminal buffers belonging to WORKSPACE-ID.
+This intentionally scans `buffer-list' so stale buffers that are missing
+from workspace state are still cleaned up."
+  (seq-filter
+   (lambda (buffer)
+     (let ((name (buffer-name buffer)))
+       (and name
+            (enkan-repl--is-enkan-buffer-name name)
+            (enkan-repl--buffer-name-matches-workspace name workspace-id))))
+   (buffer-list)))
 
-SESSION-LIST entry value may be a project-name string (legacy) or a
-\(project-name . instance) cons; both forms are read via the entry
-accessors so multi-instance sessions terminate the correct buffer."
-  (let ((terminated-count 0)
-        (termination-results '()))
-    (dolist (session session-list)
-      (let* ((session-number (car session))
-             (entry-value (cdr session))
-             (project-name (enkan-repl--session-entry-project entry-value))
-             (instance (enkan-repl--session-entry-instance entry-value))
-             (project-path (enkan-repl--get-project-path-from-directories project-name target-directories)))
-        (if project-path
-            (let ((buffer (enkan-repl--get-buffer-for-directory project-path instance)))
-              (if buffer
-                  (progn
-                    (kill-buffer buffer)
-                    (setq terminated-count (1+ terminated-count))
-                    (push (list (cons :session-number session-number)
-                                (cons :project-name project-name)
-                                (cons :status 'terminated))
-                          termination-results))
-                (push (list (cons :session-number session-number)
-                            (cons :project-name project-name)
-                            (cons :status 'buffer-not-found))
-                      termination-results)))
-          (push (list (cons :session-number session-number)
-                      (cons :project-name project-name)
-                      (cons :status 'project-path-not-found))
-                termination-results))))
-    (cons terminated-count (nreverse termination-results))))
+(defun enkan-repl--stop-workspace-terminals (workspace-id)
+  "Stop all terminal resources for WORKSPACE-ID.
+For tmux this kills the whole workspace tmux session, then kills every
+matching Emacs mirror buffer so buffer-local timers are cancelled.  For
+eat it kills every matching Emacs terminal buffer.  Returns a plist with
+`:buffers-killed' and `:tmux-killed'."
+  (let ((buffers (enkan-repl--workspace-terminal-buffers workspace-id))
+        (tmux-killed nil)
+        (buffers-killed 0))
+    (when (and (or (eq enkan-repl-terminal-backend 'tmux)
+                   (seq-some
+                    (lambda (buffer)
+                      (buffer-local-value 'enkan-repl--tmux-mirror-id buffer))
+                    buffers))
+               (fboundp 'enkan-repl--terminal-tmux-kill-workspace))
+      (setq tmux-killed
+            (ignore-errors
+              (enkan-repl--terminal-tmux-kill-workspace workspace-id))))
+    (dolist (buffer buffers)
+      (when (buffer-live-p buffer)
+        (kill-buffer buffer)
+        (setq buffers-killed (1+ buffers-killed))))
+    (list :buffers-killed buffers-killed
+          :tmux-killed tmux-killed)))
+
+(defun enkan-repl--delete-workspace-completely (workspace-id)
+  "Delete WORKSPACE-ID and stop all associated terminal resources.
+This is the single destructive workspace deletion path used by
+`enkan-repl-workspace-delete'.  It removes stale buffers as well as buffers
+recorded in workspace state.  When deleting the current workspace, session
+globals are reset and another workspace is loaded; if no workspace remains, a
+new default workspace is created via `enkan-repl-setup'."
+  (unless (enkan-repl--can-delete-workspace workspace-id enkan-repl--workspaces)
+    (user-error "Cannot delete workspace %s" workspace-id))
+  (let* ((was-current (and enkan-repl--current-workspace
+                           (string= workspace-id enkan-repl--current-workspace)))
+         (stop-result (enkan-repl--stop-workspace-terminals workspace-id)))
+    (when was-current
+      (enkan-repl--reset-global-session-variables))
+    (setq enkan-repl--workspaces
+          (enkan-repl--delete-workspace enkan-repl--workspaces workspace-id))
+    (when was-current
+      (setq enkan-repl--current-workspace nil)
+      (let ((remaining-workspaces
+             (enkan-repl--list-workspace-ids enkan-repl--workspaces)))
+        (cond
+         (remaining-workspaces
+          (setq enkan-repl--current-workspace (car remaining-workspaces))
+          (enkan-repl--load-workspace-state enkan-repl--current-workspace))
+         (t
+          (enkan-repl-setup)))))
+    (list :deleted t
+          :workspace-id workspace-id
+          :was-current was-current
+          :stop-result stop-result)))
 
 (defun enkan-repl--reset-global-session-variables ()
   "Reset global session-related variables.
@@ -2100,60 +2030,62 @@ Uses `hmenu' if available to show workspace ID with its project."
           (message "Switched to workspace %s" target-id))))))
 
 ;;;###autoload
-(defun enkan-repl-workspace-delete ()
-  "Delete a workspace.
-Cannot delete the current workspace or the only workspace.
-Uses `hmenu' if available to show workspace ID with its project."
-  (interactive)
+(defun enkan-repl-workspace-delete (&optional arg)
+  "Delete a workspace and stop all associated terminal resources.
+This is the only interactive workspace deletion command.  In
+`enkan-repl-workspace-list-mode', delete the workspace at point; otherwise
+delete the current workspace.  With prefix ARG, prompt for a workspace.
+Noninteractive string ARG deletes that workspace ID.  All paths use
+`enkan-repl--delete-workspace-completely'.
+Category: Session Controller"
+  (interactive "P")
   (let* ((workspace-ids (enkan-repl--list-workspace-ids enkan-repl--workspaces))
-         (candidates (cl-remove enkan-repl--current-workspace workspace-ids :test #'string=)))
-    (if (< (length workspace-ids) 2)
-        (message "Cannot delete the only workspace")
-      (let* ((items (mapcar (lambda (ws-id)
-                              (let* ((state (enkan-repl--get-workspace-state enkan-repl--workspaces ws-id))
-                                     (proj (or (plist-get state :current-project) "<none>")))
+         (workspace-at-point
+          (when (and (derived-mode-p 'enkan-repl-workspace-list-mode)
+                     (fboundp 'enkan-repl-workspace-list--get-workspace-at-point))
+            (enkan-repl-workspace-list--get-workspace-at-point)))
+         (target-id
+          (cond
+           ((stringp arg) arg)
+           (workspace-at-point workspace-at-point)
+           ((and (called-interactively-p 'interactive)
+                 workspace-ids
+                 arg)
+            (let* ((items
+                    (mapcar (lambda (ws-id)
+                              (let* ((state (enkan-repl--get-workspace-state
+                                             enkan-repl--workspaces ws-id))
+                                     (proj (or (plist-get state :current-project)
+                                               "<none>")))
                                 (cons (format "%s [%s]" ws-id proj) ws-id)))
-                            candidates))
-             (prompt "Delete workspace:")
-             (display (if (and (fboundp 'hmenu) items)
-                          (hmenu prompt (mapcar #'car items))
-                        (completing-read prompt (mapcar #'car items) nil t)))
-             (target-id (cdr (assoc display items #'string=))))
-        (when target-id
-          (if (enkan-repl--can-delete-workspace target-id enkan-repl--workspaces)
-              (progn
-                ;; Terminate all sessions in the workspace to delete
-                (let ((state (enkan-repl--get-workspace-state
-                              enkan-repl--workspaces target-id)))
-                  (when state
-                    (let ((session-list (plist-get state :session-list)))
-                      (when session-list
-                        (enkan-repl--terminate-all-session-buffers
-                         session-list
-                         enkan-repl-target-directories)))))
-                ;; Delete the workspace
-                (setq enkan-repl--workspaces
-                      (enkan-repl--delete-workspace enkan-repl--workspaces target-id))
-                ;; If no workspaces remain, create a new one
-                (unless enkan-repl--workspaces
-                  (enkan-repl-setup)
-                  (message "Deleted workspace %s and created new workspace" target-id))
-                (when enkan-repl--workspaces
-                  (message "Deleted workspace %s" target-id)))
-            (message "Cannot delete workspace %s" target-id)))))))
-
-(defun enkan-repl--teardown-delete-current-workspace-pure ()
-  "Delete current workspace and reset session variables.
-Pure function with side effects limited to global state modification."
-  (when enkan-repl--current-workspace
-    (let ((current-ws enkan-repl--current-workspace))
-      ;; Reset session variables first
-      (enkan-repl--reset-global-session-variables)
-      ;; Delete current workspace from workspaces list
-      (setq enkan-repl--workspaces (enkan-repl--delete-workspace enkan-repl--workspaces current-ws))
-      ;; Set current workspace to nil
-      (setq enkan-repl--current-workspace nil)
-      (princ (format "\n🗑️ Deleted workspace: %s\n" current-ws)))))
+                            workspace-ids))
+                   (display
+                    (if (and (fboundp 'hmenu) items)
+                        (hmenu "Delete workspace:" (mapcar #'car items))
+                      (completing-read "Delete workspace:"
+                                       (mapcar #'car items) nil t))))
+              (cdr (assoc display items #'string=))))
+           (enkan-repl--current-workspace enkan-repl--current-workspace))))
+    (cond
+     ((null workspace-ids)
+      (message "No workspaces to delete"))
+     ((null target-id)
+      (user-error "No workspace selected"))
+     ((not (enkan-repl--can-delete-workspace target-id enkan-repl--workspaces))
+      (user-error "Cannot delete workspace %s" target-id))
+     ((y-or-n-p (format "Delete workspace %s and stop all sessions? "
+                        target-id))
+      (let* ((result (enkan-repl--delete-workspace-completely target-id))
+             (stop-result (plist-get result :stop-result)))
+        (message "Deleted workspace %s; killed %d buffer(s)%s"
+                 target-id
+                 (or (plist-get stop-result :buffers-killed) 0)
+                 (if (plist-get stop-result :tmux-killed)
+                     ", killed tmux session"
+                   ""))
+        (when (and workspace-at-point
+                   (fboundp 'enkan-repl-workspace-list-refresh))
+          (enkan-repl-workspace-list-refresh)))))))
 
 (provide 'enkan-repl)
 

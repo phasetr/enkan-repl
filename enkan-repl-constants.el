@@ -22,7 +22,6 @@
     ("enkan-repl-recenter-bottom" . "Recenter all enkan terminal buffers at bottom.  Category: Utilities")
     ("enkan-repl-open-project-input-file" . "Open or create project input file for DIRECTORY. If DIRECTORY is nil, use current `default-directory'. If project input file exists, open it directly. If not exists, create from template then open.  Category: Utilities")
     ("enkan-repl-start-eat" . "")
-    ("enkan-repl-teardown" . "Terminate eat session(s) based on context. - Standard input file: terminate single eat session for current directory in current workspace - Center file: terminate all registered sessions in current workspace  Category: Session Controller")
     ("enkan-repl-setup" . "Set up window layout based on context. - Standard input file: basic window layout with project input file on left and eat session on right in current workspace - Center file: auto start eat sessions using project configuration in current workspace  Category: Session Controller")
     ("enkan-repl-cheat-sheet" . "Display interactive `cheat-sheet' for enkan-repl commands.  Category: Command Palette")
     ("enkan-repl-toggle-global-mode" . "Toggle enkan-repl global mode on/off.")
@@ -31,12 +30,12 @@
     ("enkan-repl-open-center-file" . "Open or create the center file based on enkan-repl-center-file configuration.  Category: Center File Operations")
     ("enkan-repl-print-setup-to-buffer" . "Print current setup variables for debugging. Displays enkan-repl-projects, enkan-repl-target-directories, enkan-repl-project-aliases, and current session state.  Category: Debugging")
     ("enkan-repl-workspace-switch" . "Switch to another workspace. Uses `hmenu' if available to show workspace ID with its project.")
-    ("enkan-repl-workspace-delete" . "Delete a workspace. Cannot delete the current workspace or the only workspace. Uses `hmenu' if available to show workspace ID with its project."))
+    ("enkan-repl-workspace-delete" . "Delete a workspace and stop all associated terminal resources. This is the only interactive workspace deletion command.  In `enkan-repl-workspace-list-mode', delete the workspace at point; otherwise delete the current workspace.  With prefix ARG, prompt for a workspace. Noninteractive string ARG deletes that workspace ID.  All paths use `enkan-repl--delete-workspace-completely'. Category: Session Controller"))
   "Precompiled list of cheat-sheet candidates.
 Each element is a cons cell (FUNCTION-NAME . DESCRIPTION).")
 
 (defconst enkan-repl-cheat-sheet-function-count
-  21
+  20
   "Number of functions in cheat-sheet.")
 
 (provide 'enkan-repl-constants)
