@@ -66,14 +66,37 @@ migrated when the value changes."
 
 ;;;; Backend dispatch helpers
 
+(defun enkan-repl--terminal--coerce-id (id)
+  "Normalize ID to the form expected by the active backend.
+
+When the active backend is tmux but ID is an Emacs buffer (typically a
+mirror buffer found by `buffer-list' lookups), reach through to the
+buffer-local `enkan-repl--tmux-mirror-id' so callers can pass either a
+buffer or a tmux target string interchangeably.
+
+When the active backend is eat but ID is a string, no conversion is
+attempted (eat operates on buffer objects); the original ID is returned
+unchanged for the dispatch to either succeed or fail loudly."
+  (cond
+   ((and (eq enkan-repl-terminal-backend 'tmux)
+         (bufferp id))
+    (or (buffer-local-value 'enkan-repl--tmux-mirror-id id) id))
+   (t id)))
+
 (defun enkan-repl--terminal--dispatch (op-name eat-fn tmux-fn &rest args)
   "Internal helper: dispatch OP-NAME to EAT-FN or TMUX-FN with ARGS.
-Selects implementation by `enkan-repl-terminal-backend'."
-  (pcase enkan-repl-terminal-backend
-    ('eat  (apply eat-fn args))
-    ('tmux (apply tmux-fn args))
-    (other (user-error "Unknown enkan-repl-terminal-backend: %S (op=%s)"
-                       other op-name))))
+Selects implementation by `enkan-repl-terminal-backend'.
+The first positional argument in ARGS, when non-nil, is coerced via
+`enkan-repl--terminal--coerce-id' so callers can pass either a buffer
+or a tmux target string regardless of backend."
+  (let ((coerced (when args
+                   (cons (enkan-repl--terminal--coerce-id (car args))
+                         (cdr args)))))
+    (pcase enkan-repl-terminal-backend
+      ('eat  (apply eat-fn (or coerced args)))
+      ('tmux (apply tmux-fn (or coerced args)))
+      (other (user-error "Unknown enkan-repl-terminal-backend: %S (op=%s)"
+                         other op-name)))))
 
 ;;;; Public API (backend-agnostic)
 

@@ -158,5 +158,45 @@
     (let ((cmd (enkan-repl--tmux-attach--default-command "enkan-02")))
       (should (string-match-p "tmux attach -t enkan-02" cmd)))))
 
+;;;; ID coercion (buffer <-> tmux target)
+
+(ert-deftest test-enkan-repl--terminal--coerce-id-tmux-buffer ()
+  "Under tmux backend, a buffer with bound `enkan-repl--tmux-mirror-id'
+must be coerced to that string id."
+  (let ((enkan-repl-terminal-backend 'tmux)
+        (buf (generate-new-buffer "*ws:01 enkan:/p/*")))
+    (unwind-protect
+        (progn
+          (with-current-buffer buf
+            (setq-local enkan-repl--tmux-mirror-id "enkan-01:p"))
+          (should (string= "enkan-01:p"
+                           (enkan-repl--terminal--coerce-id buf))))
+      (kill-buffer buf))))
+
+(ert-deftest test-enkan-repl--terminal--coerce-id-tmux-buffer-no-binding ()
+  "Under tmux backend, a buffer without binding is returned as-is."
+  (let ((enkan-repl-terminal-backend 'tmux)
+        (buf (generate-new-buffer "*plain*")))
+    (unwind-protect
+        (should (eq buf (enkan-repl--terminal--coerce-id buf)))
+      (kill-buffer buf))))
+
+(ert-deftest test-enkan-repl--terminal--coerce-id-tmux-string ()
+  "Under tmux backend, a string id passes through unchanged."
+  (let ((enkan-repl-terminal-backend 'tmux))
+    (should (string= "enkan-01:lat"
+                     (enkan-repl--terminal--coerce-id "enkan-01:lat")))))
+
+(ert-deftest test-enkan-repl--terminal--coerce-id-eat ()
+  "Under eat backend, no coercion is applied."
+  (let ((enkan-repl-terminal-backend 'eat)
+        (buf (generate-new-buffer "*plain*")))
+    (unwind-protect
+        (should (eq buf (enkan-repl--terminal--coerce-id buf)))
+      (kill-buffer buf)))
+  (let ((enkan-repl-terminal-backend 'eat))
+    (should (string= "anything"
+                     (enkan-repl--terminal--coerce-id "anything")))))
+
 (provide 'enkan-repl-terminal-test)
 ;;; enkan-repl-terminal-test.el ends here
