@@ -1,3 +1,15 @@
+# [0.18.0](https://github.com/phasetr/enkan-repl/compare/v0.17.2...v0.18.0) (2026-05-09)
+
+
+### Bug Fixes
+
+* widen eat pane in 1-session layout to fit heavy TUIs ([#59](https://github.com/phasetr/enkan-repl/issues/59)) ([54d0d2f](https://github.com/phasetr/enkan-repl/commit/54d0d2f04e0893b82339204534f3a438d9e92f62))
+
+
+### Features
+
+* abstract terminal backend; tmux becomes default ([#61](https://github.com/phasetr/enkan-repl/issues/61)) ([fab55c6](https://github.com/phasetr/enkan-repl/commit/fab55c605b74db0c06248375d04443764a379341)), closes [#59](https://github.com/phasetr/enkan-repl/issues/59)
+
 ## [0.17.2](https://github.com/phasetr/enkan-repl/compare/v0.17.1...v0.17.2) (2026-05-08)
 
 
