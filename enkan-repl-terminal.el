@@ -398,10 +398,24 @@ mirror buffers."
 (defvar-local enkan-repl--tmux-mirror-timer nil
   "Buffer-local: idle timer driving capture-pane refreshes.")
 
+(defun enkan-repl--terminal-tmux--pane-cwd (id)
+  "Return current working directory of tmux pane ID, or nil."
+  (enkan-repl--terminal-tmux--call
+   (list "display-message" "-p" "-t" id "#{pane_current_path}")
+   t))
+
 (defun enkan-repl--terminal-tmux--mirror-buffer-name (id)
   "Return mirror buffer name for tmux ID.
-Form: \"*tmux <session>:<window>*\"."
-  (format "*tmux %s*" id))
+Uses the same `*ws:NN enkan:/path/*' form as the eat backend so that
+existing buffer-list-based layout / lookup code finds tmux mirror
+buffers transparently.  Falls back to `*tmux <id>*' when the path
+cannot be determined."
+  (let ((path (enkan-repl--terminal-tmux--pane-cwd id))
+        (instance (enkan-repl--terminal-tmux-id-instance id)))
+    (cond
+     ((and path (not (string-empty-p path)))
+      (enkan-repl--path->buffer-name path instance))
+     (t (format "*tmux %s*" id)))))
 
 (defun enkan-repl--terminal-tmux--capture-pane (id lines)
   "Return current pane content of tmux ID as a string (best effort).
@@ -511,6 +525,44 @@ Returns 1 when no \"-N\" suffix is present."
      ((string-match "-\\([0-9]+\\)$" win)
       (string-to-number (match-string 1 win)))
      (t 1))))
+
+;;;###autoload
+(defun enkan-repl-tmux-kill-session (&optional session)
+  "Kill a tmux SESSION (defaults to the current workspace's enkan session).
+When called interactively without arg, prompts to pick from all
+sessions whose name starts with `enkan-repl-tmux-session-prefix'."
+  (interactive
+   (list
+    (let* ((prefix enkan-repl-tmux-session-prefix)
+           (live (enkan-repl-state--list-live-tmux-sessions prefix)))
+      (cond
+       ((null live)
+        (user-error "No tmux sessions matching prefix %s" prefix))
+       ((= 1 (length live)) (car live))
+       (t (completing-read "Kill tmux session: " live nil t))))))
+  (unless (enkan-repl--terminal-tmux--has-session session)
+    (user-error "tmux session not found: %s" session))
+  (when (enkan-repl--terminal-tmux--call (list "kill-session" "-t" session))
+    (message "Killed tmux session: %s" session)
+    t))
+
+;;;###autoload
+(defun enkan-repl-tmux-kill-all-enkan ()
+  "Kill ALL tmux sessions starting with `enkan-repl-tmux-session-prefix'.
+Asks for confirmation."
+  (interactive)
+  (let ((live (enkan-repl-state--list-live-tmux-sessions
+               enkan-repl-tmux-session-prefix)))
+    (cond
+     ((null live)
+      (message "No enkan tmux sessions to kill")
+      nil)
+     ((y-or-n-p (format "Kill %d enkan tmux session(s): %s ? "
+                        (length live) (mapconcat #'identity live ", ")))
+      (dolist (s live)
+        (enkan-repl--terminal-tmux--call (list "kill-session" "-t" s)))
+      (message "Killed: %s" (mapconcat #'identity live ", "))
+      t))))
 
 ;;;###autoload
 (defun enkan-repl-tmux-attach (&optional ws-id)
