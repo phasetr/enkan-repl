@@ -63,13 +63,13 @@
         (cl-letf (((symbol-function 'enkan-repl--get-project-path-from-directories)
                    (lambda (_name _dirs) "/path/to/test-project"))
                   ((symbol-function 'enkan-repl--get-buffer-for-directory)
-                   (lambda (path)
+                   (lambda (path &optional _instance)
                      (when (string= path "/path/to/test-project")
                        ;; Only return buffer if it matches current workspace
                        (let ((buf (get-buffer mock-buffer-name)))
-                         (when (and buf 
-                                   (enkan-repl--buffer-name-matches-workspace 
-                                    (buffer-name buf) 
+                         (when (and buf
+                                   (enkan-repl--buffer-name-matches-workspace
+                                    (buffer-name buf)
                                     enkan-repl--current-workspace))
                            buf))))))
           

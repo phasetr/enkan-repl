@@ -99,7 +99,7 @@
             
             ;; Mock enkan-repl--buffer-matches-directory to return true
             (cl-letf (((symbol-function 'enkan-repl--buffer-matches-directory)
-                       (lambda (name dir) t)))
+                       (lambda (_name _dir &optional _instance) t)))
               ;; Should return ws:01 buffer, not ws:02
               (let ((result (enkan-repl--get-buffer-for-directory "/home/test")))
                 (should (eq result buffer-ws01))))

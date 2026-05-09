@@ -61,6 +61,19 @@
 (when (locate-library "enkan-repl-utils")
   (require 'enkan-repl-utils))
 
+;; Load terminal backend dispatch (eat / tmux abstraction)
+(when (locate-library "enkan-repl-terminal")
+  (require 'enkan-repl-terminal))
+
+;; Load persistent workspace state (atomic save/load + tmux reconcile)
+(when (locate-library "enkan-repl-state")
+  (require 'enkan-repl-state)
+  ;; Flush state on Emacs exit so the disk file always reflects the last
+  ;; in-memory state, even when individual operations skipped the mirror.
+  (add-hook 'kill-emacs-hook
+            (lambda ()
+              (ignore-errors (enkan-repl-state-save)))))
+
 ;; Load workspace management functions
 (when (locate-library "enkan-repl-workspace")
   (require 'enkan-repl-workspace))
@@ -82,7 +95,25 @@
 (declare-function enkan-repl--get-current-session-state-info "enkan-repl-utils" (current-project session-list session-counter project-aliases))
 (declare-function enkan-repl-utils--encode-full-path "enkan-repl-utils" (path prefix separator))
 (declare-function enkan-repl-utils--decode-full-path "enkan-repl-utils" (encoded-name prefix separator))
-(declare-function enkan-repl--buffer-matches-directory "enkan-repl-utils" (buffer-name target-directory))
+(declare-function enkan-repl--buffer-matches-directory "enkan-repl-utils" (buffer-name target-directory &optional instance))
+(declare-function enkan-repl--buffer-alive-as-terminal-p "enkan-repl-utils" (buffer))
+(declare-function enkan-repl--terminal-tmux-alive-p "enkan-repl-terminal" (id))
+(declare-function enkan-repl--terminal-tmux--mirror-make "enkan-repl-terminal" (id))
+(defvar enkan-repl--tmux-mirror-id)
+(defvar enkan-repl-terminal-backend)
+(declare-function enkan-repl--session-entry-project "enkan-repl-utils" (entry-value))
+(declare-function enkan-repl--session-entry-instance "enkan-repl-utils" (entry-value))
+(declare-function enkan-repl--make-session-entry-value "enkan-repl-utils" (project-name &optional instance))
+(declare-function enkan-repl--buffer-name->instance "enkan-repl-utils" (name))
+(declare-function enkan-repl--terminal-start "enkan-repl-terminal" (dir))
+(declare-function enkan-repl--terminal-send "enkan-repl-terminal" (id text &optional newline))
+(declare-function enkan-repl--terminal-send-key "enkan-repl-terminal" (id key))
+(declare-function enkan-repl--terminal-alive-p "enkan-repl-terminal" (id))
+(declare-function enkan-repl--terminal-list "enkan-repl-terminal" ())
+(declare-function enkan-repl--terminal-kill "enkan-repl-terminal" (id))
+(declare-function enkan-repl--terminal-display "enkan-repl-terminal" (id))
+(declare-function enkan-repl--terminal-id-instance "enkan-repl-terminal" (id))
+(declare-function enkan-repl-state-save "enkan-repl-state" (&optional file))
 (declare-function enkan-repl--extract-project-name "enkan-repl-utils" (buffer-name-or-path))
 (declare-function enkan-repl--is-enkan-buffer-name "enkan-repl-utils" (name))
 (declare-function enkan-repl--path->buffer-name "enkan-repl-utils" (path))
@@ -357,7 +388,11 @@ This function restores workspace state from the given plist."
 (defun enkan-repl--save-workspace-state (&optional workspace-id)
   "Save current globals into `enkan-repl--workspaces' under WORKSPACE-ID.
 When WORKSPACE-ID is nil, use `enkan-repl--current-workspace'.
-Returns the saved plist for verification."
+Returns the saved plist for verification.
+
+Also writes the global workspace state to `enkan-repl-state-file' (best
+effort) when `enkan-repl-state-save' is loaded, so the disk state stays
+in sync with in-memory state across operations."
   (let* ((ws (or workspace-id enkan-repl--current-workspace)))
     ;; Only save if workspace ID is not nil
     (when ws
@@ -369,6 +404,12 @@ Returns the saved plist for verification."
                             enkan-repl--workspaces))
         ;; Add single new entry
         (push (cons ws plist) enkan-repl--workspaces)
+        ;; Mirror to disk for crash recovery (silent best-effort).
+        ;; Skip in batch / noninteractive mode (test runs) to avoid
+        ;; clobbering the user's real state file with test fixtures.
+        (when (and (fboundp 'enkan-repl-state-save)
+                   (not noninteractive))
+          (ignore-errors (enkan-repl-state-save)))
         plist))))
 
 (defun enkan-repl--load-workspace-state (&optional workspace-id)
@@ -716,11 +757,18 @@ For other buffers, use current `default-directory'."
 
 ;;;; Multi-buffer access core functions
 
-(defun enkan-repl--register-session (session-number project-name)
-  "Register PROJECT-NAME to SESSION-NUMBER.
-Order is maintained by session number (ascending)."
+(defun enkan-repl--register-session (session-number project-name &optional instance)
+  "Register PROJECT-NAME under SESSION-NUMBER (with multi-instance INSTANCE).
+INSTANCE defaults to 1.  Order is maintained by session number ascending.
+
+The cdr value uses the new cons form (project . instance) via
+`enkan-repl--make-session-entry-value'.  Readers should use
+`enkan-repl--session-entry-project' / `--session-entry-instance' to
+extract fields for forward/backward compatibility."
   (let ((updated-list (assq-delete-all session-number (enkan-repl--ws-session-list)))
-        (new-entry (cons session-number project-name)))
+        (new-entry (cons session-number
+                         (enkan-repl--make-session-entry-value
+                          project-name instance))))
     (enkan-repl--ws-set-session-list
      (sort (cons new-entry updated-list)
            (lambda (a b) (< (car a) (car b)))))))
@@ -738,9 +786,12 @@ Returns: Directory path or nil"
           (cl-return-from search-buffers
             (enkan-repl--buffer-name->path (buffer-name))))))))
 
-(defun enkan-repl--get-buffer-for-directory (&optional directory)
+(defun enkan-repl--get-buffer-for-directory (&optional directory instance)
   "Get the eat buffer for DIRECTORY if it exists and is live.
 If DIRECTORY is nil, use current `default-directory'.
+If INSTANCE is non-nil (an integer), match only the buffer whose
+multi-instance index equals INSTANCE; otherwise return the first
+matching buffer regardless of instance.
 Only returns buffers that belong to the current workspace."
   (let
       ((target-dir (or directory default-directory))
@@ -759,7 +810,7 @@ Only returns buffers that belong to the current workspace."
                    ;; Check workspace match
                    (enkan-repl--buffer-name-matches-workspace name current-ws)
                    ;; Check for directory-specific enkan buffer using the buffer-name matcher
-                   (enkan-repl--buffer-matches-directory name target-dir))
+                   (enkan-repl--buffer-matches-directory name target-dir instance))
             (setq matching-buffer buf)
             (cl-return-from search-buffers)))))
     matching-buffer))
@@ -990,26 +1041,41 @@ RESTART-FUNC is a zero-argument function to call for restart.
 
 ;;;###autoload
 (defun enkan-repl-start-eat (&optional _force)
-  "Start eat terminal emulator session in current directory.
-Simplified version for use within setup functions only.
-FORCE parameter ignored - always starts new session.
+  "Start a terminal session in current directory via the configured backend.
+FORCE parameter ignored - always starts a new session.
+
+Dispatches to `enkan-repl--terminal-start' so the active backend (eat or
+tmux, per `enkan-repl-terminal-backend') decides how to spawn the
+session.  The function name is kept for backward compatibility; the body
+no longer assumes eat specifically.
+
+For the tmux backend, an Emacs-side mirror buffer is created eagerly so
+that layout / lookup code (which iterates over `buffer-list') can find
+the session even though the actual terminal lives outside Emacs.
 
 Category: Session Controller"
   (interactive)
-  ;; Simple eat package loading - fail fast if not available
-  (require 'eat)
-  ;; Always start new eat session in current directory
   (let* ((target-dir default-directory)
-         (buffer-name (enkan-repl--path->buffer-name target-dir))
-         (eat-buffer (eat)))
-    ;; Simple buffer renaming - no error handling
-    (when eat-buffer
-      (with-current-buffer eat-buffer
-        (rename-buffer buffer-name t))
-      ;; Register session and save workspace state
+         (term-id (enkan-repl--terminal-start target-dir))
+         (instance (when term-id
+                     (enkan-repl--terminal-id-instance term-id))))
+    (when term-id
+      ;; tmux backend: ensure the mirror buffer exists so buffer-list
+      ;; based layout / count code finds the session.  No pop-up here;
+      ;; the layout setter will display it.
+      (when (and (eq enkan-repl-terminal-backend 'tmux)
+                 (fboundp 'enkan-repl--terminal-tmux--mirror-make))
+        (ignore-errors
+          (enkan-repl--terminal-tmux--mirror-make term-id)))
+      ;; Register session and save workspace state.  Multi-instance index
+      ;; is captured so the same project can be tracked across distinct
+      ;; instances.
       (when enkan-repl--current-project
         (setq enkan-repl--session-counter (1+ enkan-repl--session-counter))
-        (enkan-repl--register-session enkan-repl--session-counter enkan-repl--current-project)
+        (enkan-repl--register-session
+         enkan-repl--session-counter
+         enkan-repl--current-project
+         instance)
         (enkan-repl--save-workspace-state))
       (message "Started eat session in: %s" target-dir))))
 
@@ -1561,15 +1627,21 @@ Returns an alist of (terminated-count . session-termination-results).
 SESSION-TERMINATION-RESULTS is a list of alists, each containing
 \(:session-number N :project-name S :status STATUS).
 STATUS can be terminated, buffer-not-found, or project-path-not-found.
-This function has the side effect of killing buffers."
+This function has the side effect of killing buffers.
+
+SESSION-LIST entry value may be a project-name string (legacy) or a
+\(project-name . instance) cons; both forms are read via the entry
+accessors so multi-instance sessions terminate the correct buffer."
   (let ((terminated-count 0)
         (termination-results '()))
     (dolist (session session-list)
       (let* ((session-number (car session))
-             (project-name (cdr session))
+             (entry-value (cdr session))
+             (project-name (enkan-repl--session-entry-project entry-value))
+             (instance (enkan-repl--session-entry-instance entry-value))
              (project-path (enkan-repl--get-project-path-from-directories project-name target-directories)))
         (if project-path
-            (let ((buffer (enkan-repl--get-buffer-for-directory project-path)))
+            (let ((buffer (enkan-repl--get-buffer-for-directory project-path instance)))
               (if buffer
                   (progn
                     (kill-buffer buffer)
@@ -1624,23 +1696,17 @@ Returns plist with :buffer, :name, :live-p, :has-process, :process."
 
 (defun enkan-repl--get-available-buffers (buffer-list)
   "Pure function to get available enkan buffers from BUFFER-LIST.
-Consolidates buffer collection and filtering into single function.
-Returns list of valid enkan buffers with active eat processes.
-Only returns buffers that belong to the current workspace.
-Falls back to `get-buffer-process' when `eat--process' is unbound or nil,
-which can happen if the buffer-local variable was reset while the OS process
-remained attached to the buffer."
+Returns the buffers that belong to the current workspace and represent a
+live terminal session per `enkan-repl--buffer-alive-as-terminal-p'
+\(backend agnostic: covers eat process-attached buffers and tmux mirror
+buffers)."
   (let ((current-ws enkan-repl--current-workspace))
     (seq-filter (lambda (buffer)
                   (and (bufferp buffer)
                        (buffer-name buffer)
-                       ;; Check workspace match
                        (enkan-repl--buffer-name-matches-workspace
                         (buffer-name buffer) current-ws)
-                       (with-current-buffer buffer
-                         (let ((proc (or (and (boundp 'eat--process) eat--process)
-                                         (get-buffer-process buffer))))
-                           (and proc (process-live-p proc))))))
+                       (enkan-repl--buffer-alive-as-terminal-p buffer)))
                 buffer-list)))
 
 (defun enkan-repl--resolve-target-buffer (pfx alias buffers)
@@ -1671,22 +1737,18 @@ Resolution priority: `prefix-arg' → alias → nil (for interactive selection).
 
 (defun enkan-repl--send-primitive-action (buffer send-data)
   "Side-effect function to execute send action to BUFFER.
-BUFFER: target buffer with eat process
-SEND-DATA: plist from enkan-repl--send-primitive
+BUFFER: target terminal identifier (eat backend: buffer object).
+SEND-DATA: plist from enkan-repl--send-primitive.
 Returns t on success, nil on failure.
-Falls back to `get-buffer-process' when `eat--process' is unbound or nil."
-  (when (and buffer (buffer-live-p buffer))
-    (with-current-buffer buffer
-      (let ((proc (or (and (boundp 'eat--process) eat--process)
-                      (get-buffer-process buffer))))
-        (when (and proc (process-live-p proc))
-          (let ((content (plist-get send-data :content)))
-            (when content
-              (eat--send-string proc content)
-              ;; For text content, also send carriage return
-              (when (eq (plist-get send-data :action) 'text)
-                (eat--send-string proc "\r"))
-              t)))))))
+
+Routes through `enkan-repl--terminal-send' so the active backend (eat or
+tmux) handles the actual transport.  For text actions, a CR is appended
+as part of the same send call; for key / number actions the content is
+already the literal key sequence and no CR is appended."
+  (let ((content (plist-get send-data :content))
+        (action (plist-get send-data :action)))
+    (when (and buffer content)
+      (enkan-repl--terminal-send buffer content (eq action 'text)))))
 
 (defun enkan-repl--send-unified (text &optional pfx special-key-type)
   "Unified backend for all send commands.
@@ -1805,27 +1867,21 @@ Returns plist with :valid, :number, :message."
     (list :valid t :number number :message (format "Valid number: %s" number)))))
 
 (defun enkan-repl--send-text-to-buffer (text buffer)
-  "Center file specific function to send TEXT to BUFFER.
-Sends text followed by carriage return, with cursor positioning.
-Falls back to `get-buffer-process' when `eat--process' is unbound or nil."
-  (when (and (bufferp buffer)
-             (buffer-live-p buffer)
-             (with-current-buffer buffer
-               (let ((proc (or (and (boundp 'eat--process) eat--process)
-                               (get-buffer-process buffer))))
-                 (and proc (process-live-p proc)))))
-    (with-current-buffer buffer
-      (let ((proc (or (and (boundp 'eat--process) eat--process)
-                      (get-buffer-process buffer))))
-        (eat--send-string proc text)
-        (eat--send-string proc "\r"))
-      ;; Move cursor to bottom after eat processes the output
-      (run-at-time 0.01 nil
-                   (lambda (buf)
-                     (when (buffer-live-p buf)
-                       (with-current-buffer buf
-                         (goto-char (point-max)))))
-                   buffer)
+  "Center file specific function to send TEXT to BUFFER (with newline).
+Routes through `enkan-repl--terminal-send' so the active backend
+handles transport.  Cursor positioning runs as a deferred timer to
+match prior visual behavior on the eat backend."
+  (when (and buffer (enkan-repl--terminal-alive-p buffer))
+    (when (enkan-repl--terminal-send buffer text t)
+      ;; Move cursor to bottom after the backend processes the output
+      ;; (visual nicety; meaningful only when buffer is an Emacs buffer)
+      (when (bufferp buffer)
+        (run-at-time 0.01 nil
+                     (lambda (buf)
+                       (when (buffer-live-p buf)
+                         (with-current-buffer buf
+                           (goto-char (point-max)))))
+                     buffer))
       t)))
 
 ;;;###autoload

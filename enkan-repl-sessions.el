@@ -188,7 +188,8 @@ Returns a formatted string for display."
 (defun enkan-repl--get-current-session-state-info (current-project session-list session-counter project-aliases)
   "Pure function to get formatted session state information.
 CURRENT-PROJECT is the current project name or nil.
-SESSION-LIST is an alist of (session-number . project-name).
+SESSION-LIST is an alist of (session-number . VALUE) where VALUE is
+either a project-name string (legacy) or (project-name . instance) cons.
 SESSION-COUNTER is the next session number.
 PROJECT-ALIASES is a list of project aliases.
 Returns a plist with formatted information."
@@ -196,9 +197,14 @@ Returns a plist with formatted information."
         :session-count (length session-list)
         :next-session-number session-counter
         :sessions (if session-list
-                      (mapconcat (lambda (s)
-                                   (format "%d -> %s" (car s) (cdr s)))
-                                 session-list ", ")
+                      (mapconcat
+                       (lambda (s)
+                         (let* ((proj (enkan-repl--session-entry-project (cdr s)))
+                                (inst (enkan-repl--session-entry-instance (cdr s))))
+                           (if (and inst (> inst 1))
+                               (format "%d -> %s<%d>" (car s) proj inst)
+                             (format "%d -> %s" (car s) proj))))
+                       session-list ", ")
                     "none")
         :aliases (if project-aliases
                      (mapconcat #'identity project-aliases ", ")

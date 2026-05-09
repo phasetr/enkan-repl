@@ -21,9 +21,11 @@
 (defun enkan-repl--get-session-project-path-pure (session-number session-list project-registry)
   "Get project path for SESSION-NUMBER from SESSION-LIST and PROJECT-REGISTRY.
 Pure function that returns project path string or nil.
-SESSION-LIST format: ((session-number . project-name) ...)
+SESSION-LIST entry value may be a string (legacy) or
+\(project-name . instance) cons; both are accepted via the entry accessors.
 PROJECT-REGISTRY format: ((alias . (project-name . project-path)) ...)"
-  (let* ((session-project (cdr (assoc session-number session-list)))
+  (let* ((entry-value (cdr (assoc session-number session-list)))
+         (session-project (enkan-repl--session-entry-project entry-value))
          (project-info (when session-project
                          (cl-find-if (lambda (entry)
                                        (string= (car (cdr entry)) session-project))
@@ -33,8 +35,13 @@ PROJECT-REGISTRY format: ((alias . (project-name . project-path)) ...)"
 
 (defun enkan-repl--setup-window-eat-buffer-pure (window session-number session-list project-registry)
   "Pure function to determine eat buffer setup for WINDOW and SESSION-NUMBER.
-Returns cons (window . buffer-name) or nil if session not registered."
-  (let ((project-name (cdr (assoc session-number session-list))))
+Returns cons (window . buffer-name) or nil if session not registered.
+Honors the multi-instance index stored in SESSION-LIST so different
+instances of the same project map to distinct buffer names with <N>
+suffix."
+  (let* ((entry-value (cdr (assoc session-number session-list)))
+         (project-name (enkan-repl--session-entry-project entry-value))
+         (instance (enkan-repl--session-entry-instance entry-value)))
     (when project-name
       (let ((project-path (enkan-repl--get-project-path-from-directories project-name project-registry)))
         (when project-path
@@ -49,7 +56,10 @@ Returns cons (window . buffer-name) or nil if session not registered."
                                  (stringp enkan-repl--current-workspace))
                             enkan-repl--current-workspace
                           "01"))
-                 (buffer-name (format "*ws:%s enkan:%s*" ws-id normalized-path)))
+                 (base (format "*ws:%s enkan:%s*" ws-id normalized-path))
+                 (buffer-name (if (and instance (> instance 1))
+                                  (format "%s<%d>" base instance)
+                                base)))
             (cons window buffer-name)))))))
 
 ;;;; Window Layout Variables
@@ -100,7 +110,7 @@ Returns cons (window . buffer-name) or nil if session not registered."
 Category: Utilities"
   (interactive)
   (delete-other-windows)
-  (split-window-right (floor (* (window-width) 0.35)))
+  (split-window-right)
   ;; Set window variables - direct assignment by position
   ;; Currently at rightmost window, go back to leftmost
   (setq enkan-repl--window-1 (selected-window))

@@ -116,6 +116,61 @@
          (extracted-path (enkan-repl--buffer-name->path buffer-name)))
     (should (string-suffix-p (concat (make-string 200 ?a) "/") extracted-path))))
 
+;;;; Tests for multi-instance suffix handling (<N>)
+
+(ert-deftest test-enkan-repl--buffer-name->path-multi-instance ()
+  "Buffer-name with <N> suffix must still extract the same path."
+  (let ((p1 (enkan-repl--buffer-name->path "*ws:01 enkan:/path/to/lat/*"))
+        (p2 (enkan-repl--buffer-name->path "*ws:01 enkan:/path/to/lat/*<2>"))
+        (p3 (enkan-repl--buffer-name->path "*ws:01 enkan:/path/to/lat/*<10>")))
+    (should (stringp p1))
+    (should (string= p1 p2))
+    (should (string= p1 p3)))
+  ;; nonsense suffix is rejected
+  (should-not (enkan-repl--buffer-name->path "*ws:01 enkan:/path/*<>"))
+  (should-not (enkan-repl--buffer-name->path "*ws:01 enkan:/path/*<abc>")))
+
+(ert-deftest test-enkan-repl--buffer-name->instance ()
+  "Test instance index extraction."
+  (should (= 1 (enkan-repl--buffer-name->instance "*ws:01 enkan:/p/*")))
+  (should (= 2 (enkan-repl--buffer-name->instance "*ws:01 enkan:/p/*<2>")))
+  (should (= 10 (enkan-repl--buffer-name->instance "*ws:01 enkan:/p/*<10>")))
+  ;; non-enkan buffer
+  (should-not (enkan-repl--buffer-name->instance "*scratch*"))
+  (should-not (enkan-repl--buffer-name->instance nil)))
+
+(ert-deftest test-enkan-repl--path->buffer-name-with-instance ()
+  "Test instance suffix is appended only for instance >= 2."
+  (let ((base (enkan-repl--path->buffer-name "/p")))
+    (should (string-match "\\*ws:[0-9]\\{2\\} enkan:/p\\*$" base))
+    ;; instance 1 = no suffix
+    (should (string= base (enkan-repl--path->buffer-name "/p" 1)))
+    ;; instance 2 / 3
+    (should (string= (concat base "<2>")
+                     (enkan-repl--path->buffer-name "/p" 2)))
+    (should (string= (concat base "<7>")
+                     (enkan-repl--path->buffer-name "/p" 7)))
+    ;; nil instance treated as 1
+    (should (string= base (enkan-repl--path->buffer-name "/p" nil)))))
+
+(ert-deftest test-enkan-repl--buffer-matches-directory-multi-instance ()
+  "Buffer-matches-directory matches all instances by default; INSTANCE filter narrows."
+  (let ((b1 "*ws:01 enkan:/path/to/lat/*")
+        (b2 "*ws:01 enkan:/path/to/lat/*<2>")
+        (target "/path/to/lat"))
+    ;; no instance: any matches
+    (should (enkan-repl--buffer-matches-directory b1 target))
+    (should (enkan-repl--buffer-matches-directory b2 target))
+    ;; explicit instance 1: only b1 matches
+    (should     (enkan-repl--buffer-matches-directory b1 target 1))
+    (should-not (enkan-repl--buffer-matches-directory b2 target 1))
+    ;; explicit instance 2: only b2 matches
+    (should-not (enkan-repl--buffer-matches-directory b1 target 2))
+    (should     (enkan-repl--buffer-matches-directory b2 target 2))
+    ;; non-existent instance: nothing matches
+    (should-not (enkan-repl--buffer-matches-directory b1 target 9))
+    (should-not (enkan-repl--buffer-matches-directory b2 target 9))))
+
 (provide 'enkan-repl-name-api-test)
 
 ;;; enkan-repl-name-api-test.el ends here

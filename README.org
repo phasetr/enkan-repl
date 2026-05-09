@@ -4,10 +4,24 @@
 [[https://img.shields.io/badge/License-MIT-yellow.svg]]
 
 This package builds upon the excellent work of:
-- [[https://github.com/akib/emacs-eat][eat]] - Terminal emulator inside Emacs
+- [[https://github.com/tmux/tmux][tmux]] - Terminal multiplexer (current default backend)
+- [[https://github.com/akib/emacs-eat][eat]] - Terminal emulator inside Emacs (legacy / opt-in backend)
 - [[https://github.com/cpoile/claudemacs][claudemacs]] - Claude AI integration for Emacs
 
 We extend our deepest gratitude to the authors and contributors of these foundational packages.
+
+** Quick note on the terminal backend (read this first)
+
+As of the terminal-backend abstraction work, =enkan-repl= ships with
+=tmux= as the default backend.  Heavy modern TUIs (e.g. Claude Code's
+welcome screen, codex) overwhelmed eat's pure-elisp output processing
+and could lock Emacs's main loop.  Delegating the terminal to an
+external tmux server keeps that work entirely outside Emacs and
+preserves session continuity across Emacs restarts.
+
+eat remains fully supported as an opt-in backend; both share the same
+front-end API (=enkan-repl-send-line=, etc.).  See [[#terminal-backend]]
+below for switching, configuration, and migration notes.
 
 #+OPTIONS: toc:2
 
@@ -86,13 +100,24 @@ leveraging Emacs's native compatibility and structured document capabilities.
 Rather than supporting multiple formats like Markdown,
 we focus on what works best within the Emacs ecosystem.
 
-*** Dependency for a terminal emulator, [[https://github.com/akib/emacs-eat][eat]]
+*** Terminal backend dependency
 
-What we want to do is to develop software services.
-As various tools and services emerge,
-I don't want to spend time developing tools.
-Therefore, with the expectation that CLIs will be the main interface for programmers,
-I will fully commit to relying entirely on the terminal emulator, [[https://github.com/akib/emacs-eat][eat]].
+What we want to do is develop software services.  As various tools and
+services emerge, we do not want to spend time developing terminal
+infrastructure.  Therefore, with the expectation that CLIs will be the
+main interface for programmers, we delegate terminal work to a
+purpose-built backend chosen via the =enkan-repl-terminal-backend=
+defcustom:
+
+- =tmux= (default) -- external [[https://github.com/tmux/tmux][tmux]] server.
+  Heavy TUIs and large output volumes are processed by tmux outside of
+  Emacs, so they cannot stall Emacs's main loop.  Sessions also survive
+  Emacs restart and can be attached from any other terminal application.
+- =eat= (legacy / opt-in) -- in-Emacs [[https://github.com/akib/emacs-eat][eat]] terminal emulator.
+  Kept as a rollback path for users whose workflow does not involve
+  heavy TUIs and who prefer a fully in-Emacs terminal.
+
+See [[#terminal-backend]] for switch / configuration / migration details.
 
 *** No Default Keybindings
 We intentionally provide no default keybindings for several reasons:
@@ -244,6 +269,76 @@ Currently operates with a single fixed workspace (=ws:01=), with multi-workspace
 - =enkan-repl-workspace-delete= - Delete a workspace. Cannot delete the current workspace or the only workspace. Uses `hmenu' if available to show workspace ID with its project.
 
 ** Configuration
+
+*** Terminal Backend (=tmux= default, =eat= opt-in)
+:PROPERTIES:
+:CUSTOM_ID: terminal-backend
+:END:
+
+The terminal backend is selected at session-creation time via a single
+defcustom.  Default is =tmux=:
+
+#+begin_src elisp
+;; Default (no need to set explicitly):
+(setq enkan-repl-terminal-backend 'tmux)
+
+;; Opt-in legacy (in-Emacs eat):
+(setq enkan-repl-terminal-backend 'eat)
+#+end_src
+
+Existing sessions are not migrated when the value changes; only sessions
+created after the change use the new backend.  Both backends share the
+same user-facing send / layout commands (=enkan-repl-send-line=,
+=enkan-repl-setup-current-project-layout=, etc.).
+
+**** tmux backend specifics
+
+- Workspace =NN= maps to tmux session =enkan-NN= (prefix is
+  configurable via =enkan-repl-tmux-session-prefix=).
+- Each project alias becomes a tmux window in that session.  Multiple
+  instances of the same project become =alias=, =alias-2=, =alias-3=,
+  ... with the corresponding =*ws:NN enkan:/path/*<N>= mirror buffers
+  inside Emacs.
+- A read-only mirror buffer is updated periodically via
+  =tmux capture-pane= so the layout / send-line code can find sessions
+  via the usual =buffer-list= mechanism.  Disable mirroring with
+  =(setq enkan-repl-tmux-mirror nil)= if not desired.
+- =M-x enkan-repl-tmux-attach= launches an external terminal app and
+  attaches to the current workspace's tmux session.  The attach
+  command is configurable via =enkan-repl-tmux-attach-command= (a
+  format string with =%s= for the session name, or a function).
+- =M-x enkan-repl-tmux-kill-session= kills a single =enkan-*= session;
+  =M-x enkan-repl-tmux-kill-all-enkan= confirms then kills all of them.
+- Persistent state is stored at =enkan-repl-state-file=
+  (=~/.emacs.d/enkan-repl-state.eld= by default).  On Emacs restart the
+  state is reconciled with the live tmux server according to
+  =enkan-repl-state-recovery-policy= (=reattach= / =recreate= /
+  =prompt= / =ignore=, default =reattach=).
+
+**** eat backend specifics
+
+eat behavior is unchanged from before the abstraction work.  All
+existing eat-specific commands and buffer naming remain intact.  Use
+this backend if you want to keep the terminal entirely inside Emacs.
+
+**** Migration history (why tmux became the default)
+
+The latest =claude= CLI welcome screen sends thousands of cursor /
+color escape sequences which =eat--t-write= processes one character at
+a time in pure elisp.  Combined with frequent display geometry changes
+(narrow window splits, expanding minibuffer), this consistently locked
+Emacs's main loop -- verified via SIGUSR2 backtrace from a frozen
+session showing all CPU samples in =timer-event-handler ->
+eat--process-output-queue -> eat-term-process-output -> eat--t-write=.
+
+Switching to tmux moves the terminal emulation entirely out of Emacs;
+Emacs only periodically reads the rendered pane content into a
+read-only mirror.  Heavy TUI repaint storms no longer touch the Emacs
+main loop, and tmux sessions survive Emacs crashes.
+
+The abstraction layer (=enkan-repl-terminal.el=) keeps the eat path
+fully working as a rollback option for environments where the tmux
+default is not desired.
 
 *** Center File and Multi-Project Management
 The center file enables management of multiple projects simultaneously:

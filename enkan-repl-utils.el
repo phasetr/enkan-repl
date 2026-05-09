@@ -20,6 +20,13 @@
 
 (require 'cl-lib)
 
+;; Forward declarations into the terminal layer (enkan-repl-terminal),
+;; which depends on this file via declare-function.  We avoid a hard
+;; require to keep the dependency graph one-directional and to allow
+;; loading this file standalone in tests.
+(declare-function enkan-repl--terminal-tmux-alive-p "enkan-repl-terminal" (id))
+(defvar enkan-repl--tmux-mirror-id)
+
 ;;;; Buffer Name API (New - Compatibility Mode)
 
 (defun enkan-repl--is-enkan-buffer-name (name)
@@ -32,23 +39,43 @@ Now supports workspace-prefixed format *ws:01 enkan:/path*."
 (defun enkan-repl--buffer-name->path (name)
   "Extract expanded directory path from enkan buffer NAME.
 Returns expanded directory path ending with '/', or nil if invalid format.
-Now supports workspace-prefixed format *ws:01 enkan:/path*."
+Supports workspace-prefixed format *ws:01 enkan:/path*, including the
+optional Emacs UNIQUE suffix *ws:01 enkan:/path*<2>, *<3>, ... created by
+`rename-buffer' when multiple sessions are opened for the same path."
   (when (and (stringp name)
-             (string-match "^\\*ws:[0-9]\\{2\\} enkan:\\(.*\\)\\*$" name))
+             (string-match
+              "^\\*ws:[0-9]\\{2\\} enkan:\\(.+\\)\\*\\(?:<[0-9]+>\\)?$"
+              name))
     (let ((raw-path (match-string 1 name)))
       (file-name-as-directory (expand-file-name raw-path)))))
 
-(defun enkan-repl--path->buffer-name (path)
-  "Generate buffer name from PATH.
-Returns buffer name in format *ws:<id> enkan:<expanded-path>*.
-Workspace ID is taken from `enkan-repl--current-workspace' when available; otherwise falls back to "01"."
+(defun enkan-repl--buffer-name->instance (name)
+  "Return the multi-instance index of enkan buffer NAME (1-based).
+Returns 1 when NAME has no <N> suffix.  Returns nil when NAME is not an
+enkan buffer name."
+  (when (and (stringp name)
+             (string-match
+              "^\\*ws:[0-9]\\{2\\} enkan:.+\\*\\(?:<\\([0-9]+\\)>\\)?$"
+              name))
+    (let ((suffix (match-string 1 name)))
+      (if suffix (string-to-number suffix) 1))))
+
+(defun enkan-repl--path->buffer-name (path &optional instance)
+  "Generate buffer name from PATH, optionally with INSTANCE suffix.
+Returns buffer name in format *ws:<id> enkan:<expanded-path>* (instance 1
+or unspecified) or *ws:<id> enkan:<expanded-path>*<N> (instance >= 2).
+Workspace ID is taken from `enkan-repl--current-workspace' when available;
+otherwise falls back to \"01\"."
   (let* ((ws (when (boundp 'enkan-repl--current-workspace)
                enkan-repl--current-workspace))
          (ws-id (if (and (stringp ws)
                          (string-match-p "^[0-9][0-9]$" ws))
                     ws
-                  "01")))
-    (format "*ws:%s enkan:%s*" ws-id (expand-file-name path))))
+                  "01"))
+         (base (format "*ws:%s enkan:%s*" ws-id (expand-file-name path))))
+    (if (and instance (integerp instance) (> instance 1))
+        (format "%s<%d>" base instance)
+      base)))
 
 (defun enkan-repl--buffer-name-matches-workspace (name workspace-id)
   "Check if buffer NAME belongs to WORKSPACE-ID.
@@ -66,24 +93,84 @@ Returns workspace ID string (e.g., \"01\") or nil if not an enkan buffer."
 
 ;;;; Workspace Buffer Count Pure Functions
 
+(defun enkan-repl--buffer-alive-as-terminal-p (buffer)
+  "Return non-nil if BUFFER represents a live terminal session.
+Backend-agnostic check, in priority order:
+1. BUFFER's buffer-local `eat--process' is a live process (kephale eat).
+2. BUFFER has a live OS process attached via `get-buffer-process'
+   (akib eat / general).
+3. BUFFER is a tmux mirror carrying buffer-local
+   `enkan-repl--tmux-mirror-id' and the underlying tmux pane is alive."
+  (and (bufferp buffer)
+       (buffer-live-p buffer)
+       (or
+        ;; (1) buffer-local eat--process points at a live process
+        (with-current-buffer buffer
+          (and (boundp 'eat--process)
+               eat--process
+               (process-live-p eat--process)))
+        ;; (2) general: live process attached to the buffer
+        (let ((proc (get-buffer-process buffer)))
+          (and proc (process-live-p proc)))
+        ;; (3) tmux mirror buffer with bound id pointing at live pane
+        (let ((id (buffer-local-value
+                   'enkan-repl--tmux-mirror-id buffer)))
+          (and id (fboundp 'enkan-repl--terminal-tmux-alive-p)
+               (enkan-repl--terminal-tmux-alive-p id))))))
+
 (defun enkan-repl--get-workspace-buffer-count-pure (buffer-list workspace-id)
-  "Pure function to count living eat buffers for WORKSPACE-ID in BUFFER-LIST.
-Returns the number of valid enkan buffers with active eat processes that belong to the workspace.
-Falls back to `get-buffer-process' when `eat--process' is unbound or nil,
-which can happen if the buffer-local variable was reset while the OS process
-remained attached to the buffer."
+  "Pure function to count live terminal sessions for WORKSPACE-ID.
+Counts BUFFER-LIST entries whose name matches the enkan buffer prefix
+for WORKSPACE-ID and which represent a live session per
+`enkan-repl--buffer-alive-as-terminal-p' (covers both eat
+process-attached buffers and tmux mirror buffers)."
   (let ((count 0))
     (dolist (buffer buffer-list)
       (when (and (bufferp buffer)
                  (buffer-name buffer)
                  (enkan-repl--buffer-name-matches-workspace
                   (buffer-name buffer) workspace-id)
-                 (with-current-buffer buffer
-                   (let ((proc (or (and (boundp 'eat--process) eat--process)
-                                   (get-buffer-process buffer))))
-                     (and proc (process-live-p proc)))))
+                 (enkan-repl--buffer-alive-as-terminal-p buffer))
         (setq count (1+ count))))
     count))
+
+;;;; Session List Entry Accessors (multi-instance aware)
+;;
+;; A session-list entry is a cons (session-number . VALUE).
+;; VALUE may be either:
+;;   - a string  (legacy form: project-name only, instance defaults to 1)
+;;   - a cons    (new form:    (project-name . instance))
+;;
+;; All readers go through these accessors so the on-disk format can evolve
+;; without touching every consumer.  Writers always emit the new (cons)
+;; form via `enkan-repl--make-session-entry-value'.
+
+(defun enkan-repl--session-entry-project (entry-value)
+  "Return the project-name string from ENTRY-VALUE (cdr of session-list cell).
+Accepts both legacy string form and new (project . instance) cons form."
+  (cond
+   ((stringp entry-value) entry-value)
+   ((and (consp entry-value) (stringp (car entry-value))) (car entry-value))
+   (t nil)))
+
+(defun enkan-repl--session-entry-instance (entry-value)
+  "Return the multi-instance index (integer) from ENTRY-VALUE.
+Defaults to 1 for legacy string form or when instance is not stored."
+  (cond
+   ((stringp entry-value) 1)
+   ((and (consp entry-value) (integerp (cdr entry-value))) (cdr entry-value))
+   ((consp entry-value) 1)
+   (t 1)))
+
+(defun enkan-repl--make-session-entry-value (project-name &optional instance)
+  "Construct the cdr value for a session-list entry.
+For INSTANCE 1 (or nil), returns the legacy string form (PROJECT-NAME).
+For INSTANCE >= 2, returns the (PROJECT-NAME . INSTANCE) cons form.
+This keeps single-instance entries serialization-compatible with older
+state files while allowing multi-instance bookkeeping."
+  (if (and instance (integerp instance) (> instance 1))
+      (cons project-name instance)
+    project-name))
 
 ;;;; Session List Pure Functions
 
@@ -121,13 +208,23 @@ Example: \='enkan--Users--project\=' + \='enkan\=' + \='--\=' -> \='/Users/proje
       (concat (replace-regexp-in-string (regexp-quote separator) "/" path-part) "/"))))
 
 
-(defun enkan-repl--buffer-matches-directory (buffer-name target-directory)
+(defun enkan-repl--buffer-matches-directory (buffer-name target-directory &optional instance)
   "Pure function to check if buffer name matches target directory.
-Returns t if buffer is enkan buffer for target directory, nil otherwise."
+Returns t if BUFFER-NAME is an enkan buffer for TARGET-DIRECTORY, nil
+otherwise.  When INSTANCE is non-nil (an integer), additionally requires
+the buffer's multi-instance index to equal INSTANCE.  When INSTANCE is
+nil, any instance for that directory matches."
   (and (stringp buffer-name)
        (stringp target-directory)
        (enkan-repl--is-enkan-buffer-name buffer-name)
-       (string= buffer-name (enkan-repl--path->buffer-name target-directory))))
+       (let ((buf-path (enkan-repl--buffer-name->path buffer-name))
+             (tgt-path (file-name-as-directory
+                        (expand-file-name target-directory))))
+         (and (stringp buf-path)
+              (string= buf-path tgt-path)
+              (or (null instance)
+                  (eql instance
+                       (enkan-repl--buffer-name->instance buffer-name)))))))
 
 (defun enkan-repl--extract-session-info (buffer-name buffer-live-p has-eat-process process-live-p)
   "Pure function to extract session info from buffer properties.

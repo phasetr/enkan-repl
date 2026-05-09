@@ -54,7 +54,15 @@
 
 (ert-deftest test-workspace-not-saved-after-eat-start ()
   "Test that workspace might not be saved after eat starts."
-  (let ((enkan-repl--workspaces '())
+  ;; Kill stale enkan buffers so terminal-id-instance returns 1 in this test.
+  (dolist (buf (buffer-list))
+    (let ((name (buffer-name buf)))
+      (when (and (stringp name)
+                 (string-match-p "^\\*ws:[0-9]\\{2\\} enkan:" name))
+        (kill-buffer buf))))
+  ;; Exercises the eat backend explicitly (mocks `eat').
+  (let ((enkan-repl-terminal-backend 'eat)
+        (enkan-repl--workspaces '())
         (enkan-repl--current-workspace nil)
         (enkan-repl-session-list nil)
         (enkan-repl--session-counter 0)
