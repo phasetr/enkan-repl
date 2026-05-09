@@ -95,7 +95,20 @@
 (declare-function enkan-repl--get-current-session-state-info "enkan-repl-utils" (current-project session-list session-counter project-aliases))
 (declare-function enkan-repl-utils--encode-full-path "enkan-repl-utils" (path prefix separator))
 (declare-function enkan-repl-utils--decode-full-path "enkan-repl-utils" (encoded-name prefix separator))
-(declare-function enkan-repl--buffer-matches-directory "enkan-repl-utils" (buffer-name target-directory))
+(declare-function enkan-repl--buffer-matches-directory "enkan-repl-utils" (buffer-name target-directory &optional instance))
+(declare-function enkan-repl--session-entry-project "enkan-repl-utils" (entry-value))
+(declare-function enkan-repl--session-entry-instance "enkan-repl-utils" (entry-value))
+(declare-function enkan-repl--make-session-entry-value "enkan-repl-utils" (project-name &optional instance))
+(declare-function enkan-repl--buffer-name->instance "enkan-repl-utils" (name))
+(declare-function enkan-repl--terminal-start "enkan-repl-terminal" (dir))
+(declare-function enkan-repl--terminal-send "enkan-repl-terminal" (id text &optional newline))
+(declare-function enkan-repl--terminal-send-key "enkan-repl-terminal" (id key))
+(declare-function enkan-repl--terminal-alive-p "enkan-repl-terminal" (id))
+(declare-function enkan-repl--terminal-list "enkan-repl-terminal" ())
+(declare-function enkan-repl--terminal-kill "enkan-repl-terminal" (id))
+(declare-function enkan-repl--terminal-display "enkan-repl-terminal" (id))
+(declare-function enkan-repl--terminal-id-instance "enkan-repl-terminal" (id))
+(declare-function enkan-repl-state-save "enkan-repl-state" (&optional file))
 (declare-function enkan-repl--extract-project-name "enkan-repl-utils" (buffer-name-or-path))
 (declare-function enkan-repl--is-enkan-buffer-name "enkan-repl-utils" (name))
 (declare-function enkan-repl--path->buffer-name "enkan-repl-utils" (path))
@@ -740,11 +753,11 @@ For other buffers, use current `default-directory'."
 ;;;; Multi-buffer access core functions
 
 (defun enkan-repl--register-session (session-number project-name &optional instance)
-  "Register PROJECT-NAME (with multi-instance INSTANCE, default 1) to SESSION-NUMBER.
-Order is maintained by session number (ascending).
+  "Register PROJECT-NAME under SESSION-NUMBER (with multi-instance INSTANCE).
+INSTANCE defaults to 1.  Order is maintained by session number ascending.
 
-The entry value is stored in the new (project-name . instance) cons form
-via `enkan-repl--make-session-entry-value'.  Readers should use
+The cdr value uses the new cons form (project . instance) via
+`enkan-repl--make-session-entry-value'.  Readers should use
 `enkan-repl--session-entry-project' / `--session-entry-instance' to
 extract fields for forward/backward compatibility."
   (let ((updated-list (assq-delete-all session-number (enkan-repl--ws-session-list)))
