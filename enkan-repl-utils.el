@@ -20,6 +20,13 @@
 
 (require 'cl-lib)
 
+;; Forward declarations into the terminal layer (enkan-repl-terminal),
+;; which depends on this file via declare-function.  We avoid a hard
+;; require to keep the dependency graph one-directional and to allow
+;; loading this file standalone in tests.
+(declare-function enkan-repl--terminal-tmux-alive-p "enkan-repl-terminal" (id))
+(defvar enkan-repl--tmux-mirror-id)
+
 ;;;; Buffer Name API (New - Compatibility Mode)
 
 (defun enkan-repl--is-enkan-buffer-name (name)
@@ -86,22 +93,44 @@ Returns workspace ID string (e.g., \"01\") or nil if not an enkan buffer."
 
 ;;;; Workspace Buffer Count Pure Functions
 
+(defun enkan-repl--buffer-alive-as-terminal-p (buffer)
+  "Return non-nil if BUFFER represents a live terminal session.
+Backend-agnostic check, in priority order:
+1. BUFFER's buffer-local `eat--process' is a live process (kephale eat).
+2. BUFFER has a live OS process attached via `get-buffer-process'
+   (akib eat / general).
+3. BUFFER is a tmux mirror carrying buffer-local
+   `enkan-repl--tmux-mirror-id' and the underlying tmux pane is alive."
+  (and (bufferp buffer)
+       (buffer-live-p buffer)
+       (or
+        ;; (1) buffer-local eat--process points at a live process
+        (with-current-buffer buffer
+          (and (boundp 'eat--process)
+               eat--process
+               (process-live-p eat--process)))
+        ;; (2) general: live process attached to the buffer
+        (let ((proc (get-buffer-process buffer)))
+          (and proc (process-live-p proc)))
+        ;; (3) tmux mirror buffer with bound id pointing at live pane
+        (let ((id (buffer-local-value
+                   'enkan-repl--tmux-mirror-id buffer)))
+          (and id (fboundp 'enkan-repl--terminal-tmux-alive-p)
+               (enkan-repl--terminal-tmux-alive-p id))))))
+
 (defun enkan-repl--get-workspace-buffer-count-pure (buffer-list workspace-id)
-  "Pure function to count living eat buffers for WORKSPACE-ID in BUFFER-LIST.
-Returns the number of valid enkan buffers with active eat processes that belong to the workspace.
-Falls back to `get-buffer-process' when `eat--process' is unbound or nil,
-which can happen if the buffer-local variable was reset while the OS process
-remained attached to the buffer."
+  "Pure function to count live terminal sessions for WORKSPACE-ID.
+Counts BUFFER-LIST entries whose name matches the enkan buffer prefix
+for WORKSPACE-ID and which represent a live session per
+`enkan-repl--buffer-alive-as-terminal-p' (covers both eat
+process-attached buffers and tmux mirror buffers)."
   (let ((count 0))
     (dolist (buffer buffer-list)
       (when (and (bufferp buffer)
                  (buffer-name buffer)
                  (enkan-repl--buffer-name-matches-workspace
                   (buffer-name buffer) workspace-id)
-                 (with-current-buffer buffer
-                   (let ((proc (or (and (boundp 'eat--process) eat--process)
-                                   (get-buffer-process buffer))))
-                     (and proc (process-live-p proc)))))
+                 (enkan-repl--buffer-alive-as-terminal-p buffer))
         (setq count (1+ count))))
     count))
 

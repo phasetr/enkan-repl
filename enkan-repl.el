@@ -96,6 +96,11 @@
 (declare-function enkan-repl-utils--encode-full-path "enkan-repl-utils" (path prefix separator))
 (declare-function enkan-repl-utils--decode-full-path "enkan-repl-utils" (encoded-name prefix separator))
 (declare-function enkan-repl--buffer-matches-directory "enkan-repl-utils" (buffer-name target-directory &optional instance))
+(declare-function enkan-repl--buffer-alive-as-terminal-p "enkan-repl-utils" (buffer))
+(declare-function enkan-repl--terminal-tmux-alive-p "enkan-repl-terminal" (id))
+(declare-function enkan-repl--terminal-tmux--mirror-make "enkan-repl-terminal" (id))
+(defvar enkan-repl--tmux-mirror-id)
+(defvar enkan-repl-terminal-backend)
 (declare-function enkan-repl--session-entry-project "enkan-repl-utils" (entry-value))
 (declare-function enkan-repl--session-entry-instance "enkan-repl-utils" (entry-value))
 (declare-function enkan-repl--make-session-entry-value "enkan-repl-utils" (project-name &optional instance))
@@ -1044,6 +1049,10 @@ tmux, per `enkan-repl-terminal-backend') decides how to spawn the
 session.  The function name is kept for backward compatibility; the body
 no longer assumes eat specifically.
 
+For the tmux backend, an Emacs-side mirror buffer is created eagerly so
+that layout / lookup code (which iterates over `buffer-list') can find
+the session even though the actual terminal lives outside Emacs.
+
 Category: Session Controller"
   (interactive)
   (let* ((target-dir default-directory)
@@ -1051,6 +1060,13 @@ Category: Session Controller"
          (instance (when term-id
                      (enkan-repl--terminal-id-instance term-id))))
     (when term-id
+      ;; tmux backend: ensure the mirror buffer exists so buffer-list
+      ;; based layout / count code finds the session.  No pop-up here;
+      ;; the layout setter will display it.
+      (when (and (eq enkan-repl-terminal-backend 'tmux)
+                 (fboundp 'enkan-repl--terminal-tmux--mirror-make))
+        (ignore-errors
+          (enkan-repl--terminal-tmux--mirror-make term-id)))
       ;; Register session and save workspace state.  Multi-instance index
       ;; is captured so the same project can be tracked across distinct
       ;; instances.
@@ -1680,23 +1696,17 @@ Returns plist with :buffer, :name, :live-p, :has-process, :process."
 
 (defun enkan-repl--get-available-buffers (buffer-list)
   "Pure function to get available enkan buffers from BUFFER-LIST.
-Consolidates buffer collection and filtering into single function.
-Returns list of valid enkan buffers with active eat processes.
-Only returns buffers that belong to the current workspace.
-Falls back to `get-buffer-process' when `eat--process' is unbound or nil,
-which can happen if the buffer-local variable was reset while the OS process
-remained attached to the buffer."
+Returns the buffers that belong to the current workspace and represent a
+live terminal session per `enkan-repl--buffer-alive-as-terminal-p'
+(backend agnostic: covers eat process-attached buffers and tmux mirror
+buffers)."
   (let ((current-ws enkan-repl--current-workspace))
     (seq-filter (lambda (buffer)
                   (and (bufferp buffer)
                        (buffer-name buffer)
-                       ;; Check workspace match
                        (enkan-repl--buffer-name-matches-workspace
                         (buffer-name buffer) current-ws)
-                       (with-current-buffer buffer
-                         (let ((proc (or (and (boundp 'eat--process) eat--process)
-                                         (get-buffer-process buffer))))
-                           (and proc (process-live-p proc))))))
+                       (enkan-repl--buffer-alive-as-terminal-p buffer)))
                 buffer-list)))
 
 (defun enkan-repl--resolve-target-buffer (pfx alias buffers)
