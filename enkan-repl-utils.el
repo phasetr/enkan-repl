@@ -105,6 +105,44 @@ remained attached to the buffer."
         (setq count (1+ count))))
     count))
 
+;;;; Session List Entry Accessors (multi-instance aware)
+;;
+;; A session-list entry is a cons (session-number . VALUE).
+;; VALUE may be either:
+;;   - a string  (legacy form: project-name only, instance defaults to 1)
+;;   - a cons    (new form:    (project-name . instance))
+;;
+;; All readers go through these accessors so the on-disk format can evolve
+;; without touching every consumer.  Writers always emit the new (cons)
+;; form via `enkan-repl--make-session-entry-value'.
+
+(defun enkan-repl--session-entry-project (entry-value)
+  "Return the project-name string from ENTRY-VALUE (cdr of session-list cell).
+Accepts both legacy string form and new (project . instance) cons form."
+  (cond
+   ((stringp entry-value) entry-value)
+   ((and (consp entry-value) (stringp (car entry-value))) (car entry-value))
+   (t nil)))
+
+(defun enkan-repl--session-entry-instance (entry-value)
+  "Return the multi-instance index (integer) from ENTRY-VALUE.
+Defaults to 1 for legacy string form or when instance is not stored."
+  (cond
+   ((stringp entry-value) 1)
+   ((and (consp entry-value) (integerp (cdr entry-value))) (cdr entry-value))
+   ((consp entry-value) 1)
+   (t 1)))
+
+(defun enkan-repl--make-session-entry-value (project-name &optional instance)
+  "Construct the cdr value for a session-list entry.
+For INSTANCE 1 (or nil), returns the legacy string form (PROJECT-NAME).
+For INSTANCE >= 2, returns the (PROJECT-NAME . INSTANCE) cons form.
+This keeps single-instance entries serialization-compatible with older
+state files while allowing multi-instance bookkeeping."
+  (if (and instance (integerp instance) (> instance 1))
+      (cons project-name instance)
+    project-name))
+
 ;;;; Session List Pure Functions
 
 (defun enkan-repl--extract-project-name (buffer-name-or-path)

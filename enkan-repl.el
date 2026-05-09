@@ -716,11 +716,18 @@ For other buffers, use current `default-directory'."
 
 ;;;; Multi-buffer access core functions
 
-(defun enkan-repl--register-session (session-number project-name)
-  "Register PROJECT-NAME to SESSION-NUMBER.
-Order is maintained by session number (ascending)."
+(defun enkan-repl--register-session (session-number project-name &optional instance)
+  "Register PROJECT-NAME (with multi-instance INSTANCE, default 1) to SESSION-NUMBER.
+Order is maintained by session number (ascending).
+
+The entry value is stored in the new (project-name . instance) cons form
+via `enkan-repl--make-session-entry-value'.  Readers should use
+`enkan-repl--session-entry-project' / `--session-entry-instance' to
+extract fields for forward/backward compatibility."
   (let ((updated-list (assq-delete-all session-number (enkan-repl--ws-session-list)))
-        (new-entry (cons session-number project-name)))
+        (new-entry (cons session-number
+                         (enkan-repl--make-session-entry-value
+                          project-name instance))))
     (enkan-repl--ws-set-session-list
      (sort (cons new-entry updated-list)
            (lambda (a b) (< (car a) (car b)))))))
@@ -738,9 +745,12 @@ Returns: Directory path or nil"
           (cl-return-from search-buffers
             (enkan-repl--buffer-name->path (buffer-name))))))))
 
-(defun enkan-repl--get-buffer-for-directory (&optional directory)
+(defun enkan-repl--get-buffer-for-directory (&optional directory instance)
   "Get the eat buffer for DIRECTORY if it exists and is live.
 If DIRECTORY is nil, use current `default-directory'.
+If INSTANCE is non-nil (an integer), match only the buffer whose
+multi-instance index equals INSTANCE; otherwise return the first
+matching buffer regardless of instance.
 Only returns buffers that belong to the current workspace."
   (let
       ((target-dir (or directory default-directory))
@@ -759,7 +769,7 @@ Only returns buffers that belong to the current workspace."
                    ;; Check workspace match
                    (enkan-repl--buffer-name-matches-workspace name current-ws)
                    ;; Check for directory-specific enkan buffer using the buffer-name matcher
-                   (enkan-repl--buffer-matches-directory name target-dir))
+                   (enkan-repl--buffer-matches-directory name target-dir instance))
             (setq matching-buffer buf)
             (cl-return-from search-buffers)))))
     matching-buffer))
@@ -1561,15 +1571,21 @@ Returns an alist of (terminated-count . session-termination-results).
 SESSION-TERMINATION-RESULTS is a list of alists, each containing
 \(:session-number N :project-name S :status STATUS).
 STATUS can be terminated, buffer-not-found, or project-path-not-found.
-This function has the side effect of killing buffers."
+This function has the side effect of killing buffers.
+
+SESSION-LIST entry value may be a project-name string (legacy) or a
+\(project-name . instance) cons; both forms are read via the entry
+accessors so multi-instance sessions terminate the correct buffer."
   (let ((terminated-count 0)
         (termination-results '()))
     (dolist (session session-list)
       (let* ((session-number (car session))
-             (project-name (cdr session))
+             (entry-value (cdr session))
+             (project-name (enkan-repl--session-entry-project entry-value))
+             (instance (enkan-repl--session-entry-instance entry-value))
              (project-path (enkan-repl--get-project-path-from-directories project-name target-directories)))
         (if project-path
-            (let ((buffer (enkan-repl--get-buffer-for-directory project-path)))
+            (let ((buffer (enkan-repl--get-buffer-for-directory project-path instance)))
               (if buffer
                   (progn
                     (kill-buffer buffer)
