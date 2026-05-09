@@ -13,6 +13,8 @@
 (load (expand-file-name "enkan-repl-utils.el" default-directory) nil t)
 (load (expand-file-name "enkan-repl-terminal.el" default-directory) nil t)
 
+(defvar enkan-repl--current-workspace)
+
 ;;;; Default backend
 
 (ert-deftest test-enkan-repl-terminal-default-backend ()
@@ -143,6 +145,137 @@ documented opt-in alternative; see README."
     (should (string= "*tmux enkan-01:lat*"
                      (enkan-repl--terminal-tmux--mirror-buffer-name
                       "enkan-01:lat")))))
+
+;;;; tmux mirror buffer refresh scrolling
+
+(defun test-enkan-repl-terminal--lines (from to)
+  "Return a string containing numbered lines FROM to TO."
+  (mapconcat (lambda (line) (format "line %02d" line))
+             (number-sequence from to)
+             "\n"))
+
+(defun test-enkan-repl-terminal--goto-line (line)
+  "Move point to LINE in the current buffer."
+  (goto-char (point-min))
+  (forward-line (1- line)))
+
+(ert-deftest test-enkan-repl--terminal-tmux--mirror-refresh-sticks-to-bottom ()
+  "A tmux mirror window at the bottom should remain at the bottom after refresh."
+  (let ((buf (generate-new-buffer "*tmux mirror bottom*"))
+        (initial-content (concat (test-enkan-repl-terminal--lines 1 80) "\n"))
+        (updated-content (concat (test-enkan-repl-terminal--lines 1 81) "\n")))
+    (unwind-protect
+        (save-window-excursion
+          (delete-other-windows)
+          (let ((window-min-height 1))
+            (split-window (selected-window) 12 'below))
+          (switch-to-buffer buf)
+          (with-current-buffer buf
+            (setq-local enkan-repl--tmux-mirror-id "enkan-01:p")
+            (let ((inhibit-read-only t))
+              (insert initial-content)))
+          (goto-char (point-max))
+          (recenter -1)
+          (redisplay t)
+          (cl-letf (((symbol-function 'enkan-repl--terminal-tmux-alive-p)
+                     (lambda (_id) t))
+                    ((symbol-function 'enkan-repl--terminal-tmux--capture-pane)
+                     (lambda (_id _lines) updated-content)))
+            (enkan-repl--terminal-tmux--mirror-refresh buf))
+          (redisplay t)
+          (should (= (window-point) (point-max)))
+          (should (enkan-repl--terminal-tmux--window-at-bottom-p
+                   (selected-window))))
+      (kill-buffer buf))))
+
+(ert-deftest test-enkan-repl--terminal-tmux--mirror-refresh-preserves-scroll ()
+  "A tmux mirror window away from the bottom should keep its scroll position."
+  (let ((buf (generate-new-buffer "*tmux mirror scrolled*"))
+        (initial-content (concat (test-enkan-repl-terminal--lines 1 200) "\n"))
+        (updated-content (concat (test-enkan-repl-terminal--lines 1 201) "\n")))
+    (unwind-protect
+        (save-window-excursion
+          (delete-other-windows)
+          (let ((window-min-height 1))
+            (split-window (selected-window) 12 'below))
+          (switch-to-buffer buf)
+          (with-current-buffer buf
+            (setq-local enkan-repl--tmux-mirror-id "enkan-01:p")
+            (let ((inhibit-read-only t))
+              (insert initial-content)))
+          (test-enkan-repl-terminal--goto-line 30)
+          (set-window-start nil (point))
+          (test-enkan-repl-terminal--goto-line 35)
+          (set-window-point nil (point))
+          (redisplay t)
+          (cl-letf (((symbol-function 'enkan-repl--terminal-tmux-alive-p)
+                     (lambda (_id) t))
+                    ((symbol-function 'enkan-repl--terminal-tmux--capture-pane)
+                     (lambda (_id _lines) updated-content)))
+            (enkan-repl--terminal-tmux--mirror-refresh buf))
+          (should (= 30 (line-number-at-pos (window-start) t)))
+          (should (= 35 (line-number-at-pos (window-point) t))))
+      (kill-buffer buf))))
+
+(ert-deftest test-enkan-repl--terminal-tmux--mirror-refresh-skips-hidden ()
+  "A hidden tmux mirror should not run synchronous tmux capture."
+  (let ((buf (generate-new-buffer "*tmux mirror hidden*"))
+        (capture-count 0))
+    (unwind-protect
+        (progn
+          (with-current-buffer buf
+            (setq-local enkan-repl--tmux-mirror-id "enkan-01:p"))
+          (cl-letf (((symbol-function 'enkan-repl--terminal-tmux-alive-p)
+                     (lambda (_id) t))
+                    ((symbol-function 'enkan-repl--terminal-tmux--capture-pane)
+                     (lambda (_id _lines)
+                       (setq capture-count (1+ capture-count))
+                       "hidden content")))
+            (enkan-repl--terminal-tmux--mirror-refresh buf)
+            (should (= 0 capture-count))
+            (with-current-buffer buf
+            (should (eq enkan-repl--tmux-mirror-state 'hidden)))))
+      (kill-buffer buf))))
+
+(ert-deftest test-enkan-repl--terminal-tmux--mirror-refresh-shows-refreshing ()
+  "A tmux mirror should enter `refreshing' before synchronous capture starts."
+  (let ((buf (generate-new-buffer "*tmux mirror status*"))
+        observed-state)
+    (unwind-protect
+        (with-current-buffer buf
+          (setq-local enkan-repl--tmux-mirror-id "enkan-01:p")
+          (cl-letf (((symbol-function 'enkan-repl--terminal-tmux-alive-p)
+                     (lambda (_id) t))
+                    ((symbol-function 'enkan-repl--terminal-tmux--capture-pane)
+                     (lambda (_id _lines)
+                       (setq observed-state enkan-repl--tmux-mirror-state)
+                       "status content")))
+            (enkan-repl--terminal-tmux--mirror-refresh buf t)
+            (should (eq observed-state 'refreshing))
+            (should (eq enkan-repl--tmux-mirror-state 'fresh))))
+      (kill-buffer buf))))
+
+(ert-deftest test-enkan-repl--terminal-tmux-refresh-current-forces-hidden ()
+  "Manual refresh should update the current mirror even when it is hidden."
+  (let ((buf (generate-new-buffer "*tmux mirror manual*"))
+        (capture-count 0))
+    (unwind-protect
+        (with-current-buffer buf
+          (setq-local enkan-repl--tmux-mirror-id "enkan-01:p")
+          (cl-letf (((symbol-function 'enkan-repl--terminal-tmux-alive-p)
+                     (lambda (_id) t))
+                    ((symbol-function 'enkan-repl--terminal-tmux--capture-pane)
+                     (lambda (_id _lines)
+                       (setq capture-count (1+ capture-count))
+                       "manual content"))
+                    ((symbol-function 'message) (lambda (&rest _) nil)))
+            (enkan-repl-tmux-refresh-current)
+            (should (= 1 capture-count))
+            (should (string= "manual content"
+                             (buffer-substring-no-properties
+                              (point-min) (point-max))))
+            (should (eq enkan-repl--tmux-mirror-state 'fresh))))
+      (kill-buffer buf))))
 
 ;;;; attach helper default command (per-system shape)
 

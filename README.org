@@ -235,7 +235,7 @@ Currently operates with a single fixed workspace (=ws:01=), with multi-workspace
 *** Workspace Behavior
 - All sessions are scoped to workspace =ws:01=
 - Session discovery only finds buffers in the current workspace
-- Setup/teardown operations affect only the current workspace
+- Setup and deletion operations affect only the current workspace
 
 ** Core Functions
 
@@ -258,7 +258,7 @@ Currently operates with a single fixed workspace (=ws:01=), with multi-workspace
 - =enkan-repl-send-5= - Send \\='5\\=' to enkan session buffer with optional PFX. - From enkan buffer: Send to current buffer - From other buffer without prefix: Interactive buffer selection - With numeric prefix: Send to buffer at index (1-based)  Uses unified backend with smart buffer detection.
 
 *** Session Control
-- =enkan-repl-teardown= - Terminate eat session(s) based on context. - Standard input file: terminate single eat session for current directory in current workspace - Center file: terminate all registered sessions in current workspace
+- =enkan-repl-workspace-delete= - Delete a workspace and stop all associated terminal resources.
 - =enkan-repl-setup= - Arrange windows for (the author's) optimal workflow
 
 *** Utilities
@@ -266,7 +266,7 @@ Currently operates with a single fixed workspace (=ws:01=), with multi-workspace
 - =enkan-repl-start-eat= - 
 - =enkan-repl-toggle-global-mode= - Toggle enkan-repl global mode on/off.
 - =enkan-repl-workspace-switch= - Switch to another workspace. Uses `hmenu' if available to show workspace ID with its project.
-- =enkan-repl-workspace-delete= - Delete a workspace. Cannot delete the current workspace or the only workspace. Uses `hmenu' if available to show workspace ID with its project.
+- =enkan-repl-workspace-delete= - Delete the current workspace, or prompt for a workspace with a prefix argument.
 
 ** Configuration
 
@@ -299,10 +299,17 @@ same user-facing send / layout commands (=enkan-repl-send-line=,
   instances of the same project become =alias=, =alias-2=, =alias-3=,
   ... with the corresponding =*ws:NN enkan:/path/*<N>= mirror buffers
   inside Emacs.
-- A read-only mirror buffer is updated periodically via
-  =tmux capture-pane= so the layout / send-line code can find sessions
-  via the usual =buffer-list= mechanism.  Disable mirroring with
-  =(setq enkan-repl-tmux-mirror nil)= if not desired.
+- A read-only mirror buffer is updated via =tmux capture-pane= so the
+  layout / send-line code can find sessions via the usual
+  =buffer-list= mechanism.  Visible mirrors refresh every
+  =enkan-repl-tmux-mirror-interval= seconds (default =5.0=).  Hidden
+  mirrors do not run capture until displayed or manually refreshed.
+  Disable mirroring with =(setq enkan-repl-tmux-mirror nil)= if not
+  desired.
+- Mirror buffers show refresh state in the header line
+  (=refreshing=, =hidden=, =fresh=, =unchanged=, =closed=).  Press =g=
+  in a mirror buffer, or run =M-x enkan-repl-tmux-refresh-current=, to
+  force an immediate refresh.
 - =M-x enkan-repl-tmux-attach= launches an external terminal app and
   attaches to the current workspace's tmux session.  The attach
   command is configurable via =enkan-repl-tmux-attach-command= (a
