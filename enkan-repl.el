@@ -61,6 +61,10 @@
 (when (locate-library "enkan-repl-utils")
   (require 'enkan-repl-utils))
 
+;; Load terminal backend dispatch (eat / tmux abstraction)
+(when (locate-library "enkan-repl-terminal")
+  (require 'enkan-repl-terminal))
+
 ;; Load workspace management functions
 (when (locate-library "enkan-repl-workspace")
   (require 'enkan-repl-workspace))
@@ -1000,26 +1004,30 @@ RESTART-FUNC is a zero-argument function to call for restart.
 
 ;;;###autoload
 (defun enkan-repl-start-eat (&optional _force)
-  "Start eat terminal emulator session in current directory.
-Simplified version for use within setup functions only.
-FORCE parameter ignored - always starts new session.
+  "Start a terminal session in current directory via the configured backend.
+FORCE parameter ignored - always starts a new session.
+
+Dispatches to `enkan-repl--terminal-start' so the active backend (eat or
+tmux, per `enkan-repl-terminal-backend') decides how to spawn the
+session.  The function name is kept for backward compatibility; the body
+no longer assumes eat specifically.
 
 Category: Session Controller"
   (interactive)
-  ;; Simple eat package loading - fail fast if not available
-  (require 'eat)
-  ;; Always start new eat session in current directory
   (let* ((target-dir default-directory)
-         (buffer-name (enkan-repl--path->buffer-name target-dir))
-         (eat-buffer (eat)))
-    ;; Simple buffer renaming - no error handling
-    (when eat-buffer
-      (with-current-buffer eat-buffer
-        (rename-buffer buffer-name t))
-      ;; Register session and save workspace state
+         (term-id (enkan-repl--terminal-start target-dir))
+         (instance (when term-id
+                     (enkan-repl--terminal-id-instance term-id))))
+    (when term-id
+      ;; Register session and save workspace state.  Multi-instance index
+      ;; is captured so the same project can be tracked across distinct
+      ;; instances.
       (when enkan-repl--current-project
         (setq enkan-repl--session-counter (1+ enkan-repl--session-counter))
-        (enkan-repl--register-session enkan-repl--session-counter enkan-repl--current-project)
+        (enkan-repl--register-session
+         enkan-repl--session-counter
+         enkan-repl--current-project
+         instance)
         (enkan-repl--save-workspace-state))
       (message "Started eat session in: %s" target-dir))))
 
@@ -1687,22 +1695,18 @@ Resolution priority: `prefix-arg' → alias → nil (for interactive selection).
 
 (defun enkan-repl--send-primitive-action (buffer send-data)
   "Side-effect function to execute send action to BUFFER.
-BUFFER: target buffer with eat process
-SEND-DATA: plist from enkan-repl--send-primitive
+BUFFER: target terminal identifier (eat backend: buffer object).
+SEND-DATA: plist from enkan-repl--send-primitive.
 Returns t on success, nil on failure.
-Falls back to `get-buffer-process' when `eat--process' is unbound or nil."
-  (when (and buffer (buffer-live-p buffer))
-    (with-current-buffer buffer
-      (let ((proc (or (and (boundp 'eat--process) eat--process)
-                      (get-buffer-process buffer))))
-        (when (and proc (process-live-p proc))
-          (let ((content (plist-get send-data :content)))
-            (when content
-              (eat--send-string proc content)
-              ;; For text content, also send carriage return
-              (when (eq (plist-get send-data :action) 'text)
-                (eat--send-string proc "\r"))
-              t)))))))
+
+Routes through `enkan-repl--terminal-send' so the active backend (eat or
+tmux) handles the actual transport.  For text actions, a CR is appended
+as part of the same send call; for key / number actions the content is
+already the literal key sequence and no CR is appended."
+  (let ((content (plist-get send-data :content))
+        (action (plist-get send-data :action)))
+    (when (and buffer content)
+      (enkan-repl--terminal-send buffer content (eq action 'text)))))
 
 (defun enkan-repl--send-unified (text &optional pfx special-key-type)
   "Unified backend for all send commands.
@@ -1821,27 +1825,21 @@ Returns plist with :valid, :number, :message."
     (list :valid t :number number :message (format "Valid number: %s" number)))))
 
 (defun enkan-repl--send-text-to-buffer (text buffer)
-  "Center file specific function to send TEXT to BUFFER.
-Sends text followed by carriage return, with cursor positioning.
-Falls back to `get-buffer-process' when `eat--process' is unbound or nil."
-  (when (and (bufferp buffer)
-             (buffer-live-p buffer)
-             (with-current-buffer buffer
-               (let ((proc (or (and (boundp 'eat--process) eat--process)
-                               (get-buffer-process buffer))))
-                 (and proc (process-live-p proc)))))
-    (with-current-buffer buffer
-      (let ((proc (or (and (boundp 'eat--process) eat--process)
-                      (get-buffer-process buffer))))
-        (eat--send-string proc text)
-        (eat--send-string proc "\r"))
-      ;; Move cursor to bottom after eat processes the output
-      (run-at-time 0.01 nil
-                   (lambda (buf)
-                     (when (buffer-live-p buf)
-                       (with-current-buffer buf
-                         (goto-char (point-max)))))
-                   buffer)
+  "Center file specific function to send TEXT to BUFFER (with newline).
+Routes through `enkan-repl--terminal-send' so the active backend
+handles transport.  Cursor positioning runs as a deferred timer to
+match prior visual behavior on the eat backend."
+  (when (and buffer (enkan-repl--terminal-alive-p buffer))
+    (when (enkan-repl--terminal-send buffer text t)
+      ;; Move cursor to bottom after the backend processes the output
+      ;; (visual nicety; meaningful only when buffer is an Emacs buffer)
+      (when (bufferp buffer)
+        (run-at-time 0.01 nil
+                     (lambda (buf)
+                       (when (buffer-live-p buf)
+                         (with-current-buffer buf
+                           (goto-char (point-max)))))
+                     buffer))
       t)))
 
 ;;;###autoload

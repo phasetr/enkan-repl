@@ -57,7 +57,8 @@ migrated when the value changes."
 (declare-function eat "eat" (&optional program arg))
 (declare-function eat--send-string "eat" (process string))
 (declare-function eat--send-input "eat" (terminal input))
-(declare-function enkan-repl--path->buffer-name "enkan-repl-utils" (path))
+(declare-function enkan-repl--path->buffer-name "enkan-repl-utils" (path &optional instance))
+(declare-function enkan-repl--buffer-name->instance "enkan-repl-utils" (name))
 (declare-function enkan-repl--buffer-name-matches-workspace
                   "enkan-repl-utils" (name workspace-id))
 (defvar eat--process)
@@ -134,6 +135,15 @@ Return non-nil on success."
    'display
    #'enkan-repl--terminal-eat-display
    #'enkan-repl--terminal-tmux-display
+   id))
+
+(defun enkan-repl--terminal-id-instance (id)
+  "Return the multi-instance index (integer, 1-based) of terminal ID.
+Returns 1 when ID has no explicit instance suffix."
+  (enkan-repl--terminal--dispatch
+   'id-instance
+   #'enkan-repl--terminal-eat-id-instance
+   #'enkan-repl--terminal-tmux-id-instance
    id))
 
 ;;;; eat backend
@@ -214,6 +224,11 @@ Return the eat buffer."
   (when (and id (buffer-live-p id))
     (pop-to-buffer-same-window id)))
 
+(defun enkan-repl--terminal-eat-id-instance (id)
+  "eat backend: derive instance index from buffer ID's name (1 if no <N>)."
+  (when (and id (buffer-live-p id))
+    (or (enkan-repl--buffer-name->instance (buffer-name id)) 1)))
+
 ;;;; tmux backend (stubs - to be implemented in later phases)
 
 (defun enkan-repl--terminal-tmux-start (_dir)
@@ -243,6 +258,10 @@ Return the eat buffer."
 (defun enkan-repl--terminal-tmux-display (_id)
   "tmux backend: not implemented."
   (user-error "tmux backend is not implemented yet"))
+
+(defun enkan-repl--terminal-tmux-id-instance (_id)
+  "tmux backend: not implemented."
+  1)
 
 (provide 'enkan-repl-terminal)
 ;;; enkan-repl-terminal.el ends here
