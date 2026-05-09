@@ -65,6 +65,15 @@
 (when (locate-library "enkan-repl-terminal")
   (require 'enkan-repl-terminal))
 
+;; Load persistent workspace state (atomic save/load + tmux reconcile)
+(when (locate-library "enkan-repl-state")
+  (require 'enkan-repl-state)
+  ;; Flush state on Emacs exit so the disk file always reflects the last
+  ;; in-memory state, even when individual operations skipped the mirror.
+  (add-hook 'kill-emacs-hook
+            (lambda ()
+              (ignore-errors (enkan-repl-state-save)))))
+
 ;; Load workspace management functions
 (when (locate-library "enkan-repl-workspace")
   (require 'enkan-repl-workspace))
@@ -361,7 +370,11 @@ This function restores workspace state from the given plist."
 (defun enkan-repl--save-workspace-state (&optional workspace-id)
   "Save current globals into `enkan-repl--workspaces' under WORKSPACE-ID.
 When WORKSPACE-ID is nil, use `enkan-repl--current-workspace'.
-Returns the saved plist for verification."
+Returns the saved plist for verification.
+
+Also writes the global workspace state to `enkan-repl-state-file' (best
+effort) when `enkan-repl-state-save' is loaded, so the disk state stays
+in sync with in-memory state across operations."
   (let* ((ws (or workspace-id enkan-repl--current-workspace)))
     ;; Only save if workspace ID is not nil
     (when ws
@@ -373,6 +386,12 @@ Returns the saved plist for verification."
                             enkan-repl--workspaces))
         ;; Add single new entry
         (push (cons ws plist) enkan-repl--workspaces)
+        ;; Mirror to disk for crash recovery (silent best-effort).
+        ;; Skip in batch / noninteractive mode (test runs) to avoid
+        ;; clobbering the user's real state file with test fixtures.
+        (when (and (fboundp 'enkan-repl-state-save)
+                   (not noninteractive))
+          (ignore-errors (enkan-repl-state-save)))
         plist))))
 
 (defun enkan-repl--load-workspace-state (&optional workspace-id)
