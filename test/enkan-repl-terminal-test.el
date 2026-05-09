@@ -115,18 +115,25 @@
 
 (ert-deftest test-enkan-repl--terminal-tmux--mirror-buffer-name ()
   ;; When pane-cwd succeeds: mirror buffer name uses the eat backend
-  ;; format `*ws:NN enkan:/path/*' so existing layout/lookup code finds
-  ;; tmux mirror buffers transparently.
+  ;; format `*ws:NN enkan:/path/*' (with trailing slash) so existing
+  ;; buffer-list-based layout / send-target lookup finds tmux mirror
+  ;; buffers transparently.
   (let ((enkan-repl--current-workspace "01"))
     (cl-letf (((symbol-function 'enkan-repl--terminal-tmux--pane-cwd)
                (lambda (_id) "/path/to/lat")))
-      (should (string= "*ws:01 enkan:/path/to/lat*"
+      (should (string= "*ws:01 enkan:/path/to/lat/*"
+                       (enkan-repl--terminal-tmux--mirror-buffer-name
+                        "enkan-01:lat"))))
+    ;; pane-cwd already with trailing slash: idempotent
+    (cl-letf (((symbol-function 'enkan-repl--terminal-tmux--pane-cwd)
+               (lambda (_id) "/path/to/lat/")))
+      (should (string= "*ws:01 enkan:/path/to/lat/*"
                        (enkan-repl--terminal-tmux--mirror-buffer-name
                         "enkan-01:lat"))))
     ;; instance suffix is honored (lat-3 -> instance 3 -> *<3>)
     (cl-letf (((symbol-function 'enkan-repl--terminal-tmux--pane-cwd)
                (lambda (_id) "/path/to/lat")))
-      (should (string= "*ws:01 enkan:/path/to/lat*<3>"
+      (should (string= "*ws:01 enkan:/path/to/lat/*<3>"
                        (enkan-repl--terminal-tmux--mirror-buffer-name
                         "enkan-01:lat-3")))))
   ;; When pane-cwd cannot be determined, falls back to *tmux <id>* form.

@@ -408,13 +408,16 @@ mirror buffers."
   "Return mirror buffer name for tmux ID.
 Uses the same `*ws:NN enkan:/path/*' form as the eat backend so that
 existing buffer-list-based layout / lookup code finds tmux mirror
-buffers transparently.  Falls back to `*tmux <id>*' when the path
-cannot be determined."
+buffers transparently.  The path is normalized via
+`file-name-as-directory' so the trailing slash matches what
+`enkan-repl--path->buffer-name' produces from `enkan-repl-target-directories'
+entries (which include the trailing slash).  Falls back to
+`*tmux <id>*' when the path cannot be determined."
   (let ((path (enkan-repl--terminal-tmux--pane-cwd id))
         (instance (enkan-repl--terminal-tmux-id-instance id)))
     (cond
      ((and path (not (string-empty-p path)))
-      (enkan-repl--path->buffer-name path instance))
+      (enkan-repl--path->buffer-name (file-name-as-directory path) instance))
      (t (format "*tmux %s*" id)))))
 
 (defun enkan-repl--terminal-tmux--capture-pane (id lines)
