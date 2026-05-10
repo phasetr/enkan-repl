@@ -35,6 +35,7 @@
 ;;; Code:
 
 (require 'cl-lib)
+(require 'subr-x)
 
 (defgroup enkan-repl-terminal nil
   "Terminal backend selection for enkan-repl."
@@ -69,6 +70,8 @@ migrated when the value changes."
                   "enkan-repl-utils" (name workspace-id))
 (declare-function enkan-repl-state--list-live-tmux-sessions
                   "enkan-repl-state" (prefix))
+(declare-function enkan-repl-notify-task-complete
+                  "enkan-repl-mac-notify" (&optional message))
 (defvar eat--process)
 (defvar enkan-repl--current-workspace)
 
@@ -139,11 +142,14 @@ Return non-nil on success."
 
 (defun enkan-repl--terminal-alive-p (id)
   "Return non-nil if terminal ID is alive."
-  (enkan-repl--terminal--dispatch
-   'alive-p
-   #'enkan-repl--terminal-eat-alive-p
-   #'enkan-repl--terminal-tmux-alive-p
-   id))
+  (if (and (eq enkan-repl-terminal-backend 'tmux)
+           (bufferp id))
+      (enkan-repl--terminal-tmux-mirror-buffer-alive-p id)
+    (enkan-repl--terminal--dispatch
+     'alive-p
+     #'enkan-repl--terminal-eat-alive-p
+     #'enkan-repl--terminal-tmux-alive-p
+     id)))
 
 (defun enkan-repl--terminal-list ()
   "Return list of identifiers for sessions in current workspace."
@@ -275,6 +281,14 @@ like \"enkan-01\"."
   :type 'string
   :group 'enkan-repl-terminal)
 
+(defcustom enkan-repl-tmux-command-timeout 2.0
+  "Maximum seconds to wait for synchronous tmux control commands.
+This applies to lightweight control operations such as session/window
+enumeration, send-keys, and kill commands.  Pane capture uses the separate
+`enkan-repl-tmux-mirror-capture-timeout'."
+  :type 'number
+  :group 'enkan-repl-terminal)
+
 (defun enkan-repl--terminal-tmux--workspace-session ()
   "Return the tmux session name corresponding to current workspace, or nil."
   (when (and (boundp 'enkan-repl--current-workspace)
@@ -287,17 +301,53 @@ When CAPTURE is non-nil, return stdout as a string (trailing newline stripped),
 or nil on non-zero exit.  Otherwise return t on zero exit, nil on non-zero."
   (unless (executable-find enkan-repl-tmux-executable)
     (user-error "Tmux executable not found: %s" enkan-repl-tmux-executable))
-  (with-temp-buffer
-    (let ((status (apply #'call-process
-                         enkan-repl-tmux-executable
-                         nil (current-buffer) nil args)))
-      (cond
-       ((not (zerop status)) nil)
-       (capture (let ((s (buffer-substring-no-properties (point-min) (point-max))))
-                  (if (string-suffix-p "\n" s)
-                      (substring s 0 -1)
-                    s)))
-       (t t)))))
+  (let* ((timeout (and (numberp enkan-repl-tmux-command-timeout)
+                       (> enkan-repl-tmux-command-timeout 0)
+                       enkan-repl-tmux-command-timeout))
+         (deadline (and timeout
+                        (+ (float-time) timeout)))
+         (output-buffer (and capture
+                             (generate-new-buffer " *enkan-repl tmux call*")))
+         (done nil)
+         (status nil)
+         process)
+    (unwind-protect
+        (progn
+          (setq process
+                (make-process
+                 :name "enkan-tmux-call"
+                 :buffer output-buffer
+                 :command (cons enkan-repl-tmux-executable args)
+                 :connection-type 'pipe
+                 :noquery t
+                 :sentinel (lambda (proc _event)
+                             (when (memq (process-status proc) '(exit signal))
+                               (setq status (process-exit-status proc))
+                               (setq done t)))))
+          (while (and (not done)
+                      (process-live-p process)
+                      (or (not deadline) (< (float-time) deadline)))
+            (accept-process-output process 0.05)
+            (when (and (not done)
+                       (memq (process-status process) '(exit signal)))
+              (setq status (process-exit-status process))
+              (setq done t)))
+          (unless done
+            (when (process-live-p process)
+              (delete-process process))
+            (setq status 'timeout))
+          (cond
+           ((not (and (integerp status) (zerop status))) nil)
+           (capture
+            (with-current-buffer output-buffer
+              (let ((s (buffer-substring-no-properties
+                        (point-min) (point-max))))
+                (if (string-suffix-p "\n" s)
+                    (substring s 0 -1)
+                  s))))
+           (t t)))
+      (when (buffer-live-p output-buffer)
+        (kill-buffer output-buffer)))))
 
 (defun enkan-repl--terminal-tmux--has-session (session)
   "Return non-nil if tmux SESSION exists."
@@ -352,6 +402,7 @@ target identifier (e.g. \"enkan-01:lat\")."
                       (user-error "No current workspace; cannot start tmux session")))
          (base (enkan-repl--terminal-tmux--derive-base-name dir))
          (cdir (expand-file-name dir)))
+    (enkan-repl--terminal-tmux--ensure-bell-monitor)
     (cond
      ;; Session does not exist: create it with the first window in DIR.
      ((not (enkan-repl--terminal-tmux--has-session session))
@@ -417,15 +468,127 @@ mirror buffer."
   :type 'boolean
   :group 'enkan-repl-terminal)
 
+(defcustom enkan-repl-tmux-mirror-auto-refresh nil
+  "When non-nil, tmux mirror buffers refresh themselves on an idle timer.
+The default is nil because mirror refresh can still involve main-thread buffer
+updates.  Use `enkan-repl-tmux-refresh-current' or
+`enkan-repl-tmux-refresh-workspace' for explicit refreshes."
+  :type 'boolean
+  :group 'enkan-repl-terminal)
+
 (defcustom enkan-repl-tmux-mirror-interval 5.0
-  "Idle interval (seconds) between `tmux capture-pane' refreshes.
-Applies to every active tmux mirror buffer."
+  "Idle interval (seconds) used when tmux mirror auto-refresh is enabled.
+This is ignored unless `enkan-repl-tmux-mirror-auto-refresh' is non-nil."
   :type 'number
   :group 'enkan-repl-terminal)
 
-(defcustom enkan-repl-tmux-mirror-history-lines 500
-  "Number of scrollback lines to capture per refresh tick."
+(defcustom enkan-repl-tmux-bell-notify t
+  "When non-nil, watch tmux alerts and notify task completion or prompts.
+This is independent from mirror auto-refresh.  Permission prompt detection uses
+a small bounded capture and refreshes only the target that triggered a
+notification."
+  :type 'boolean
+  :group 'enkan-repl-terminal)
+
+(defcustom enkan-repl-tmux-bell-notify-interval 2.0
+  "Seconds between lightweight tmux bell alert checks."
+  :type 'number
+  :group 'enkan-repl-terminal)
+
+(defcustom enkan-repl-tmux-bell-notify-timeout 0.2
+  "Maximum seconds to wait for one tmux bell alert check."
+  :type 'number
+  :group 'enkan-repl-terminal)
+
+(defcustom enkan-repl-tmux-prompt-notify t
+  "When non-nil, notify for Claude Code/Codex CLI permission prompts."
+  :type 'boolean
+  :group 'enkan-repl-terminal)
+
+(defcustom enkan-repl-tmux-prompt-notify-lines 40
+  "Recent tmux lines inspected for permission prompts."
   :type 'integer
+  :group 'enkan-repl-terminal)
+
+(defcustom enkan-repl-tmux-prompt-notify-max-chars (* 16 1024)
+  "Maximum characters inspected per tmux pane for prompt notifications."
+  :type 'integer
+  :group 'enkan-repl-terminal)
+
+(defcustom enkan-repl-tmux-prompt-notify-patterns
+  '("permission[[:space:]-]+\\(required\\|requested\\|needed\\)"
+    "\\(requires\\|needs\\)[[:space:]]+\\(approval\\|permission\\)"
+    "\\(approval\\|permission\\)[[:space:]-]+\\(required\\|requested\\|needed\\)"
+    "waiting[[:space:]]+for[[:space:]]+\\(approval\\|permission\\)"
+    "\\(allow\\|approve\\|deny\\|reject\\)[[:space:]]+\\(command\\|execution\\|tool\\)"
+    "\\(allow\\|approve\\)[^?\n]*\\?"
+    "do you want to \\(continue\\|proceed\\|run\\|execute\\|allow\\)"
+    "\\b\\(y/n\\|yes/no\\)\\b")
+  "Case-insensitive regexps that identify CLI permission prompts."
+  :type '(repeat regexp)
+  :group 'enkan-repl-terminal)
+
+(defcustom enkan-repl-tmux-activity-notify t
+  "When non-nil, notify after tmux pane output changes and then settles.
+This covers CLIs that do not emit a terminal bell when an answer finishes.
+The monitor uses the same small bounded capture as prompt notifications; it
+does not re-enable periodic full mirror refresh."
+  :type 'boolean
+  :group 'enkan-repl-terminal)
+
+(defcustom enkan-repl-tmux-activity-notify-idle-seconds 1.5
+  "Seconds of unchanged alert-capture content before notifying completion."
+  :type 'number
+  :group 'enkan-repl-terminal)
+
+(defcustom enkan-repl-tmux-alert-capture-targets-per-poll 4
+  "Maximum number of tmux targets inspected with capture-pane per poll.
+Bell flags remain checked for all sessions every poll.  Prompt and activity
+notifications use bounded pane captures, so this limit caps worst-case UI
+latency when many background panes exist."
+  :type 'integer
+  :group 'enkan-repl-terminal)
+
+(defcustom enkan-repl-tmux-mirror-history-lines 160
+  "Number of recent tmux lines to capture per refresh.
+The mirror is a lightweight status view, not a full transcript.  Keep this
+small enough that manual refresh remains cheap after a long idle period."
+  :type 'integer
+  :group 'enkan-repl-terminal)
+
+(defcustom enkan-repl-tmux-mirror-display-lines 80
+  "Maximum number of lines kept in a tmux mirror buffer."
+  :type 'integer
+  :group 'enkan-repl-terminal)
+
+(defcustom enkan-repl-tmux-mirror-max-chars (* 64 1024)
+  "Maximum characters to apply to a tmux mirror buffer per refresh.
+When captured content is larger than this value, keep the tail of the
+capture.  This bounds main-thread work after the asynchronous tmux
+process returns."
+  :type 'integer
+  :group 'enkan-repl-terminal)
+
+(defcustom enkan-repl-tmux-mirror-compact-noisy-blocks t
+  "When non-nil, collapse large diff-like or very long output blocks."
+  :type 'boolean
+  :group 'enkan-repl-terminal)
+
+(defcustom enkan-repl-tmux-mirror-noisy-block-threshold 6
+  "Minimum consecutive noisy lines collapsed into one mirror summary line."
+  :type 'integer
+  :group 'enkan-repl-terminal)
+
+(defcustom enkan-repl-tmux-mirror-max-line-length 240
+  "Maximum line length shown verbatim in tmux mirror buffers."
+  :type 'integer
+  :group 'enkan-repl-terminal)
+
+(defcustom enkan-repl-tmux-mirror-capture-timeout 3.0
+  "Seconds before an in-flight tmux mirror capture is cancelled.
+This bounds how long `enkan-repl-tmux-refresh-current' can wait on a stuck
+tmux capture process."
+  :type 'number
   :group 'enkan-repl-terminal)
 
 (defvar-local enkan-repl--tmux-mirror-id nil
@@ -433,6 +596,12 @@ Applies to every active tmux mirror buffer."
 
 (defvar-local enkan-repl--tmux-mirror-timer nil
   "Buffer-local: idle timer driving capture-pane refreshes.")
+
+(defvar-local enkan-repl--tmux-mirror-refresh-process nil
+  "Buffer-local asynchronous `tmux capture-pane' process.")
+
+(defvar-local enkan-repl--tmux-mirror-cwd-process nil
+  "Buffer-local asynchronous tmux pane cwd lookup process.")
 
 (defvar-local enkan-repl--tmux-mirror-state 'idle
   "Buffer-local refresh state for the tmux mirror buffer.")
@@ -448,6 +617,19 @@ Applies to every active tmux mirror buffer."
 
 (defvar-local enkan-repl--tmux-mirror-last-content-hash nil
   "Buffer-local hash of the last captured tmux mirror content.")
+
+(defvar enkan-repl--tmux-bell-monitor-timer nil
+  "Timer used to poll tmux bell alerts for completion notifications.")
+
+(defvar enkan-repl--tmux-bell-monitor-seen (make-hash-table :test #'equal)
+  "Tmux alert keys already notified while their condition remains set.")
+
+(defvar enkan-repl--tmux-bell-monitor-content-state
+  (make-hash-table :test #'equal)
+  "Per-target small-capture state used for tmux activity notifications.")
+
+(defvar enkan-repl--tmux-bell-monitor-target-cursor 0
+  "Round-robin cursor for bounded tmux alert capture polling.")
 
 (defvar enkan-repl-tmux-mirror-mode-map
   (let ((map (make-sparse-keymap)))
@@ -497,11 +679,277 @@ Applies to every active tmux mirror buffer."
 (defun enkan-repl--terminal-tmux--mirror-set-state (state)
   "Set tmux mirror refresh STATE and refresh visible status immediately."
   (setq enkan-repl--tmux-mirror-state state)
-  (enkan-repl--terminal-tmux--mirror-update-status)
-  ;; A visible "refreshing" marker only helps if redisplay happens before the
-  ;; synchronous tmux process call starts.
-  (when (eq state 'refreshing)
-    (redisplay t)))
+  (enkan-repl--terminal-tmux--mirror-update-status))
+
+(defun enkan-repl--terminal-tmux--mirror-auto-refresh-enabled-p ()
+  "Return non-nil when tmux mirror auto-refresh should run."
+  (and enkan-repl-tmux-mirror-auto-refresh
+       (numberp enkan-repl-tmux-mirror-interval)
+       (> enkan-repl-tmux-mirror-interval 0)))
+
+(defun enkan-repl--terminal-tmux--bell-monitor-enabled-p ()
+  "Return non-nil when tmux bell notification monitoring should run."
+  (and enkan-repl-tmux-bell-notify
+       (numberp enkan-repl-tmux-bell-notify-interval)
+       (> enkan-repl-tmux-bell-notify-interval 0)))
+
+(defun enkan-repl--terminal-tmux--bell-monitor-sessions ()
+  "Return tmux sessions that should be checked for bell alerts."
+  (let ((enkan-repl-tmux-command-timeout
+         (if (and (numberp enkan-repl-tmux-bell-notify-timeout)
+                  (> enkan-repl-tmux-bell-notify-timeout 0))
+             enkan-repl-tmux-bell-notify-timeout
+           0.2)))
+    (cl-remove-duplicates
+     (delq nil
+           (if (fboundp 'enkan-repl-state--list-live-tmux-sessions)
+               (enkan-repl-state--list-live-tmux-sessions
+                enkan-repl-tmux-session-prefix)
+             (list (enkan-repl--terminal-tmux--workspace-session))))
+     :test #'equal)))
+
+(defun enkan-repl--terminal-tmux--bell-alert-targets (session)
+  "Return tmux target ids with a bell alert flag in SESSION."
+  (let* ((enkan-repl-tmux-command-timeout
+          (if (and (numberp enkan-repl-tmux-bell-notify-timeout)
+                   (> enkan-repl-tmux-bell-notify-timeout 0))
+              enkan-repl-tmux-bell-notify-timeout
+            0.2))
+         (out (enkan-repl--terminal-tmux--call
+               (list "list-windows" "-t" session "-F"
+                     "#{window_name}\t#{window_bell_flag}")
+               t)))
+    (when (stringp out)
+      (delq
+       nil
+       (mapcar
+        (lambda (line)
+          (pcase-let ((`(,window ,flag) (split-string line "\t")))
+            (when (and window (string= flag "1"))
+              (enkan-repl--terminal-tmux--make-id session window))))
+        (split-string out "\n" t))))))
+
+(defun enkan-repl--terminal-tmux--all-targets (session)
+  "Return all tmux target ids in SESSION."
+  (let ((windows (enkan-repl--terminal-tmux--list-windows session)))
+    (mapcar (lambda (window)
+              (enkan-repl--terminal-tmux--make-id session window))
+            windows)))
+
+(defun enkan-repl--terminal-tmux--alert-capture (target)
+  "Return a small bounded capture from TARGET for alert detection."
+  (let* ((lines (if (and (integerp enkan-repl-tmux-prompt-notify-lines)
+                         (> enkan-repl-tmux-prompt-notify-lines 0))
+                    enkan-repl-tmux-prompt-notify-lines
+                  40))
+         (max-chars (and (integerp enkan-repl-tmux-prompt-notify-max-chars)
+                         (> enkan-repl-tmux-prompt-notify-max-chars 0)
+                         enkan-repl-tmux-prompt-notify-max-chars))
+         (enkan-repl-tmux-command-timeout
+          (if (and (numberp enkan-repl-tmux-bell-notify-timeout)
+                   (> enkan-repl-tmux-bell-notify-timeout 0))
+              enkan-repl-tmux-bell-notify-timeout
+            0.2))
+         (out (enkan-repl--terminal-tmux--call
+               (list "capture-pane" "-p" "-J" "-S"
+                     (format "-%d" lines)
+                     "-t" target)
+               t)))
+    (when (stringp out)
+      (if (and max-chars (> (length out) max-chars))
+          (substring out (- max-chars))
+        out))))
+
+(defun enkan-repl--terminal-tmux--prompt-content-p (content)
+  "Return non-nil when CONTENT looks like a CLI permission prompt."
+  (let ((case-fold-search t)
+        (patterns enkan-repl-tmux-prompt-notify-patterns)
+        matched)
+    (while (and patterns (not matched))
+      (setq matched (string-match-p (car patterns) content))
+      (setq patterns (cdr patterns)))
+    matched))
+
+(defun enkan-repl--terminal-tmux--prompt-alert-targets (session)
+  "Return tmux target ids in SESSION that look like permission prompts."
+  (when enkan-repl-tmux-prompt-notify
+    (delq
+     nil
+     (mapcar
+      (lambda (target)
+        (let ((content (enkan-repl--terminal-tmux--alert-capture target)))
+          (when (and content
+                     (enkan-repl--terminal-tmux--prompt-content-p content))
+            target)))
+      (enkan-repl--terminal-tmux--all-targets session)))))
+
+(defun enkan-repl--terminal-tmux--activity-notify-enabled-p ()
+  "Return non-nil when tmux content-settled notifications should run."
+  (and enkan-repl-tmux-activity-notify
+       (numberp enkan-repl-tmux-activity-notify-idle-seconds)
+       (>= enkan-repl-tmux-activity-notify-idle-seconds 0)))
+
+(defun enkan-repl--terminal-tmux--activity-alert-p (target content now)
+  "Return non-nil when TARGET CONTENT has changed and then settled by NOW.
+The first observation only establishes a baseline.  Later content changes mark
+the target active, and a notification is emitted once the small capture remains
+unchanged for `enkan-repl-tmux-activity-notify-idle-seconds'."
+  (when (and (enkan-repl--terminal-tmux--activity-notify-enabled-p)
+             (stringp content))
+    (let* ((hash (secure-hash 'sha1 content))
+           (state (gethash target
+                           enkan-repl--tmux-bell-monitor-content-state))
+           (previous-hash (plist-get state :hash))
+           (changed-at (or (plist-get state :changed-at) now))
+           (notified (plist-get state :notified)))
+      (cond
+       ((null state)
+        (puthash target
+                 (list :hash hash :changed-at now :notified t)
+                 enkan-repl--tmux-bell-monitor-content-state)
+        nil)
+       ((not (equal hash previous-hash))
+        (puthash target
+                 (list :hash hash :changed-at now :notified nil)
+                 enkan-repl--tmux-bell-monitor-content-state)
+        nil)
+       ((not notified)
+        (let ((settled-p
+               (>= (float-time (time-subtract now changed-at))
+                   enkan-repl-tmux-activity-notify-idle-seconds)))
+          (when settled-p
+            (puthash target
+                     (list :hash hash :changed-at changed-at :notified t)
+                     enkan-repl--tmux-bell-monitor-content-state))
+          settled-p))
+       (t nil)))))
+
+(defun enkan-repl--terminal-tmux--alert-target-slice (targets)
+  "Return the bounded round-robin subset of TARGETS to capture this poll."
+  (let* ((targets (cl-remove-duplicates targets :test #'equal))
+         (len (length targets))
+         (limit (if (and (integerp enkan-repl-tmux-alert-capture-targets-per-poll)
+                         (> enkan-repl-tmux-alert-capture-targets-per-poll 0))
+                    enkan-repl-tmux-alert-capture-targets-per-poll
+                  len)))
+    (cond
+     ((zerop len) nil)
+     ((>= limit len)
+      (setq enkan-repl--tmux-bell-monitor-target-cursor 0)
+      targets)
+     (t
+      (let ((start (mod enkan-repl--tmux-bell-monitor-target-cursor len))
+            selected)
+        (dotimes (i limit)
+          (push (nth (mod (+ start i) len) targets) selected))
+        (setq enkan-repl--tmux-bell-monitor-target-cursor
+              (mod (+ start limit) len))
+        (nreverse selected))))))
+
+(defun enkan-repl--terminal-tmux--alert-key (kind target)
+  "Return a stable de-duplication key for alert KIND and TARGET."
+  (format "%s\t%s" kind target))
+
+(defun enkan-repl--terminal-tmux--refresh-alert-target (target)
+  "Force-refresh the mirror buffer for alert TARGET."
+  (when enkan-repl-tmux-mirror
+    (let ((buf (enkan-repl--terminal-tmux--mirror-make target t)))
+      (when buf
+        (enkan-repl--terminal-tmux--mirror-refresh buf t)))))
+
+(defun enkan-repl--terminal-tmux--bell-notify (target &optional kind)
+  "Refresh and notify that tmux TARGET emitted alert KIND."
+  (enkan-repl--terminal-tmux--refresh-alert-target target)
+  (if (fboundp 'enkan-repl-notify-task-complete)
+      (enkan-repl-notify-task-complete
+       (pcase kind
+         ('prompt (format "tmux permission requested: %s" target))
+         ('activity (format "tmux task completed: %s" target))
+         (_ (format "tmux task completed: %s" target))))
+    (message "%s"
+             (pcase kind
+               ('prompt (format "tmux permission requested: %s" target))
+               ('activity (format "tmux task completed: %s" target))
+               (_ (format "tmux task completed: %s" target))))))
+
+(defun enkan-repl--terminal-tmux--bell-monitor-poll ()
+  "Poll tmux alert flags/prompts and notify newly observed alerts."
+  (when (enkan-repl--terminal-tmux--bell-monitor-enabled-p)
+    (let ((active (make-hash-table :test #'equal))
+          (seen-targets (make-hash-table :test #'equal))
+          targets-to-capture
+          (now (current-time)))
+      (dolist (session (enkan-repl--terminal-tmux--bell-monitor-sessions))
+        (dolist (target (enkan-repl--terminal-tmux--bell-alert-targets session))
+          (let ((key (enkan-repl--terminal-tmux--alert-key 'bell target)))
+            (puthash key t active)
+            (unless (gethash key enkan-repl--tmux-bell-monitor-seen)
+              (puthash key t enkan-repl--tmux-bell-monitor-seen)
+              (enkan-repl--terminal-tmux--bell-notify target 'bell))))
+        (dolist (target (enkan-repl--terminal-tmux--all-targets session))
+          (puthash target t seen-targets)
+          (push target targets-to-capture)))
+      (dolist (target (enkan-repl--terminal-tmux--alert-target-slice
+                       (nreverse targets-to-capture)))
+        (when (gethash target seen-targets)
+          (let* ((content (enkan-repl--terminal-tmux--alert-capture target))
+                 (prompt-p (and content
+                                enkan-repl-tmux-prompt-notify
+                                (enkan-repl--terminal-tmux--prompt-content-p
+                                 content)))
+                 (activity-p
+                  (enkan-repl--terminal-tmux--activity-alert-p
+                   target content now)))
+            (when prompt-p
+              (let ((key (enkan-repl--terminal-tmux--alert-key 'prompt target)))
+                (puthash key t active)
+                (unless (gethash key enkan-repl--tmux-bell-monitor-seen)
+                  (puthash key t enkan-repl--tmux-bell-monitor-seen)
+                  (enkan-repl--terminal-tmux--bell-notify target 'prompt))))
+            (when activity-p
+              (enkan-repl--terminal-tmux--bell-notify target 'activity)))))
+      (maphash
+       (lambda (key _)
+         (unless (gethash key active)
+           (remhash key enkan-repl--tmux-bell-monitor-seen)))
+       enkan-repl--tmux-bell-monitor-seen)
+      (maphash
+       (lambda (target _)
+         (unless (gethash target seen-targets)
+           (remhash target enkan-repl--tmux-bell-monitor-content-state)))
+       enkan-repl--tmux-bell-monitor-content-state))))
+
+(defun enkan-repl--terminal-tmux--ensure-bell-monitor ()
+  "Start tmux bell notification monitoring when enabled."
+  (when (and (enkan-repl--terminal-tmux--bell-monitor-enabled-p)
+             (not enkan-repl--tmux-bell-monitor-timer))
+    (setq enkan-repl--tmux-bell-monitor-timer
+          (run-with-timer
+           enkan-repl-tmux-bell-notify-interval
+           enkan-repl-tmux-bell-notify-interval
+           #'enkan-repl--terminal-tmux--bell-monitor-poll))))
+
+(defun enkan-repl-tmux-stop-bell-monitor ()
+  "Stop tmux bell notification monitoring."
+  (interactive)
+  (when enkan-repl--tmux-bell-monitor-timer
+    (cancel-timer enkan-repl--tmux-bell-monitor-timer)
+    (setq enkan-repl--tmux-bell-monitor-timer nil))
+  (clrhash enkan-repl--tmux-bell-monitor-seen)
+  (clrhash enkan-repl--tmux-bell-monitor-content-state)
+  (setq enkan-repl--tmux-bell-monitor-target-cursor 0))
+
+(defun enkan-repl--terminal-tmux-mirror-buffer-alive-p (buffer)
+  "Return non-nil when BUFFER is an open tmux mirror.
+This is intentionally an Emacs-local check.  UI paths call this while scanning
+`buffer-list', so it must not synchronously query tmux."
+  (and (bufferp buffer)
+       (buffer-live-p buffer)
+       (buffer-local-boundp 'enkan-repl--tmux-mirror-id buffer)
+       (buffer-local-value 'enkan-repl--tmux-mirror-id buffer)
+       (not (and (buffer-local-boundp 'enkan-repl--tmux-mirror-state buffer)
+                 (eq (buffer-local-value 'enkan-repl--tmux-mirror-state buffer)
+                     'closed)))))
 
 (defun enkan-repl--terminal-tmux-kill-workspace (workspace-id)
   "Kill the tmux session backing WORKSPACE-ID.
@@ -511,27 +959,10 @@ Returns non-nil when a live tmux session was killed."
     (when (and session (enkan-repl--terminal-tmux--has-session session))
       (enkan-repl--terminal-tmux--call (list "kill-session" "-t" session)))))
 
-(defun enkan-repl--terminal-tmux--line-column-at (position)
-  "Return a cons cell of line and column at POSITION in the current buffer."
-  (save-excursion
-    (goto-char position)
-    (cons (line-number-at-pos nil t) (current-column))))
-
-(defun enkan-repl--terminal-tmux--position-at-line-column (line-column)
-  "Return buffer position for LINE-COLUMN in the current buffer."
-  (save-excursion
-    (goto-char (point-min))
-    (forward-line (1- (car line-column)))
-    (move-to-column (cdr line-column))
-    (point)))
-
 (defun enkan-repl--terminal-tmux--window-at-bottom-p (window)
   "Return non-nil when WINDOW is displaying the current buffer bottom."
   (or (= (window-point window) (point-max))
-      (let ((start-line (line-number-at-pos (window-start window) t))
-            (end-line (line-number-at-pos (point-max) t))
-            (height (max 1 (window-body-height window))))
-        (<= end-line (+ start-line height)))))
+      (pos-visible-in-window-p (point-max) window t)))
 
 (defun enkan-repl--terminal-tmux--mirror-window-state (buffer)
   "Capture scroll state for windows currently displaying BUFFER."
@@ -540,10 +971,8 @@ Returns non-nil when a live tmux session was killed."
      (lambda (window)
        (list :window window
              :at-bottom (enkan-repl--terminal-tmux--window-at-bottom-p window)
-             :start (enkan-repl--terminal-tmux--line-column-at
-                     (window-start window))
-             :point (enkan-repl--terminal-tmux--line-column-at
-                     (window-point window))))
+             :start (window-start window)
+             :point (window-point window)))
      (get-buffer-window-list buffer nil t))))
 
 (defun enkan-repl--terminal-tmux--restore-window-state (buffer states)
@@ -557,61 +986,368 @@ bottom.  Other windows keep their previous line and column."
           (when (and (window-live-p window)
                      (eq (window-buffer window) buffer))
             (if (plist-get state :at-bottom)
-                (let* ((height (max 1 (window-body-height window)))
-                       (end-line (line-number-at-pos (point-max) t))
-                       (start-line (max 1 (- end-line height -1)))
-                       (start (enkan-repl--terminal-tmux--position-at-line-column
-                               (cons start-line 0))))
-                  (set-window-point window (point-max))
-                  (set-window-start window start))
-              (let ((start (enkan-repl--terminal-tmux--position-at-line-column
-                            (plist-get state :start)))
-                    (point (enkan-repl--terminal-tmux--position-at-line-column
-                            (plist-get state :point))))
+                (progn
+                  (set-window-point window (point-max)))
+              (let ((start (min (point-max) (plist-get state :start)))
+                    (point (min (point-max) (plist-get state :point))))
                 (set-window-point window point)
                 (set-window-start window start)))))))))
 
 (defun enkan-repl--terminal-tmux--replace-mirror-content (content)
-  "Replace the current tmux mirror buffer with CONTENT while preserving markers."
-  (let ((source (generate-new-buffer " *enkan-repl tmux capture*")))
-    (unwind-protect
-        (progn
-          (with-current-buffer source
-            (insert content))
-          (replace-buffer-contents source))
-      (kill-buffer source))))
+  "Replace the current tmux mirror buffer with CONTENT.
+This intentionally avoids `replace-buffer-contents'.  Mirror buffers are a
+bounded recent-status view, and diffing a stale huge buffer is unnecessary
+main-thread work."
+  (erase-buffer)
+  (insert content))
 
-(defun enkan-repl--terminal-tmux--pane-cwd (id)
-  "Return current working directory of tmux pane ID, or nil."
-  (enkan-repl--terminal-tmux--call
-   (list "display-message" "-p" "-t" id "#{pane_current_path}")
-   t))
+(defun enkan-repl--terminal-tmux--mirror-fallback-buffer-name (id)
+  "Return a non-blocking fallback mirror buffer name for tmux ID."
+  (format "*tmux %s*" id))
 
-(defun enkan-repl--terminal-tmux--mirror-buffer-name (id)
-  "Return mirror buffer name for tmux ID.
-Uses the same `*ws:NN enkan:/path/*' form as the eat backend so that
-existing buffer-list-based layout / lookup code finds tmux mirror
-buffers transparently.  The path is normalized via
-`file-name-as-directory' so the trailing slash matches what
-`enkan-repl--path->buffer-name' produces from `enkan-repl-target-directories'
-entries (which include the trailing slash).  Falls back to
-`*tmux <id>*' when the path cannot be determined."
-  (let ((path (enkan-repl--terminal-tmux--pane-cwd id))
-        (instance (enkan-repl--terminal-tmux-id-instance id)))
-    (cond
-     ((and path (not (string-empty-p path)))
-      (enkan-repl--path->buffer-name (file-name-as-directory path) instance))
-     (t (format "*tmux %s*" id)))))
+(defun enkan-repl--terminal-tmux--id-workspace (id)
+  "Return workspace id encoded in tmux target ID, or nil.
+For example, with `enkan-repl-tmux-session-prefix' set to \"enkan-\",
+\"enkan-02:lat\" maps to \"02\"."
+  (let ((session (enkan-repl--terminal-tmux--id-session id))
+        (prefix enkan-repl-tmux-session-prefix))
+    (when (and (stringp session)
+               (stringp prefix)
+               (string-prefix-p prefix session)
+               (> (length session) (length prefix)))
+      (substring session (length prefix)))))
 
-(defun enkan-repl--terminal-tmux--capture-pane (id lines)
-  "Return current pane content of tmux ID as a string (best effort).
-LINES is the maximum scrollback to include (negative numbers per
-`tmux capture-pane -S' semantics)."
-  (or (enkan-repl--terminal-tmux--call
-       (list "capture-pane" "-p" "-J" "-S" (format "-%d" (max 0 lines))
-             "-t" id)
-       t)
-      ""))
+(defun enkan-repl--terminal-tmux--mirror-buffer-name-for-path (id path)
+  "Return path-based mirror buffer name for tmux ID at PATH.
+The name uses the same `*ws:NN enkan:/path/*' form as the eat backend so
+buffer-list-based layout and send-target lookup can find tmux mirrors."
+  (let ((enkan-repl--current-workspace
+         (or (enkan-repl--terminal-tmux--id-workspace id)
+             enkan-repl--current-workspace)))
+    (enkan-repl--path->buffer-name
+     (file-name-as-directory path)
+     (enkan-repl--terminal-tmux-id-instance id))))
+
+(defun enkan-repl--terminal-tmux--mirror-buffer-name (id &optional path)
+  "Return mirror buffer name for tmux ID without calling tmux.
+When PATH is non-nil, return the path-based eat-compatible name.
+Otherwise return a tmux-id fallback name.  Pane cwd discovery is done
+asynchronously by `enkan-repl--terminal-tmux--mirror-make'."
+  (if (and path (not (string-empty-p path)))
+      (enkan-repl--terminal-tmux--mirror-buffer-name-for-path id path)
+    (enkan-repl--terminal-tmux--mirror-fallback-buffer-name id)))
+
+(defun enkan-repl--terminal-tmux--find-mirror-buffer (id)
+  "Return an existing tmux mirror buffer for ID, or nil."
+  (cl-find-if
+   (lambda (buffer)
+     (and (buffer-live-p buffer)
+          (buffer-local-boundp 'enkan-repl--tmux-mirror-id buffer)
+          (equal (buffer-local-value 'enkan-repl--tmux-mirror-id buffer)
+                 id)))
+   (buffer-list)))
+
+(defun enkan-repl--terminal-tmux--repair-mirror-buffer-name (buffer)
+  "Repair BUFFER's workspace prefix from its tmux mirror id.
+Return non-nil when BUFFER was renamed.  This uses only Emacs-local metadata
+and the existing buffer path; it does not call tmux."
+  (when (and (buffer-live-p buffer)
+             (buffer-local-boundp 'enkan-repl--tmux-mirror-id buffer))
+    (let* ((id (buffer-local-value 'enkan-repl--tmux-mirror-id buffer))
+           (workspace (and id
+                           (enkan-repl--terminal-tmux--id-workspace id)))
+           (path (enkan-repl--buffer-name->path (buffer-name buffer))))
+      (when (and workspace path)
+        (let* ((enkan-repl--current-workspace workspace)
+               (expected-name
+                (enkan-repl--path->buffer-name
+                 path
+                 (enkan-repl--terminal-tmux-id-instance id))))
+          (unless (string= (buffer-name buffer) expected-name)
+            (with-current-buffer buffer
+              (rename-buffer expected-name t))
+            t))))))
+
+;;;###autoload
+(defun enkan-repl-tmux-repair-mirror-buffer-names ()
+  "Repair tmux mirror buffer workspace prefixes from their tmux target ids.
+This fixes already-created mirror buffers whose `*ws:NN enkan:...*' name was
+derived from the current Emacs workspace instead of the tmux target session."
+  (interactive)
+  (let ((count 0))
+    (dolist (buffer (buffer-list))
+      (when (enkan-repl--terminal-tmux--repair-mirror-buffer-name buffer)
+        (setq count (1+ count))))
+    (message "Repaired %d tmux mirror buffer name(s)" count)
+    count))
+
+(defun enkan-repl--terminal-tmux--pane-cwd-async (id callback)
+  "Resolve tmux pane cwd for ID asynchronously, then call CALLBACK.
+CALLBACK receives the cwd string, or nil on failure."
+  (unless (executable-find enkan-repl-tmux-executable)
+    (user-error "Tmux executable not found: %s" enkan-repl-tmux-executable))
+  (let* ((output-buffer (generate-new-buffer " *enkan-repl tmux cwd*"))
+         (command (list enkan-repl-tmux-executable
+                        "display-message" "-p" "-t" id
+                        "#{pane_current_path}")))
+    (make-process
+     :name (format "enkan-tmux-cwd %s" id)
+     :buffer output-buffer
+     :command command
+     :connection-type 'pipe
+     :noquery t
+     :sentinel
+     (lambda (process _event)
+       (when (memq (process-status process) '(exit signal))
+         (let* ((status (process-exit-status process))
+                (content (when (buffer-live-p output-buffer)
+                           (with-current-buffer output-buffer
+                             (string-trim
+                              (buffer-substring-no-properties
+                               (point-min) (point-max)))))))
+           (when (buffer-live-p output-buffer)
+             (kill-buffer output-buffer))
+           (funcall callback
+                    (and (zerop status)
+                         content
+                         (not (string-empty-p content))
+                         content))))))))
+
+(defun enkan-repl--terminal-tmux--mirror-rename-for-cwd (buffer id cwd)
+  "Rename mirror BUFFER for ID using CWD when it is still current."
+  (when (and cwd (buffer-live-p buffer))
+    (with-current-buffer buffer
+      (when (equal enkan-repl--tmux-mirror-id id)
+        (let ((name (enkan-repl--terminal-tmux--mirror-buffer-name id cwd)))
+          (unless (string= (buffer-name buffer) name)
+            (rename-buffer name t)))))))
+
+(defun enkan-repl--terminal-tmux--mirror-start-cwd-lookup (buffer id)
+  "Start asynchronous cwd lookup for mirror BUFFER bound to ID."
+  (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      (unless (and enkan-repl--tmux-mirror-cwd-process
+                   (process-live-p enkan-repl--tmux-mirror-cwd-process))
+        (let ((target-buffer buffer)
+              (target-id id))
+          (setq enkan-repl--tmux-mirror-cwd-process
+                (enkan-repl--terminal-tmux--pane-cwd-async
+                 id
+                 (lambda (cwd)
+                   (when (buffer-live-p target-buffer)
+                     (with-current-buffer target-buffer
+                       (setq enkan-repl--tmux-mirror-cwd-process nil)))
+                   (enkan-repl--terminal-tmux--mirror-rename-for-cwd
+                    target-buffer target-id cwd)))))))))
+
+(defun enkan-repl--terminal-tmux--tail-append (content chunk max-chars)
+  "Append CHUNK to CONTENT, keeping at most MAX-CHARS characters.
+When MAX-CHARS is nil or non-positive, return the full concatenation."
+  (if (and (integerp max-chars) (> max-chars 0))
+      (cond
+       ((>= (length chunk) max-chars)
+        (substring chunk (- max-chars)))
+       (t
+        (let ((combined (concat content chunk)))
+          (if (> (length combined) max-chars)
+              (substring combined (- max-chars))
+            combined))))
+    (concat content chunk)))
+
+(defun enkan-repl--terminal-tmux--tail-lines (content max-lines)
+  "Return CONTENT limited to its final MAX-LINES lines."
+  (if (and (integerp max-lines) (> max-lines 0))
+      (let* ((lines (split-string content "\n"))
+             (count (length lines)))
+        (string-join
+         (if (> count max-lines)
+             (last lines max-lines)
+           lines)
+         "\n"))
+    content))
+
+(defun enkan-repl--terminal-tmux--max-line-length ()
+  "Return the configured mirror line length limit, or nil."
+  (and (integerp enkan-repl-tmux-mirror-max-line-length)
+       (> enkan-repl-tmux-mirror-max-line-length 0)
+       enkan-repl-tmux-mirror-max-line-length))
+
+(defun enkan-repl--terminal-tmux--truncate-line (line max-length)
+  "Return LINE shortened to MAX-LENGTH characters when needed."
+  (if (and max-length (> (length line) max-length))
+      (format "%s [enkan-repl: omitted %d chars]"
+              (substring line 0 max-length)
+              (- (length line) max-length))
+    line))
+
+(defun enkan-repl--terminal-tmux--noisy-line-p (line)
+  "Return non-nil when LINE looks like generated diff/code noise."
+  (let ((max-length (enkan-repl--terminal-tmux--max-line-length)))
+    (or (and max-length
+             (> (length line) max-length))
+        (string-match-p
+         (rx string-start (* space)
+             (or "diff --git" "index " "@@ " "+++ " "--- "
+                 "```" "~~~"))
+         line)
+        (string-match-p
+         (rx string-start (* space) (or "+" "-")
+             (not (any "\n")))
+         line))))
+
+(defun enkan-repl--terminal-tmux--noisy-block-threshold ()
+  "Return the configured noisy block threshold."
+  (if (and (integerp enkan-repl-tmux-mirror-noisy-block-threshold)
+           (> enkan-repl-tmux-mirror-noisy-block-threshold 0))
+      enkan-repl-tmux-mirror-noisy-block-threshold
+    6))
+
+(defun enkan-repl--terminal-tmux--flush-noisy-lines (lines output)
+  "Append compacted or verbatim noisy LINES to OUTPUT."
+  (let ((threshold (enkan-repl--terminal-tmux--noisy-block-threshold)))
+    (if (>= (length lines) threshold)
+        (cons (format "[enkan-repl: omitted %d noisy/diff line(s)]"
+                      (length lines))
+              output)
+      (append lines output))))
+
+(defun enkan-repl--terminal-tmux--compact-noisy-content (content)
+  "Collapse large noisy blocks in CONTENT."
+  (if (not enkan-repl-tmux-mirror-compact-noisy-blocks)
+      content
+    (let ((output nil)
+          (noisy nil)
+          (max-length (enkan-repl--terminal-tmux--max-line-length)))
+      (dolist (line (split-string content "\n"))
+        (if (enkan-repl--terminal-tmux--noisy-line-p line)
+            (push (enkan-repl--terminal-tmux--truncate-line line max-length)
+                  noisy)
+          (let ((line (enkan-repl--terminal-tmux--truncate-line
+                       line max-length)))
+            (when noisy
+              (setq output
+                    (enkan-repl--terminal-tmux--flush-noisy-lines
+                     noisy output))
+              (setq noisy nil))
+            (push line output))))
+      (when noisy
+        (setq output
+              (enkan-repl--terminal-tmux--flush-noisy-lines noisy output)))
+      (string-join (reverse output) "\n"))))
+
+(defun enkan-repl--terminal-tmux--prepare-mirror-content (content)
+  "Return bounded, display-ready tmux mirror CONTENT."
+  (let* ((max-chars (and (integerp enkan-repl-tmux-mirror-max-chars)
+                         (> enkan-repl-tmux-mirror-max-chars 0)
+                         enkan-repl-tmux-mirror-max-chars))
+         (content (if (and max-chars
+                           (> (length content) max-chars))
+                      (substring content (- max-chars))
+                    content)))
+    (setq content (enkan-repl--terminal-tmux--compact-noisy-content content))
+    (setq content
+          (enkan-repl--terminal-tmux--tail-lines
+           content enkan-repl-tmux-mirror-display-lines))
+    (if (and max-chars (> (length content) max-chars))
+        (substring content (- max-chars))
+      content)))
+
+(defun enkan-repl--terminal-tmux--capture-pane-async (id lines callback)
+  "Capture tmux ID asynchronously and call CALLBACK with content and status.
+LINES is the maximum scrollback to include.  CALLBACK receives two
+arguments: CONTENT, or nil on failure, and the tmux process exit status."
+  (unless (executable-find enkan-repl-tmux-executable)
+    (user-error "Tmux executable not found: %s" enkan-repl-tmux-executable))
+  (let* ((command (list enkan-repl-tmux-executable
+                        "capture-pane" "-p" "-J" "-S"
+                        (format "-%d" (max 0 lines))
+                        "-t" id))
+         (max-chars (and (integerp enkan-repl-tmux-mirror-max-chars)
+                         (> enkan-repl-tmux-mirror-max-chars 0)
+                         enkan-repl-tmux-mirror-max-chars))
+         (content "")
+         (done nil)
+         timer
+         process)
+    (cl-labels
+        ((finish
+          (status)
+          (unless done
+            (setq done t)
+            (when timer
+              (cancel-timer timer)
+              (setq timer nil))
+            (funcall callback
+                     (and (integerp status) (zerop status) content)
+                     status))))
+      (setq process
+            (make-process
+             :name (format "enkan-tmux-capture %s" id)
+             :buffer nil
+             :command command
+             :connection-type 'pipe
+             :noquery t
+             :filter (lambda (_process chunk)
+                       (setq content
+                             (enkan-repl--terminal-tmux--tail-append
+                              content chunk max-chars)))
+             :sentinel (lambda (proc _event)
+                         (when (memq (process-status proc) '(exit signal))
+                           (finish (process-exit-status proc))))))
+      (when (and (numberp enkan-repl-tmux-mirror-capture-timeout)
+                 (> enkan-repl-tmux-mirror-capture-timeout 0))
+        (setq timer
+              (run-at-time
+               enkan-repl-tmux-mirror-capture-timeout nil
+               (lambda ()
+                 (unless done
+                   (finish 'timeout)
+                   (when (process-live-p process)
+                     (delete-process process)))))))
+      process)))
+
+(defun enkan-repl--terminal-tmux--mirror-mark-closed ()
+  "Mark current tmux mirror buffer as closed."
+  (enkan-repl--terminal-tmux--mirror-stop (current-buffer))
+  (enkan-repl--terminal-tmux--mirror-set-state 'closed)
+  (let ((inhibit-read-only t))
+    (goto-char (point-max))
+    (insert "\n[tmux pane closed]\n")))
+
+(defun enkan-repl--terminal-tmux--mirror-apply-content
+    (buffer id started content status)
+  "Apply async tmux capture CONTENT to BUFFER for ID.
+STARTED is the capture start time.  STATUS is the tmux process exit status."
+  (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      (when (equal enkan-repl--tmux-mirror-id id)
+        (setq enkan-repl--tmux-mirror-refresh-process nil)
+        (cond
+         ((eq status 'timeout)
+          (enkan-repl--terminal-tmux--mirror-set-state 'timed-out))
+         ((null content)
+          (enkan-repl--terminal-tmux--mirror-mark-closed))
+         (t
+          (let* ((content
+                  (enkan-repl--terminal-tmux--prepare-mirror-content content))
+                 (content-hash (secure-hash 'sha1 content))
+                 (window-state (enkan-repl--terminal-tmux--mirror-window-state
+                                buffer))
+                 (inhibit-read-only t))
+            (setq enkan-repl--tmux-mirror-last-refresh-time (current-time))
+            (setq enkan-repl--tmux-mirror-last-refresh-duration
+                  (float-time
+                   (time-subtract enkan-repl--tmux-mirror-last-refresh-time
+                                  started)))
+            (setq enkan-repl--tmux-mirror-last-refresh-bytes
+                  (string-bytes content))
+            (if (equal content-hash enkan-repl--tmux-mirror-last-content-hash)
+                (enkan-repl--terminal-tmux--mirror-set-state 'unchanged)
+              (setq enkan-repl--tmux-mirror-last-content-hash content-hash)
+              (enkan-repl--terminal-tmux--replace-mirror-content content)
+              (enkan-repl--terminal-tmux--restore-window-state
+               buffer window-state)
+              (enkan-repl--terminal-tmux--mirror-set-state 'fresh)))))))))
 
 (defun enkan-repl--terminal-tmux--mirror-refresh (buffer &optional force)
   "Refresh mirror BUFFER by capturing current tmux pane content.
@@ -624,41 +1360,29 @@ When FORCE is non-nil, refresh even when BUFFER is hidden."
         (cond
          ((null id))
          ((and (not force)
+               (active-minibuffer-window))
+          (enkan-repl--terminal-tmux--mirror-set-state 'deferred)
+          'deferred)
+         ((and (not force)
                (not (enkan-repl--terminal-tmux--mirror-visible-p buffer)))
           (enkan-repl--terminal-tmux--mirror-set-state 'hidden)
           'hidden)
-         (t
+         ((and enkan-repl--tmux-mirror-refresh-process
+               (process-live-p enkan-repl--tmux-mirror-refresh-process))
           (enkan-repl--terminal-tmux--mirror-set-state 'refreshing)
-          (if (not (enkan-repl--terminal-tmux-alive-p id))
-              (progn
-                ;; Pane is gone -- stop polling and surface a marker.
-                (enkan-repl--terminal-tmux--mirror-stop buffer)
-                (enkan-repl--terminal-tmux--mirror-set-state 'closed)
-                (let ((inhibit-read-only t))
-                  (goto-char (point-max))
-                  (insert "\n[tmux pane closed]\n")))
-            (let* ((started (current-time))
-                   (content (enkan-repl--terminal-tmux--capture-pane
-                             id enkan-repl-tmux-mirror-history-lines))
-                   (content-hash (secure-hash 'sha1 content))
-                   (window-state (enkan-repl--terminal-tmux--mirror-window-state
-                                  buffer))
-                   (inhibit-read-only t))
-              (setq enkan-repl--tmux-mirror-last-refresh-time (current-time))
-              (setq enkan-repl--tmux-mirror-last-refresh-duration
-                    (float-time (time-subtract
-                                 enkan-repl--tmux-mirror-last-refresh-time
-                                 started)))
-              (setq enkan-repl--tmux-mirror-last-refresh-bytes
-                    (string-bytes content))
-              (if (equal content-hash enkan-repl--tmux-mirror-last-content-hash)
-                  (enkan-repl--terminal-tmux--mirror-set-state 'unchanged)
-                (setq enkan-repl--tmux-mirror-last-content-hash content-hash)
-                (enkan-repl--terminal-tmux--replace-mirror-content content)
-                (enkan-repl--terminal-tmux--restore-window-state
-                 buffer window-state)
-                (enkan-repl--terminal-tmux--mirror-set-state 'fresh))
-              enkan-repl--tmux-mirror-state))))))))
+          'refreshing)
+         (t
+          (let ((started (current-time))
+                (target-buffer buffer)
+                (target-id id))
+            (enkan-repl--terminal-tmux--mirror-set-state 'refreshing)
+            (setq enkan-repl--tmux-mirror-refresh-process
+                  (enkan-repl--terminal-tmux--capture-pane-async
+                   id enkan-repl-tmux-mirror-history-lines
+                   (lambda (content status)
+                     (enkan-repl--terminal-tmux--mirror-apply-content
+                      target-buffer target-id started content status))))
+            'refreshing)))))))
 
 (defun enkan-repl--terminal-tmux--mirror-stop (buffer)
   "Cancel mirror refresh timer for BUFFER (if any)."
@@ -668,23 +1392,62 @@ When FORCE is non-nil, refresh even when BUFFER is hidden."
         (cancel-timer enkan-repl--tmux-mirror-timer)
         (setq enkan-repl--tmux-mirror-timer nil)))))
 
-(defun enkan-repl--terminal-tmux--mirror-make (id)
-  "Get or create the mirror buffer for tmux ID, set up timer, return it."
-  (let ((buf (get-buffer-create
-              (enkan-repl--terminal-tmux--mirror-buffer-name id))))
+;;;###autoload
+(defun enkan-repl-tmux-stop-all-mirrors (&optional kill-buffers)
+  "Stop all tmux mirror timers and in-flight mirror processes.
+With prefix KILL-BUFFERS, also kill the mirror buffers.  This command does not
+call tmux; it only quiets Emacs-side timers and subprocess sentinels."
+  (interactive "P")
+  (let ((count 0))
+    (dolist (buffer (buffer-list))
+      (when (and (buffer-live-p buffer)
+                 (buffer-local-boundp 'enkan-repl--tmux-mirror-id buffer)
+                 (buffer-local-value 'enkan-repl--tmux-mirror-id buffer))
+        (setq count (1+ count))
+        (with-current-buffer buffer
+          (enkan-repl--terminal-tmux--mirror-stop buffer)
+          (when (and enkan-repl--tmux-mirror-refresh-process
+                     (process-live-p enkan-repl--tmux-mirror-refresh-process))
+            (delete-process enkan-repl--tmux-mirror-refresh-process))
+          (setq enkan-repl--tmux-mirror-refresh-process nil)
+          (when (and enkan-repl--tmux-mirror-cwd-process
+                     (process-live-p enkan-repl--tmux-mirror-cwd-process))
+            (delete-process enkan-repl--tmux-mirror-cwd-process))
+          (setq enkan-repl--tmux-mirror-cwd-process nil)
+          (enkan-repl--terminal-tmux--mirror-set-state 'stopped))
+        (when kill-buffers
+          (kill-buffer buffer))))
+    (message "Stopped %d tmux mirror buffer(s)" count)
+    count))
+
+(defun enkan-repl--terminal-tmux--mirror-make (id &optional defer-refresh path)
+  "Get or create the mirror buffer for tmux ID and return it.
+When tmux mirror auto-refresh is enabled and DEFER-REFRESH is nil, start a
+timer and immediately refresh the mirror content.  With the default settings,
+mirror buffers never refresh unless explicitly requested.
+When PATH is non-nil, use it for the eat-compatible buffer name.  Otherwise
+create the buffer without blocking on tmux cwd lookup and rename it later when
+the asynchronous lookup returns."
+  (let ((buf (or (enkan-repl--terminal-tmux--find-mirror-buffer id)
+                 (get-buffer-create
+                  (enkan-repl--terminal-tmux--mirror-buffer-name id path)))))
+    (enkan-repl--terminal-tmux--ensure-bell-monitor)
     (with-current-buffer buf
       (unless (derived-mode-p 'enkan-repl-tmux-mirror-mode)
         (enkan-repl-tmux-mirror-mode))
       (setq enkan-repl--tmux-mirror-id id)
       (enkan-repl--terminal-tmux--mirror-update-status)
-      (unless enkan-repl--tmux-mirror-timer
+      (unless path
+        (enkan-repl--terminal-tmux--mirror-start-cwd-lookup buf id))
+      (when (and (enkan-repl--terminal-tmux--mirror-auto-refresh-enabled-p)
+                 (not enkan-repl--tmux-mirror-timer))
         (setq enkan-repl--tmux-mirror-timer
               (run-with-idle-timer
                enkan-repl-tmux-mirror-interval t
                #'enkan-repl--terminal-tmux--mirror-refresh buf)))
-      ;; First refresh immediately for instant feedback when visible.  Hidden
-      ;; mirrors stay cheap until manually refreshed or displayed.
-      (enkan-repl--terminal-tmux--mirror-refresh buf)
+      (when (and (enkan-repl--terminal-tmux--mirror-auto-refresh-enabled-p)
+                 (not defer-refresh))
+        (enkan-repl--terminal-tmux--mirror-refresh buf))
       ;; Stop the timer when buffer is killed.
       (add-hook 'kill-buffer-hook
                 (lambda ()
@@ -703,10 +1466,37 @@ externally via `enkan-repl-tmux-attach'."
                      " or set `enkan-repl-tmux-mirror' to t."))
     nil)
    (t
-    (let ((buf (enkan-repl--terminal-tmux--mirror-make id)))
+    (let ((buf (enkan-repl--terminal-tmux--mirror-make id t)))
       (pop-to-buffer-same-window buf)
-      (enkan-repl--terminal-tmux--mirror-refresh buf t)
+      (message "tmux mirror displayed; press g or run M-x enkan-repl-tmux-refresh-current to refresh")
       buf))))
+
+;;;###autoload
+(defun enkan-repl-tmux-refresh-workspace (&optional quiet)
+  "Refresh tmux mirror buffers for the current workspace.
+Mirror buffers are created for live tmux windows that do not yet have one.
+When QUIET is non-nil, suppress the status message.
+Returns the number of refreshed mirror buffers."
+  (interactive)
+  (unless (eq enkan-repl-terminal-backend 'tmux)
+    (user-error "Current terminal backend is not tmux: %S"
+                enkan-repl-terminal-backend))
+  (unless enkan-repl-tmux-mirror
+    (user-error "Tmux mirror is disabled"))
+  (let ((ids (enkan-repl--terminal-tmux-list))
+        (count 0))
+    (dolist (id ids)
+      (let ((buf (enkan-repl--terminal-tmux--mirror-make id t)))
+        (when buf
+          (enkan-repl--terminal-tmux--mirror-refresh buf t)
+          (setq count (1+ count)))))
+    (unless quiet
+      (message "Refreshed %d tmux mirror buffer(s) for workspace %s"
+               count
+               (or (and (boundp 'enkan-repl--current-workspace)
+                        enkan-repl--current-workspace)
+                   "<none>")))
+    count))
 
 ;;;###autoload
 (defun enkan-repl-tmux-refresh-current ()

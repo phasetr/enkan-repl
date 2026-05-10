@@ -83,9 +83,9 @@ the second buffer gets named with <2> suffix instead of using the workspace ID."
     (should (equal '((1 . "er")) enkan-repl-session-list))
     (should (equal '((1 . "er")) (enkan-repl--ws-session-list)))
     
-    ;; Test that setup-window-eat-buffer-pure returns correct result
-    (when (fboundp 'enkan-repl--setup-window-eat-buffer-pure)
-      (let ((result (enkan-repl--setup-window-eat-buffer-pure
+    ;; Test that setup-window-terminal-buffer-pure returns correct result
+    (when (fboundp 'enkan-repl--setup-window-terminal-buffer-pure)
+      (let ((result (enkan-repl--setup-window-terminal-buffer-pure
                      'test-window 1
                      (enkan-repl--ws-session-list)
                      enkan-repl-target-directories)))
@@ -95,8 +95,8 @@ the second buffer gets named with <2> suffix instead of using the workspace ID."
         (should (consp result))
         (should (string-match-p "\\*ws:01 enkan:/path/to/er/\\*" (cdr result)))))))
 
-(ert-deftest test-setup-session-eat-buffer-returns-nil ()
-  "Test that setup-session-eat-buffer behaves correctly when session list is empty."
+(ert-deftest test-setup-session-terminal-buffer-returns-nil ()
+  "Test that setup-session-terminal-buffer behaves correctly when session list is empty."
   
   (let ((enkan-repl--current-workspace "01")
         (enkan-repl-session-list nil) ;; Empty session list
@@ -116,9 +116,9 @@ the second buffer gets named with <2> suffix instead of using the workspace ID."
                (lambda (buffer)
                  (error "Should not try to switch to buffer"))))
       
-      ;; Call enkan-repl--setup-session-eat-buffer with empty session list
-      (when (fboundp 'enkan-repl--setup-session-eat-buffer)
-        (enkan-repl--setup-session-eat-buffer 'test-window 1))
+      ;; Call enkan-repl--setup-session-terminal-buffer with empty session list
+      (when (fboundp 'enkan-repl--setup-session-terminal-buffer)
+        (enkan-repl--setup-session-terminal-buffer 'test-window 1))
       
       ;; Should show "No session registered" message
       (should (cl-find-if (lambda (msg)

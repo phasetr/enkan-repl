@@ -43,7 +43,7 @@
 ;; - File path support for AI tool direct reading
 ;;
 ;; Quick Start:
-;;   M-x enkan-repl-start-eat
+;;   M-x enkan-repl-start-session
 ;;   M-x enkan-repl-open-project-input-file
 ;;
 ;; This package builds upon eat terminal emulator.  We extend our deepest
@@ -52,6 +52,7 @@
 ;;; Code:
 
 (require 'cl-lib)
+(require 'subr-x)
 
 ;; Load horizontal menu interface if available (avoid compile-time hard fail)
 (when (locate-library "hmenu")
@@ -72,7 +73,8 @@
   ;; in-memory state, even when individual operations skipped the mirror.
   (add-hook 'kill-emacs-hook
             (lambda ()
-              (ignore-errors (enkan-repl-state-save)))))
+              (unless noninteractive
+                (ignore-errors (enkan-repl-state-save))))))
 
 ;; Load workspace management functions
 (when (locate-library "enkan-repl-workspace")
@@ -98,10 +100,15 @@
 (declare-function enkan-repl--buffer-matches-directory "enkan-repl-utils" (buffer-name target-directory &optional instance))
 (declare-function enkan-repl--buffer-alive-as-terminal-p "enkan-repl-utils" (buffer))
 (declare-function enkan-repl--terminal-tmux-alive-p "enkan-repl-terminal" (id))
-(declare-function enkan-repl--terminal-tmux--mirror-make "enkan-repl-terminal" (id))
+(declare-function enkan-repl--terminal-tmux-mirror-buffer-alive-p "enkan-repl-terminal" (buffer))
+(declare-function enkan-repl--terminal-tmux--mirror-make "enkan-repl-terminal" (id &optional defer-refresh path))
+(declare-function enkan-repl--terminal-tmux--list-windows "enkan-repl-terminal" (session))
+(declare-function enkan-repl--terminal-tmux--make-id "enkan-repl-terminal" (session window))
 (declare-function enkan-repl--terminal-tmux-kill-workspace "enkan-repl-terminal" (workspace-id))
+(declare-function enkan-repl-tmux-refresh-workspace "enkan-repl-terminal" (&optional quiet))
 (defvar enkan-repl--tmux-mirror-id)
 (defvar enkan-repl-terminal-backend)
+(defvar enkan-repl-tmux-session-prefix)
 (declare-function enkan-repl--session-entry-project "enkan-repl-utils" (entry-value))
 (declare-function enkan-repl--session-entry-instance "enkan-repl-utils" (entry-value))
 (declare-function enkan-repl--make-session-entry-value "enkan-repl-utils" (project-name &optional instance))
@@ -114,7 +121,10 @@
 (declare-function enkan-repl--terminal-kill "enkan-repl-terminal" (id))
 (declare-function enkan-repl--terminal-display "enkan-repl-terminal" (id))
 (declare-function enkan-repl--terminal-id-instance "enkan-repl-terminal" (id))
+(declare-function enkan-repl-state-load "enkan-repl-state" (&optional file))
 (declare-function enkan-repl-state-save "enkan-repl-state" (&optional file))
+(declare-function enkan-repl-state--list-live-tmux-sessions "enkan-repl-state" (prefix))
+(declare-function enkan-repl-state-tmux-reconcile "enkan-repl-state" (&optional file))
 (declare-function enkan-repl--extract-project-name "enkan-repl-utils" (buffer-name-or-path))
 (declare-function enkan-repl--is-enkan-buffer-name "enkan-repl-utils" (name))
 (declare-function enkan-repl--path->buffer-name "enkan-repl-utils" (path))
@@ -432,6 +442,172 @@ Returns the loaded plist, or nil if no state was found."
         (enkan-repl--update-target-directories-for-workspace)))
     plist))
 
+(defun enkan-repl--tmux-reattach-already-current-p (loaded-workspaces current-id)
+  "Return non-nil when LOADED-WORKSPACES and CURRENT-ID match current state."
+  (and current-id
+       (string= current-id enkan-repl--current-workspace)
+       (equal loaded-workspaces enkan-repl--workspaces)))
+
+(defun enkan-repl--tmux-reattach-workspace-id (session)
+  "Return workspace id encoded in tmux SESSION, or nil."
+  (let ((prefix enkan-repl-tmux-session-prefix))
+    (when (and (stringp session)
+               (string-prefix-p prefix session)
+               (> (length session) (length prefix)))
+      (substring session (length prefix)))))
+
+(defun enkan-repl--tmux-reattach-project-name (window)
+  "Infer a project name from tmux WINDOW."
+  (let ((name (if (and (stringp window)
+                       (not (string-empty-p window)))
+                  window
+                "tmux")))
+    (if (string-match "\\`\\(.+\\)-[0-9]+\\'" name)
+        (match-string 1 name)
+      name)))
+
+(defun enkan-repl--tmux-reattach-state-from-session (session)
+  "Build a minimal workspace plist from live tmux SESSION.
+This intentionally uses tmux window names only.  Pane cwd lookup is not
+performed here because that would add synchronous tmux calls to reattach."
+  (let ((windows (enkan-repl--terminal-tmux--list-windows session))
+        (counter 0)
+        session-list
+        aliases
+        current-project)
+    (dolist (window windows)
+      (let* ((id (enkan-repl--terminal-tmux--make-id session window))
+             (project (enkan-repl--tmux-reattach-project-name window))
+             (instance (enkan-repl--terminal-id-instance id)))
+        (setq counter (1+ counter))
+        (unless current-project
+          (setq current-project project))
+        (push (cons counter
+                    (enkan-repl--make-session-entry-value project instance))
+              session-list)
+        (unless (assoc project aliases)
+          (push (cons project project) aliases))))
+    (list :current-project current-project
+          :session-list (nreverse session-list)
+          :session-counter counter
+          :project-aliases (nreverse aliases))))
+
+(defun enkan-repl--tmux-reattach-live-workspaces ()
+  "Return live tmux workspaces as an alist of (WORKSPACE-ID . STATE)."
+  (let ((sessions (enkan-repl-state--list-live-tmux-sessions
+                   enkan-repl-tmux-session-prefix))
+        workspaces)
+    (dolist (session sessions)
+      (let ((workspace-id (enkan-repl--tmux-reattach-workspace-id session)))
+        (when workspace-id
+          (push (cons workspace-id
+                      (enkan-repl--tmux-reattach-state-from-session session))
+                workspaces))))
+    (nreverse workspaces)))
+
+(defun enkan-repl--tmux-reattach-merge-workspaces (persisted live)
+  "Merge PERSISTED and LIVE workspace alists.
+Live tmux sessions define the set of restored workspaces.  Persisted state wins
+for a live workspace when it exists; otherwise a minimal live-derived state is
+used."
+  (let (merged imported restored dropped)
+    (dolist (live-entry live)
+      (let* ((workspace-id (car live-entry))
+             (persisted-entry (assoc workspace-id persisted #'string=)))
+        (push workspace-id restored)
+        (if persisted-entry
+            (push (cons workspace-id (copy-tree (cdr persisted-entry)))
+                  merged)
+          (push workspace-id imported)
+          (push (copy-tree live-entry) merged))))
+    (dolist (persisted-entry persisted)
+      (unless (assoc (car persisted-entry) live #'string=)
+        (push (car persisted-entry) dropped)))
+    (list :loaded-workspaces (nreverse merged)
+          :restored (nreverse restored)
+          :imported (nreverse imported)
+          :dropped (nreverse dropped))))
+
+(defun enkan-repl--tmux-ensure-restored-workspaces (workspace-ids)
+  "Ensure tmux mirror buffers exist for WORKSPACE-IDS without force-refreshing.
+Returns the total number of mirror buffers ensured."
+  (let ((previous-workspace enkan-repl--current-workspace)
+        (total 0))
+    (unwind-protect
+        (dolist (workspace-id workspace-ids total)
+          (setq enkan-repl--current-workspace workspace-id)
+          (dolist (id (or (enkan-repl--terminal-list) nil))
+            (when (enkan-repl--terminal-tmux--mirror-make id t)
+              (setq total (1+ total)))))
+      (setq enkan-repl--current-workspace previous-workspace))))
+
+;;;###autoload
+(defun enkan-repl-tmux-reattach (&optional file)
+  "Reconnect Emacs state to live tmux sessions.
+FILE defaults to `enkan-repl-state-file'.  Live tmux sessions whose names start
+with `enkan-repl-tmux-session-prefix' define the workspaces to restore.  When a
+matching persisted workspace exists, its saved state is reused.  When no saved
+state exists for a live tmux session, a minimal workspace is imported from the
+tmux session's windows so reattach works after Emacs state was lost.
+
+This command is intentionally manual; enkan-repl does not reattach on load."
+  (interactive)
+  (unless (eq enkan-repl-terminal-backend 'tmux)
+    (user-error "Current terminal backend is not tmux: %S"
+                enkan-repl-terminal-backend))
+  (unless (and (fboundp 'enkan-repl-state-load)
+               (fboundp 'enkan-repl-state--list-live-tmux-sessions))
+    (user-error "Enkan-repl-state is not loaded"))
+  (let* ((payload (enkan-repl-state-load file))
+         (persisted-workspaces (plist-get payload :workspaces))
+         (live-workspaces (enkan-repl--tmux-reattach-live-workspaces))
+         (result (enkan-repl--tmux-reattach-merge-workspaces
+                  persisted-workspaces live-workspaces))
+         (loaded-workspaces (plist-get result :loaded-workspaces))
+         (restored-ids (plist-get result :restored))
+         (saved-current (plist-get payload :current))
+         (current-id (cond
+                      ((and saved-current
+                            (member saved-current restored-ids))
+                       saved-current)
+                      ((and enkan-repl--current-workspace
+                            (member enkan-repl--current-workspace restored-ids))
+                       enkan-repl--current-workspace)
+                      (t (car restored-ids)))))
+    (unless loaded-workspaces
+      (user-error "No live enkan tmux sessions found"))
+    (if (enkan-repl--tmux-reattach-already-current-p
+         loaded-workspaces current-id)
+        (progn
+          (message "Already reattached to %d workspace(s); no refresh needed"
+                   (length loaded-workspaces))
+          result)
+      (setq enkan-repl--workspaces loaded-workspaces)
+      (setq enkan-repl--current-workspace current-id)
+      (enkan-repl--load-workspace-state current-id)
+      (let ((ensured (enkan-repl--tmux-ensure-restored-workspaces
+                      restored-ids)))
+        (setq enkan-repl--current-workspace current-id)
+        (enkan-repl--load-workspace-state current-id)
+        (when (fboundp 'enkan-repl-state-save)
+          (ignore-errors (enkan-repl-state-save file)))
+        (message
+         "Reattached %d workspace(s), ensured %d tmux mirror buffer(s)%s"
+         (length loaded-workspaces)
+         ensured
+         (let ((dropped (plist-get result :dropped))
+               (imported (plist-get result :imported)))
+           (concat
+            (if imported
+                (format ", imported live tmux: %s"
+                        (mapconcat #'identity imported ", "))
+              "")
+            (if dropped
+                (format ", dropped state-only: %s"
+                        (mapconcat #'identity dropped ", "))
+              ""))))
+        result))))
+
 ;;;; Workspace Management Pure Functions
 
 (defun enkan-repl--update-target-directories-for-workspace ()
@@ -623,11 +799,11 @@ Returns the template path to use, or nil to use default template."
                (insert "- ~M-x enkan-repl-send-3~ - Send '3' for numbered choice prompts\n")
                (insert "- ~M-x enkan-repl-send-escape~ - Send ESC key to interrupt operations\n")
                (insert "- ~M-x enkan-repl-open-project-input-file~ - Open or create project input file\n")
-               (insert "- ~M-x enkan-repl-start-eat~ - Start eat terminal session\n")
+               (insert "- ~M-x enkan-repl-start-session~ - Start terminal session\n")
                (insert "- ~M-x enkan-repl-setup~ - Set up convenient window layout\n")
                (insert "\n** Working Notes\n")
                (insert "Write your thoughts and notes here.\n")
-               (insert "Send specific parts to a eat buffer using the commands above.\n"))
+               (insert "Send specific parts to a terminal session using the commands above.\n"))
              (message "Created new template file: %s" template-path)
              template-path)))
         (?q
@@ -702,18 +878,18 @@ Returns categorized functions as string, or falls back to static list."
   (concat "** Command Palette\n\n"
           "- ~M-x enkan-repl-cheat-sheet~ - Display interactive cheat-sheet for enkan-repl commands.\n\n"
           "** Text Sender\n\n"
-          "- ~M-x enkan-repl-send-region~ - Send the text in region from START to END to eat session.\n"
-          "- ~M-x enkan-repl-send-buffer~ - Send the entire current buffer to eat session.\n"
-          "- ~M-x enkan-repl-send-rest-of-buffer~ - Send rest of buffer from cursor position to end to eat session.\n"
-          "- ~M-x enkan-repl-send-line~ - Send the current line to eat session.\n"
-          "- ~M-x enkan-repl-send-enter~ - Send enter key to eat session buffer.\n"
-          "- ~M-x enkan-repl-send-1~ - Send \\='1\\=' to eat session buffer for numbered choice prompts.\n"
-          "- ~M-x enkan-repl-send-2~ - Send \\='2\\=' to eat session buffer for numbered choice prompts.\n"
-          "- ~M-x enkan-repl-send-3~ - Send \\='3\\=' to eat session buffer for numbered choice prompts.\n"
-          "- ~M-x enkan-repl-send-escape~ - Send ESC key to eat session buffer.\n\n"
+          "- ~M-x enkan-repl-send-region~ - Send the text in region from START to END to terminal session.\n"
+          "- ~M-x enkan-repl-send-buffer~ - Send the entire current buffer to terminal session.\n"
+          "- ~M-x enkan-repl-send-rest-of-buffer~ - Send rest of buffer from cursor position to end to terminal session.\n"
+          "- ~M-x enkan-repl-send-line~ - Send the current line to terminal session.\n"
+          "- ~M-x enkan-repl-send-enter~ - Send enter key to terminal session buffer.\n"
+          "- ~M-x enkan-repl-send-1~ - Send \\='1\\=' to terminal session buffer for numbered choice prompts.\n"
+          "- ~M-x enkan-repl-send-2~ - Send \\='2\\=' to terminal session buffer for numbered choice prompts.\n"
+          "- ~M-x enkan-repl-send-3~ - Send \\='3\\=' to terminal session buffer for numbered choice prompts.\n"
+          "- ~M-x enkan-repl-send-escape~ - Send ESC key to terminal session buffer.\n\n"
           "** Session Controller\n\n"
-          "- ~M-x enkan-repl-start-eat~ - Start eat terminal and change to appropriate directory.\n"
-          "- ~M-x enkan-repl-setup~ - Set up window layout with org file on left and eat on right.\n\n"
+          "- ~M-x enkan-repl-start-session~ - Start terminal session in the current directory.\n"
+          "- ~M-x enkan-repl-setup~ - Set up window layout with org file on left and terminal on right.\n\n"
           "** Utilities\n\n"
           "- ~M-x enkan-repl-open-project-input-file~ - Open or create project input file for current directory.\n"
           "- ~M-x enkan-repl-status~ - Show detailed diagnostic information for troubleshooting connection issues.\n"))
@@ -792,7 +968,7 @@ Returns: Directory path or nil"
             (enkan-repl--buffer-name->path (buffer-name))))))))
 
 (defun enkan-repl--get-buffer-for-directory (&optional directory instance)
-  "Get the eat buffer for DIRECTORY if it exists and is live.
+  "Get the terminal buffer for DIRECTORY if it exists and is live.
 If DIRECTORY is nil, use current `default-directory'.
 If INSTANCE is non-nil (an integer), match only the buffer whose
 multi-instance index equals INSTANCE; otherwise return the first
@@ -832,8 +1008,8 @@ Only returns buffers that belong to the current workspace."
 ;;;; Send Functions - Internal Helpers
 
 (defun enkan-repl--can-send-text (&optional directory)
-  "Check if text can actually be sent to eat session (strict check).
-If DIRECTORY is provided, check for eat session in that directory.
+  "Check if text can actually be sent to terminal session (strict check).
+If DIRECTORY is provided, check for a terminal session in that directory.
 Otherwise, use current `default-directory'.
 Falls back to `get-buffer-process' when `eat--process' is unbound or nil."
   (let ((session-buffer (enkan-repl--get-buffer-for-directory directory)))
@@ -1042,24 +1218,21 @@ RESTART-FUNC is a zero-argument function to call for restart.
     (kill-buffer existing-buffer)
     (if restart-func
         (funcall restart-func)
-      (message "Removed dead eat session buffer in: %s" target-dir))))
+      (message "Removed dead terminal session buffer in: %s" target-dir))))
 
-;;;###autoload
-(defun enkan-repl-start-eat (&optional _force)
+(defun enkan-repl--start-session (&optional _force)
   "Start a terminal session in current directory via the configured backend.
 FORCE parameter ignored - always starts a new session.
 
 Dispatches to `enkan-repl--terminal-start' so the active backend (eat or
 tmux, per `enkan-repl-terminal-backend') decides how to spawn the
-session.  The function name is kept for backward compatibility; the body
-no longer assumes eat specifically.
+session.
 
 For the tmux backend, an Emacs-side mirror buffer is created eagerly so
 that layout / lookup code (which iterates over `buffer-list') can find
 the session even though the actual terminal lives outside Emacs.
 
 Category: Session Controller"
-  (interactive)
   (let* ((target-dir default-directory)
          (term-id (enkan-repl--terminal-start target-dir))
          (instance (when term-id
@@ -1071,7 +1244,7 @@ Category: Session Controller"
       (when (and (eq enkan-repl-terminal-backend 'tmux)
                  (fboundp 'enkan-repl--terminal-tmux--mirror-make))
         (ignore-errors
-          (enkan-repl--terminal-tmux--mirror-make term-id)))
+          (enkan-repl--terminal-tmux--mirror-make term-id nil target-dir)))
       ;; Register session and save workspace state.  Multi-instance index
       ;; is captured so the same project can be tracked across distinct
       ;; instances.
@@ -1082,7 +1255,19 @@ Category: Session Controller"
          enkan-repl--current-project
          instance)
         (enkan-repl--save-workspace-state))
-      (message "Started eat session in: %s" target-dir))))
+      (message "Started terminal session in: %s" target-dir))))
+
+;;;###autoload
+(defun enkan-repl-start-session (&optional force)
+  "Start a terminal session in the current directory.
+This is the backend-neutral session starter.  It works with both the eat and
+tmux terminal backends configured by `enkan-repl-terminal-backend'.
+FORCE is accepted for interactive compatibility and currently ignored;
+the command always starts a new session.
+
+Category: Session Controller"
+  (interactive "P")
+  (enkan-repl--start-session force))
 
 (defun enkan-repl--is-standard-file-path (file-path directory-name)
   "Check if FILE-PATH is a standard input file for DIRECTORY-NAME."
@@ -1138,10 +1323,10 @@ COUNTER: session counter"
       (princ (format "🔧 Setup project aliases (enkan-repl-project-aliases): %s\n\n" (enkan-repl--ws-project-aliases))))))
 
 (defun enkan-repl--setup-start-sessions (alias-list buffer-name)
-  "Start eat sessions for each alias in ALIAS-LIST and log to BUFFER-NAME.
+  "Start terminal sessions for each alias in ALIAS-LIST and log to BUFFER-NAME.
 Includes error handling for individual session failures."
   (with-current-buffer buffer-name
-    (princ "🚀 Starting eat sessions:\n"))
+    (princ "🚀 Starting terminal sessions:\n"))
   (let ((session-number 1)
         (success-count 0)
         (failure-count 0))
@@ -1152,8 +1337,8 @@ Includes error handling for individual session failures."
                   (default-directory (expand-file-name (cdr project-info))))
               ;; Register session
               (enkan-repl--register-session session-number project-name)
-              ;; Start eat session in current directory (force restart if needed)
-              (enkan-repl-start-eat t)
+              ;; Start terminal session in current directory.
+              (enkan-repl-start-session t)
               (with-current-buffer buffer-name
                 (princ (format "  ✅ Session %d: %s (%s) - SUCCESS\n" session-number alias project-name)))
               (setq success-count (1+ success-count))))
@@ -1179,8 +1364,8 @@ Implemented as pure function, side effects are handled by upper functions."
 (defun enkan-repl-setup ()
   "Set up window layout based on context.
 - Standard input file: basic window layout with project input file on
-  left and eat session on right in current workspace
-- Center file: auto start eat sessions using project configuration
+  left and terminal session on right in current workspace
+- Center file: auto start terminal sessions using project configuration
   in current workspace
 
 Category: Session Controller"
@@ -1191,13 +1376,13 @@ Category: Session Controller"
     (if is-standard-file
         ;; Standard input file mode: simple window layout
         (progn
-          ;; Create workspace with project BEFORE starting eat session
+          ;; Create workspace with project before starting terminal session.
           (enkan-repl--setup-create-workspace-with-project t nil)
           (delete-other-windows)
           (split-window-right)
-          ;; Move to right window and start eat session
+          ;; Move to right window and start terminal session
           (other-window 1)
-          (enkan-repl-start-eat)
+          (enkan-repl-start-session)
           ;; Move back to left window and open project input file
           (other-window -1)
           (enkan-repl-open-project-input-file)
@@ -1316,7 +1501,10 @@ Category: Command Palette"
   "Rebuild `enkan-repl-global-minor-mode-map'.
 Uses `enkan-repl-global-minor-bindings' as source."
   (setq enkan-repl-global-minor-mode-map
-        (enkan-repl--build-map enkan-repl-global-minor-bindings)))
+        (enkan-repl--build-map enkan-repl-global-minor-bindings))
+  (when-let ((entry (assq 'enkan-repl-global-minor-mode
+                          minor-mode-map-alist)))
+    (setcdr entry enkan-repl-global-minor-mode-map)))
 
 ;; 初期構築
 (enkan-repl--refresh-global-minor-map)
@@ -1351,12 +1539,21 @@ When enabled, some keybindings are available across all buffers."
 (defun enkan-repl--get-project-paths-for-current (current-project projects target-directories)
   "Get project paths for CURRENT-PROJECT from PROJECTS and TARGET-DIRECTORIES.
 Returns a list of (alias . path) pairs."
-  (let ((alias-list (cdr (assoc current-project projects))))
-    (cl-loop for alias in alias-list
-             for project-info = (enkan-repl--get-project-info-from-directories
-                                 alias target-directories)
-             when project-info
-             collect (cons alias (cdr project-info)))))
+  (let ((alias-list (cdr (assoc current-project projects)))
+        paths)
+    (setq paths
+          (cl-loop for alias in alias-list
+                   for project-info = (enkan-repl--get-project-info-from-directories
+                                       alias target-directories)
+                   when project-info
+                   collect (cons alias (cdr project-info))))
+    (or paths
+        (cl-loop for entry in target-directories
+                 for alias = (car entry)
+                 for project-info = (cdr entry)
+                 when (and (consp project-info)
+                           (string= (car project-info) current-project))
+                 collect (cons alias (cdr project-info))))))
 
 (defun enkan-repl--resolve-send-target (pfx resolved-alias current-project projects target-directories)
   "Resolve target buffer from prefix/alias and project config.
@@ -1386,7 +1583,7 @@ Returns a plist with :status and other keys."
                                    collect (cons nil buffer)))))
       (if (null active-pairs)
           (list :status 'no-buffers
-                :message "No active enkan sessions found. Start one with M-x enkan-repl-start-eat")
+                :message "No active enkan sessions found. Start one with M-x enkan-repl-start-session")
         ;; Resolve based on prefix-arg or alias
         (cond
          ;; Priority 1: prefix-arg based selection
@@ -1614,6 +1811,10 @@ Returns plist with :buffer, :name, :live-p, :has-process, :process."
   (when (bufferp buffer)
     (let* ((name (buffer-name buffer))
            (live-p (buffer-live-p buffer))
+           (tmux-mirror-p (and live-p
+                               (fboundp 'enkan-repl--terminal-tmux-mirror-buffer-alive-p)
+                               (enkan-repl--terminal-tmux-mirror-buffer-alive-p
+                                buffer)))
            (process-info (when live-p
                            (with-current-buffer buffer
                              (list :bound (boundp 'eat--process)
@@ -1621,7 +1822,10 @@ Returns plist with :buffer, :name, :live-p, :has-process, :process."
       (list :buffer buffer
             :name name
             :live-p live-p
-            :has-process (and process-info (plist-get process-info :bound) (plist-get process-info :process))
+            :has-process (or tmux-mirror-p
+                             (and process-info
+                                  (plist-get process-info :bound)
+                                  (plist-get process-info :process)))
             :process (when process-info (plist-get process-info :process))))))
 
 (defun enkan-repl--get-available-buffers (buffer-list)
@@ -1816,7 +2020,7 @@ match prior visual behavior on the eat backend."
 
 ;;;###autoload
 (defun enkan-repl-send-escape (&optional pfx)
-  "Send ESC key to eat session buffer with optional PFX.
+  "Send ESC key to enkan session buffer with optional PFX.
 - If called from enkan buffer: Send ESC to current buffer
 - If called from center file without prefix: Select from available enkan buffers
 - With numeric prefix: Send to buffer at that index (1-based)

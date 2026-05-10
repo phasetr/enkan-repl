@@ -207,7 +207,7 @@ compatibility with other environments has not been verified.
    /This ensures Claude sessions are isolated and changes are tracked safely./
 
 3. *Open project file*: =M-x enkan-repl-open-project-input-file=
-4. *Start eat session*: =M-x enkan-repl-start-eat=
+4. *Start terminal session*: =M-x enkan-repl-start-session=
 5. *Write your thoughts* in the input org-mode file
 6. *Access functions easily*: Use =M-x enkan-repl-cheat-sheet= to browse and select functions
 7. *Send specific parts* using =M-x enkan-repl-send-region= or =M-x enkan-repl-send-rest-of-buffer=
@@ -258,12 +258,13 @@ Currently operates with a single fixed workspace (=ws:01=), with multi-workspace
 - =enkan-repl-send-5= - Send \\='5\\=' to enkan session buffer with optional PFX. - From enkan buffer: Send to current buffer - From other buffer without prefix: Interactive buffer selection - With numeric prefix: Send to buffer at index (1-based)  Uses unified backend with smart buffer detection.
 
 *** Session Control
+- =enkan-repl-start-session= - Start a terminal session in the current directory. This is the backend-neutral session starter.  It works with both the eat and tmux terminal backends configured by `enkan-repl-terminal-backend'. FORCE is accepted for interactive compatibility and currently ignored; the command always starts a new session.
 - =enkan-repl-setup= - Arrange windows for (the author's) optimal workflow
 - =enkan-repl-workspace-delete= - Delete a workspace and stop all associated terminal resources. This is the only interactive workspace deletion command.  In `enkan-repl-workspace-list-mode', delete the workspace at point; otherwise delete the current workspace.  With prefix ARG, prompt for a workspace. Noninteractive string ARG deletes that workspace ID.  All paths use `enkan-repl--delete-workspace-completely'.
 
 *** Utilities
+- =enkan-repl-tmux-reattach= - Reconnect Emacs state to live tmux sessions. FILE defaults to `enkan-repl-state-file'.  Live tmux sessions whose names start with `enkan-repl-tmux-session-prefix' define the workspaces to restore.  When a matching persisted workspace exists, its saved state is reused.  When no saved state exists for a live tmux session, a minimal workspace is imported from the tmux session's windows so reattach works after Emacs state was lost.  This command is intentionally manual; enkan-repl does not reattach on load.
 - =enkan-repl-recenter-bottom= - Recenter all enkan terminal buffers at bottom.
-- =enkan-repl-start-eat= - 
 - =enkan-repl-toggle-global-mode= - Toggle enkan-repl global mode on/off.
 - =enkan-repl-workspace-switch= - Switch to another workspace. Uses `hmenu' if available to show workspace ID with its project.
 
@@ -298,17 +299,22 @@ same user-facing send / layout commands (=enkan-repl-send-line=,
   instances of the same project become =alias=, =alias-2=, =alias-3=,
   ... with the corresponding =*ws:NN enkan:/path/*<N>= mirror buffers
   inside Emacs.
-- A read-only mirror buffer is updated via =tmux capture-pane= so the
+- A read-only mirror buffer can be updated via =tmux capture-pane= so the
   layout / send-line code can find sessions via the usual
-  =buffer-list= mechanism.  Visible mirrors refresh every
-  =enkan-repl-tmux-mirror-interval= seconds (default =5.0=).  Hidden
-  mirrors do not run capture until displayed or manually refreshed.
+  =buffer-list= mechanism.  Mirror refresh is manual by default: displaying
+  or recreating a mirror buffer does not capture pane content.  Press =g= in a
+  mirror buffer, or run =M-x enkan-repl-tmux-refresh-current=, to refresh it.
+  Automatic timer refresh is opt-in via
+  =(setq enkan-repl-tmux-mirror-auto-refresh t)= and then uses
+  =enkan-repl-tmux-mirror-interval= seconds.
   Disable mirroring with =(setq enkan-repl-tmux-mirror nil)= if not
   desired.
 - Mirror buffers show refresh state in the header line
-  (=refreshing=, =hidden=, =fresh=, =unchanged=, =closed=).  Press =g=
-  in a mirror buffer, or run =M-x enkan-repl-tmux-refresh-current=, to
-  force an immediate refresh.
+  (=refreshing=, =hidden=, =fresh=, =unchanged=, =closed=).
+- Run =M-x enkan-repl-tmux-refresh-workspace= to recreate or force
+  refresh all tmux mirror buffers for the currently selected workspace.
+  This is useful when tmux windows exist but the Emacs-side mirrors are
+  stale or missing.
 - =M-x enkan-repl-tmux-attach= launches an external terminal app and
   attaches to the current workspace's tmux session.  The attach
   command is configurable via =enkan-repl-tmux-attach-command= (a
@@ -316,10 +322,16 @@ same user-facing send / layout commands (=enkan-repl-send-line=,
 - =M-x enkan-repl-tmux-kill-session= kills a single =enkan-*= session;
   =M-x enkan-repl-tmux-kill-all-enkan= confirms then kills all of them.
 - Persistent state is stored at =enkan-repl-state-file=
-  (=~/.emacs.d/enkan-repl-state.eld= by default).  On Emacs restart the
-  state is reconciled with the live tmux server according to
-  =enkan-repl-state-recovery-policy= (=reattach= / =recreate= /
-  =prompt= / =ignore=, default =reattach=).
+  (=~/.emacs.d/enkan-repl-state.eld= by default).  enkan-repl does not
+  automatically reconnect Emacs to live tmux sessions on startup.  Run
+  =M-x enkan-repl-tmux-reattach= when you want to manually reconnect.
+  Live =enkan-*= tmux sessions define the workspaces to restore.  When
+  saved state exists for a live workspace it is reused; when it does not,
+  enkan-repl imports a minimal workspace from the tmux windows so the
+  session can be used again.  Reattach ensures mirror buffers exist, but
+  it avoids force-refreshing every restored workspace; use
+  =M-x enkan-repl-tmux-refresh-workspace= when you explicitly want to
+  refresh the current workspace's mirror contents.
 
 **** eat backend specifics
 

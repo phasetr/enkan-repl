@@ -41,12 +41,12 @@ format: ## Auto-format elisp files using built-in indent-region (spaces only)
 	$(BATCH) --eval "(progn (find-file \"enkan-repl.el\") (setq-local indent-tabs-mode nil) (untabify (point-min) (point-max)) (mark-whole-buffer) (indent-region (point-min) (point-max)) (save-buffer))"
 	$(BATCH) --eval "(progn (find-file \"test/enkan-repl-test.el\") (setq-local indent-tabs-mode nil) (untabify (point-min) (point-max)) (mark-whole-buffer) (indent-region (point-min) (point-max)) (save-buffer))"
 
-check: test compile checkdoc lint format ## Run all quality checks including formatting
+check: test compile checkdoc lint format clean ## Run all quality checks including formatting
 
-check-ci: test compile checkdoc format ## Run quality checks for CI (without package-lint)
+check-ci: test compile checkdoc format clean ## Run quality checks for CI (without package-lint)
 
 clean: ## Remove compiled files
-	rm -f *.elc
+	find . -path ./.git -prune -o -name '*.elc' -type f -exec rm -f {} +
 
 extract-api: ## Extract public API documentation as org file
 	$(BATCH) -l scripts/generate-docs.el --eval "(extract-public-api)"

@@ -33,7 +33,7 @@
         (message "  Buffer name: %s" buffer-name)
         (message ""))))
   
-  ;; Test what enkan-repl--setup-window-eat-buffer-pure generates
+  ;; Test what enkan-repl--setup-window-terminal-buffer-pure generates
   (let ((enkan-repl--current-workspace "01")
         (session-list '((1 . "er")))
         (target-directories '(("er-alias" . ("er" . "/Users/sekine/dev/self/er"))))
@@ -41,11 +41,11 @@
         (target-directories3 '(("er-alias" . ("er" . "~/dev/self/er"))))
         (target-directories4 '(("er-alias" . ("er" . "~/dev/self/er/")))))
     
-    (message "\n=== Testing setup-window-eat-buffer-pure with different path formats ===")
+    (message "\n=== Testing setup-window-terminal-buffer-pure with different path formats ===")
     
-    (when (fboundp 'enkan-repl--setup-window-eat-buffer-pure)
+    (when (fboundp 'enkan-repl--setup-window-terminal-buffer-pure)
       ;; Test without trailing slash
-      (let ((result (enkan-repl--setup-window-eat-buffer-pure
+      (let ((result (enkan-repl--setup-window-terminal-buffer-pure
                      'test-window 1 session-list target-directories)))
         (message "Target dir without trailing slash: %s" 
                  (cdr (assoc "er-alias" target-directories)))
@@ -53,7 +53,7 @@
         (message ""))
       
       ;; Test with trailing slash
-      (let ((result (enkan-repl--setup-window-eat-buffer-pure
+      (let ((result (enkan-repl--setup-window-terminal-buffer-pure
                      'test-window 1 session-list target-directories2)))
         (message "Target dir with trailing slash: %s" 
                  (cdr (assoc "er-alias" target-directories2)))
@@ -61,7 +61,7 @@
         (message ""))
       
       ;; Test with ~ notation
-      (let ((result (enkan-repl--setup-window-eat-buffer-pure
+      (let ((result (enkan-repl--setup-window-terminal-buffer-pure
                      'test-window 1 session-list target-directories3)))
         (message "Target dir with ~: %s" 
                  (cdr (assoc "er-alias" target-directories3)))
@@ -69,7 +69,7 @@
         (message ""))
       
       ;; Test with ~ and trailing slash
-      (let ((result (enkan-repl--setup-window-eat-buffer-pure
+      (let ((result (enkan-repl--setup-window-terminal-buffer-pure
                      'test-window 1 session-list target-directories4)))
         (message "Target dir with ~ and trailing slash: %s" 
                  (cdr (assoc "er-alias" target-directories4)))
@@ -85,7 +85,7 @@
     
     (unwind-protect
         (progn
-          ;; Create buffer as enkan-repl-start-eat would
+          ;; Create buffer as enkan-repl-start-session would
           (let ((buffer-name (enkan-repl--path->buffer-name default-directory)))
             (message "Creating buffer with name: %s" buffer-name)
             (setq buffer (generate-new-buffer buffer-name))
@@ -95,14 +95,14 @@
             (should (get-buffer buffer-name))
             (message "Buffer created successfully: %s" (buffer-name buffer))
             
-            ;; Now test if setup-window-eat-buffer-pure can find it
+            ;; Now test if setup-window-terminal-buffer-pure can find it
             (let* ((session-list '((1 . "er")))
                    (target-directories '(("er-alias" . ("er" . "/Users/sekine/dev/self/er"))))
-                   (result (when (fboundp 'enkan-repl--setup-window-eat-buffer-pure)
-                            (enkan-repl--setup-window-eat-buffer-pure
+                   (result (when (fboundp 'enkan-repl--setup-window-terminal-buffer-pure)
+                            (enkan-repl--setup-window-terminal-buffer-pure
                              'test-window 1 session-list target-directories))))
               
-              (message "setup-window-eat-buffer-pure returned: %s" (cdr result))
+              (message "setup-window-terminal-buffer-pure returned: %s" (cdr result))
               
               ;; Check if the generated name matches
               (should result)

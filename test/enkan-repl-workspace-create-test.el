@@ -70,7 +70,7 @@
              ((symbol-function 'delete-other-windows) (lambda ()))
              ((symbol-function 'split-window-right) (lambda ()))
              ((symbol-function 'other-window) (lambda (n)))
-             ((symbol-function 'enkan-repl-start-eat) (lambda (&optional force)))
+             ((symbol-function 'enkan-repl-start-session) (lambda (&optional force)))
              ((symbol-function 'enkan-repl-open-project-input-file) (lambda ()))
              ((symbol-function 'message) (lambda (&rest args) nil)))
     ;; Execute enkan-repl-setup
@@ -118,7 +118,7 @@
       (should (string= (plist-get ws-state :current-project) "MyProject"))
       (should (equal (plist-get ws-state :project-aliases) '("alias1"))))))
 
-(ert-deftest test-enkan-repl--setup-window-eat-buffer-pure-workspace-context ()
+(ert-deftest test-enkan-repl--setup-window-terminal-buffer-pure-workspace-context ()
   "Test that window eat buffer name includes correct workspace ID."
   ;; Load window-layouts if exists
   (when (file-exists-p "/Users/sekine/dev/self/enkan-repl/examples/window-layouts.el")
@@ -129,8 +129,8 @@
         (session-list '((1 . "project-a")))
         ;; project-registry format: ((alias . (project-name . project-path)) ...)
         (project-registry '(("alias1" . ("project-a" . "/path/to")))))
-    (when (fboundp 'enkan-repl--setup-window-eat-buffer-pure)
-      (let ((result (enkan-repl--setup-window-eat-buffer-pure
+    (when (fboundp 'enkan-repl--setup-window-terminal-buffer-pure)
+      (let ((result (enkan-repl--setup-window-terminal-buffer-pure
                      'dummy-window 1 session-list project-registry)))
         (when result
           ;; Buffer name should include ws:01
@@ -141,8 +141,8 @@
         (session-list '((1 . "project-a")))
         ;; project-registry format: ((alias . (project-name . project-path)) ...)
         (project-registry '(("alias1" . ("project-a" . "/path/to")))))
-    (when (fboundp 'enkan-repl--setup-window-eat-buffer-pure)
-      (let ((result (enkan-repl--setup-window-eat-buffer-pure
+    (when (fboundp 'enkan-repl--setup-window-terminal-buffer-pure)
+      (let ((result (enkan-repl--setup-window-terminal-buffer-pure
                      'dummy-window 1 session-list project-registry)))
         (when result
           ;; Buffer name should include ws:02

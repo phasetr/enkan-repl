@@ -127,6 +127,17 @@
     (should (equal (plist-get result :status) 'single))
     (should (equal (plist-get result :path) "/path/to/proj1"))
     (should (equal (plist-get result :alias) "alias1")))
+
+  ;; Test with current project as an actual project name, not a project config.
+  (let ((result (enkan-repl--target-directory-info
+                 "Project One"
+                 nil
+                 '(("alias1" "Project One" . "/path/to/proj1"))
+                 "Select project:"
+                 nil)))
+    (should (equal (plist-get result :status) 'single))
+    (should (equal (plist-get result :path) "/path/to/proj1"))
+    (should (equal (plist-get result :alias) "alias1")))
   
   ;; Test with validation failure
   (let ((result (enkan-repl--target-directory-info 
@@ -137,6 +148,80 @@
                  (lambda (path) (string-prefix-p "/valid" path)))))
     (should (equal (plist-get result :status) 'invalid))
     (should (equal (plist-get result :path) "/invalid/path"))))
+
+(ert-deftest test-enkan-repl-open-project-directory-current-project-name ()
+  "Open project directory when current project is a target project name."
+  (let ((tmpdir (file-name-as-directory
+                 (make-temp-file "enkan-open-project-" t)))
+        opened)
+    (unwind-protect
+        (let ((enkan-repl--current-project "enkan-repl")
+              (enkan-repl-projects nil)
+              (enkan-repl-target-directories nil))
+          (setq enkan-repl-target-directories
+                `(("er" . ("enkan-repl" . ,tmpdir))))
+          (cl-letf (((symbol-function 'dired)
+                     (lambda (path)
+                       (setq opened path))))
+            (enkan-repl-open-project-directory)
+            (should (equal opened tmpdir))))
+      (delete-directory tmpdir t))))
+
+(ert-deftest test-enkan-repl-keybinding-example-commands-defined ()
+  "Every command bound in examples/keybinding.el should be defined."
+  (let* ((repo-root (file-name-as-directory
+                     (expand-file-name default-directory)))
+         (examples-dir (expand-file-name "examples" repo-root))
+         (load-path (cons examples-dir load-path))
+         (old-bindings enkan-repl-global-minor-bindings)
+         (old-center enkan-repl-center-file)
+         (old-mode enkan-repl-global-minor-mode)
+         (expected-commands
+          '(enkan-repl-send-escape
+            enkan-repl-toggle-global-mode
+            enkan-repl-magit
+            enkan-repl-send-enter
+            enkan-repl-send-line
+            enkan-repl-send-1
+            enkan-repl-send-2
+            enkan-repl-send-3
+            enkan-repl-send-4
+            enkan-repl-send-5
+            enkan-repl-send-region
+            enkan-repl-open-project-directory
+            other-window-or-split
+            enkan-repl-recenter-bottom
+            enkan-repl-open-center-file
+            enkan-repl-setup
+            enkan-repl-workspace-delete
+            enkan-repl-workspace-switch
+            enkan-repl-tmux-refresh-workspace
+            enkan-repl-tmux-reattach
+            enkan-repl-setup-current-project-layout)))
+    (unwind-protect
+        (progn
+          (setq enkan-repl-global-minor-bindings nil)
+          (enkan-repl-global-minor-mode -1)
+          (load (expand-file-name "window-layouts.el" examples-dir) nil t)
+          (load (expand-file-name "keybinding.el" examples-dir) nil t)
+          (should (eq (cdr (assoc "C-M-s" enkan-repl-global-minor-bindings))
+                      'enkan-repl-setup))
+          (dolist (command expected-commands)
+            (should (fboundp command)))
+          (dolist (binding enkan-repl-global-minor-bindings)
+            (should (fboundp (cdr binding)))
+            (should (eq (lookup-key enkan-repl-global-minor-mode-map
+                                    (kbd (car binding)))
+                        (cdr binding)))
+            (should (eq (lookup-key
+                         (cdr (assq 'enkan-repl-global-minor-mode
+                                    minor-mode-map-alist))
+                         (kbd (car binding)))
+                        (cdr binding)))))
+      (setq enkan-repl-center-file old-center)
+      (setq enkan-repl-global-minor-bindings old-bindings)
+      (enkan-repl--refresh-global-minor-map)
+      (enkan-repl-global-minor-mode (if old-mode 1 -1)))))
 
 ;; Tests for enkan-repl--select-project
 (ert-deftest test-enkan-repl--select-project ()

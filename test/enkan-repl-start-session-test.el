@@ -1,7 +1,7 @@
-;;; enkan-repl-start-eat-session-test.el --- Test for session registration on eat start -*- lexical-binding: t -*-
+;;; enkan-repl-start-session-test.el --- Test for session registration on start -*- lexical-binding: t -*-
 
 ;;; Commentary:
-;; Test that enkan-repl-start-eat properly registers sessions
+;; Test that enkan-repl-start-session properly registers sessions
 
 ;;; Code:
 
@@ -24,8 +24,8 @@ workspace starts at instance 1."
                  (string-match-p "^\\*ws:[0-9]\\{2\\} enkan:" name))
         (kill-buffer buf)))))
 
-(ert-deftest test-start-eat-registers-session ()
-  "Test that enkan-repl-start-eat registers session and saves workspace."
+(ert-deftest test-start-session-registers-session ()
+  "Test that enkan-repl-start-session registers session and saves workspace."
   (enkan-repl-test--kill-stale-enkan-buffers)
   ;; Exercises the eat backend explicitly (mocks `eat').
   (let ((enkan-repl-terminal-backend 'eat)
@@ -52,8 +52,8 @@ workspace starts at instance 1."
               ((symbol-function 'require)
                (lambda (_) t)))
       
-      ;; Call enkan-repl-start-eat
-      (enkan-repl-start-eat)
+      ;; Call enkan-repl-start-session
+      (enkan-repl-start-session)
       
       ;; Session should be registered
       (should (equal '((1 . "er")) enkan-repl-session-list))
@@ -70,7 +70,7 @@ workspace starts at instance 1."
         (kill-buffer mock-eat-buffer)))))
 
 (ert-deftest test-multiple-eat-sessions-in-workspace ()
-  "Test that multiple eat sessions are properly registered."
+  "Test that multiple terminal sessions are properly registered."
   (enkan-repl-test--kill-stale-enkan-buffers)
   ;; Exercises the eat backend explicitly (mocks `eat').
   (let ((enkan-repl-terminal-backend 'eat)
@@ -97,12 +97,12 @@ workspace starts at instance 1."
               ((symbol-function 'require)
                (lambda (_) t)))
       
-      ;; Start first eat session (instance 1 -> legacy string form)
-      (enkan-repl-start-eat)
+      ;; Start first terminal session (instance 1 -> legacy string form)
+      (enkan-repl-start-session)
       (should (equal '((1 . "er")) enkan-repl-session-list))
 
-      ;; Start second eat session (instance 2 -> cons form)
-      (enkan-repl-start-eat)
+      ;; Start second terminal session (instance 2 -> cons form)
+      (enkan-repl-start-session)
       (should (equal '((1 . "er") (2 "er" . 2)) enkan-repl-session-list))
       (should (= 2 enkan-repl--session-counter))
 
@@ -115,5 +115,34 @@ workspace starts at instance 1."
         (when (buffer-live-p buf)
           (kill-buffer buf))))))
 
-(provide 'enkan-repl-start-eat-session-test)
-;;; enkan-repl-start-eat-session-test.el ends here
+(ert-deftest test-setup-start-sessions-binds-project-directory ()
+  "Test setup starts sessions from the configured project directory.
+This preserves the old `enkan-repl-setup' -> starter behavior: keybinding
+workflows resolve project aliases before calling the backend-neutral starter."
+  (let* ((project-dir (file-name-as-directory
+                       (make-temp-file "enkan-start-session-" t)))
+         (log-buffer (generate-new-buffer " *enkan-start-session-log*"))
+         (started nil)
+         (enkan-repl-target-directories
+          `(("er" . ("enkan-repl" . ,project-dir))))
+         (enkan-repl-session-list nil)
+         (enkan-repl--session-counter 0)
+         (enkan-repl--current-project "enkan-repl")
+         (enkan-repl--current-workspace "01")
+         (enkan-repl--workspaces '(("01" . nil))))
+    (unwind-protect
+        (cl-letf (((symbol-function 'enkan-repl-start-session)
+                   (lambda (&optional force)
+                     (push (cons force default-directory) started))))
+          (enkan-repl--setup-start-sessions '("er") log-buffer)
+          (should (= 1 (length started)))
+          (should (eq (caar started) t))
+          (should (file-equal-p (cdar started) project-dir))
+          (should-not (file-equal-p (cdar started)
+                                    (expand-file-name "~/"))))
+      (when (buffer-live-p log-buffer)
+        (kill-buffer log-buffer))
+      (delete-directory project-dir t))))
+
+(provide 'enkan-repl-start-session-test)
+;;; enkan-repl-start-session-test.el ends here

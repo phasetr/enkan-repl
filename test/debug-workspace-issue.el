@@ -89,13 +89,13 @@
       ;; This is the problem - target-directories might be empty
       (should enkan-repl-target-directories)
       
-      ;; Test setup-window-eat-buffer-pure
-      (when (fboundp 'enkan-repl--setup-window-eat-buffer-pure)
-        (let ((result (enkan-repl--setup-window-eat-buffer-pure
+      ;; Test setup-window-terminal-buffer-pure
+      (when (fboundp 'enkan-repl--setup-window-terminal-buffer-pure)
+        (let ((result (enkan-repl--setup-window-terminal-buffer-pure
                        'test-window 1
                        enkan-repl-session-list
                        enkan-repl-target-directories)))
-          (message "setup-window-eat-buffer-pure result: %s" result)
+          (message "setup-window-terminal-buffer-pure result: %s" result)
           (should result)
           (when result
             (should (string-match-p "\\*ws:01 enkan:/path/to/er/\\*" (cdr result)))))))))

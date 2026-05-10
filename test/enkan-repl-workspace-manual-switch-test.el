@@ -88,7 +88,7 @@
                  nil)))
       
       ;; Start eat (but save is mocked to do nothing)
-      (enkan-repl-start-eat)
+      (enkan-repl-start-session)
       
       ;; Session is registered in memory
       (should (equal '((1 . "er")) enkan-repl-session-list))

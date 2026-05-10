@@ -40,7 +40,7 @@
   (let ((function-names (mapcar #'car enkan-repl-cheat-sheet-candidates)))
     (should (member "enkan-repl-cheat-sheet" function-names))
     (should (member "enkan-repl-send-region" function-names))
-    (should (member "enkan-repl-start-eat" function-names))))
+    (should (member "enkan-repl-start-session" function-names))))
 
 (ert-deftest test-constants-consistency ()
   "Test that constants are consistent with function count."

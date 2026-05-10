@@ -133,5 +133,27 @@ load it back, ensuring data survives serialization."
   (let ((enkan-repl-state-recovery-policy 'ignore))
     (should (null (enkan-repl-state-tmux-reconcile "/no/such/file")))))
 
+(ert-deftest test-enkan-repl-state-tmux-reconcile-keeps-current ()
+  "Reconcile result includes the persisted current workspace."
+  (let ((tmp (make-temp-file "enkan-repl-state-current-" nil ".eld"))
+        (enkan-repl-state-recovery-policy 'reattach)
+        (enkan-repl-tmux-session-prefix "enkan-"))
+    (unwind-protect
+        (progn
+          (with-temp-file tmp
+            (prin1 '(:schema-version 1
+                     :saved-at "2026-05-09T00:00:00+0900"
+                     :current "02"
+                     :workspaces (("01" :session-list nil)
+                                  ("02" :session-list nil)))
+                   (current-buffer)))
+          (cl-letf (((symbol-function 'enkan-repl-state--list-live-tmux-sessions)
+                     (lambda (_prefix) '("enkan-02"))))
+            (let ((result (enkan-repl-state-tmux-reconcile tmp)))
+              (should (equal '("02") (plist-get result :restored)))
+              (should (string= "02" (plist-get result :current))))))
+      (when (file-exists-p tmp)
+        (delete-file tmp)))))
+
 (provide 'enkan-repl-state-test)
 ;;; enkan-repl-state-test.el ends here

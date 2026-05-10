@@ -48,7 +48,7 @@
       (enkan-repl--load-workspace-state test-ws1)
       
       ;; Test: In ws:01, should find er project path
-      (let ((result (enkan-repl--setup-window-eat-buffer-pure
+      (let ((result (enkan-repl--setup-window-terminal-buffer-pure
                      'dummy-window 1 
                      '((1 . "er"))
                      enkan-repl-target-directories)))
@@ -73,7 +73,7 @@
         (enkan-repl--load-workspace-state test-ws2)
         
         ;; Test: In ws:02, should find project-b path 
-        (let ((result (enkan-repl--setup-window-eat-buffer-pure
+        (let ((result (enkan-repl--setup-window-terminal-buffer-pure
                        'dummy-window 1
                        '((1 . "project-b"))
                        enkan-repl-target-directories)))
@@ -95,7 +95,7 @@
           (enkan-repl--load-workspace-state test-ws1)
           
           ;; Test: After switching back to ws:01, should still find er project
-          (let ((result (enkan-repl--setup-window-eat-buffer-pure
+          (let ((result (enkan-repl--setup-window-terminal-buffer-pure
                          'dummy-window 1
                          '((1 . "er"))
                          enkan-repl-target-directories)))
@@ -122,7 +122,7 @@
                  ;; Simulate buffer not existing
                  nil)))
       
-      (let ((result (enkan-repl--setup-window-eat-buffer-pure
+      (let ((result (enkan-repl--setup-window-terminal-buffer-pure
                      'dummy-window 1
                      '((1 . "er"))
                      enkan-repl-target-directories)))
