@@ -171,6 +171,11 @@
                        (plist-get (cdr (assoc "03" enkan-repl--workspaces
                                               #'string=))
                                   :session-list)))
+        (should (equal '(("enkan-repl" . "enkan-repl")
+                         ("worker-2" . "worker"))
+                       (plist-get (cdr (assoc "03" enkan-repl--workspaces
+                                              #'string=))
+                                  :project-aliases)))
         (should (equal '(("enkan-repl" . ("enkan-repl" . "/repo/enkan-repl"))
                          ("worker-2" . ("worker" . "/repo/worker")))
                        (plist-get (cdr (assoc "03" enkan-repl--workspaces

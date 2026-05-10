@@ -210,6 +210,31 @@
       (should (string-match-p "/Users/me/dev/lat/" formatted))
       (should-not (string-match-p "<not found>" formatted)))))
 
+(ert-deftest test-workspace-list-shows-live-imported-window-alias-paths ()
+  "Workspace list should show every live-imported tmux window path."
+  (let* ((enkan-repl--workspaces nil)
+         (enkan-repl--current-workspace "03")
+         (enkan-repl-projects nil)
+         (enkan-repl-target-directories nil))
+    (setq enkan-repl--workspaces
+          (list (cons "03" '(:current-project "enkan-repl"
+                             :project-aliases
+                             (("enkan-repl" . "enkan-repl")
+                              ("worker-2" . "worker"))
+                             :target-directories
+                             (("enkan-repl" .
+                               ("enkan-repl" . "/repo/enkan-repl"))
+                              ("worker-2" . ("worker" . "/repo/worker")))
+                             :session-list
+                             ((1 . "enkan-repl") (2 . "worker"))
+                             :session-counter 2))))
+    (let ((formatted (enkan-repl-workspace-list--format-workspace-info
+                      "03" enkan-repl--workspaces "03" nil)))
+      (should (string-match-p "enkan-repl" formatted))
+      (should (string-match-p "/repo/enkan-repl" formatted))
+      (should (string-match-p "/repo/worker" formatted))
+      (should-not (string-match-p "<not found>" formatted)))))
+
 (ert-deftest test-workspace-list-keeps-imported-paths-after-repeated-switches ()
   "Repeated workspace switching should not make imported paths disappear."
   (let ((enkan-repl--workspaces

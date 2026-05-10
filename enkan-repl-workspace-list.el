@@ -24,6 +24,7 @@
 (declare-function enkan-repl--save-workspace-state "enkan-repl" ())
 (declare-function enkan-repl--load-workspace-state "enkan-repl" (workspace-id))
 (declare-function enkan-repl--get-project-paths-for-current "enkan-repl" (current-project projects target-directories))
+(declare-function enkan-repl--projects-with-current-aliases "enkan-repl" (projects current-project project-aliases))
 (declare-function enkan-repl--get-project-info-from-directories "enkan-repl-utils" (alias target-directories))
 (declare-function enkan-repl-workspace-delete "enkan-repl" (&optional arg))
 (declare-function enkan-repl-setup "enkan-repl" ())
@@ -70,7 +71,10 @@ TARGET-DIRECTORIES is the fallback global directory registry."
          (paths (when current-project
                   (enkan-repl--get-project-paths-for-current
                    current-project
-                   (bound-and-true-p enkan-repl-projects)
+                   (enkan-repl--projects-with-current-aliases
+                    (bound-and-true-p enkan-repl-projects)
+                    current-project
+                    (plist-get state :project-aliases))
                    workspace-dirs))))
     (or paths
         (cl-loop for alias in (enkan-repl-workspace-list--project-alias-names

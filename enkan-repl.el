@@ -411,6 +411,25 @@ ALIASES may be a list of strings or an alist of (alias . project-name)."
   (or (cdr (assoc alias project-aliases))
       alias))
 
+(defun enkan-repl--projects-with-current-aliases (projects current-project project-aliases)
+  "Return PROJECTS augmented with CURRENT-PROJECT's PROJECT-ALIASES.
+Merge the current workspace's aliases into CURRENT-PROJECT's project
+configuration.  This lets reattached live tmux sessions expose every window
+alias to send-target and directory resolution, even when the user's static
+project config is absent or incomplete for the imported tmux windows."
+  (let* ((aliases (enkan-repl--project-alias-names project-aliases))
+         (configured (cdr (assoc current-project projects)))
+         (merged (append configured
+                         (cl-remove-if (lambda (alias)
+                                         (member alias configured))
+                                       aliases))))
+    (if (and current-project aliases)
+        (cons (cons current-project merged)
+              (cl-remove current-project projects
+                         :key #'car
+                         :test #'equal))
+      projects)))
+
 (defun enkan-repl--ws-state->plist ()
   "Collect current global session-related variables into a plist.
 This function does not change behavior; it only mirrors current globals."
@@ -554,8 +573,8 @@ window names remain the aliases used to address live tmux windows."
         (push (cons counter
                     (enkan-repl--make-session-entry-value project instance))
               session-list)
-        (unless (assoc project aliases)
-          (push (cons project project) aliases))
+        (unless (assoc alias aliases)
+          (push (cons alias project) aliases))
         (when cwd
           (unless (assoc alias target-directories)
             (push (cons alias (cons project cwd)) target-directories)))))
@@ -2111,7 +2130,10 @@ Returns t on success, nil on failure."
                         pfx
                         resolved-alias
                         (enkan-repl--ws-current-project)
-                        enkan-repl-projects
+                        (enkan-repl--projects-with-current-aliases
+                         enkan-repl-projects
+                         (enkan-repl--ws-current-project)
+                         enkan-repl-project-aliases)
                         enkan-repl-target-directories))
            (status (plist-get resolution :status))
            (target-buffer nil))
@@ -2238,7 +2260,10 @@ Category: Center File Multi-buffer Access"
   (interactive "P")
   (let ((result (enkan-repl--target-directory-info
                  (enkan-repl--ws-current-project)
-                 enkan-repl-projects
+                 (enkan-repl--projects-with-current-aliases
+                  enkan-repl-projects
+                  (enkan-repl--ws-current-project)
+                  enkan-repl-project-aliases)
                  enkan-repl-target-directories
                  "Select project directory to open:"
                  #'file-directory-p

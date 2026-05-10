@@ -48,6 +48,24 @@
   (should-not (enkan-repl--target-alias-instance-for-path
                "renamed-2" "/repo/actual")))
 
+(ert-deftest test-enkan-repl--projects-with-current-aliases ()
+  "Workspace aliases should become an implicit current project config."
+  (should (equal '(("proj" . ("a" "b")))
+                 (enkan-repl--projects-with-current-aliases
+                  nil
+                  "proj"
+                  '(("a" . "a") ("b" . "b")))))
+  (should (equal '(("proj" . ("configured" "a")))
+                 (enkan-repl--projects-with-current-aliases
+                  '(("proj" . ("configured")))
+                  "proj"
+                  '(("a" . "a")))))
+  (should (equal '(("proj" . ("configured" "a")))
+                 (enkan-repl--projects-with-current-aliases
+                  '(("proj" . ("configured" "a")))
+                  "proj"
+                  '(("a" . "a"))))))
+
 ;; Tests for enkan-repl--resolve-send-target
 (ert-deftest test-enkan-repl--resolve-send-target ()
   "Test resolving send target with prefix-arg and alias."
@@ -151,6 +169,38 @@
       (when (buffer-live-p buffer2)
         (kill-buffer buffer2)))))
 
+(ert-deftest test-enkan-repl--resolve-send-target-live-import-aliases ()
+  "Live-imported tmux aliases should expose every imported window."
+  (let* ((buffer1 (get-buffer-create "*ws:03 enkan:/repo/enkan-repl/*"))
+         (buffer2 (get-buffer-create "*ws:03 enkan:/repo/worker/*<2>"))
+         (enkan-repl--current-workspace "03")
+         (current-project "enkan-repl")
+         (project-aliases
+          '(("enkan-repl" . "enkan-repl")
+            ("worker-2" . "worker")))
+         (projects
+          (enkan-repl--projects-with-current-aliases
+           nil current-project project-aliases))
+         (target-directories
+          '(("enkan-repl" . ("enkan-repl" . "/repo/enkan-repl"))
+            ("worker-2" . ("worker" . "/repo/worker")))))
+    (unwind-protect
+        (progn
+          (should (eq buffer2
+                      (plist-get
+                       (enkan-repl--resolve-send-target
+                        nil "worker-2" current-project projects target-directories)
+                       :buffer)))
+          (let ((result (enkan-repl--resolve-send-target
+                         nil nil current-project projects target-directories)))
+            (should (equal (plist-get result :status) 'needs-selection))
+            (should (equal (plist-get result :buffers)
+                           (list buffer1 buffer2)))))
+      (when (buffer-live-p buffer1)
+        (kill-buffer buffer1))
+      (when (buffer-live-p buffer2)
+        (kill-buffer buffer2)))))
+
 ;; Tests for enkan-repl--target-directory-info
 (ert-deftest test-enkan-repl--target-directory-info ()
   "Test unified project selection handling."
@@ -235,6 +285,43 @@
             (enkan-repl-open-project-directory)
             (should (equal opened tmpdir))))
       (delete-directory tmpdir t))))
+
+(ert-deftest test-enkan-repl-open-project-directory-live-import-aliases ()
+  "Open project directory should include every live-imported tmux alias."
+  (let ((tmpdir1 (file-name-as-directory
+                  (make-temp-file "enkan-open-main-" t)))
+        (tmpdir2 (file-name-as-directory
+                  (make-temp-file "enkan-open-worker-" t)))
+        opened
+        choices-seen)
+    (unwind-protect
+        (let ((enkan-repl--current-project "enkan-repl")
+              (enkan-repl-projects
+               '(("enkan-repl" . ("configured"))))
+              (enkan-repl-project-aliases
+               '(("enkan-repl" . "enkan-repl")
+                 ("worker-2" . "worker")))
+              (enkan-repl-target-directories nil))
+          (setq enkan-repl-target-directories
+                `(("configured" . ("configured" . ,tmpdir1))
+                  ("enkan-repl" . ("enkan-repl" . ,tmpdir1))
+                  ("worker-2" . ("worker" . ,tmpdir2))))
+          (cl-letf (((symbol-function 'hmenu)
+                     (lambda (_prompt choices)
+                       (setq choices-seen choices)
+                       (seq-find (lambda (choice)
+                                   (string-match-p "\\`worker-2 " choice))
+                                 choices)))
+                    ((symbol-function 'dired)
+                     (lambda (path)
+                       (setq opened path))))
+            (enkan-repl-open-project-directory)
+            (should (seq-some (lambda (choice)
+                                (string-match-p "\\`worker-2 " choice))
+                              choices-seen))
+            (should (equal opened tmpdir2))))
+      (delete-directory tmpdir1 t)
+      (delete-directory tmpdir2 t))))
 
 (ert-deftest test-enkan-repl-keybinding-example-commands-defined ()
   "Every command bound in examples/keybinding.el should be defined."
