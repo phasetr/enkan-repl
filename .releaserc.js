@@ -28,42 +28,6 @@ module.exports = {
 		],
 		// Generate release notes from commits
 		"@semantic-release/release-notes-generator",
-		// Generate and update CHANGELOG.md
-		[
-			"@semantic-release/changelog",
-			{
-				changelogFile: "CHANGELOG.md",
-			},
-		],
-		// Update version in enkan-repl.el and regenerate documentation
-		[
-			"@semantic-release/exec",
-			{
-				prepareCmd: [
-					// Update version in .el file
-					"emacs --batch --load scripts/bump-version.el -- ${nextRelease.version}",
-					// Regenerate precompiled constants for cheat-sheet performance (must be first)
-					"emacs --batch --load scripts/generate-constants.el --eval '(generate-cheat-sheet-constants)'",
-					// Regenerate documentation files with updated functions (uses constants)
-					"emacs --batch --load scripts/generate-docs.el --eval '(generate-all-docs)'",
-				].join(" && "),
-			},
-		],
-		// Commit the changes
-		[
-			"@semantic-release/git",
-			{
-				assets: [
-					"CHANGELOG.md",
-					"package.json",
-					"enkan-repl.el",
-					"README.org",
-					"enkan-repl-constants.el",
-				],
-				message:
-					"chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}",
-			},
-		],
 		// Create GitHub release
 		"@semantic-release/github",
 	],

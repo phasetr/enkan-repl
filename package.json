@@ -23,13 +23,10 @@
   "author": "phasetr <phasetr@gmail.com>",
   "license": "MIT",
   "devDependencies": {
-    "@semantic-release/changelog": "^6.0.3",
-    "@semantic-release/commit-analyzer": "^11.0.0",
-    "@semantic-release/exec": "^6.0.3",
-    "@semantic-release/git": "^10.0.1",
-    "@semantic-release/github": "^9.2.6",
-    "@semantic-release/release-notes-generator": "^12.0.0",
-    "conventional-changelog-conventionalcommits": "^7.0.2",
-    "semantic-release": "^23.0.0"
+    "@semantic-release/commit-analyzer": "^13.0.1",
+    "@semantic-release/github": "^12.0.8",
+    "@semantic-release/release-notes-generator": "^14.1.1",
+    "conventional-changelog-conventionalcommits": "^9.3.1",
+    "semantic-release": "^25.0.3"
   }
 }
