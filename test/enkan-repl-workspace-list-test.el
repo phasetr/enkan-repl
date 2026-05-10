@@ -210,6 +210,39 @@
       (should (string-match-p "/Users/me/dev/lat/" formatted))
       (should-not (string-match-p "<not found>" formatted)))))
 
+(ert-deftest test-workspace-list-keeps-imported-paths-after-repeated-switches ()
+  "Repeated workspace switching should not make imported paths disappear."
+  (let ((enkan-repl--workspaces
+         '(("02" . (:current-project "lat"
+                    :project-aliases (("lat" . "lat"))
+                    :target-directories
+                    (("lat" . ("lat" . "/Users/me/dev/lat/")))
+                    :session-list ((1 . "lat"))
+                    :session-counter 1))
+           ("05" . (:current-project "er"
+                    :project-aliases (("er" . "er"))
+                    :target-directories
+                    (("er" . ("er" . "/Users/me/dev/enkan-repl/")))
+                    :session-list ((1 . "er"))
+                    :session-counter 1))))
+        (enkan-repl--current-workspace "05")
+        (enkan-repl--current-project nil)
+        (enkan-repl-session-list nil)
+        (enkan-repl--session-counter 0)
+        (enkan-repl-project-aliases nil)
+        (enkan-repl-target-directories nil))
+    (dotimes (_ 3)
+      (enkan-repl--load-workspace-state "05")
+      (enkan-repl--save-workspace-state "05")
+      (setq enkan-repl--current-workspace "02")
+      (enkan-repl--load-workspace-state "02")
+      (enkan-repl--save-workspace-state "02")
+      (setq enkan-repl--current-workspace "05"))
+    (dolist (workspace-id '("02" "05"))
+      (let ((formatted (enkan-repl-workspace-list--format-workspace-info
+                        workspace-id enkan-repl--workspaces "05" nil)))
+        (should-not (string-match-p "<not found>" formatted))))))
+
 (provide 'enkan-repl-workspace-list-test)
 
 ;;; enkan-repl-workspace-list-test.el ends here

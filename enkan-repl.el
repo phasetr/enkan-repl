@@ -381,13 +381,44 @@ and `enkan-repl--load-workspace-state'.")
   "Setter: set project aliases to VALUE."
   (setq enkan-repl-project-aliases value))
 
+(defun enkan-repl--project-alias-names (aliases)
+  "Return alias names from ALIASES.
+ALIASES may be a list of strings or an alist of (alias . project-name)."
+  (delq nil
+        (mapcar (lambda (entry)
+                  (cond
+                   ((stringp entry) entry)
+                   ((consp entry) (car entry))))
+                aliases)))
+
+(defun enkan-repl--target-directories-for-state (current-project project-aliases target-directories)
+  "Return TARGET-DIRECTORIES relevant to CURRENT-PROJECT and PROJECT-ALIASES."
+  (let ((aliases (enkan-repl--project-alias-names project-aliases)))
+    (cl-remove-if-not
+     (lambda (entry)
+       (let ((alias (car entry))
+             (project-info (cdr entry)))
+         (and (consp project-info)
+              (or (member alias aliases)
+                  (and current-project
+                       (string= (car project-info) current-project))))))
+     target-directories)))
+
 (defun enkan-repl--ws-state->plist ()
   "Collect current global session-related variables into a plist.
 This function does not change behavior; it only mirrors current globals."
-  (list :current-project   enkan-repl--current-project
-        :session-list      enkan-repl-session-list
-        :session-counter   enkan-repl--session-counter
-        :project-aliases   enkan-repl-project-aliases))
+  (let ((state (list :current-project   enkan-repl--current-project
+                     :session-list      enkan-repl-session-list
+                     :session-counter   enkan-repl--session-counter
+                     :project-aliases   enkan-repl-project-aliases))
+        (target-directories
+         (enkan-repl--target-directories-for-state
+          enkan-repl--current-project
+          enkan-repl-project-aliases
+          enkan-repl-target-directories)))
+    (if target-directories
+        (plist-put state :target-directories target-directories)
+      state)))
 
 (defun enkan-repl--plist->ws-state (state)
   "Set current global session-related variables from STATE plist.
@@ -418,7 +449,8 @@ in sync with in-memory state across operations."
     (when ws
       (let* ((old-plist (cdr (assoc ws enkan-repl--workspaces #'string=)))
              (plist (enkan-repl--ws-state->plist)))
-        (when (plist-member old-plist :target-directories)
+        (when (and (not (plist-member plist :target-directories))
+                   (plist-member old-plist :target-directories))
           (setq plist
                 (plist-put plist :target-directories
                            (plist-get old-plist :target-directories))))
@@ -526,6 +558,27 @@ for display and follow-up directory resolution when available."
                 workspaces))))
     (nreverse workspaces)))
 
+(defun enkan-repl--tmux-reattach-merge-target-directories (persisted live)
+  "Merge PERSISTED and LIVE target directory alists.
+LIVE entries win for duplicate aliases because they reflect current tmux pane
+cwd values.  PERSISTED entries with aliases not present in LIVE are retained."
+  (let ((merged (copy-tree live)))
+    (dolist (entry persisted)
+      (unless (assoc (car entry) merged)
+        (setq merged (append merged (list (copy-tree entry))))))
+    merged))
+
+(defun enkan-repl--tmux-reattach-merge-state (persisted live)
+  "Merge one PERSISTED workspace state with one LIVE tmux-derived state."
+  (let* ((state (copy-tree persisted))
+         (target-directories
+          (enkan-repl--tmux-reattach-merge-target-directories
+           (plist-get persisted :target-directories)
+           (plist-get live :target-directories))))
+    (if target-directories
+        (plist-put state :target-directories target-directories)
+      state)))
+
 (defun enkan-repl--tmux-reattach-merge-workspaces (persisted live)
   "Merge PERSISTED and LIVE workspace alists.
 Live tmux sessions define the set of restored workspaces.  Persisted state wins
@@ -537,7 +590,10 @@ used."
              (persisted-entry (assoc workspace-id persisted #'string=)))
         (push workspace-id restored)
         (if persisted-entry
-            (push (cons workspace-id (copy-tree (cdr persisted-entry)))
+            (push (cons workspace-id
+                        (enkan-repl--tmux-reattach-merge-state
+                         (cdr persisted-entry)
+                         (cdr live-entry)))
                   merged)
           (push workspace-id imported)
           (push (copy-tree live-entry) merged))))

@@ -175,17 +175,57 @@
                          ("03" "enkan-03:enkan-repl" t))
                        ensured-workspaces))))))
 
+(ert-deftest test-enkan-repl-tmux-reattach-enriches-persisted-state-with-live-cwd ()
+  "Manual tmux reattach should add live cwd paths to persisted workspaces."
+  (let ((saved-workspaces
+         '(("05" :current-project "er"
+                  :session-list ((1 . "er"))
+                  :session-counter 1
+                  :project-aliases (("er" . "er")))))
+        (enkan-repl-terminal-backend 'tmux)
+        (enkan-repl--workspaces nil)
+        (enkan-repl--current-workspace nil)
+        (enkan-repl--current-project nil)
+        (enkan-repl-session-list nil)
+        (enkan-repl--session-counter 0)
+        (enkan-repl-project-aliases nil))
+    (cl-letf (((symbol-function 'enkan-repl-state-load)
+               (lambda (&optional _file)
+                 (list :workspaces saved-workspaces :current "05")))
+              ((symbol-function 'enkan-repl-state--list-live-tmux-sessions)
+               (lambda (_prefix)
+                 '("enkan-05")))
+              ((symbol-function 'enkan-repl--terminal-tmux--list-window-cwds)
+               (lambda (_session)
+                 '(("er" . "/Users/me/dev/enkan-repl"))))
+              ((symbol-function 'enkan-repl--terminal-list)
+               (lambda () nil))
+              ((symbol-function 'enkan-repl-state-save)
+               (lambda (&optional _file) t)))
+      (let ((result (enkan-repl-tmux-reattach)))
+        (should result)
+        (should (equal '(("er" . ("er" . "/Users/me/dev/enkan-repl")))
+                       (plist-get (cdr (assoc "05" enkan-repl--workspaces
+                                              #'string=))
+                                  :target-directories)))
+        (should (equal '(("er" . ("er" . "/Users/me/dev/enkan-repl")))
+                       enkan-repl-target-directories))))))
+
 (ert-deftest test-enkan-repl-tmux-reattach-skips-already-current-state ()
   "Manual tmux reattach does not force-refresh when state is already current."
   (let* ((saved-workspaces
           '(("01" :current-project "old"
                    :session-list ((1 . "old"))
                    :session-counter 1
-                   :project-aliases nil)
+                   :project-aliases nil
+                   :target-directories
+                   (("window" . ("window" . "/tmp/window"))))
             ("02" :current-project "proj"
                    :session-list ((1 . "proj"))
                    :session-counter 1
-                   :project-aliases nil)))
+                   :project-aliases nil
+                   :target-directories
+                   (("window" . ("window" . "/tmp/window"))))))
          (enkan-repl-terminal-backend 'tmux)
          (enkan-repl--workspaces saved-workspaces)
          (enkan-repl--current-workspace "02"))
