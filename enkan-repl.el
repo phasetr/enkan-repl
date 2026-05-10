@@ -721,6 +721,8 @@ with `enkan-repl-tmux-session-prefix' define the workspaces to restore.  When a
 matching persisted workspace exists, its saved state is reused.  When no saved
 state exists for a live tmux session, a minimal workspace is imported from the
 tmux session's windows so reattach works after Emacs state was lost.
+Imported tmux window names become the workspace aliases used by send commands,
+workspace-list path display, and project-directory selection.
 
 This command is intentionally manual; enkan-repl does not reattach on load."
   (interactive)
@@ -2253,7 +2255,10 @@ Category: Center File Multi-buffer Access"
 
 ;;;###autoload
 (defun enkan-repl-open-project-directory (&optional pfx)
-  "Open project directory in Dired from enkan-repl-projects with optional PFX.
+  "Open the current workspace's project directory in Dired with optional PFX.
+Directory choices are resolved from `enkan-repl-projects' plus the current
+workspace's aliases and target directories, including aliases imported by
+`enkan-repl-tmux-reattach'.
 With prefix argument (\\[universal-argument]), select from available buffers.
 
 Category: Center File Multi-buffer Access"

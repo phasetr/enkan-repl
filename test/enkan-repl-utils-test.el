@@ -73,6 +73,29 @@
       (when (file-exists-p test-file)
         (delete-file test-file)))))
 
+(ert-deftest test-enkan-repl-utils--extract-function-info-long-docstring ()
+  "Test extraction of docstrings longer than ten lines."
+  (let ((test-file (make-temp-file "test-utils-" nil ".el")))
+    (unwind-protect
+        (progn
+          (with-temp-file test-file
+            (insert ";;; test file\n")
+            (insert "(defun test-long-docstring ()\n")
+            (insert "  \"Line 1.\n")
+            (dotimes (i 12)
+              (insert (format "Line %d.\n" (+ i 2))))
+            (insert "Final line.\"\n")
+            (insert "  (interactive)\n")
+            (insert "  nil)\n"))
+          (let ((functions (enkan-repl-utils--extract-function-info test-file)))
+            (should (= (length functions) 1))
+            (let ((docstring (plist-get (car functions) :docstring)))
+              (should (string-match-p "Line 1" docstring))
+              (should (string-match-p "Line 13" docstring))
+              (should (string-match-p "Final line" docstring)))))
+      (when (file-exists-p test-file)
+        (delete-file test-file)))))
+
 (ert-deftest test-enkan-repl-utils--extract-function-info-no-docstring ()
   "Test extraction of functions without docstrings."
   (let ((test-file (make-temp-file "test-utils-" nil ".el")))

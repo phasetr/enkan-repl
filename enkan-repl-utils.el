@@ -427,7 +427,7 @@ Returns a list of plists, each containing :name, :args, :docstring,
                     (in-docstring nil)
                     (docstring-lines '()))
                 (while (and (< next-line-idx (length lines))
-                            (< next-line-idx (+ current-line 10))) ; reasonable limit
+                            (< next-line-idx (+ current-line 40))) ; reasonable limit
                   (let ((next-line (nth next-line-idx lines)))
                     (cond
                      ;; Start of docstring
