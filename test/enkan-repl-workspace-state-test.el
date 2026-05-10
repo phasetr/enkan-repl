@@ -97,6 +97,36 @@
     (should (equal '("junk" . "/repo/junk")
                    (enkan-repl--setup-project-session "junk")))))
 
+(ert-deftest test-enkan-repl--load-legacy-state-merges-discovered-targets ()
+  "Loading old states without target dirs should preserve the target registry."
+  (let* ((project-name "enkan-repl-legacy-project")
+         (temp-root (file-name-as-directory
+                     (make-temp-file "enkan-repl-legacy-state-" t)))
+         (project-dir (expand-file-name project-name temp-root))
+         (default-directory temp-root)
+         (enkan-repl--workspaces
+          `(("01" . (:current-project ,project-name
+                      :session-list ((1 . ,project-name))
+                      :session-counter 1
+                      :project-aliases (("legacy" . ,project-name))))))
+         (enkan-repl--current-workspace "01")
+         (enkan-repl--current-project nil)
+         (enkan-repl-session-list nil)
+         (enkan-repl--session-counter 0)
+         (enkan-repl-project-aliases nil)
+         (enkan-repl-target-directories
+          '(("junk" . ("junk" . "/repo/junk")))))
+    (unwind-protect
+        (progn
+          (make-directory project-dir)
+          (enkan-repl--load-workspace-state "01")
+          (should (equal `(("legacy" . (,project-name . ,project-dir))
+                           ("junk" . ("junk" . "/repo/junk")))
+                         enkan-repl-target-directories))
+          (should (equal '("junk" . "/repo/junk")
+                         (enkan-repl--setup-project-session "junk"))))
+      (delete-directory temp-root t))))
+
 (ert-deftest test-enkan-repl--merge-target-directories-primary-wins ()
   "Workspace target directories should win over preserved registry entries."
   (should (equal '(("er" . ("enkan-repl" . "/state/enkan-repl"))

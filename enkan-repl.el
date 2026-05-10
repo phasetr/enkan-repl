@@ -810,23 +810,29 @@ This ensures that directory lookups work correctly after workspace switch."
     ;; Find project directories from files in standard locations
     (let ((dirs '()))
       ;; Check standard project locations
-      (dolist (alias enkan-repl-project-aliases)
+      (dolist (alias (enkan-repl--project-alias-names enkan-repl-project-aliases))
         ;; Try to find project directory from standard locations
-        (let* ((home-dir (expand-file-name "~"))
+        (let* ((project-name
+                (enkan-repl--project-name-for-alias
+                 alias enkan-repl-project-aliases))
+               (home-dir (expand-file-name "~"))
                (common-paths (list
-                              (expand-file-name (format "dev/self/%s" enkan-repl--current-project) home-dir)
-                              (expand-file-name (format "dev/%s" enkan-repl--current-project) home-dir)
-                              (expand-file-name (format "Documents/%s" enkan-repl--current-project) home-dir)
-                              (expand-file-name (format "projects/%s" enkan-repl--current-project) home-dir)
-                              (expand-file-name enkan-repl--current-project default-directory))))
+                              (expand-file-name (format "dev/self/%s" project-name) home-dir)
+                              (expand-file-name (format "dev/%s" project-name) home-dir)
+                              (expand-file-name (format "Documents/%s" project-name) home-dir)
+                              (expand-file-name (format "projects/%s" project-name) home-dir)
+                              (expand-file-name project-name default-directory))))
           ;; Find first existing directory
           (dolist (path common-paths)
             (when (and (not (assoc alias dirs))
                        (file-directory-p path))
-              (push (cons alias (cons enkan-repl--current-project path)) dirs)))))
+              (push (cons alias (cons project-name path)) dirs)))))
       ;; Update enkan-repl-target-directories if we found directories
       (when dirs
-        (setq enkan-repl-target-directories dirs)))))
+        (setq enkan-repl-target-directories
+              (enkan-repl--merge-target-directories
+               (nreverse dirs)
+               enkan-repl-target-directories))))))
 
 (defun enkan-repl--initialize-default-workspace ()
   "Initialize default workspace '01' with first available project.
