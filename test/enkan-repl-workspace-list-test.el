@@ -243,6 +243,32 @@
                         workspace-id enkan-repl--workspaces "05" nil)))
         (should-not (string-match-p "<not found>" formatted))))))
 
+(ert-deftest test-workspace-list-resolves-normalized-persisted-alias-paths ()
+  "Workspace list should resolve reattached paths by persisted project alias."
+  (let ((enkan-repl--workspaces
+         '(("02" . (:current-project "lat"
+                    :project-aliases (("lat" . "lat"))
+                    :target-directories
+                    (("lat" . ("lat" . "/Users/me/dev/lattice-system"))
+                     ("lattice-system" .
+                      ("lattice-system" . "/Users/me/dev/lattice-system")))
+                    :session-list ((1 . "lat"))
+                    :session-counter 0))
+           ("05" . (:current-project "er"
+                    :project-aliases (("er" . "enkan-repl"))
+                    :target-directories
+                    (("er" . ("enkan-repl" . "/Users/me/dev/enkan-repl"))
+                     ("enkan-repl" .
+                      ("enkan-repl" . "/Users/me/dev/enkan-repl")))
+                    :session-list ((1 . "enkan-repl"))
+                    :session-counter 0))))
+        (enkan-repl-projects nil))
+    (dolist (workspace-id '("02" "05"))
+      (let ((formatted (enkan-repl-workspace-list--format-workspace-info
+                        workspace-id enkan-repl--workspaces "05" nil)))
+        (should-not (string-match-p "<not found>" formatted))
+        (should (string-match-p "/Users/me/dev/" formatted))))))
+
 (provide 'enkan-repl-workspace-list-test)
 
 ;;; enkan-repl-workspace-list-test.el ends here

@@ -404,6 +404,11 @@ ALIASES may be a list of strings or an alist of (alias . project-name)."
                        (string= (car project-info) current-project))))))
      target-directories)))
 
+(defun enkan-repl--project-name-for-alias (alias project-aliases)
+  "Return project name for ALIAS from PROJECT-ALIASES, or ALIAS."
+  (or (cdr (assoc alias project-aliases))
+      alias))
+
 (defun enkan-repl--ws-state->plist ()
   "Collect current global session-related variables into a plist.
 This function does not change behavior; it only mirrors current globals."
@@ -568,13 +573,42 @@ cwd values.  PERSISTED entries with aliases not present in LIVE are retained."
         (setq merged (append merged (list (copy-tree entry))))))
     merged))
 
+(defun enkan-repl--tmux-reattach-normalize-target-directories (state live)
+  "Normalize LIVE target directories so they are addressable from STATE."
+  (let* ((current-project (plist-get state :current-project))
+         (project-aliases (plist-get state :project-aliases))
+         (aliases (enkan-repl--project-alias-names project-aliases)))
+    (cond
+     ((null live) nil)
+     ((and (= 1 (length live))
+           (or current-project (= 1 (length aliases))))
+      (let* ((entry (car live))
+             (path (cdr (cdr entry)))
+             (alias (or current-project (car aliases) (car entry)))
+             (project (enkan-repl--project-name-for-alias
+                       alias project-aliases)))
+        (list (cons alias (cons project path)))))
+     ((= (length aliases) (length live))
+      (cl-mapcar
+       (lambda (alias entry)
+         (cons alias
+               (cons (enkan-repl--project-name-for-alias
+                      alias project-aliases)
+                     (cdr (cdr entry)))))
+       aliases live))
+     (t live))))
+
 (defun enkan-repl--tmux-reattach-merge-state (persisted live)
   "Merge one PERSISTED workspace state with one LIVE tmux-derived state."
   (let* ((state (copy-tree persisted))
+         (live-target-directories
+          (enkan-repl--tmux-reattach-normalize-target-directories
+           state
+           (plist-get live :target-directories)))
          (target-directories
           (enkan-repl--tmux-reattach-merge-target-directories
            (plist-get persisted :target-directories)
-           (plist-get live :target-directories))))
+           live-target-directories)))
     (if target-directories
         (plist-put state :target-directories target-directories)
       state)))
@@ -1625,6 +1659,10 @@ Returns a list of (alias . path) pairs."
                    when project-info
                    collect (cons alias (cdr project-info))))
     (or paths
+        (when-let ((project-info
+                    (enkan-repl--get-project-info-from-directories
+                     current-project target-directories)))
+          (list (cons current-project (cdr project-info))))
         (cl-loop for entry in target-directories
                  for alias = (car entry)
                  for project-info = (cdr entry)

@@ -211,6 +211,58 @@
         (should (equal '(("er" . ("er" . "/Users/me/dev/enkan-repl")))
                        enkan-repl-target-directories))))))
 
+(ert-deftest test-enkan-repl-tmux-reattach-normalizes-live-cwd-to-persisted-alias ()
+  "Reattach should keep cwd addressable when tmux window names differ."
+  (let ((saved-workspaces
+         '(("02" :current-project "lat"
+                  :session-list ((1 . "lat"))
+                  :session-counter 0
+                  :project-aliases (("lat" . "lat"))
+                  :target-directories
+                  (("lattice-system" . ("lattice-system" . "/old/lat"))))
+           ("05" :current-project "er"
+                  :session-list ((1 . "enkan-repl"))
+                  :session-counter 0
+                  :project-aliases (("er" . "enkan-repl"))
+                  :target-directories
+                  (("enkan-repl" . ("enkan-repl" . "/old/er"))))))
+        (enkan-repl-terminal-backend 'tmux)
+        (enkan-repl--workspaces nil)
+        (enkan-repl--current-workspace nil)
+        (enkan-repl--current-project nil)
+        (enkan-repl-session-list nil)
+        (enkan-repl--session-counter 0)
+        (enkan-repl-project-aliases nil))
+    (cl-letf (((symbol-function 'enkan-repl-state-load)
+               (lambda (&optional _file)
+                 (list :workspaces saved-workspaces :current "05")))
+              ((symbol-function 'enkan-repl-state--list-live-tmux-sessions)
+               (lambda (_prefix)
+                 '("enkan-02" "enkan-05")))
+              ((symbol-function 'enkan-repl--terminal-tmux--list-window-cwds)
+               (lambda (session)
+                 (cond
+                  ((string= session "enkan-02")
+                   '(("lattice-system" . "/Users/me/dev/lattice-system")))
+                  ((string= session "enkan-05")
+                   '(("enkan-repl" . "/Users/me/dev/enkan-repl"))))))
+              ((symbol-function 'enkan-repl--terminal-list)
+               (lambda () nil))
+              ((symbol-function 'enkan-repl-state-save)
+               (lambda (&optional _file) t)))
+      (let ((result (enkan-repl-tmux-reattach)))
+        (should result)
+        (should (equal '(("lat" . ("lat" . "/Users/me/dev/lattice-system"))
+                         ("lattice-system" . ("lattice-system" . "/old/lat")))
+                       (plist-get (cdr (assoc "02" enkan-repl--workspaces
+                                              #'string=))
+                                  :target-directories)))
+        (should (equal '(("er" . ("enkan-repl" . "/Users/me/dev/enkan-repl"))
+                         ("enkan-repl" . ("enkan-repl" . "/old/er")))
+                       (plist-get (cdr (assoc "05" enkan-repl--workspaces
+                                              #'string=))
+                                  :target-directories)))))))
+
 (ert-deftest test-enkan-repl-tmux-reattach-skips-already-current-state ()
   "Manual tmux reattach does not force-refresh when state is already current."
   (let* ((saved-workspaces
@@ -219,13 +271,15 @@
                    :session-counter 1
                    :project-aliases nil
                    :target-directories
-                   (("window" . ("window" . "/tmp/window"))))
+                   (("old" . ("old" . "/tmp/window"))
+                    ("window" . ("window" . "/tmp/window"))))
             ("02" :current-project "proj"
                    :session-list ((1 . "proj"))
                    :session-counter 1
                    :project-aliases nil
                    :target-directories
-                   (("window" . ("window" . "/tmp/window"))))))
+                   (("proj" . ("proj" . "/tmp/window"))
+                    ("window" . ("window" . "/tmp/window"))))))
          (enkan-repl-terminal-backend 'tmux)
          (enkan-repl--workspaces saved-workspaces)
          (enkan-repl--current-workspace "02"))

@@ -138,6 +138,18 @@
     (should (equal (plist-get result :status) 'single))
     (should (equal (plist-get result :path) "/path/to/proj1"))
     (should (equal (plist-get result :alias) "alias1")))
+
+  ;; Test with current project as the target alias saved by tmux reattach.
+  (let ((result (enkan-repl--target-directory-info
+                 "er"
+                 nil
+                 '(("er" "enkan-repl" . "/path/to/enkan-repl")
+                   ("enkan-repl" "enkan-repl" . "/path/to/enkan-repl"))
+                 "Select project:"
+                 nil)))
+    (should (equal (plist-get result :status) 'single))
+    (should (equal (plist-get result :path) "/path/to/enkan-repl"))
+    (should (equal (plist-get result :alias) "er")))
   
   ;; Test with validation failure
   (let ((result (enkan-repl--target-directory-info 
