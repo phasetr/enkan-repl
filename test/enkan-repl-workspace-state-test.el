@@ -73,6 +73,39 @@
       (should (equal enkan-repl--session-counter 2))
       (should (equal enkan-repl-project-aliases '(("p3" . "proj3") ("p4" . "proj4")))))))
 
+(ert-deftest test-enkan-repl--load-workspace-state-preserves-target-registry ()
+  "Loading a workspace should not discard unrelated configured targets."
+  (let ((enkan-repl--workspaces
+         '(("01" . (:current-project "er"
+                    :session-list ((1 . "enkan-repl"))
+                    :session-counter 1
+                    :project-aliases (("er" . "enkan-repl"))
+                    :target-directories
+                    (("er" . ("enkan-repl" . "/repo/enkan-repl")))))))
+        (enkan-repl--current-workspace "01")
+        (enkan-repl--current-project nil)
+        (enkan-repl-session-list nil)
+        (enkan-repl--session-counter 0)
+        (enkan-repl-project-aliases nil)
+        (enkan-repl-target-directories
+         '(("er" . ("enkan-repl" . "/repo/enkan-repl"))
+           ("junk" . ("junk" . "/repo/junk")))))
+    (enkan-repl--load-workspace-state "01")
+    (should (equal '(("er" . ("enkan-repl" . "/repo/enkan-repl"))
+                     ("junk" . ("junk" . "/repo/junk")))
+                   enkan-repl-target-directories))
+    (should (equal '("junk" . "/repo/junk")
+                   (enkan-repl--setup-project-session "junk")))))
+
+(ert-deftest test-enkan-repl--merge-target-directories-primary-wins ()
+  "Workspace target directories should win over preserved registry entries."
+  (should (equal '(("er" . ("enkan-repl" . "/state/enkan-repl"))
+                   ("junk" . ("junk" . "/repo/junk")))
+                 (enkan-repl--merge-target-directories
+                  '(("er" . ("enkan-repl" . "/state/enkan-repl")))
+                  '(("er" . ("enkan-repl" . "/config/enkan-repl"))
+                    ("junk" . ("junk" . "/repo/junk")))))))
+
 (ert-deftest test-enkan-repl--save-workspace-state ()
   "Test saving workspace state."
   (let ((enkan-repl--workspaces nil)

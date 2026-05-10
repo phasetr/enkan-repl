@@ -118,6 +118,24 @@
       (should (string= (plist-get ws-state :current-project) "MyProject"))
       (should (equal (plist-get ws-state :project-aliases) '("alias1"))))))
 
+(ert-deftest test-enkan-repl--setup-start-sessions-reports-failures ()
+  "Session setup should report failures instead of looking successful."
+  (let ((buffer-name "*enkan-repl-test-setup-start*")
+        (enkan-repl-target-directories nil))
+    (unwind-protect
+        (with-current-buffer (get-buffer-create buffer-name)
+          (erase-buffer)
+          (let* ((standard-output (current-buffer))
+                 (result (enkan-repl--setup-start-sessions
+                          '("junk")
+                          buffer-name)))
+            (should (= 0 (plist-get result :success-count)))
+            (should (= 1 (plist-get result :failure-count)))
+            (should (string-match-p "Project alias .junk. not found"
+                                    (buffer-string)))))
+      (when (get-buffer buffer-name)
+        (kill-buffer buffer-name)))))
+
 (ert-deftest test-enkan-repl--setup-window-terminal-buffer-pure-workspace-context ()
   "Test that window eat buffer name includes correct workspace ID."
   ;; Load window-layouts if exists
