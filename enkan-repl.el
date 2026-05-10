@@ -543,8 +543,13 @@ for display and follow-up directory resolution when available."
               session-list)
         (unless (assoc project aliases)
           (push (cons project project) aliases))
-        (when (and cwd (not (assoc project target-directories)))
-          (push (cons project (cons project cwd)) target-directories))))
+        (when cwd
+          (cond
+           ((not (assoc project target-directories))
+            (push (cons project (cons project cwd)) target-directories))
+           ((and (not (string= window project))
+                 (not (assoc window target-directories)))
+            (push (cons window (cons project cwd)) target-directories))))))
     (list :current-project current-project
           :session-list (nreverse session-list)
           :session-counter counter
@@ -647,7 +652,9 @@ used."
                        (enkan-repl--tmux-reattach-project-name window)))
          (target-directories (plist-get state :target-directories)))
     (when project
-      (or (when-let ((entry (assoc project target-directories)))
+      (or (when-let ((entry (assoc window target-directories)))
+            (cdr (cdr entry)))
+          (when-let ((entry (assoc project target-directories)))
             (cdr (cdr entry)))
           (cl-loop for entry in target-directories
                    for value = (cdr entry)
@@ -1692,16 +1699,15 @@ Returns a list of (alias . path) pairs."
                    when project-info
                    collect (cons alias (cdr project-info))))
     (or paths
-        (when-let ((project-info
-                    (enkan-repl--get-project-info-from-directories
-                     current-project target-directories)))
-          (list (cons current-project (cdr project-info))))
         (cl-loop for entry in target-directories
                  for alias = (car entry)
                  for project-info = (cdr entry)
                  when (and (consp project-info)
                            (string= (car project-info) current-project))
-                 collect (cons alias (cdr project-info))))))
+                 collect (cons alias (cdr project-info)))
+        (when-let ((project-info (enkan-repl--get-project-info-from-directories
+                                  current-project target-directories)))
+          (list (cons current-project (cdr project-info)))))))
 
 (defun enkan-repl--no-active-sessions-message ()
   "Return the user-facing message for missing send targets."

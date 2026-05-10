@@ -29,6 +29,16 @@
     ;; Test with nil directories
     (should (null (enkan-repl--get-project-info-from-directories "proj1" nil)))))
 
+(ert-deftest test-enkan-repl--get-project-paths-for-current-duplicate-project ()
+  "Project path lookup should keep all aliases for the same project."
+  (should (equal '(("proj" . "/repo/proj-a")
+                   ("proj-2" . "/repo/proj-b"))
+                 (enkan-repl--get-project-paths-for-current
+                  "proj"
+                  nil
+                  '(("proj" . ("proj" . "/repo/proj-a"))
+                    ("proj-2" . ("proj" . "/repo/proj-b")))))))
+
 ;; Tests for enkan-repl--resolve-send-target
 (ert-deftest test-enkan-repl--resolve-send-target ()
   "Test resolving send target with prefix-arg and alias."
