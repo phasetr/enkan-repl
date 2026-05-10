@@ -47,7 +47,7 @@
       
       ;; Start eat in first workspace
       (let ((default-directory "/path/to/enkan-repl/"))
-        (enkan-repl-start-eat))
+        (enkan-repl-start-session))
       
       ;; Check first buffer name
       (should (= (length renamed-buffers) 1))
@@ -69,7 +69,7 @@
       
       ;; Start eat in second workspace
       (let ((default-directory "/path/to/enkan-repl/"))
-        (enkan-repl-start-eat))
+        (enkan-repl-start-session))
       
       ;; Check second buffer name - THE PROBLEM!
       (should (= (length renamed-buffers) 2))

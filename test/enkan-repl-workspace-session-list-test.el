@@ -74,8 +74,8 @@
     (should (equal '((1 . "er")) (enkan-repl--ws-session-list)))
     
     ;; Test buffer name generation
-    (when (fboundp 'enkan-repl--setup-window-eat-buffer-pure)
-      (let ((result (enkan-repl--setup-window-eat-buffer-pure
+    (when (fboundp 'enkan-repl--setup-window-terminal-buffer-pure)
+      (let ((result (enkan-repl--setup-window-terminal-buffer-pure
                      'test-window 1
                      (enkan-repl--ws-session-list)
                      enkan-repl-target-directories)))
@@ -135,9 +135,9 @@
                    (when (string-match "not found\\|No session" msg)
                      msg)))))
       
-      ;; Test setup-session-eat-buffer behavior
-      (when (fboundp 'enkan-repl--setup-session-eat-buffer)
-        (let ((msg (enkan-repl--setup-session-eat-buffer 'test-window 1)))
+      ;; Test setup-session-terminal-buffer behavior
+      (when (fboundp 'enkan-repl--setup-session-terminal-buffer)
+        (let ((msg (enkan-repl--setup-session-terminal-buffer 'test-window 1)))
           ;; Should show message about missing buffer or no session
           (should (or (string-match-p "not found" msg)
                       (string-match-p "No session" msg))))))))

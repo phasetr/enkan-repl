@@ -72,8 +72,17 @@
     (should (equal enkan-repl-session-list '((1 . "project-c") (2 . "project-b"))))))
 
 (ert-deftest test-enkan-repl-tmux-reattach-restores-state ()
-  "Manual tmux reattach restores reconciled workspace state."
-  (let ((enkan-repl-terminal-backend 'tmux)
+  "Manual tmux reattach restores persisted state for live tmux sessions."
+  (let ((saved-workspaces
+         '(("01" :current-project "old"
+                  :session-list ((1 . "old"))
+                  :session-counter 1
+                  :project-aliases nil)
+           ("02" :current-project "proj"
+                  :session-list ((1 . "proj"))
+                  :session-counter 1
+                  :project-aliases (("p" . "proj")))))
+        (enkan-repl-terminal-backend 'tmux)
         (enkan-repl--workspaces nil)
         (enkan-repl--current-workspace "01")
         (enkan-repl--current-project nil)
@@ -81,27 +90,21 @@
         (enkan-repl--session-counter 0)
         (enkan-repl-project-aliases nil)
         ensured-workspaces)
-    (cl-letf (((symbol-function 'enkan-repl-state-tmux-reconcile)
+    (cl-letf (((symbol-function 'enkan-repl-state-load)
                (lambda (&optional _file)
-                 '(:loaded-workspaces
-                   (("01" :current-project "old"
-                          :session-list ((1 . "old"))
-                          :session-counter 1
-                          :project-aliases nil)
-                    ("02" :current-project "proj"
-                          :session-list ((1 . "proj"))
-                          :session-counter 1
-                          :project-aliases (("p" . "proj"))))
-                   :restored ("01" "02")
-                   :dropped nil
-                   :orphan-tmux nil
-                   :current "02")))
+                 (list :workspaces saved-workspaces :current "02")))
+              ((symbol-function 'enkan-repl-state--list-live-tmux-sessions)
+               (lambda (_prefix)
+                 '("enkan-01" "enkan-02")))
+              ((symbol-function 'enkan-repl--terminal-tmux--list-windows)
+               (lambda (_session)
+                 '("window")))
               ((symbol-function 'enkan-repl--terminal-list)
                (lambda ()
                  (list (format "enkan-%s:window"
                                enkan-repl--current-workspace))))
               ((symbol-function 'enkan-repl--terminal-tmux--mirror-make)
-               (lambda (id &optional defer-refresh)
+               (lambda (id &optional defer-refresh _path)
                  (push (list enkan-repl--current-workspace id defer-refresh)
                        ensured-workspaces)
                  id))
@@ -114,6 +117,50 @@
         (should (equal '((1 . "proj")) enkan-repl-session-list))
         (should (equal '(("02" "enkan-02:window" t)
                          ("01" "enkan-01:window" t))
+                       ensured-workspaces))))))
+
+(ert-deftest test-enkan-repl-tmux-reattach-imports-live-session-without-state ()
+  "Manual tmux reattach imports live tmux sessions when no state exists."
+  (let ((enkan-repl-terminal-backend 'tmux)
+        (enkan-repl--workspaces nil)
+        (enkan-repl--current-workspace nil)
+        (enkan-repl--current-project nil)
+        (enkan-repl-session-list nil)
+        (enkan-repl--session-counter 0)
+        (enkan-repl-project-aliases nil)
+        ensured-workspaces)
+    (cl-letf (((symbol-function 'enkan-repl-state-load)
+               (lambda (&optional _file) nil))
+              ((symbol-function 'enkan-repl-state--list-live-tmux-sessions)
+               (lambda (_prefix)
+                 '("enkan-03")))
+              ((symbol-function 'enkan-repl--terminal-tmux--list-windows)
+               (lambda (_session)
+                 '("enkan-repl" "worker-2")))
+              ((symbol-function 'enkan-repl--terminal-list)
+               (lambda ()
+                 (list "enkan-03:enkan-repl" "enkan-03:worker-2")))
+              ((symbol-function 'enkan-repl--terminal-tmux--mirror-make)
+               (lambda (id &optional defer-refresh _path)
+                 (push (list enkan-repl--current-workspace id defer-refresh)
+                       ensured-workspaces)
+                 id))
+              ((symbol-function 'enkan-repl-state-save)
+               (lambda (&optional _file) t)))
+      (let ((result (enkan-repl-tmux-reattach)))
+        (should result)
+        (should (equal '("03") (plist-get result :imported)))
+        (should (equal "03" enkan-repl--current-workspace))
+        (should (equal "enkan-repl" enkan-repl--current-project))
+        (should (equal '((1 . "enkan-repl") (2 . ("worker" . 2)))
+                       enkan-repl-session-list))
+        (should (equal '((1 . "enkan-repl") (2 . ("worker" . 2)))
+                       (plist-get (cdr (assoc "03" enkan-repl--workspaces
+                                              #'string=))
+                                  :session-list)))
+        (should (= 2 enkan-repl--session-counter))
+        (should (equal '(("03" "enkan-03:worker-2" t)
+                         ("03" "enkan-03:enkan-repl" t))
                        ensured-workspaces))))))
 
 (ert-deftest test-enkan-repl-tmux-reattach-skips-already-current-state ()
@@ -132,16 +179,21 @@
          (enkan-repl--current-workspace "02"))
     (cl-letf (((symbol-function 'enkan-repl-state-tmux-reconcile)
                (lambda (&optional _file)
-                 (list :loaded-workspaces saved-workspaces
-                       :restored '("01" "02")
-                       :dropped nil
-                       :orphan-tmux nil
-                       :current "02")))
+                 (error "Should not use old persisted-only reconcile")))
+              ((symbol-function 'enkan-repl-state-load)
+               (lambda (&optional _file)
+                 (list :workspaces saved-workspaces :current "02")))
+              ((symbol-function 'enkan-repl-state--list-live-tmux-sessions)
+               (lambda (_prefix)
+                 '("enkan-01" "enkan-02")))
+              ((symbol-function 'enkan-repl--terminal-tmux--list-windows)
+               (lambda (_session)
+                 '("window")))
               ((symbol-function 'enkan-repl--terminal-list)
                (lambda ()
                  (error "Should not list tmux windows when already current")))
               ((symbol-function 'enkan-repl--terminal-tmux--mirror-make)
-               (lambda (_id &optional _defer-refresh)
+               (lambda (_id &optional _defer-refresh _path)
                  (error "Should not create mirrors when already current")))
               ((symbol-function 'enkan-repl-state-save)
                (lambda (&optional _file)

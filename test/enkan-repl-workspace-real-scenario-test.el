@@ -35,7 +35,7 @@
                (lambda () (generate-new-buffer "*eat*")))
               ((symbol-function 'require)
                (lambda (_) t)))
-      (enkan-repl-start-eat))
+      (enkan-repl-start-session))
     (message "WS 01 sessions: %S" enkan-repl-session-list)
     
     (message "\n=== User creates WS 02 ===")
@@ -48,7 +48,7 @@
                (lambda () (generate-new-buffer "*eat*")))
               ((symbol-function 'require)
                (lambda (_) t)))
-      (enkan-repl-start-eat))
+      (enkan-repl-start-session))
     (message "WS 02 sessions: %S" enkan-repl-session-list)
     
     (message "\n=== User switches to WS 02 ===")
@@ -89,7 +89,7 @@
                (lambda () (generate-new-buffer "*eat*")))
               ((symbol-function 'require)
                (lambda (_) t)))
-      (enkan-repl-start-eat))
+      (enkan-repl-start-session))
     
     ;; Check states
     (let ((ws01-state (enkan-repl--get-workspace-state enkan-repl--workspaces "01"))

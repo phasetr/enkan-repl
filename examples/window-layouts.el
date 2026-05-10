@@ -33,8 +33,8 @@ PROJECT-REGISTRY format: ((alias . (project-name . project-path)) ...)"
          (project-path (when project-info (cdr (cdr project-info)))))
     project-path))
 
-(defun enkan-repl--setup-window-eat-buffer-pure (window session-number session-list project-registry)
-  "Pure function to determine eat buffer setup for WINDOW and SESSION-NUMBER.
+(defun enkan-repl--setup-window-terminal-buffer-pure (window session-number session-list project-registry)
+  "Pure function to determine terminal buffer setup for WINDOW and SESSION-NUMBER.
 Returns cons (window . buffer-name) or nil if session not registered.
 Honors the multi-instance index stored in SESSION-LIST so different
 instances of the same project map to distinct buffer names with <N>
@@ -46,7 +46,7 @@ suffix."
       (let ((project-path (enkan-repl--get-project-path-from-directories project-name project-registry)))
         (when project-path
           (let* ((expanded-path (expand-file-name project-path))
-                 ;; Ensure path ends with / for consistency with eat buffer names
+                 ;; Ensure path ends with / for consistency with terminal buffer names.
                  (normalized-path (if (string-suffix-p "/" expanded-path)
                                       expanded-path
                                     (concat expanded-path "/")))
@@ -61,6 +61,51 @@ suffix."
                                   (format "%s<%d>" base instance)
                                 base)))
             (cons window buffer-name)))))))
+
+(defun enkan-repl--registered-session-buffer-for-entry (entry)
+  "Return the live terminal buffer corresponding to session ENTRY.
+ENTRY is one element of `enkan-repl-session-list'.  Prefer the exact path
+registered through `enkan-repl-target-directories'.  When no project path is
+configured, fall back to matching the project name encoded in existing buffer
+names.  Stray buffers whose paths do not correspond to registered sessions are
+not returned."
+  (let* ((session-number (car entry))
+         (entry-value (cdr entry))
+         (project-name (enkan-repl--session-entry-project entry-value))
+         (instance (enkan-repl--session-entry-instance entry-value))
+         (setup (enkan-repl--setup-window-terminal-buffer-pure
+                 nil session-number (enkan-repl--ws-session-list)
+                 enkan-repl-target-directories))
+         (exact-buffer (and setup (get-buffer (cdr setup)))))
+    (cond
+     ((and exact-buffer
+           (enkan-repl--buffer-alive-as-terminal-p exact-buffer))
+      exact-buffer)
+     (project-name
+      (cl-find-if
+       (lambda (buffer)
+         (let ((name (buffer-name buffer)))
+           (and name
+                (enkan-repl--buffer-name-matches-workspace
+                 name enkan-repl--current-workspace)
+                (string= (or (enkan-repl--extract-project-name name) "")
+                         project-name)
+                (= (enkan-repl--buffer-name->instance name) instance)
+                (enkan-repl--buffer-alive-as-terminal-p buffer))))
+       (buffer-list))))))
+
+(defun enkan-repl--registered-session-buffers ()
+  "Return live terminal buffers registered for the current workspace.
+The returned list follows session slot order and excludes stray tmux mirror
+buffers that merely share the same workspace prefix.  Duplicate session-list
+entries that resolve to the same buffer are collapsed."
+  (let (buffers)
+    (dolist (entry (sort (copy-sequence (enkan-repl--ws-session-list))
+                         (lambda (a b) (< (car a) (car b)))))
+      (let ((buffer (enkan-repl--registered-session-buffer-for-entry entry)))
+        (when (and buffer (not (memq buffer buffers)))
+          (push buffer buffers))))
+    (nreverse buffers)))
 
 ;;;; Window Layout Variables
 
@@ -77,21 +122,29 @@ suffix."
 
 ;;;; Window Layout Functions
 
-;; Helper function for setting up eat buffer in window
-(defun enkan-repl--setup-session-eat-buffer (window session-number)
-  "Setup eat buffer for SESSION-NUMBER in WINDOW."
-  (let ((eat-setup (enkan-repl--setup-window-eat-buffer-pure
-                     window session-number (enkan-repl--ws-session-list) enkan-repl-target-directories)))
-    (if eat-setup
-      (let ((buffer (get-buffer (cdr eat-setup))))
+;;;###autoload
+(defun other-window-or-split ()
+  "Move to the next window, splitting the frame when only one window exists."
+  (interactive)
+  (when (one-window-p)
+    (split-window-right))
+  (other-window 1))
+
+;; Helper function for setting up terminal buffer in window.
+(defun enkan-repl--setup-session-terminal-buffer (window session-number)
+  "Setup terminal buffer for SESSION-NUMBER in WINDOW."
+  (let ((terminal-setup (enkan-repl--setup-window-terminal-buffer-pure
+                         window session-number (enkan-repl--ws-session-list) enkan-repl-target-directories)))
+    (if terminal-setup
+      (let ((buffer (get-buffer (cdr terminal-setup))))
         (if buffer
           (progn
-            (select-window (car eat-setup))
+            (select-window (car terminal-setup))
             (switch-to-buffer buffer)
-            (message "✅ Window %d: Opened eat buffer %s"
-                    session-number (cdr eat-setup)))
-          (message "❌ Window %d: Eat buffer %s not found. Run C-M-s to start sessions."
-            session-number (cdr eat-setup))))
+            (message "✅ Window %d: Opened terminal buffer %s"
+                    session-number (cdr terminal-setup)))
+          (message "❌ Window %d: Terminal buffer %s not found. Run C-M-s to start sessions."
+            session-number (cdr terminal-setup))))
       (message "❌ Window %d: No session registered for slot %d (internal number %d)."
         session-number session-number session-number))))
 
@@ -121,14 +174,14 @@ Category: Utilities"
     (select-window enkan-repl--window-1)
     (find-file enkan-repl-center-file)
     (message "✅ Window 1: Opened center file %s" enkan-repl-center-file))
-  ;; Setup eat buffers in session windows - use actual living buffers
-  (let ((available-buffers (enkan-repl--get-available-buffers (buffer-list))))
+  ;; Setup terminal buffers in session windows - use actual living buffers.
+  (let ((available-buffers (enkan-repl--registered-session-buffers)))
     (when (and available-buffers (> (length available-buffers) 0))
       ;; Use first available buffer in window 2
       (when enkan-repl--window-2
         (select-window enkan-repl--window-2)
         (switch-to-buffer (car available-buffers))
-        (message "✅ Window 2: Opened eat buffer %s" (buffer-name (car available-buffers))))))
+        (message "✅ Window 2: Opened terminal buffer %s" (buffer-name (car available-buffers))))))
   ;; Always select the center file window (Window 1) at the end
   (when enkan-repl--window-1
     (select-window enkan-repl--window-1)))
@@ -166,19 +219,19 @@ Category: Utilities"
     (select-window enkan-repl--window-1)
     (find-file enkan-repl-center-file)
     (message "✅ Window 1: Opened center file %s" enkan-repl-center-file))
-  ;; Setup eat buffers in session windows - use actual living buffers
-  (let ((available-buffers (enkan-repl--get-available-buffers (buffer-list))))
+  ;; Setup terminal buffers in session windows - use actual living buffers.
+  (let ((available-buffers (enkan-repl--registered-session-buffers)))
     (when (and available-buffers (> (length available-buffers) 0))
       ;; Place first buffer in window 2
       (when enkan-repl--window-2
         (select-window enkan-repl--window-2)
         (switch-to-buffer (car available-buffers))
-        (message "✅ Window 2: Opened eat buffer %s" (buffer-name (car available-buffers))))
+        (message "✅ Window 2: Opened terminal buffer %s" (buffer-name (car available-buffers))))
       ;; Place second buffer in window 3 if exists
       (when (and (> (length available-buffers) 1) enkan-repl--window-3)
         (select-window enkan-repl--window-3)
         (switch-to-buffer (cadr available-buffers))
-        (message "✅ Window 3: Opened eat buffer %s" (buffer-name (cadr available-buffers))))))
+        (message "✅ Window 3: Opened terminal buffer %s" (buffer-name (cadr available-buffers))))))
   ;; Always select the center file window (Window 1) at the end
   (when enkan-repl--window-1
     (select-window enkan-repl--window-1)))
@@ -219,24 +272,24 @@ Category: Utilities"
     (select-window enkan-repl--window-1)
     (find-file enkan-repl-center-file)
     (message "✅ Window 1: Opened center file %s" enkan-repl-center-file))
-  ;; Setup eat buffers in session windows - use actual living buffers
-  (let ((available-buffers (enkan-repl--get-available-buffers (buffer-list))))
+  ;; Setup terminal buffers in session windows - use actual living buffers.
+  (let ((available-buffers (enkan-repl--registered-session-buffers)))
     (when (and available-buffers (> (length available-buffers) 0))
       ;; Place first buffer in window 2
       (when enkan-repl--window-2
         (select-window enkan-repl--window-2)
         (switch-to-buffer (car available-buffers))
-        (message "✅ Window 2: Opened eat buffer %s" (buffer-name (car available-buffers))))
+        (message "✅ Window 2: Opened terminal buffer %s" (buffer-name (car available-buffers))))
       ;; Place second buffer in window 3 if exists
       (when (and (> (length available-buffers) 1) enkan-repl--window-3)
         (select-window enkan-repl--window-3)
         (switch-to-buffer (cadr available-buffers))
-        (message "✅ Window 3: Opened eat buffer %s" (buffer-name (cadr available-buffers))))
+        (message "✅ Window 3: Opened terminal buffer %s" (buffer-name (cadr available-buffers))))
       ;; Place third buffer in window 4 if exists
       (when (and (> (length available-buffers) 2) enkan-repl--window-4)
         (select-window enkan-repl--window-4)
         (switch-to-buffer (caddr available-buffers))
-        (message "✅ Window 4: Opened eat buffer %s" (buffer-name (caddr available-buffers))))))
+        (message "✅ Window 4: Opened terminal buffer %s" (buffer-name (caddr available-buffers))))))
   ;; Always select the center file window (Window 1) at the end
   (when enkan-repl--window-1
     (select-window enkan-repl--window-1)))
@@ -281,29 +334,29 @@ Category: Utilities"
     (select-window enkan-repl--window-1)
     (find-file enkan-repl-center-file)
     (message "✅ Window 1: Opened center file %s" enkan-repl-center-file))
-  ;; Setup eat buffers in session windows - use actual living buffers
-  (let ((available-buffers (enkan-repl--get-available-buffers (buffer-list))))
+  ;; Setup terminal buffers in session windows - use actual living buffers.
+  (let ((available-buffers (enkan-repl--registered-session-buffers)))
     (when (and available-buffers (> (length available-buffers) 0))
       ;; Place first buffer in window 2
       (when enkan-repl--window-2
         (select-window enkan-repl--window-2)
         (switch-to-buffer (car available-buffers))
-        (message "✅ Window 2: Opened eat buffer %s" (buffer-name (car available-buffers))))
+        (message "✅ Window 2: Opened terminal buffer %s" (buffer-name (car available-buffers))))
       ;; Place second buffer in window 3 if exists
       (when (and (> (length available-buffers) 1) enkan-repl--window-3)
         (select-window enkan-repl--window-3)
         (switch-to-buffer (cadr available-buffers))
-        (message "✅ Window 3: Opened eat buffer %s" (buffer-name (cadr available-buffers))))
+        (message "✅ Window 3: Opened terminal buffer %s" (buffer-name (cadr available-buffers))))
       ;; Place third buffer in window 4 if exists
       (when (and (> (length available-buffers) 2) enkan-repl--window-4)
         (select-window enkan-repl--window-4)
         (switch-to-buffer (caddr available-buffers))
-        (message "✅ Window 4: Opened eat buffer %s" (buffer-name (caddr available-buffers))))
+        (message "✅ Window 4: Opened terminal buffer %s" (buffer-name (caddr available-buffers))))
       ;; Place fourth buffer in window 5 if exists
       (when (and (> (length available-buffers) 3) enkan-repl--window-5)
         (select-window enkan-repl--window-5)
         (switch-to-buffer (cadddr available-buffers))
-        (message "✅ Window 5: Opened eat buffer %s" (buffer-name (cadddr available-buffers))))))
+        (message "✅ Window 5: Opened terminal buffer %s" (buffer-name (cadddr available-buffers))))))
   ;; Always select the center file window (Window 1) at the end
   (when enkan-repl--window-1
     (select-window enkan-repl--window-1)))
@@ -321,10 +374,11 @@ Category: Utilities"
     (error "No current project active. Run enkan-repl-setup first"))
   (unless enkan-repl--current-workspace
     (error "No current workspace active"))
-  ;; Count actual living buffers for current workspace
-  (let ((session-count (enkan-repl--get-workspace-buffer-count-pure 
-                        (buffer-list) 
-                        enkan-repl--current-workspace)))
+  ;; Count registered live buffers for current workspace.  Do not use every
+  ;; mirror buffer with the workspace prefix: stale tmux windows can recreate
+  ;; stray mirrors asynchronously, and those must not drive the layout.
+  (let* ((session-buffers (enkan-repl--registered-session-buffers))
+         (session-count (length session-buffers)))
     (message "Setting up layout for %d actual sessions in workspace '%s' for project '%s'..."
       session-count enkan-repl--current-workspace (enkan-repl--ws-current-project))
     (cond

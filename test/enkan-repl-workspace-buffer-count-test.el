@@ -10,6 +10,7 @@
 ;; Load required files
 (load (expand-file-name "enkan-repl.el" default-directory) nil t)
 (load (expand-file-name "enkan-repl-utils.el" default-directory) nil t)
+(load (expand-file-name "enkan-repl-terminal.el" default-directory) nil t)
 
 (ert-deftest test-enkan-repl--get-workspace-buffer-count-pure ()
   "Test pure function to get living buffer count for workspace."
@@ -42,6 +43,27 @@
           (with-current-buffer buffer
             (when (and (boundp 'eat--process) eat--process)
               (delete-process eat--process)))
+          (kill-buffer buffer))))))
+
+(ert-deftest test-enkan-repl--get-workspace-buffer-count-tmux-local ()
+  "Counting tmux mirror buffers must not synchronously query tmux."
+  (let ((buffer1 (generate-new-buffer "*ws:01 enkan:/path/to/er/*"))
+        (buffer2 (generate-new-buffer "*ws:01 enkan:/path/to/dead/*")))
+    (unwind-protect
+        (progn
+          (with-current-buffer buffer1
+            (setq-local enkan-repl--tmux-mirror-id "enkan-01:er"))
+          (with-current-buffer buffer2
+            (setq-local enkan-repl--tmux-mirror-id "enkan-01:dead")
+            (setq-local enkan-repl--tmux-mirror-state 'closed))
+          (cl-letf (((symbol-function 'enkan-repl--terminal-tmux-alive-p)
+                     (lambda (_id)
+                       (error "must not synchronously query tmux"))))
+            (should (= 1 (enkan-repl--get-workspace-buffer-count-pure
+                          (list buffer1 buffer2)
+                          "01")))))
+      (dolist (buffer (list buffer1 buffer2))
+        (when (buffer-live-p buffer)
           (kill-buffer buffer))))))
 
 (provide 'enkan-repl-workspace-buffer-count-test)

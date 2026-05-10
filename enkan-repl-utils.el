@@ -25,6 +25,8 @@
 ;; require to keep the dependency graph one-directional and to allow
 ;; loading this file standalone in tests.
 (declare-function enkan-repl--terminal-tmux-alive-p "enkan-repl-terminal" (id))
+(declare-function enkan-repl--terminal-tmux-mirror-buffer-alive-p
+                  "enkan-repl-terminal" (buffer))
 (defvar enkan-repl--tmux-mirror-id)
 
 ;;;; Buffer Name API (New - Compatibility Mode)
@@ -99,8 +101,9 @@ Backend-agnostic check, in priority order:
 1. BUFFER's buffer-local `eat--process' is a live process (kephale eat).
 2. BUFFER has a live OS process attached via `get-buffer-process'
    (akib eat / general).
-3. BUFFER is a tmux mirror carrying buffer-local
-   `enkan-repl--tmux-mirror-id' and the underlying tmux pane is alive."
+3. BUFFER is an open tmux mirror carrying buffer-local
+   `enkan-repl--tmux-mirror-id'.  This path intentionally avoids synchronous
+   tmux liveness checks while scanning `buffer-list'."
   (and (bufferp buffer)
        (buffer-live-p buffer)
        (or
@@ -112,11 +115,12 @@ Backend-agnostic check, in priority order:
         ;; (2) general: live process attached to the buffer
         (let ((proc (get-buffer-process buffer)))
           (and proc (process-live-p proc)))
-        ;; (3) tmux mirror buffer with bound id pointing at live pane
-        (let ((id (buffer-local-value
-                   'enkan-repl--tmux-mirror-id buffer)))
-          (and id (fboundp 'enkan-repl--terminal-tmux-alive-p)
-               (enkan-repl--terminal-tmux-alive-p id))))))
+        ;; (3) tmux mirror buffer.  Do not synchronously call tmux here;
+        ;; this predicate is used inside buffer-list scans and completion
+        ;; paths where blocking the main thread is worse than keeping a
+        ;; stale mirror until the next async refresh marks it closed.
+        (and (fboundp 'enkan-repl--terminal-tmux-mirror-buffer-alive-p)
+             (enkan-repl--terminal-tmux-mirror-buffer-alive-p buffer)))))
 
 (defun enkan-repl--get-workspace-buffer-count-pure (buffer-list workspace-id)
   "Pure function to count live terminal sessions for WORKSPACE-ID.
@@ -449,7 +453,6 @@ Returns a list of plists, each containing :name, :args, :docstring,
               ;; Look for (interactive) in the function body
               ;; Only search until we find another defun or end of reasonable function scope
               (let ((body-idx (1+ current-line))
-                    (paren-count 0)
                     (in-function t))
                 (while (and (< body-idx (length lines))
                             (not interactive-p)
@@ -593,7 +596,8 @@ Returns formatted string."
 (defun enkan-repl-utils--encode-full-path (path prefix separator)
   "Encode PATH with PREFIX and SEPARATOR (pure).
 Returns string like PREFIX + PATH with '/' replaced by SEPARATOR.
-Example: PATH '/Users/proj', PREFIX 'enkan', SEP '--' -> 'enkan--Users--proj'"
+Example: PATH \='/Users/proj', PREFIX \='enkan', SEP \='--'
+returns \='enkan--Users--proj'."
   (let* ((expanded-path (expand-file-name path))
          (cleaned-path (if (string-suffix-p "/" expanded-path)
                            (substring expanded-path 0 -1)
@@ -603,7 +607,7 @@ Example: PATH '/Users/proj', PREFIX 'enkan', SEP '--' -> 'enkan--Users--proj'"
 (defun enkan-repl-utils--decode-full-path (encoded-name prefix separator)
   "Decode ENCODED-NAME using PREFIX and SEPARATOR (pure).
 Returns normalized directory path ending with '/'.
-Example: 'enkan--Users--proj' -> '/Users/proj/'"
+Example: \='enkan--Users--proj' returns \='/Users/proj/'."
   (when (string-prefix-p prefix encoded-name)
     (let ((path-part (substring encoded-name (length prefix))))
       (concat (replace-regexp-in-string (regexp-quote separator) "/" path-part) "/"))))

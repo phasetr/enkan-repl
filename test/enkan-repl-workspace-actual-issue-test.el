@@ -74,10 +74,10 @@
                                    buffer))
                        buffer-selection-log))))
       
-      ;; Call enkan-repl--setup-session-eat-buffer 
+      ;; Call enkan-repl--setup-session-terminal-buffer
       ;; This is what enkan-repl-setup-1session-layout calls
-      (when (fboundp 'enkan-repl--setup-session-eat-buffer)
-        (enkan-repl--setup-session-eat-buffer 'dummy-window 1))
+      (when (fboundp 'enkan-repl--setup-session-terminal-buffer)
+        (enkan-repl--setup-session-terminal-buffer 'dummy-window 1))
       
       ;; Check log - should NOT open center file in eat window
       ;; But if eat buffer doesn't exist, it might fall back to center file
@@ -85,8 +85,8 @@
                                 (string-match-p "center\\.md" log))
                               buffer-selection-log)))))
 
-(ert-deftest test-setup-session-eat-buffer-logic ()
-  "Test the logic of enkan-repl--setup-session-eat-buffer."
+(ert-deftest test-setup-session-terminal-buffer-logic ()
+  "Test the logic of enkan-repl--setup-session-terminal-buffer."
   
   (let ((enkan-repl--current-workspace "01")
         (enkan-repl--session-list '((1 . "er")))
@@ -94,9 +94,9 @@
          '(("er-alias" . ("er" . "/path/to/er"))))
         test-buffer-name)
     
-    ;; Test: setup-window-eat-buffer-pure should return correct buffer name
-    (when (fboundp 'enkan-repl--setup-window-eat-buffer-pure)
-      (let ((result (enkan-repl--setup-window-eat-buffer-pure
+    ;; Test: setup-window-terminal-buffer-pure should return correct buffer name
+    (when (fboundp 'enkan-repl--setup-window-terminal-buffer-pure)
+      (let ((result (enkan-repl--setup-window-terminal-buffer-pure
                      'dummy-window 1 
                      enkan-repl--session-list
                      enkan-repl-target-directories)))
@@ -121,7 +121,7 @@
                  (error "switch-to-buffer should not be called when buffer doesn't exist"))))
       
       ;; When buffer doesn't exist, it should message an error, not switch
-      (when (fboundp 'enkan-repl--setup-session-eat-buffer)
+      (when (fboundp 'enkan-repl--setup-session-terminal-buffer)
         ;; Mock message to prevent actual output
         (cl-letf (((symbol-function 'message)
                    (lambda (&rest args)
@@ -130,7 +130,7 @@
                        t))))
           
           ;; This should not error - it should just show a message
-          (enkan-repl--setup-session-eat-buffer 'dummy-window 1))))))
+          (enkan-repl--setup-session-terminal-buffer 'dummy-window 1))))))
 
 (provide 'enkan-repl-workspace-actual-issue-test)
 ;;; enkan-repl-workspace-actual-issue-test.el ends here

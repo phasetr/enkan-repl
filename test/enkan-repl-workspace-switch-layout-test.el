@@ -117,15 +117,15 @@
 (ert-deftest test-workspace-buffer-selection-pure ()
   "Test pure function buffer selection logic for workspaces."
   
-  ;; Test that enkan-repl--setup-window-eat-buffer-pure respects workspace ID
-  (when (fboundp 'enkan-repl--setup-window-eat-buffer-pure)
+  ;; Test that enkan-repl--setup-window-terminal-buffer-pure respects workspace ID
+  (when (fboundp 'enkan-repl--setup-window-terminal-buffer-pure)
     
     ;; Test with ws:01
     (let ((enkan-repl--current-workspace "01")
           (session-list '((1 . "er")))
           (project-registry '(("er-alias" . ("er" . "/path/to/er")))))
       
-      (let ((result (enkan-repl--setup-window-eat-buffer-pure
+      (let ((result (enkan-repl--setup-window-terminal-buffer-pure
                      'dummy-window 1 session-list project-registry)))
         (when result
           ;; Should return ws:01 buffer name
@@ -136,11 +136,74 @@
           (session-list '((1 . "er")))
           (project-registry '(("er-alias" . ("er" . "/path/to/er")))))
       
-      (let ((result (enkan-repl--setup-window-eat-buffer-pure
+      (let ((result (enkan-repl--setup-window-terminal-buffer-pure
                      'dummy-window 1 session-list project-registry)))
         (when result
           ;; Should return ws:02 buffer name
           (should (string-match-p "\\*ws:02 " (cdr result))))))))
+
+(ert-deftest test-workspace-layout-ignores-stray-tmux-mirrors ()
+  "C-M-l should ignore tmux mirrors that are not registered sessions."
+  (let* ((project-dir "/Users/sekine/dev/self/enkan-repl/")
+         (good (generate-new-buffer
+                (format "*ws:01 enkan:%s*" project-dir)))
+         (stray-1 (generate-new-buffer "*ws:01 enkan:/Users/sekine/*"))
+         (stray-2 (generate-new-buffer "*ws:01 enkan:/Users/sekine/*<2>"))
+         (enkan-repl--current-workspace "01")
+         (enkan-repl--current-project "enkan-repl")
+         (enkan-repl-session-list '((1 . "enkan-repl")))
+         (enkan-repl-target-directories
+          `(("er" . ("enkan-repl" . ,project-dir))))
+         (called nil))
+    (unwind-protect
+        (progn
+          (with-current-buffer good
+            (setq-local enkan-repl--tmux-mirror-id "enkan-01:enkan-repl"))
+          (with-current-buffer stray-1
+            (setq-local enkan-repl--tmux-mirror-id "enkan-01:sekine"))
+          (with-current-buffer stray-2
+            (setq-local enkan-repl--tmux-mirror-id "enkan-01:sekine-2"))
+          (should (equal (list good)
+                         (enkan-repl--registered-session-buffers)))
+          (cl-letf (((symbol-function 'enkan-repl-setup-1session-layout)
+                     (lambda () (setq called 'one)))
+                    ((symbol-function 'enkan-repl-setup-2session-layout)
+                     (lambda () (setq called 'two)))
+                    ((symbol-function 'enkan-repl-setup-3session-layout)
+                     (lambda () (setq called 'three))))
+            (enkan-repl-setup-current-project-layout)
+            (should (eq called 'one))))
+      (dolist (buffer (list good stray-1 stray-2))
+        (when (buffer-live-p buffer)
+          (kill-buffer buffer))))))
+
+(ert-deftest test-workspace-layout-deduplicates-session-list-buffer ()
+  "C-M-l should not count duplicate session entries resolving to one buffer."
+  (let* ((project-dir "/Users/sekine/dev/self/enkan-repl/")
+         (good (generate-new-buffer
+                (format "*ws:01 enkan:%s*" project-dir)))
+         (enkan-repl--current-workspace "01")
+         (enkan-repl--current-project "enkan-repl")
+         (enkan-repl-session-list '((1 . "enkan-repl")
+                                    (2 . "enkan-repl")
+                                    (3 "enkan-repl" . 2)))
+         (enkan-repl-target-directories
+          `(("er" . ("enkan-repl" . ,project-dir))))
+         (called nil))
+    (unwind-protect
+        (progn
+          (with-current-buffer good
+            (setq-local enkan-repl--tmux-mirror-id "enkan-01:enkan-repl"))
+          (should (equal (list good)
+                         (enkan-repl--registered-session-buffers)))
+          (cl-letf (((symbol-function 'enkan-repl-setup-1session-layout)
+                     (lambda () (setq called 'one)))
+                    ((symbol-function 'enkan-repl-setup-2session-layout)
+                     (lambda () (setq called 'two))))
+            (enkan-repl-setup-current-project-layout)
+            (should (eq called 'one))))
+      (when (buffer-live-p good)
+        (kill-buffer good)))))
 
 (provide 'enkan-repl-workspace-switch-layout-test)
 ;;; enkan-repl-workspace-switch-layout-test.el ends here
