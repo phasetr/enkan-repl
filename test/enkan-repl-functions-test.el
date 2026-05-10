@@ -39,6 +39,15 @@
                   '(("proj" . ("proj" . "/repo/proj-a"))
                     ("proj-2" . ("proj" . "/repo/proj-b")))))))
 
+(ert-deftest test-enkan-repl--target-alias-instance-for-path ()
+  "Alias suffixes imply instances only relative to the path basename."
+  (should (= 2 (enkan-repl--target-alias-instance-for-path
+                "lat-2" "/repo/lat")))
+  (should-not (enkan-repl--target-alias-instance-for-path
+               "foo-2" "/repo/foo-2"))
+  (should-not (enkan-repl--target-alias-instance-for-path
+               "renamed-2" "/repo/actual")))
+
 ;; Tests for enkan-repl--resolve-send-target
 (ert-deftest test-enkan-repl--resolve-send-target ()
   "Test resolving send target with prefix-arg and alias."
@@ -111,6 +120,36 @@
     (should (equal (length (plist-get result :buffers)) 2))
     (kill-buffer buffer1)
     (kill-buffer buffer2)))
+
+(ert-deftest test-enkan-repl--resolve-send-target-multi-instance-alias ()
+  "Send target resolution should distinguish same-path instance buffers."
+  (let* ((buffer1 (get-buffer-create "*ws:01 enkan:/repo/lat/*"))
+         (buffer2 (get-buffer-create "*ws:01 enkan:/repo/lat/*<2>"))
+         (projects nil)
+         (target-directories
+          '(("lat" . ("lat" . "/repo/lat"))
+            ("lat-2" . ("lat" . "/repo/lat")))))
+    (unwind-protect
+        (progn
+          (should (eq buffer2
+                      (plist-get
+                       (enkan-repl--resolve-send-target
+                        2 nil "lat" projects target-directories)
+                       :buffer)))
+          (should (eq buffer2
+                      (plist-get
+                       (enkan-repl--resolve-send-target
+                        nil "lat-2" "lat" projects target-directories)
+                       :buffer)))
+          (let ((result (enkan-repl--resolve-send-target
+                         nil nil "lat" projects target-directories)))
+            (should (equal (plist-get result :status) 'needs-selection))
+            (should (equal (plist-get result :buffers)
+                           (list buffer1 buffer2)))))
+      (when (buffer-live-p buffer1)
+        (kill-buffer buffer1))
+      (when (buffer-live-p buffer2)
+        (kill-buffer buffer2)))))
 
 ;; Tests for enkan-repl--target-directory-info
 (ert-deftest test-enkan-repl--target-directory-info ()

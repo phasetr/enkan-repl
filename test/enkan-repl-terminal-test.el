@@ -68,6 +68,17 @@ documented opt-in alternative; see README."
   (should (= 1 (enkan-repl--terminal-tmux-id-instance "enkan-01:my-proj")))  ; "-proj" not a number
   (should (= 1 (enkan-repl--terminal-tmux-id-instance nil))))
 
+(ert-deftest test-enkan-repl--terminal-tmux-id-instance-for-path ()
+  "Path-aware tmux instance parsing should not strip real numeric project names."
+  (should (= 2 (enkan-repl--terminal-tmux-id-instance-for-path
+                "enkan-01:lat-2" "/repo/lat")))
+  (should (= 1 (enkan-repl--terminal-tmux-id-instance-for-path
+                "enkan-01:foo-2" "/repo/foo-2")))
+  (should (= 3 (enkan-repl--terminal-tmux-id-instance-for-path
+                "enkan-01:foo-2-3" "/repo/foo-2")))
+  (should (= 1 (enkan-repl--terminal-tmux-id-instance-for-path
+                "enkan-01:renamed-window-2" "/repo/actual"))))
+
 (ert-deftest test-enkan-repl--terminal-tmux--derive-base-name ()
   (should (string= "lat"
                    (enkan-repl--terminal-tmux--derive-base-name "/path/to/lat")))
@@ -288,6 +299,46 @@ documented opt-in alternative; see README."
         (should (= 3 (enkan-repl--terminal-eat-id-instance buf)))
       (kill-buffer buf))))
 
+(ert-deftest test-enkan-repl--terminal-eat-alive-p-uses-eat-process ()
+  "Eat liveness should honor buffer-local `eat--process'."
+  (let ((buf (generate-new-buffer "*ws:01 enkan:/p/*"))
+        (proc nil))
+    (unwind-protect
+        (progn
+          (setq proc (start-process "enkan-eat-alive-test" nil "cat"))
+          (with-current-buffer buf
+            (setq-local eat--process proc))
+          (should (enkan-repl--terminal-eat-alive-p buf)))
+      (when (and proc (process-live-p proc))
+        (delete-process proc))
+      (when (buffer-live-p buf)
+        (kill-buffer buf)))))
+
+(ert-deftest test-enkan-repl--terminal-eat-list-uses-eat-process ()
+  "Eat session listing should honor buffer-local `eat--process'."
+  (let ((enkan-repl--current-workspace "01")
+        (buf (generate-new-buffer "*ws:01 enkan:/p/*"))
+        (other (generate-new-buffer "*ws:02 enkan:/p/*"))
+        (proc nil)
+        (other-proc nil))
+    (unwind-protect
+        (progn
+          (setq proc (start-process "enkan-eat-list-test" nil "cat"))
+          (setq other-proc (start-process "enkan-eat-list-other-test" nil "cat"))
+          (with-current-buffer buf
+            (setq-local eat--process proc))
+          (with-current-buffer other
+            (setq-local eat--process other-proc))
+          (should (equal (list buf) (enkan-repl--terminal-eat-list))))
+      (when (and proc (process-live-p proc))
+        (delete-process proc))
+      (when (and other-proc (process-live-p other-proc))
+        (delete-process other-proc))
+      (when (buffer-live-p buf)
+        (kill-buffer buf))
+      (when (buffer-live-p other)
+        (kill-buffer other)))))
+
 ;;;; tmux mirror buffer naming
 
 (ert-deftest test-enkan-repl--terminal-tmux--mirror-buffer-name ()
@@ -304,6 +355,10 @@ documented opt-in alternative; see README."
     (should (string= "*ws:01 enkan:/path/to/lat/*<3>"
                      (enkan-repl--terminal-tmux--mirror-buffer-name
                       "enkan-01:lat-3" "/path/to/lat"))))
+  ;; Numeric suffixes in the actual path basename are not duplicate instances.
+  (should (string= "*ws:01 enkan:/path/to/foo-2/*"
+                   (enkan-repl--terminal-tmux--mirror-buffer-name
+                    "enkan-01:foo-2" "/path/to/foo-2")))
   ;; Without PATH, this function never calls tmux and immediately falls back.
   (should (string= "*tmux enkan-01:lat*"
                    (enkan-repl--terminal-tmux--mirror-buffer-name
@@ -364,6 +419,27 @@ documented opt-in alternative; see README."
                      "enkan-01:lat" t))
           (should (string= "*ws:01 enkan:/path/to/lat/*"
                            (buffer-name buf))))
+      (when (buffer-live-p buf)
+        (kill-buffer buf)))))
+
+(ert-deftest test-enkan-repl--terminal-tmux--mirror-make-renames-existing-fallback-with-path ()
+  "Path-aware mirror creation should repair an existing fallback mirror name."
+  (let ((enkan-repl--current-workspace "01")
+        (buf nil)
+        (cwd-lookups 0))
+    (unwind-protect
+        (cl-letf (((symbol-function 'enkan-repl--terminal-tmux--pane-cwd-async)
+                   (lambda (&rest _)
+                     (setq cwd-lookups (1+ cwd-lookups))
+                     nil)))
+          (setq buf (enkan-repl--terminal-tmux--mirror-make
+                     "enkan-01:lat" t))
+          (should (string= "*tmux enkan-01:lat*" (buffer-name buf)))
+          (should (eq buf (enkan-repl--terminal-tmux--mirror-make
+                           "enkan-01:lat" t "/path/to/lat")))
+          (should (string= "*ws:01 enkan:/path/to/lat/*"
+                           (buffer-name buf)))
+          (should (= 1 cwd-lookups)))
       (when (buffer-live-p buf)
         (kill-buffer buf)))))
 

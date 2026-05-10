@@ -123,13 +123,14 @@
 (declare-function enkan-repl--terminal-kill "enkan-repl-terminal" (id))
 (declare-function enkan-repl--terminal-display "enkan-repl-terminal" (id))
 (declare-function enkan-repl--terminal-id-instance "enkan-repl-terminal" (id))
+(declare-function enkan-repl--terminal-tmux-id-instance-for-path "enkan-repl-terminal" (id path))
 (declare-function enkan-repl-state-load "enkan-repl-state" (&optional file))
 (declare-function enkan-repl-state-save "enkan-repl-state" (&optional file))
 (declare-function enkan-repl-state--list-live-tmux-sessions "enkan-repl-state" (prefix))
 (declare-function enkan-repl-state-tmux-reconcile "enkan-repl-state" (&optional file))
 (declare-function enkan-repl--extract-project-name "enkan-repl-utils" (buffer-name-or-path))
 (declare-function enkan-repl--is-enkan-buffer-name "enkan-repl-utils" (name))
-(declare-function enkan-repl--path->buffer-name "enkan-repl-utils" (path))
+(declare-function enkan-repl--path->buffer-name "enkan-repl-utils" (path &optional instance))
 (declare-function enkan-repl--buffer-name->path "enkan-repl-utils" (name))
 (declare-function enkan-repl--get-project-info-from-directories "enkan-repl-utils" (alias target-directories))
 (declare-function enkan-repl--get-project-path-from-directories "enkan-repl-utils" (project-name target-directories))
@@ -505,20 +506,27 @@ Returns the loaded plist, or nil if no state was found."
                (> (length session) (length prefix)))
       (substring session (length prefix)))))
 
-(defun enkan-repl--tmux-reattach-project-name (window)
-  "Infer a project name from tmux WINDOW."
-  (let ((name (if (and (stringp window)
-                       (not (string-empty-p window)))
-                  window
-                "tmux")))
-    (if (string-match "\\`\\(.+\\)-[0-9]+\\'" name)
+(defun enkan-repl--tmux-reattach-project-name (window &optional cwd)
+  "Infer a project name from tmux WINDOW and CWD.
+When CWD is available, use its directory basename.  Window names may be
+manually edited or may legitimately end in numeric suffixes such as foo-2."
+  (let* ((cwd-name (and (stringp cwd)
+                        (not (string-empty-p cwd))
+                        (enkan-repl--extract-project-name cwd)))
+         (name (or cwd-name
+                   (and (stringp window)
+                        (not (string-empty-p window))
+                        window)
+                   "tmux")))
+    (if (and (not cwd-name)
+             (string-match "\\`\\(.+\\)-[0-9]+\\'" name))
         (match-string 1 name)
       name)))
 
 (defun enkan-repl--tmux-reattach-state-from-session (session)
   "Build a minimal workspace plist from live tmux SESSION.
-This uses tmux window names for project/session names and pane cwd values
-for display and follow-up directory resolution when available."
+This uses pane cwd basenames for project/session names when available.  tmux
+window names remain the aliases used to address live tmux windows."
   (let ((window-cwds (if (fboundp 'enkan-repl--terminal-tmux--list-window-cwds)
                          (enkan-repl--terminal-tmux--list-window-cwds session)
                        (mapcar (lambda (window) (cons window nil))
@@ -533,8 +541,13 @@ for display and follow-up directory resolution when available."
       (let* ((window (car window-cwd))
              (cwd (cdr window-cwd))
              (id (enkan-repl--terminal-tmux--make-id session window))
-             (project (enkan-repl--tmux-reattach-project-name window))
-             (instance (enkan-repl--terminal-id-instance id)))
+             (project (enkan-repl--tmux-reattach-project-name window cwd))
+             (alias (if (and (stringp window) (not (string-empty-p window)))
+                        window
+                      project))
+             (instance (if (and cwd (fboundp 'enkan-repl--terminal-tmux-id-instance-for-path))
+                           (enkan-repl--terminal-tmux-id-instance-for-path id cwd)
+                         (enkan-repl--terminal-id-instance id))))
         (setq counter (1+ counter))
         (unless current-project
           (setq current-project project))
@@ -544,12 +557,8 @@ for display and follow-up directory resolution when available."
         (unless (assoc project aliases)
           (push (cons project project) aliases))
         (when cwd
-          (cond
-           ((not (assoc project target-directories))
-            (push (cons project (cons project cwd)) target-directories))
-           ((and (not (string= window project))
-                 (not (assoc window target-directories)))
-            (push (cons window (cons project cwd)) target-directories))))))
+          (unless (assoc alias target-directories)
+            (push (cons alias (cons project cwd)) target-directories)))))
     (list :current-project current-project
           :session-list (nreverse session-list)
           :session-counter counter
@@ -1387,7 +1396,11 @@ Category: Session Controller"
   (let* ((target-dir default-directory)
          (term-id (enkan-repl--terminal-start target-dir))
          (instance (when term-id
-                     (enkan-repl--terminal-id-instance term-id))))
+                     (if (and (eq enkan-repl-terminal-backend 'tmux)
+                              (fboundp 'enkan-repl--terminal-tmux-id-instance-for-path))
+                         (enkan-repl--terminal-tmux-id-instance-for-path
+                          term-id target-dir)
+                       (enkan-repl--terminal-id-instance term-id)))))
     (when term-id
       ;; tmux backend: ensure the mirror buffer exists so buffer-list
       ;; based layout / count code finds the session.  No pop-up here;
@@ -1718,6 +1731,19 @@ Returns a list of (alias . path) pairs."
        "to create a new one")
     "No active enkan sessions found. Start one with M-x enkan-repl-start-session"))
 
+(defun enkan-repl--target-alias-instance-for-path (alias path)
+  "Return instance number implied by ALIAS for PATH, or nil.
+ALIAS like project-2 means instance 2 only when PATH's basename is project.
+This avoids treating real project names like foo-2 as second instances."
+  (let ((base (and (stringp path)
+                   (enkan-repl--extract-project-name path))))
+    (when (and (stringp alias)
+               (stringp base)
+               (string-match
+                (format "\\`%s-\\([0-9]+\\)\\'" (regexp-quote base))
+                alias))
+      (string-to-number (match-string 1 alias)))))
+
 (defun enkan-repl--resolve-send-target (pfx resolved-alias current-project projects target-directories)
   "Resolve target buffer from prefix/alias and project config.
 PREFIX-ARG (PFX): numeric prefix for buffer selection (optional)
@@ -1730,13 +1756,16 @@ Returns a plist with :status and other keys."
                           (enkan-repl--get-project-paths-for-current
                            current-project projects target-directories)))
          ;; Helper function to convert path to buffer
-         (path-to-buffer (lambda (path)
+         (path-to-buffer (lambda (alias path)
                            (get-buffer
-                            (enkan-repl--path->buffer-name path))))
+                            (enkan-repl--path->buffer-name
+                             path
+                             (enkan-repl--target-alias-instance-for-path
+                              alias path)))))
          ;; Helper function to check if buffer exists
          (get-active-buffers (lambda (paths)
                                (cl-loop for (alias . path) in paths
-                                        for buffer = (funcall path-to-buffer path)
+                                        for buffer = (funcall path-to-buffer alias path)
                                         when buffer
                                         collect (cons alias buffer)))))
     ;; Check if we have active buffers
