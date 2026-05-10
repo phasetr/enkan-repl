@@ -24,6 +24,8 @@
 (declare-function enkan-repl--save-workspace-state "enkan-repl" ())
 (declare-function enkan-repl--load-workspace-state "enkan-repl" (workspace-id))
 (declare-function enkan-repl--get-project-paths-for-current "enkan-repl" (current-project projects target-directories))
+(declare-function enkan-repl--projects-with-current-aliases "enkan-repl" (projects current-project project-aliases))
+(declare-function enkan-repl--get-project-info-from-directories "enkan-repl-utils" (alias target-directories))
 (declare-function enkan-repl-workspace-delete "enkan-repl" (&optional arg))
 (declare-function enkan-repl-setup "enkan-repl" ())
 
@@ -50,6 +52,40 @@
   (setq buffer-read-only t)
   (setq truncate-lines t))
 
+(defun enkan-repl-workspace-list--project-alias-names (aliases)
+  "Return alias names from ALIASES.
+ALIASES may be a list of strings or an alist of (alias . project-name)."
+  (delq nil
+        (mapcar (lambda (entry)
+                  (cond
+                   ((stringp entry) entry)
+                   ((consp entry) (car entry))))
+                aliases)))
+
+(defun enkan-repl-workspace-list--project-paths (state target-directories)
+  "Return displayable project paths for workspace STATE.
+TARGET-DIRECTORIES is the fallback global directory registry."
+  (let* ((current-project (plist-get state :current-project))
+         (workspace-dirs (or (plist-get state :target-directories)
+                             target-directories))
+         (paths (when current-project
+                  (enkan-repl--get-project-paths-for-current
+                   current-project
+                   (enkan-repl--projects-with-current-aliases
+                    (bound-and-true-p enkan-repl-projects)
+                    current-project
+                    (plist-get state :project-aliases))
+                   workspace-dirs))))
+    (or paths
+        (cl-loop for alias in (enkan-repl-workspace-list--project-alias-names
+                               (or (plist-get state :project-aliases)
+                                   (and current-project
+                                        (list current-project))))
+                 for info = (enkan-repl--get-project-info-from-directories
+                             alias workspace-dirs)
+                 when info
+                 collect (cons alias (cdr info))))))
+
 (defun enkan-repl-workspace-list--format-workspace-info (workspace-id workspaces current-workspace target-directories)
   "Format workspace information for display.
 WORKSPACE-ID is the workspace identifier.
@@ -59,12 +95,8 @@ TARGET-DIRECTORIES is the list of target directories."
   (let* ((state (enkan-repl--get-workspace-state workspaces workspace-id))
           (current-project (plist-get state :current-project))
           (is-current (string= workspace-id current-workspace))
-          ;; Get project paths using existing function
-          (project-paths (when current-project
-                           (enkan-repl--get-project-paths-for-current
-                             current-project
-                             (bound-and-true-p enkan-repl-projects)
-                             target-directories)))
+          (project-paths
+           (enkan-repl-workspace-list--project-paths state target-directories))
           ;; Format all paths when multiple targets exist
           (project-dirs (if project-paths
                           (mapconcat (lambda (pair) (cdr pair))

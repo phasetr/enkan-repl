@@ -29,6 +29,43 @@
     ;; Test with nil directories
     (should (null (enkan-repl--get-project-info-from-directories "proj1" nil)))))
 
+(ert-deftest test-enkan-repl--get-project-paths-for-current-duplicate-project ()
+  "Project path lookup should keep all aliases for the same project."
+  (should (equal '(("proj" . "/repo/proj-a")
+                   ("proj-2" . "/repo/proj-b"))
+                 (enkan-repl--get-project-paths-for-current
+                  "proj"
+                  nil
+                  '(("proj" . ("proj" . "/repo/proj-a"))
+                    ("proj-2" . ("proj" . "/repo/proj-b")))))))
+
+(ert-deftest test-enkan-repl--target-alias-instance-for-path ()
+  "Alias suffixes imply instances only relative to the path basename."
+  (should (= 2 (enkan-repl--target-alias-instance-for-path
+                "lat-2" "/repo/lat")))
+  (should-not (enkan-repl--target-alias-instance-for-path
+               "foo-2" "/repo/foo-2"))
+  (should-not (enkan-repl--target-alias-instance-for-path
+               "renamed-2" "/repo/actual")))
+
+(ert-deftest test-enkan-repl--projects-with-current-aliases ()
+  "Workspace aliases should become an implicit current project config."
+  (should (equal '(("proj" . ("a" "b")))
+                 (enkan-repl--projects-with-current-aliases
+                  nil
+                  "proj"
+                  '(("a" . "a") ("b" . "b")))))
+  (should (equal '(("proj" . ("configured" "a")))
+                 (enkan-repl--projects-with-current-aliases
+                  '(("proj" . ("configured")))
+                  "proj"
+                  '(("a" . "a")))))
+  (should (equal '(("proj" . ("configured" "a")))
+                 (enkan-repl--projects-with-current-aliases
+                  '(("proj" . ("configured" "a")))
+                  "proj"
+                  '(("a" . "a"))))))
+
 ;; Tests for enkan-repl--resolve-send-target
 (ert-deftest test-enkan-repl--resolve-send-target ()
   "Test resolving send target with prefix-arg and alias."
@@ -37,10 +74,18 @@
                  nil nil nil nil nil)))
     (should (equal (plist-get result :status) 'no-buffers))
     (should (string-match-p "No active enkan sessions" (plist-get result :message))))
+
+  ;; Test tmux backend message points reattach users at reattach first.
+  (let* ((enkan-repl-terminal-backend 'tmux)
+         (result (enkan-repl--resolve-send-target
+                  nil nil nil nil nil)))
+    (should (equal (plist-get result :status) 'no-buffers))
+    (should (string-match-p "enkan-repl-tmux-reattach"
+                            (plist-get result :message))))
   
   ;; Test with prefix-arg resolving to buffer
-  (let* ((buffer1 (get-buffer-create "*ws:01 enkan:/path/1*"))
-         (buffer2 (get-buffer-create "*ws:01 enkan:/path/2*"))
+  (let* ((buffer1 (get-buffer-create "*ws:01 enkan:/path/1/*"))
+         (buffer2 (get-buffer-create "*ws:01 enkan:/path/2/*"))
          (result (enkan-repl--resolve-send-target
                   1 nil "test-project"
                   '(("test-project" . ("alias1" "alias2")))
@@ -52,7 +97,7 @@
     (kill-buffer buffer2))
   
   ;; Test with alias resolving to buffer
-  (let* ((buffer1 (get-buffer-create "*ws:01 enkan:/path/to/proj1*"))
+  (let* ((buffer1 (get-buffer-create "*ws:01 enkan:/path/to/proj1/*"))
          (result (enkan-repl--resolve-send-target
                   nil "alias1" "test-project" 
                   '(("test-project" . ("alias1")))
@@ -62,7 +107,7 @@
     (kill-buffer buffer1))
   
   ;; Test with alias not found (but buffer exists for other aliases)
-  (let* ((buffer1 (get-buffer-create "*ws:01 enkan:/path/to/proj1*"))
+  (let* ((buffer1 (get-buffer-create "*ws:01 enkan:/path/to/proj1/*"))
          (result (enkan-repl--resolve-send-target
                   nil "nonexistent" "test-project"
                   '(("test-project" . ("alias1")))
@@ -72,7 +117,7 @@
     (kill-buffer buffer1))
   
   ;; Test with single buffer auto-selection
-  (let* ((buffer1 (get-buffer-create "*ws:01 enkan:/single/path*"))
+  (let* ((buffer1 (get-buffer-create "*ws:01 enkan:/single/path/*"))
          (result (enkan-repl--resolve-send-target
                   nil nil "test-project"
                   '(("test-project" . ("alias1")))
@@ -82,8 +127,8 @@
     (kill-buffer buffer1))
   
   ;; Test requiring interactive selection
-  (let* ((buffer1 (get-buffer-create "*ws:01 enkan:/path/1*"))
-         (buffer2 (get-buffer-create "*ws:01 enkan:/path/2*"))
+  (let* ((buffer1 (get-buffer-create "*ws:01 enkan:/path/1/*"))
+         (buffer2 (get-buffer-create "*ws:01 enkan:/path/2/*"))
          (result (enkan-repl--resolve-send-target
                   nil nil "test-project"
                   '(("test-project" . ("alias1" "alias2")))
@@ -93,6 +138,68 @@
     (should (equal (length (plist-get result :buffers)) 2))
     (kill-buffer buffer1)
     (kill-buffer buffer2)))
+
+(ert-deftest test-enkan-repl--resolve-send-target-multi-instance-alias ()
+  "Send target resolution should distinguish same-path instance buffers."
+  (let* ((buffer1 (get-buffer-create "*ws:01 enkan:/repo/lat/*"))
+         (buffer2 (get-buffer-create "*ws:01 enkan:/repo/lat/*<2>"))
+         (projects nil)
+         (target-directories
+          '(("lat" . ("lat" . "/repo/lat"))
+            ("lat-2" . ("lat" . "/repo/lat")))))
+    (unwind-protect
+        (progn
+          (should (eq buffer2
+                      (plist-get
+                       (enkan-repl--resolve-send-target
+                        2 nil "lat" projects target-directories)
+                       :buffer)))
+          (should (eq buffer2
+                      (plist-get
+                       (enkan-repl--resolve-send-target
+                        nil "lat-2" "lat" projects target-directories)
+                       :buffer)))
+          (let ((result (enkan-repl--resolve-send-target
+                         nil nil "lat" projects target-directories)))
+            (should (equal (plist-get result :status) 'needs-selection))
+            (should (equal (plist-get result :buffers)
+                           (list buffer1 buffer2)))))
+      (when (buffer-live-p buffer1)
+        (kill-buffer buffer1))
+      (when (buffer-live-p buffer2)
+        (kill-buffer buffer2)))))
+
+(ert-deftest test-enkan-repl--resolve-send-target-live-import-aliases ()
+  "Live-imported tmux aliases should expose every imported window."
+  (let* ((buffer1 (get-buffer-create "*ws:03 enkan:/repo/enkan-repl/*"))
+         (buffer2 (get-buffer-create "*ws:03 enkan:/repo/worker/*<2>"))
+         (enkan-repl--current-workspace "03")
+         (current-project "enkan-repl")
+         (project-aliases
+          '(("enkan-repl" . "enkan-repl")
+            ("worker-2" . "worker")))
+         (projects
+          (enkan-repl--projects-with-current-aliases
+           nil current-project project-aliases))
+         (target-directories
+          '(("enkan-repl" . ("enkan-repl" . "/repo/enkan-repl"))
+            ("worker-2" . ("worker" . "/repo/worker")))))
+    (unwind-protect
+        (progn
+          (should (eq buffer2
+                      (plist-get
+                       (enkan-repl--resolve-send-target
+                        nil "worker-2" current-project projects target-directories)
+                       :buffer)))
+          (let ((result (enkan-repl--resolve-send-target
+                         nil nil current-project projects target-directories)))
+            (should (equal (plist-get result :status) 'needs-selection))
+            (should (equal (plist-get result :buffers)
+                           (list buffer1 buffer2)))))
+      (when (buffer-live-p buffer1)
+        (kill-buffer buffer1))
+      (when (buffer-live-p buffer2)
+        (kill-buffer buffer2)))))
 
 ;; Tests for enkan-repl--target-directory-info
 (ert-deftest test-enkan-repl--target-directory-info ()
@@ -138,6 +245,18 @@
     (should (equal (plist-get result :status) 'single))
     (should (equal (plist-get result :path) "/path/to/proj1"))
     (should (equal (plist-get result :alias) "alias1")))
+
+  ;; Test with current project as the target alias saved by tmux reattach.
+  (let ((result (enkan-repl--target-directory-info
+                 "er"
+                 nil
+                 '(("er" "enkan-repl" . "/path/to/enkan-repl")
+                   ("enkan-repl" "enkan-repl" . "/path/to/enkan-repl"))
+                 "Select project:"
+                 nil)))
+    (should (equal (plist-get result :status) 'single))
+    (should (equal (plist-get result :path) "/path/to/enkan-repl"))
+    (should (equal (plist-get result :alias) "er")))
   
   ;; Test with validation failure
   (let ((result (enkan-repl--target-directory-info 
@@ -166,6 +285,43 @@
             (enkan-repl-open-project-directory)
             (should (equal opened tmpdir))))
       (delete-directory tmpdir t))))
+
+(ert-deftest test-enkan-repl-open-project-directory-live-import-aliases ()
+  "Open project directory should include every live-imported tmux alias."
+  (let ((tmpdir1 (file-name-as-directory
+                  (make-temp-file "enkan-open-main-" t)))
+        (tmpdir2 (file-name-as-directory
+                  (make-temp-file "enkan-open-worker-" t)))
+        opened
+        choices-seen)
+    (unwind-protect
+        (let ((enkan-repl--current-project "enkan-repl")
+              (enkan-repl-projects
+               '(("enkan-repl" . ("configured"))))
+              (enkan-repl-project-aliases
+               '(("enkan-repl" . "enkan-repl")
+                 ("worker-2" . "worker")))
+              (enkan-repl-target-directories nil))
+          (setq enkan-repl-target-directories
+                `(("configured" . ("configured" . ,tmpdir1))
+                  ("enkan-repl" . ("enkan-repl" . ,tmpdir1))
+                  ("worker-2" . ("worker" . ,tmpdir2))))
+          (cl-letf (((symbol-function 'hmenu)
+                     (lambda (_prompt choices)
+                       (setq choices-seen choices)
+                       (seq-find (lambda (choice)
+                                   (string-match-p "\\`worker-2 " choice))
+                                 choices)))
+                    ((symbol-function 'dired)
+                     (lambda (path)
+                       (setq opened path))))
+            (enkan-repl-open-project-directory)
+            (should (seq-some (lambda (choice)
+                                (string-match-p "\\`worker-2 " choice))
+                              choices-seen))
+            (should (equal opened tmpdir2))))
+      (delete-directory tmpdir1 t)
+      (delete-directory tmpdir2 t))))
 
 (ert-deftest test-enkan-repl-keybinding-example-commands-defined ()
   "Every command bound in examples/keybinding.el should be defined."

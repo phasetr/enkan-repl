@@ -20,6 +20,43 @@
       (should (equal (plist-get plist :session-counter) 2))
       (should (equal (plist-get plist :project-aliases) '(("p1" . "proj1") ("p2" . "proj2")))))))
 
+(ert-deftest test-enkan-repl--ws-state->plist-filters-target-directories ()
+  "Workspace state should keep only target directories relevant to it."
+  (let ((enkan-repl--current-project "enkan-repl")
+        (enkan-repl-session-list '((1 . "enkan-repl") (2 . "worker")))
+        (enkan-repl--session-counter 2)
+        (enkan-repl-project-aliases
+         '(("er" . "enkan-repl") ("worker" . "worker")))
+        (enkan-repl-target-directories
+         '(("er" . ("enkan-repl" . "/repo/enkan-repl"))
+           ("worker" . ("worker" . "/repo/worker"))
+           ("other" . ("other" . "/repo/other")))))
+    (let ((plist (enkan-repl--ws-state->plist)))
+      (should (equal '(("er" . ("enkan-repl" . "/repo/enkan-repl"))
+                       ("worker" . ("worker" . "/repo/worker")))
+                     (plist-get plist :target-directories))))))
+
+(ert-deftest test-enkan-repl--save-workspace-state-preserves-imported-target-directories ()
+  "Saving after workspace switches should not drop imported tmux cwd paths."
+  (let ((enkan-repl--workspaces
+         '(("05" . (:current-project "er"
+                    :session-list ((1 . "er"))
+                    :session-counter 1
+                    :project-aliases (("er" . "er"))
+                    :target-directories
+                    (("er" . ("er" . "/repo/enkan-repl")))))))
+        (enkan-repl--current-workspace "05")
+        (enkan-repl--current-project "er")
+        (enkan-repl-session-list '((1 . "er")))
+        (enkan-repl--session-counter 1)
+        (enkan-repl-project-aliases '(("er" . "er")))
+        (enkan-repl-target-directories nil))
+    (enkan-repl--save-workspace-state)
+    (should (equal '(("er" . ("er" . "/repo/enkan-repl")))
+                   (plist-get (cdr (assoc "05" enkan-repl--workspaces
+                                          #'string=))
+                              :target-directories)))))
+
 (ert-deftest test-enkan-repl--plist->ws-state ()
   "Test restoring workspace state from plist."
   (let ((enkan-repl--current-project nil)

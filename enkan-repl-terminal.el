@@ -185,6 +185,14 @@ Returns 1 when ID has no explicit instance suffix."
 
 ;;;; eat backend
 
+(defun enkan-repl--terminal-eat--live-process (buffer)
+  "Return BUFFER's live eat process, or nil."
+  (when (and buffer (buffer-live-p buffer))
+    (with-current-buffer buffer
+      (let ((proc (or (and (boundp 'eat--process) eat--process)
+                      (get-buffer-process buffer))))
+        (and proc (process-live-p proc) proc)))))
+
 (defun enkan-repl--terminal-eat-start (dir)
   "Eat backend: create eat session in DIR and rename to enkan buffer name.
 Return the eat buffer."
@@ -231,10 +239,7 @@ NEWLINE non-nil appends a CR after TEXT."
 
 (defun enkan-repl--terminal-eat-alive-p (id)
   "Eat backend: t if buffer ID has a live process."
-  (and id
-       (buffer-live-p id)
-       (let ((proc (get-buffer-process id)))
-         (and proc (process-live-p proc)))))
+  (and (enkan-repl--terminal-eat--live-process id) t))
 
 (defun enkan-repl--terminal-eat-list ()
   "Eat backend: list of live enkan buffers in current workspace."
@@ -247,8 +252,7 @@ NEWLINE non-nil appends a CR after TEXT."
               (buffer-name buf)
               (enkan-repl--buffer-name-matches-workspace
                (buffer-name buf) current-ws)
-              (let ((proc (get-buffer-process buf)))
-                (and proc (process-live-p proc)))))
+              (enkan-repl--terminal-eat--live-process buf)))
        (buffer-list)))))
 
 (defun enkan-repl--terminal-eat-kill (id)
@@ -361,6 +365,22 @@ or nil on non-zero exit.  Otherwise return t on zero exit, nil on non-zero."
     (if (and out (not (string-empty-p out)))
         (split-string out "\n" t)
       nil)))
+
+(defun enkan-repl--terminal-tmux--list-window-cwds (session)
+  "Return list of (WINDOW . CWD) pairs in tmux SESSION."
+  (let ((out (enkan-repl--terminal-tmux--call
+              (list "list-windows" "-t" session "-F"
+                    "#{window_name}\t#{pane_current_path}")
+              t)))
+    (when (and out (not (string-empty-p out)))
+      (delq
+       nil
+       (mapcar
+        (lambda (line)
+          (pcase-let ((`(,window ,cwd) (split-string line "\t")))
+            (when (and window cwd (not (string-empty-p window)))
+              (cons window (unless (string-empty-p cwd) cwd)))))
+        (split-string out "\n" t))))))
 
 (defun enkan-repl--terminal-tmux--derive-base-name (dir)
   "Derive a base window name from DIR (file-name-nondirectory of cleaned dir)."
@@ -1026,7 +1046,7 @@ buffer-list-based layout and send-target lookup can find tmux mirrors."
              enkan-repl--current-workspace)))
     (enkan-repl--path->buffer-name
      (file-name-as-directory path)
-     (enkan-repl--terminal-tmux-id-instance id))))
+     (enkan-repl--terminal-tmux-id-instance-for-path id path))))
 
 (defun enkan-repl--terminal-tmux--mirror-buffer-name (id &optional path)
   "Return mirror buffer name for tmux ID without calling tmux.
@@ -1436,6 +1456,8 @@ the asynchronous lookup returns."
       (unless (derived-mode-p 'enkan-repl-tmux-mirror-mode)
         (enkan-repl-tmux-mirror-mode))
       (setq enkan-repl--tmux-mirror-id id)
+      (when path
+        (enkan-repl--terminal-tmux--mirror-rename-for-cwd buf id path))
       (enkan-repl--terminal-tmux--mirror-update-status)
       (unless path
         (enkan-repl--terminal-tmux--mirror-start-cwd-lookup buf id))
@@ -1539,6 +1561,23 @@ Returns 1 when no \"-N\" suffix is present."
     (cond
      ((null win) 1)
      ((string-match "-\\([0-9]+\\)$" win)
+      (string-to-number (match-string 1 win)))
+     (t 1))))
+
+(defun enkan-repl--terminal-tmux-id-instance-for-path (id path)
+  "Return tmux ID's instance index relative to PATH.
+A numeric suffix is treated as an instance only when the tmux window name is
+the PATH basename followed by -N.  This keeps projects whose real names end in
+digits, such as foo-2, at instance 1."
+  (let* ((win (enkan-repl--terminal-tmux--id-window id))
+         (base (and (stringp path)
+                    (enkan-repl--terminal-tmux--derive-base-name path))))
+    (cond
+     ((and win base (string= win base)) 1)
+     ((and win base
+           (string-match
+            (format "\\`%s-\\([0-9]+\\)\\'" (regexp-quote base))
+            win))
       (string-to-number (match-string 1 win)))
      (t 1))))
 

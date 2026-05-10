@@ -171,6 +171,129 @@
       (should (string-match-p "/home/user/project-b/" formatted))
       (should (string-match-p "/home/user/project-c/" formatted)))))
 
+(ert-deftest test-workspace-list-uses-project-alias-fallback ()
+  "Workspace list should resolve paths from aliases when project name fails."
+  (let* ((enkan-repl--workspaces nil)
+         (enkan-repl--current-workspace "05")
+         (enkan-repl-projects nil)
+         (enkan-repl-target-directories
+          '(("er" . ("enkan-repl" . "/Users/me/dev/enkan-repl/")))))
+    (setq enkan-repl--workspaces
+          (list (cons "05" '(:current-project "er"
+                             :project-aliases (("er" . "er"))
+                             :session-list ()
+                             :session-counter 0))))
+    (let ((formatted (enkan-repl-workspace-list--format-workspace-info
+                      "05" enkan-repl--workspaces "05"
+                      enkan-repl-target-directories)))
+      (should (string-match-p "er" formatted))
+      (should (string-match-p "/Users/me/dev/enkan-repl/" formatted))
+      (should-not (string-match-p "<not found>" formatted)))))
+
+(ert-deftest test-workspace-list-uses-state-target-directories ()
+  "Workspace list should use target directories imported into workspace state."
+  (let* ((enkan-repl--workspaces nil)
+         (enkan-repl--current-workspace "02")
+         (enkan-repl-projects nil)
+         (enkan-repl-target-directories nil))
+    (setq enkan-repl--workspaces
+          (list (cons "02" '(:current-project "lat"
+                             :project-aliases (("lat" . "lat"))
+                             :target-directories
+                             (("lat" . ("lat" . "/Users/me/dev/lat/")))
+                             :session-list ()
+                             :session-counter 0))))
+    (let ((formatted (enkan-repl-workspace-list--format-workspace-info
+                      "02" enkan-repl--workspaces "02"
+                      enkan-repl-target-directories)))
+      (should (string-match-p "lat" formatted))
+      (should (string-match-p "/Users/me/dev/lat/" formatted))
+      (should-not (string-match-p "<not found>" formatted)))))
+
+(ert-deftest test-workspace-list-shows-live-imported-window-alias-paths ()
+  "Workspace list should show every live-imported tmux window path."
+  (let* ((enkan-repl--workspaces nil)
+         (enkan-repl--current-workspace "03")
+         (enkan-repl-projects nil)
+         (enkan-repl-target-directories nil))
+    (setq enkan-repl--workspaces
+          (list (cons "03" '(:current-project "enkan-repl"
+                             :project-aliases
+                             (("enkan-repl" . "enkan-repl")
+                              ("worker-2" . "worker"))
+                             :target-directories
+                             (("enkan-repl" .
+                               ("enkan-repl" . "/repo/enkan-repl"))
+                              ("worker-2" . ("worker" . "/repo/worker")))
+                             :session-list
+                             ((1 . "enkan-repl") (2 . "worker"))
+                             :session-counter 2))))
+    (let ((formatted (enkan-repl-workspace-list--format-workspace-info
+                      "03" enkan-repl--workspaces "03" nil)))
+      (should (string-match-p "enkan-repl" formatted))
+      (should (string-match-p "/repo/enkan-repl" formatted))
+      (should (string-match-p "/repo/worker" formatted))
+      (should-not (string-match-p "<not found>" formatted)))))
+
+(ert-deftest test-workspace-list-keeps-imported-paths-after-repeated-switches ()
+  "Repeated workspace switching should not make imported paths disappear."
+  (let ((enkan-repl--workspaces
+         '(("02" . (:current-project "lat"
+                    :project-aliases (("lat" . "lat"))
+                    :target-directories
+                    (("lat" . ("lat" . "/Users/me/dev/lat/")))
+                    :session-list ((1 . "lat"))
+                    :session-counter 1))
+           ("05" . (:current-project "er"
+                    :project-aliases (("er" . "er"))
+                    :target-directories
+                    (("er" . ("er" . "/Users/me/dev/enkan-repl/")))
+                    :session-list ((1 . "er"))
+                    :session-counter 1))))
+        (enkan-repl--current-workspace "05")
+        (enkan-repl--current-project nil)
+        (enkan-repl-session-list nil)
+        (enkan-repl--session-counter 0)
+        (enkan-repl-project-aliases nil)
+        (enkan-repl-target-directories nil))
+    (dotimes (_ 3)
+      (enkan-repl--load-workspace-state "05")
+      (enkan-repl--save-workspace-state "05")
+      (setq enkan-repl--current-workspace "02")
+      (enkan-repl--load-workspace-state "02")
+      (enkan-repl--save-workspace-state "02")
+      (setq enkan-repl--current-workspace "05"))
+    (dolist (workspace-id '("02" "05"))
+      (let ((formatted (enkan-repl-workspace-list--format-workspace-info
+                        workspace-id enkan-repl--workspaces "05" nil)))
+        (should-not (string-match-p "<not found>" formatted))))))
+
+(ert-deftest test-workspace-list-resolves-normalized-persisted-alias-paths ()
+  "Workspace list should resolve reattached paths by persisted project alias."
+  (let ((enkan-repl--workspaces
+         '(("02" . (:current-project "lat"
+                    :project-aliases (("lat" . "lat"))
+                    :target-directories
+                    (("lat" . ("lat" . "/Users/me/dev/lattice-system"))
+                     ("lattice-system" .
+                      ("lattice-system" . "/Users/me/dev/lattice-system")))
+                    :session-list ((1 . "lat"))
+                    :session-counter 0))
+           ("05" . (:current-project "er"
+                    :project-aliases (("er" . "enkan-repl"))
+                    :target-directories
+                    (("er" . ("enkan-repl" . "/Users/me/dev/enkan-repl"))
+                     ("enkan-repl" .
+                      ("enkan-repl" . "/Users/me/dev/enkan-repl")))
+                    :session-list ((1 . "enkan-repl"))
+                    :session-counter 0))))
+        (enkan-repl-projects nil))
+    (dolist (workspace-id '("02" "05"))
+      (let ((formatted (enkan-repl-workspace-list--format-workspace-info
+                        workspace-id enkan-repl--workspaces "05" nil)))
+        (should-not (string-match-p "<not found>" formatted))
+        (should (string-match-p "/Users/me/dev/" formatted))))))
+
 (provide 'enkan-repl-workspace-list-test)
 
 ;;; enkan-repl-workspace-list-test.el ends here

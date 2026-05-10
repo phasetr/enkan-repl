@@ -103,7 +103,9 @@
 (declare-function enkan-repl--terminal-tmux-mirror-buffer-alive-p "enkan-repl-terminal" (buffer))
 (declare-function enkan-repl--terminal-tmux--mirror-make "enkan-repl-terminal" (id &optional defer-refresh path))
 (declare-function enkan-repl--terminal-tmux--list-windows "enkan-repl-terminal" (session))
+(declare-function enkan-repl--terminal-tmux--list-window-cwds "enkan-repl-terminal" (session))
 (declare-function enkan-repl--terminal-tmux--make-id "enkan-repl-terminal" (session window))
+(declare-function enkan-repl--terminal-tmux--id-window "enkan-repl-terminal" (id))
 (declare-function enkan-repl--terminal-tmux-kill-workspace "enkan-repl-terminal" (workspace-id))
 (declare-function enkan-repl-tmux-refresh-workspace "enkan-repl-terminal" (&optional quiet))
 (defvar enkan-repl--tmux-mirror-id)
@@ -121,13 +123,14 @@
 (declare-function enkan-repl--terminal-kill "enkan-repl-terminal" (id))
 (declare-function enkan-repl--terminal-display "enkan-repl-terminal" (id))
 (declare-function enkan-repl--terminal-id-instance "enkan-repl-terminal" (id))
+(declare-function enkan-repl--terminal-tmux-id-instance-for-path "enkan-repl-terminal" (id path))
 (declare-function enkan-repl-state-load "enkan-repl-state" (&optional file))
 (declare-function enkan-repl-state-save "enkan-repl-state" (&optional file))
 (declare-function enkan-repl-state--list-live-tmux-sessions "enkan-repl-state" (prefix))
 (declare-function enkan-repl-state-tmux-reconcile "enkan-repl-state" (&optional file))
 (declare-function enkan-repl--extract-project-name "enkan-repl-utils" (buffer-name-or-path))
 (declare-function enkan-repl--is-enkan-buffer-name "enkan-repl-utils" (name))
-(declare-function enkan-repl--path->buffer-name "enkan-repl-utils" (path))
+(declare-function enkan-repl--path->buffer-name "enkan-repl-utils" (path &optional instance))
 (declare-function enkan-repl--buffer-name->path "enkan-repl-utils" (name))
 (declare-function enkan-repl--get-project-info-from-directories "enkan-repl-utils" (alias target-directories))
 (declare-function enkan-repl--get-project-path-from-directories "enkan-repl-utils" (project-name target-directories))
@@ -335,6 +338,7 @@ Each value is a plist containing the following keys:
   :session-list      (alist (number . project-name))
   :session-counter   (integer)
   :project-aliases   (alist (alias . project-name))
+  :target-directories (alist (alias . (project-name . project-path)))
 Workspace states are saved/restored via `enkan-repl--save-workspace-state'
 and `enkan-repl--load-workspace-state'.")
 
@@ -379,13 +383,68 @@ and `enkan-repl--load-workspace-state'.")
   "Setter: set project aliases to VALUE."
   (setq enkan-repl-project-aliases value))
 
+(defun enkan-repl--project-alias-names (aliases)
+  "Return alias names from ALIASES.
+ALIASES may be a list of strings or an alist of (alias . project-name)."
+  (delq nil
+        (mapcar (lambda (entry)
+                  (cond
+                   ((stringp entry) entry)
+                   ((consp entry) (car entry))))
+                aliases)))
+
+(defun enkan-repl--target-directories-for-state (current-project project-aliases target-directories)
+  "Return TARGET-DIRECTORIES relevant to CURRENT-PROJECT and PROJECT-ALIASES."
+  (let ((aliases (enkan-repl--project-alias-names project-aliases)))
+    (cl-remove-if-not
+     (lambda (entry)
+       (let ((alias (car entry))
+             (project-info (cdr entry)))
+         (and (consp project-info)
+              (or (member alias aliases)
+                  (and current-project
+                       (string= (car project-info) current-project))))))
+     target-directories)))
+
+(defun enkan-repl--project-name-for-alias (alias project-aliases)
+  "Return project name for ALIAS from PROJECT-ALIASES, or ALIAS."
+  (or (cdr (assoc alias project-aliases))
+      alias))
+
+(defun enkan-repl--projects-with-current-aliases (projects current-project project-aliases)
+  "Return PROJECTS augmented with CURRENT-PROJECT's PROJECT-ALIASES.
+Merge the current workspace's aliases into CURRENT-PROJECT's project
+configuration.  This lets reattached live tmux sessions expose every window
+alias to send-target and directory resolution, even when the user's static
+project config is absent or incomplete for the imported tmux windows."
+  (let* ((aliases (enkan-repl--project-alias-names project-aliases))
+         (configured (cdr (assoc current-project projects)))
+         (merged (append configured
+                         (cl-remove-if (lambda (alias)
+                                         (member alias configured))
+                                       aliases))))
+    (if (and current-project aliases)
+        (cons (cons current-project merged)
+              (cl-remove current-project projects
+                         :key #'car
+                         :test #'equal))
+      projects)))
+
 (defun enkan-repl--ws-state->plist ()
   "Collect current global session-related variables into a plist.
 This function does not change behavior; it only mirrors current globals."
-  (list :current-project   enkan-repl--current-project
-        :session-list      enkan-repl-session-list
-        :session-counter   enkan-repl--session-counter
-        :project-aliases   enkan-repl-project-aliases))
+  (let ((state (list :current-project   enkan-repl--current-project
+                     :session-list      enkan-repl-session-list
+                     :session-counter   enkan-repl--session-counter
+                     :project-aliases   enkan-repl-project-aliases))
+        (target-directories
+         (enkan-repl--target-directories-for-state
+          enkan-repl--current-project
+          enkan-repl-project-aliases
+          enkan-repl-target-directories)))
+    (if target-directories
+        (plist-put state :target-directories target-directories)
+      state)))
 
 (defun enkan-repl--plist->ws-state (state)
   "Set current global session-related variables from STATE plist.
@@ -398,7 +457,10 @@ This function restores workspace state from the given plist."
   (when (plist-member state :session-counter)
     (setq enkan-repl--session-counter (plist-get state :session-counter)))
   (when (plist-member state :project-aliases)
-    (setq enkan-repl-project-aliases (plist-get state :project-aliases))))
+    (setq enkan-repl-project-aliases (plist-get state :project-aliases)))
+  (when (plist-member state :target-directories)
+    (setq enkan-repl-target-directories
+          (plist-get state :target-directories))))
 
 (defun enkan-repl--save-workspace-state (&optional workspace-id)
   "Save current globals into `enkan-repl--workspaces' under WORKSPACE-ID.
@@ -411,7 +473,13 @@ in sync with in-memory state across operations."
   (let* ((ws (or workspace-id enkan-repl--current-workspace)))
     ;; Only save if workspace ID is not nil
     (when ws
-      (let ((plist (enkan-repl--ws-state->plist)))
+      (let* ((old-plist (cdr (assoc ws enkan-repl--workspaces #'string=)))
+             (plist (enkan-repl--ws-state->plist)))
+        (when (and (not (plist-member plist :target-directories))
+                   (plist-member old-plist :target-directories))
+          (setq plist
+                (plist-put plist :target-directories
+                           (plist-get old-plist :target-directories))))
         ;; Remove ALL existing entries with same ID (defensive programming)
         (setq enkan-repl--workspaces
               (cl-remove-if (lambda (entry)
@@ -438,7 +506,8 @@ Returns the loaded plist, or nil if no state was found."
     (when plist
       (enkan-repl--plist->ws-state plist)
       ;; Update target directories based on restored project aliases
-      (when enkan-repl-project-aliases
+      (when (and enkan-repl-project-aliases
+                 (not (plist-member plist :target-directories)))
         (enkan-repl--update-target-directories-for-workspace)))
     plist))
 
@@ -456,41 +525,64 @@ Returns the loaded plist, or nil if no state was found."
                (> (length session) (length prefix)))
       (substring session (length prefix)))))
 
-(defun enkan-repl--tmux-reattach-project-name (window)
-  "Infer a project name from tmux WINDOW."
-  (let ((name (if (and (stringp window)
-                       (not (string-empty-p window)))
-                  window
-                "tmux")))
-    (if (string-match "\\`\\(.+\\)-[0-9]+\\'" name)
+(defun enkan-repl--tmux-reattach-project-name (window &optional cwd)
+  "Infer a project name from tmux WINDOW and CWD.
+When CWD is available, use its directory basename.  Window names may be
+manually edited or may legitimately end in numeric suffixes such as foo-2."
+  (let* ((cwd-name (and (stringp cwd)
+                        (not (string-empty-p cwd))
+                        (enkan-repl--extract-project-name cwd)))
+         (name (or cwd-name
+                   (and (stringp window)
+                        (not (string-empty-p window))
+                        window)
+                   "tmux")))
+    (if (and (not cwd-name)
+             (string-match "\\`\\(.+\\)-[0-9]+\\'" name))
         (match-string 1 name)
       name)))
 
 (defun enkan-repl--tmux-reattach-state-from-session (session)
   "Build a minimal workspace plist from live tmux SESSION.
-This intentionally uses tmux window names only.  Pane cwd lookup is not
-performed here because that would add synchronous tmux calls to reattach."
-  (let ((windows (enkan-repl--terminal-tmux--list-windows session))
+This uses pane cwd basenames for project/session names when available.  tmux
+window names remain the aliases used to address live tmux windows."
+  (let ((window-cwds (if (fboundp 'enkan-repl--terminal-tmux--list-window-cwds)
+                         (enkan-repl--terminal-tmux--list-window-cwds session)
+                       (mapcar (lambda (window) (cons window nil))
+                               (enkan-repl--terminal-tmux--list-windows
+                                session))))
         (counter 0)
         session-list
         aliases
+        target-directories
         current-project)
-    (dolist (window windows)
-      (let* ((id (enkan-repl--terminal-tmux--make-id session window))
-             (project (enkan-repl--tmux-reattach-project-name window))
-             (instance (enkan-repl--terminal-id-instance id)))
+    (dolist (window-cwd window-cwds)
+      (let* ((window (car window-cwd))
+             (cwd (cdr window-cwd))
+             (id (enkan-repl--terminal-tmux--make-id session window))
+             (project (enkan-repl--tmux-reattach-project-name window cwd))
+             (alias (if (and (stringp window) (not (string-empty-p window)))
+                        window
+                      project))
+             (instance (if (and cwd (fboundp 'enkan-repl--terminal-tmux-id-instance-for-path))
+                           (enkan-repl--terminal-tmux-id-instance-for-path id cwd)
+                         (enkan-repl--terminal-id-instance id))))
         (setq counter (1+ counter))
         (unless current-project
           (setq current-project project))
         (push (cons counter
                     (enkan-repl--make-session-entry-value project instance))
               session-list)
-        (unless (assoc project aliases)
-          (push (cons project project) aliases))))
+        (unless (assoc alias aliases)
+          (push (cons alias project) aliases))
+        (when cwd
+          (unless (assoc alias target-directories)
+            (push (cons alias (cons project cwd)) target-directories)))))
     (list :current-project current-project
           :session-list (nreverse session-list)
           :session-counter counter
-          :project-aliases (nreverse aliases))))
+          :project-aliases (nreverse aliases)
+          :target-directories (nreverse target-directories))))
 
 (defun enkan-repl--tmux-reattach-live-workspaces ()
   "Return live tmux workspaces as an alist of (WORKSPACE-ID . STATE)."
@@ -505,6 +597,56 @@ performed here because that would add synchronous tmux calls to reattach."
                 workspaces))))
     (nreverse workspaces)))
 
+(defun enkan-repl--tmux-reattach-merge-target-directories (persisted live)
+  "Merge PERSISTED and LIVE target directory alists.
+LIVE entries win for duplicate aliases because they reflect current tmux pane
+cwd values.  PERSISTED entries with aliases not present in LIVE are retained."
+  (let ((merged (copy-tree live)))
+    (dolist (entry persisted)
+      (unless (assoc (car entry) merged)
+        (setq merged (append merged (list (copy-tree entry))))))
+    merged))
+
+(defun enkan-repl--tmux-reattach-normalize-target-directories (state live)
+  "Normalize LIVE target directories so they are addressable from STATE."
+  (let* ((current-project (plist-get state :current-project))
+         (project-aliases (plist-get state :project-aliases))
+         (aliases (enkan-repl--project-alias-names project-aliases)))
+    (cond
+     ((null live) nil)
+     ((and (= 1 (length live))
+           (or current-project (= 1 (length aliases))))
+      (let* ((entry (car live))
+             (path (cdr (cdr entry)))
+             (alias (or current-project (car aliases) (car entry)))
+             (project (enkan-repl--project-name-for-alias
+                       alias project-aliases)))
+        (list (cons alias (cons project path)))))
+     ((= (length aliases) (length live))
+      (cl-mapcar
+       (lambda (alias entry)
+         (cons alias
+               (cons (enkan-repl--project-name-for-alias
+                      alias project-aliases)
+                     (cdr (cdr entry)))))
+       aliases live))
+     (t live))))
+
+(defun enkan-repl--tmux-reattach-merge-state (persisted live)
+  "Merge one PERSISTED workspace state with one LIVE tmux-derived state."
+  (let* ((state (copy-tree persisted))
+         (live-target-directories
+          (enkan-repl--tmux-reattach-normalize-target-directories
+           state
+           (plist-get live :target-directories)))
+         (target-directories
+          (enkan-repl--tmux-reattach-merge-target-directories
+           (plist-get persisted :target-directories)
+           live-target-directories)))
+    (if target-directories
+        (plist-put state :target-directories target-directories)
+      state)))
+
 (defun enkan-repl--tmux-reattach-merge-workspaces (persisted live)
   "Merge PERSISTED and LIVE workspace alists.
 Live tmux sessions define the set of restored workspaces.  Persisted state wins
@@ -516,7 +658,10 @@ used."
              (persisted-entry (assoc workspace-id persisted #'string=)))
         (push workspace-id restored)
         (if persisted-entry
-            (push (cons workspace-id (copy-tree (cdr persisted-entry)))
+            (push (cons workspace-id
+                        (enkan-repl--tmux-reattach-merge-state
+                         (cdr persisted-entry)
+                         (cdr live-entry)))
                   merged)
           (push workspace-id imported)
           (push (copy-tree live-entry) merged))))
@@ -528,17 +673,44 @@ used."
           :imported (nreverse imported)
           :dropped (nreverse dropped))))
 
-(defun enkan-repl--tmux-ensure-restored-workspaces (workspace-ids)
+(defun enkan-repl--tmux-reattach-path-for-id (id state)
+  "Return the live pane cwd for tmux ID from reattach STATE, or nil."
+  (let* ((window (enkan-repl--terminal-tmux--id-window id))
+         (project (and window
+                       (enkan-repl--tmux-reattach-project-name window)))
+         (target-directories (plist-get state :target-directories)))
+    (when project
+      (or (when-let ((entry (assoc window target-directories)))
+            (cdr (cdr entry)))
+          (when-let ((entry (assoc project target-directories)))
+            (cdr (cdr entry)))
+          (cl-loop for entry in target-directories
+                   for value = (cdr entry)
+                   when (and (consp value)
+                             (string= (car value) project))
+                   return (cdr value))
+          (when (= 1 (length target-directories))
+            (cdr (cdr (car target-directories))))))))
+
+(defun enkan-repl--tmux-ensure-restored-workspaces (workspace-ids
+                                                    &optional path-workspaces)
   "Ensure tmux mirror buffers exist for WORKSPACE-IDS without force-refreshing.
+PATH-WORKSPACES, when non-nil, supplies live cwd state used to create mirrors
+with eat-compatible path buffer names immediately.
+
 Returns the total number of mirror buffers ensured."
   (let ((previous-workspace enkan-repl--current-workspace)
         (total 0))
     (unwind-protect
         (dolist (workspace-id workspace-ids total)
           (setq enkan-repl--current-workspace workspace-id)
-          (dolist (id (or (enkan-repl--terminal-list) nil))
-            (when (enkan-repl--terminal-tmux--mirror-make id t)
-              (setq total (1+ total)))))
+          (let ((state (cdr (assoc workspace-id path-workspaces #'string=))))
+            (dolist (id (or (enkan-repl--terminal-list) nil))
+              (when (enkan-repl--terminal-tmux--mirror-make
+                     id
+                     t
+                     (enkan-repl--tmux-reattach-path-for-id id state))
+                (setq total (1+ total))))))
       (setq enkan-repl--current-workspace previous-workspace))))
 
 ;;;###autoload
@@ -549,6 +721,8 @@ with `enkan-repl-tmux-session-prefix' define the workspaces to restore.  When a
 matching persisted workspace exists, its saved state is reused.  When no saved
 state exists for a live tmux session, a minimal workspace is imported from the
 tmux session's windows so reattach works after Emacs state was lost.
+Imported tmux window names become the workspace aliases used by send commands,
+workspace-list path display, and project-directory selection.
 
 This command is intentionally manual; enkan-repl does not reattach on load."
   (interactive)
@@ -578,15 +752,22 @@ This command is intentionally manual; enkan-repl does not reattach on load."
       (user-error "No live enkan tmux sessions found"))
     (if (enkan-repl--tmux-reattach-already-current-p
          loaded-workspaces current-id)
-        (progn
-          (message "Already reattached to %d workspace(s); no refresh needed"
-                   (length loaded-workspaces))
+        (let ((ensured (enkan-repl--tmux-ensure-restored-workspaces
+                        restored-ids
+                        live-workspaces)))
+          (setq enkan-repl--current-workspace current-id)
+          (enkan-repl--load-workspace-state current-id)
+          (message
+           "Already reattached to %d workspace(s), ensured %d tmux mirror buffer(s)"
+           (length loaded-workspaces)
+           ensured)
           result)
       (setq enkan-repl--workspaces loaded-workspaces)
       (setq enkan-repl--current-workspace current-id)
       (enkan-repl--load-workspace-state current-id)
       (let ((ensured (enkan-repl--tmux-ensure-restored-workspaces
-                      restored-ids)))
+                      restored-ids
+                      live-workspaces)))
         (setq enkan-repl--current-workspace current-id)
         (enkan-repl--load-workspace-state current-id)
         (when (fboundp 'enkan-repl-state-save)
@@ -1236,7 +1417,11 @@ Category: Session Controller"
   (let* ((target-dir default-directory)
          (term-id (enkan-repl--terminal-start target-dir))
          (instance (when term-id
-                     (enkan-repl--terminal-id-instance term-id))))
+                     (if (and (eq enkan-repl-terminal-backend 'tmux)
+                              (fboundp 'enkan-repl--terminal-tmux-id-instance-for-path))
+                         (enkan-repl--terminal-tmux-id-instance-for-path
+                          term-id target-dir)
+                       (enkan-repl--terminal-id-instance term-id)))))
     (when term-id
       ;; tmux backend: ensure the mirror buffer exists so buffer-list
       ;; based layout / count code finds the session.  No pop-up here;
@@ -1553,7 +1738,32 @@ Returns a list of (alias . path) pairs."
                  for project-info = (cdr entry)
                  when (and (consp project-info)
                            (string= (car project-info) current-project))
-                 collect (cons alias (cdr project-info))))))
+                 collect (cons alias (cdr project-info)))
+        (when-let ((project-info (enkan-repl--get-project-info-from-directories
+                                  current-project target-directories)))
+          (list (cons current-project (cdr project-info)))))))
+
+(defun enkan-repl--no-active-sessions-message ()
+  "Return the user-facing message for missing send targets."
+  (if (eq enkan-repl-terminal-backend 'tmux)
+      (concat
+       "No active enkan sessions found. Run M-x enkan-repl-tmux-reattach "
+       "for existing tmux sessions, or M-x enkan-repl-start-session "
+       "to create a new one")
+    "No active enkan sessions found. Start one with M-x enkan-repl-start-session"))
+
+(defun enkan-repl--target-alias-instance-for-path (alias path)
+  "Return instance number implied by ALIAS for PATH, or nil.
+ALIAS like project-2 means instance 2 only when PATH's basename is project.
+This avoids treating real project names like foo-2 as second instances."
+  (let ((base (and (stringp path)
+                   (enkan-repl--extract-project-name path))))
+    (when (and (stringp alias)
+               (stringp base)
+               (string-match
+                (format "\\`%s-\\([0-9]+\\)\\'" (regexp-quote base))
+                alias))
+      (string-to-number (match-string 1 alias)))))
 
 (defun enkan-repl--resolve-send-target (pfx resolved-alias current-project projects target-directories)
   "Resolve target buffer from prefix/alias and project config.
@@ -1567,12 +1777,16 @@ Returns a plist with :status and other keys."
                           (enkan-repl--get-project-paths-for-current
                            current-project projects target-directories)))
          ;; Helper function to convert path to buffer
-         (path-to-buffer (lambda (path)
-                           (get-buffer (enkan-repl--path->buffer-name path))))
+         (path-to-buffer (lambda (alias path)
+                           (get-buffer
+                            (enkan-repl--path->buffer-name
+                             path
+                             (enkan-repl--target-alias-instance-for-path
+                              alias path)))))
          ;; Helper function to check if buffer exists
          (get-active-buffers (lambda (paths)
                                (cl-loop for (alias . path) in paths
-                                        for buffer = (funcall path-to-buffer path)
+                                        for buffer = (funcall path-to-buffer alias path)
                                         when buffer
                                         collect (cons alias buffer)))))
     ;; Check if we have active buffers
@@ -1583,7 +1797,7 @@ Returns a plist with :status and other keys."
                                    collect (cons nil buffer)))))
       (if (null active-pairs)
           (list :status 'no-buffers
-                :message "No active enkan sessions found. Start one with M-x enkan-repl-start-session")
+                :message (enkan-repl--no-active-sessions-message))
         ;; Resolve based on prefix-arg or alias
         (cond
          ;; Priority 1: prefix-arg based selection
@@ -1918,7 +2132,10 @@ Returns t on success, nil on failure."
                         pfx
                         resolved-alias
                         (enkan-repl--ws-current-project)
-                        enkan-repl-projects
+                        (enkan-repl--projects-with-current-aliases
+                         enkan-repl-projects
+                         (enkan-repl--ws-current-project)
+                         enkan-repl-project-aliases)
                         enkan-repl-target-directories))
            (status (plist-get resolution :status))
            (target-buffer nil))
@@ -2038,14 +2255,20 @@ Category: Center File Multi-buffer Access"
 
 ;;;###autoload
 (defun enkan-repl-open-project-directory (&optional pfx)
-  "Open project directory in Dired from enkan-repl-projects with optional PFX.
+  "Open the current workspace's project directory in Dired with optional PFX.
+Directory choices are resolved from `enkan-repl-projects' plus the current
+workspace's aliases and target directories, including aliases imported by
+`enkan-repl-tmux-reattach'.
 With prefix argument (\\[universal-argument]), select from available buffers.
 
 Category: Center File Multi-buffer Access"
   (interactive "P")
   (let ((result (enkan-repl--target-directory-info
                  (enkan-repl--ws-current-project)
-                 enkan-repl-projects
+                 (enkan-repl--projects-with-current-aliases
+                  enkan-repl-projects
+                  (enkan-repl--ws-current-project)
+                  enkan-repl-project-aliases)
                  enkan-repl-target-directories
                  "Select project directory to open:"
                  #'file-directory-p
