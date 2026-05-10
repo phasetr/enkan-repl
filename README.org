@@ -404,7 +404,7 @@ byte compilation,
 and documentation checks.
 
 ** Releases
-This project uses automated releases via [[https://semantic-release.gitbook.io/][semantic-release]]. New versions are automatically published to GitHub Releases and a [[file:CHANGELOG.md][CHANGELOG.md]] is generated based on Conventional Commits. You can find detailed release notes in the CHANGELOG.
+This project uses automated releases via [[https://semantic-release.gitbook.io/][semantic-release]]. New versions are automatically published to GitHub Releases based on Conventional Commits. You can find detailed release notes on the GitHub Releases page.
 
 *Note*: The `semantic-release` toolchain is used for development/release automation only. The Elisp package itself has no Node.js runtime dependencies and can be installed normally via MELPA.
 
