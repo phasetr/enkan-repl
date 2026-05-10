@@ -4,7 +4,7 @@
 
 ;; Author: [phasetr] <phasetr@gmail.com>
 ;; Version: 0.19.0
-;; Package-Requires: ((emacs "28.2") (eat "0.9.4"))
+;; Package-Requires: ((emacs "30.1") (eat "0.9.4"))
 ;; Keywords: enkan ai tools convenience
 ;; URL: https://github.com/phasetr/enkan-repl
 ;; License: MIT
@@ -1483,7 +1483,7 @@ Category: Command Palette"
   "Build a sparse keymap from BINDINGS of (KEY . COMMAND)."
   (let ((m (make-sparse-keymap)))
     (dolist (kv bindings)
-      (define-key m (kbd (car kv)) (cdr kv)))
+      (keymap-set m (car kv) (cdr kv)))
     m))
 
 ;; Store original keybindings for safe restoration
