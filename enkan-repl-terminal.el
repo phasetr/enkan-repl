@@ -362,6 +362,22 @@ or nil on non-zero exit.  Otherwise return t on zero exit, nil on non-zero."
         (split-string out "\n" t)
       nil)))
 
+(defun enkan-repl--terminal-tmux--list-window-cwds (session)
+  "Return list of (WINDOW . CWD) pairs in tmux SESSION."
+  (let ((out (enkan-repl--terminal-tmux--call
+              (list "list-windows" "-t" session "-F"
+                    "#{window_name}\t#{pane_current_path}")
+              t)))
+    (when (and out (not (string-empty-p out)))
+      (delq
+       nil
+       (mapcar
+        (lambda (line)
+          (pcase-let ((`(,window ,cwd) (split-string line "\t")))
+            (when (and window cwd (not (string-empty-p window)))
+              (cons window (unless (string-empty-p cwd) cwd)))))
+        (split-string out "\n" t))))))
+
 (defun enkan-repl--terminal-tmux--derive-base-name (dir)
   "Derive a base window name from DIR (file-name-nondirectory of cleaned dir)."
   (let* ((clean (directory-file-name (expand-file-name dir)))

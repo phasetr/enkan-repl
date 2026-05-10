@@ -171,6 +171,45 @@
       (should (string-match-p "/home/user/project-b/" formatted))
       (should (string-match-p "/home/user/project-c/" formatted)))))
 
+(ert-deftest test-workspace-list-uses-project-alias-fallback ()
+  "Workspace list should resolve paths from aliases when project name fails."
+  (let* ((enkan-repl--workspaces nil)
+         (enkan-repl--current-workspace "05")
+         (enkan-repl-projects nil)
+         (enkan-repl-target-directories
+          '(("er" . ("enkan-repl" . "/Users/me/dev/enkan-repl/")))))
+    (setq enkan-repl--workspaces
+          (list (cons "05" '(:current-project "er"
+                             :project-aliases (("er" . "er"))
+                             :session-list ()
+                             :session-counter 0))))
+    (let ((formatted (enkan-repl-workspace-list--format-workspace-info
+                      "05" enkan-repl--workspaces "05"
+                      enkan-repl-target-directories)))
+      (should (string-match-p "er" formatted))
+      (should (string-match-p "/Users/me/dev/enkan-repl/" formatted))
+      (should-not (string-match-p "<not found>" formatted)))))
+
+(ert-deftest test-workspace-list-uses-state-target-directories ()
+  "Workspace list should use target directories imported into workspace state."
+  (let* ((enkan-repl--workspaces nil)
+         (enkan-repl--current-workspace "02")
+         (enkan-repl-projects nil)
+         (enkan-repl-target-directories nil))
+    (setq enkan-repl--workspaces
+          (list (cons "02" '(:current-project "lat"
+                             :project-aliases (("lat" . "lat"))
+                             :target-directories
+                             (("lat" . ("lat" . "/Users/me/dev/lat/")))
+                             :session-list ()
+                             :session-counter 0))))
+    (let ((formatted (enkan-repl-workspace-list--format-workspace-info
+                      "02" enkan-repl--workspaces "02"
+                      enkan-repl-target-directories)))
+      (should (string-match-p "lat" formatted))
+      (should (string-match-p "/Users/me/dev/lat/" formatted))
+      (should-not (string-match-p "<not found>" formatted)))))
+
 (provide 'enkan-repl-workspace-list-test)
 
 ;;; enkan-repl-workspace-list-test.el ends here

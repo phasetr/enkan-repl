@@ -426,6 +426,16 @@ documented opt-in alternative; see README."
       (when (buffer-live-p buf)
         (kill-buffer buf)))))
 
+(ert-deftest test-enkan-repl--terminal-tmux--list-window-cwds ()
+  "Window cwd listing should parse tmux names and pane cwd values."
+  (cl-letf (((symbol-function 'enkan-repl--terminal-tmux--call)
+             (lambda (_args _capture)
+               "lat\t/Users/me/lat\ner\t/Users/me/enkan-repl\n")))
+    (should (equal '(("lat" . "/Users/me/lat")
+                     ("er" . "/Users/me/enkan-repl"))
+                   (enkan-repl--terminal-tmux--list-window-cwds
+                    "enkan-02")))))
+
 (ert-deftest test-enkan-repl-tmux-refresh-workspace ()
   "Refresh command creates or updates mirrors for current tmux windows."
   (let ((enkan-repl-terminal-backend 'tmux)
