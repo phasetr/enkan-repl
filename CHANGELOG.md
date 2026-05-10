@@ -1,3 +1,16 @@
+# [0.19.0](https://github.com/phasetr/enkan-repl/compare/v0.18.1...v0.19.0) (2026-05-10)
+
+
+### Bug Fixes
+
+* keep keybinding example compatible with emacs 28 ([90a8a2a](https://github.com/phasetr/enkan-repl/commit/90a8a2aa1800e06ce4268d6d18f5bad2b7a38f52))
+* use emacs 28 compatible keymap binding ([f2fdd59](https://github.com/phasetr/enkan-repl/commit/f2fdd59fe2c8de2d6ab1e40141174310e6b13fda))
+
+
+### Features
+
+* add manual tmux reattach commands ([#63](https://github.com/phasetr/enkan-repl/issues/63)) ([3d70358](https://github.com/phasetr/enkan-repl/commit/3d703589866fc357f9f03a85511e560527be07a4))
+
 ## [0.18.1](https://github.com/phasetr/enkan-repl/compare/v0.18.0...v0.18.1) (2026-05-09)
 
 
