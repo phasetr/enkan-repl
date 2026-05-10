@@ -64,8 +64,10 @@ enkan buffer name."
 
 (defun enkan-repl--path->buffer-name (path &optional instance)
   "Generate buffer name from PATH, optionally with INSTANCE suffix.
-Returns buffer name in format *ws:<id> enkan:<expanded-path>* (instance 1
-or unspecified) or *ws:<id> enkan:<expanded-path>*<N> (instance >= 2).
+PATH is normalized as a directory, so `/p' and `/p/' produce the same buffer
+name.  Returns buffer name in format *ws:<id> enkan:<expanded-directory>*
+\(instance 1 or unspecified) or *ws:<id> enkan:<expanded-directory>*<N>
+\(instance >= 2).
 Workspace ID is taken from `enkan-repl--current-workspace' when available;
 otherwise falls back to \"01\"."
   (let* ((ws (when (boundp 'enkan-repl--current-workspace)
@@ -74,7 +76,8 @@ otherwise falls back to \"01\"."
                          (string-match-p "^[0-9][0-9]$" ws))
                     ws
                   "01"))
-         (base (format "*ws:%s enkan:%s*" ws-id (expand-file-name path))))
+         (directory (file-name-as-directory (expand-file-name path)))
+         (base (format "*ws:%s enkan:%s*" ws-id directory)))
     (if (and instance (integerp instance) (> instance 1))
         (format "%s<%d>" base instance)
       base)))

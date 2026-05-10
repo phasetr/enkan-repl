@@ -61,18 +61,23 @@
     (should (stringp result))
     (should (string-prefix-p "*ws:01 enkan:" result))
     (should (string-suffix-p "*" result))
-    (should (string-match "\\*ws:01 enkan:/home/user/project\\*" result)))
+    (should (string-match "\\*ws:01 enkan:/home/user/project/\\*" result)))
   
   ;; Path with trailing slash
   (let ((result (enkan-repl--path->buffer-name "/home/user/project/")))
     (should (stringp result))
     (should (string-match "\\*ws:01 enkan:/home/user/project/\\*" result)))
+
+  ;; Directory paths are canonical: trailing slash does not create
+  ;; a distinct terminal buffer name.
+  (should (string= (enkan-repl--path->buffer-name "/home/user/project")
+                   (enkan-repl--path->buffer-name "/home/user/project/")))
   
   ;; Relative path (will be expanded)
   (let ((result (enkan-repl--path->buffer-name "~/test")))
     (should (stringp result))
     (should (string-prefix-p "*ws:01 enkan:" result))
-    (should (string-match "/test\\*$" result))))
+    (should (string-match "/test/\\*$" result))))
 
 ;;;; Compatibility tests - verify old and new APIs return same results
 
@@ -88,7 +93,7 @@
   (let* ((path "/home/user/project")
          (result (enkan-repl--path->buffer-name path)))
     (should (string-prefix-p "*ws:01 enkan:" result))
-    (should (string-match "\\*ws:01 enkan:/home/user/project\\*" result)))
+    (should (string-match "\\*ws:01 enkan:/home/user/project/\\*" result)))
   
   ;; Test enkan-repl--buffer-matches-directory with new format
   (let* ((buffer-name "*ws:01 enkan:/home/user/project*")
@@ -142,7 +147,7 @@
 (ert-deftest test-enkan-repl--path->buffer-name-with-instance ()
   "Test instance suffix is appended only for instance >= 2."
   (let ((base (enkan-repl--path->buffer-name "/p")))
-    (should (string-match "\\*ws:[0-9]\\{2\\} enkan:/p\\*$" base))
+    (should (string-match "\\*ws:[0-9]\\{2\\} enkan:/p/\\*$" base))
     ;; instance 1 = no suffix
     (should (string= base (enkan-repl--path->buffer-name "/p" 1)))
     ;; instance 2 / 3

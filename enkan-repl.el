@@ -105,6 +105,7 @@
 (declare-function enkan-repl--terminal-tmux--list-windows "enkan-repl-terminal" (session))
 (declare-function enkan-repl--terminal-tmux--list-window-cwds "enkan-repl-terminal" (session))
 (declare-function enkan-repl--terminal-tmux--make-id "enkan-repl-terminal" (session window))
+(declare-function enkan-repl--terminal-tmux--id-window "enkan-repl-terminal" (id))
 (declare-function enkan-repl--terminal-tmux-kill-workspace "enkan-repl-terminal" (workspace-id))
 (declare-function enkan-repl-tmux-refresh-workspace "enkan-repl-terminal" (&optional quiet))
 (defvar enkan-repl--tmux-mirror-id)
@@ -639,17 +640,42 @@ used."
           :imported (nreverse imported)
           :dropped (nreverse dropped))))
 
-(defun enkan-repl--tmux-ensure-restored-workspaces (workspace-ids)
+(defun enkan-repl--tmux-reattach-path-for-id (id state)
+  "Return the live pane cwd for tmux ID from reattach STATE, or nil."
+  (let* ((window (enkan-repl--terminal-tmux--id-window id))
+         (project (and window
+                       (enkan-repl--tmux-reattach-project-name window)))
+         (target-directories (plist-get state :target-directories)))
+    (when project
+      (or (when-let ((entry (assoc project target-directories)))
+            (cdr (cdr entry)))
+          (cl-loop for entry in target-directories
+                   for value = (cdr entry)
+                   when (and (consp value)
+                             (string= (car value) project))
+                   return (cdr value))
+          (when (= 1 (length target-directories))
+            (cdr (cdr (car target-directories))))))))
+
+(defun enkan-repl--tmux-ensure-restored-workspaces (workspace-ids
+                                                    &optional path-workspaces)
   "Ensure tmux mirror buffers exist for WORKSPACE-IDS without force-refreshing.
+PATH-WORKSPACES, when non-nil, supplies live cwd state used to create mirrors
+with eat-compatible path buffer names immediately.
+
 Returns the total number of mirror buffers ensured."
   (let ((previous-workspace enkan-repl--current-workspace)
         (total 0))
     (unwind-protect
         (dolist (workspace-id workspace-ids total)
           (setq enkan-repl--current-workspace workspace-id)
-          (dolist (id (or (enkan-repl--terminal-list) nil))
-            (when (enkan-repl--terminal-tmux--mirror-make id t)
-              (setq total (1+ total)))))
+          (let ((state (cdr (assoc workspace-id path-workspaces #'string=))))
+            (dolist (id (or (enkan-repl--terminal-list) nil))
+              (when (enkan-repl--terminal-tmux--mirror-make
+                     id
+                     t
+                     (enkan-repl--tmux-reattach-path-for-id id state))
+                (setq total (1+ total))))))
       (setq enkan-repl--current-workspace previous-workspace))))
 
 ;;;###autoload
@@ -689,15 +715,22 @@ This command is intentionally manual; enkan-repl does not reattach on load."
       (user-error "No live enkan tmux sessions found"))
     (if (enkan-repl--tmux-reattach-already-current-p
          loaded-workspaces current-id)
-        (progn
-          (message "Already reattached to %d workspace(s); no refresh needed"
-                   (length loaded-workspaces))
+        (let ((ensured (enkan-repl--tmux-ensure-restored-workspaces
+                        restored-ids
+                        live-workspaces)))
+          (setq enkan-repl--current-workspace current-id)
+          (enkan-repl--load-workspace-state current-id)
+          (message
+           "Already reattached to %d workspace(s), ensured %d tmux mirror buffer(s)"
+           (length loaded-workspaces)
+           ensured)
           result)
       (setq enkan-repl--workspaces loaded-workspaces)
       (setq enkan-repl--current-workspace current-id)
       (enkan-repl--load-workspace-state current-id)
       (let ((ensured (enkan-repl--tmux-ensure-restored-workspaces
-                      restored-ids)))
+                      restored-ids
+                      live-workspaces)))
         (setq enkan-repl--current-workspace current-id)
         (enkan-repl--load-workspace-state current-id)
         (when (fboundp 'enkan-repl-state-save)
@@ -1670,6 +1703,15 @@ Returns a list of (alias . path) pairs."
                            (string= (car project-info) current-project))
                  collect (cons alias (cdr project-info))))))
 
+(defun enkan-repl--no-active-sessions-message ()
+  "Return the user-facing message for missing send targets."
+  (if (eq enkan-repl-terminal-backend 'tmux)
+      (concat
+       "No active enkan sessions found. Run M-x enkan-repl-tmux-reattach "
+       "for existing tmux sessions, or M-x enkan-repl-start-session "
+       "to create a new one")
+    "No active enkan sessions found. Start one with M-x enkan-repl-start-session"))
+
 (defun enkan-repl--resolve-send-target (pfx resolved-alias current-project projects target-directories)
   "Resolve target buffer from prefix/alias and project config.
 PREFIX-ARG (PFX): numeric prefix for buffer selection (optional)
@@ -1683,7 +1725,8 @@ Returns a plist with :status and other keys."
                            current-project projects target-directories)))
          ;; Helper function to convert path to buffer
          (path-to-buffer (lambda (path)
-                           (get-buffer (enkan-repl--path->buffer-name path))))
+                           (get-buffer
+                            (enkan-repl--path->buffer-name path))))
          ;; Helper function to check if buffer exists
          (get-active-buffers (lambda (paths)
                                (cl-loop for (alias . path) in paths
@@ -1698,7 +1741,7 @@ Returns a plist with :status and other keys."
                                    collect (cons nil buffer)))))
       (if (null active-pairs)
           (list :status 'no-buffers
-                :message "No active enkan sessions found. Start one with M-x enkan-repl-start-session")
+                :message (enkan-repl--no-active-sessions-message))
         ;; Resolve based on prefix-arg or alias
         (cond
          ;; Priority 1: prefix-arg based selection

@@ -107,8 +107,11 @@
                  (list (format "enkan-%s:window"
                                enkan-repl--current-workspace))))
               ((symbol-function 'enkan-repl--terminal-tmux--mirror-make)
-               (lambda (id &optional defer-refresh _path)
-                 (push (list enkan-repl--current-workspace id defer-refresh)
+               (lambda (id &optional defer-refresh path)
+                 (push (list enkan-repl--current-workspace
+                             id
+                             defer-refresh
+                             path)
                        ensured-workspaces)
                  id))
               ((symbol-function 'enkan-repl-state-save)
@@ -118,8 +121,8 @@
         (should (equal "02" enkan-repl--current-workspace))
         (should (equal "proj" enkan-repl--current-project))
         (should (equal '((1 . "proj")) enkan-repl-session-list))
-        (should (equal '(("02" "enkan-02:window" t)
-                         ("01" "enkan-01:window" t))
+        (should (equal '(("02" "enkan-02:window" t "/tmp/window")
+                         ("01" "enkan-01:window" t "/tmp/window"))
                        ensured-workspaces))))))
 
 (ert-deftest test-enkan-repl-tmux-reattach-imports-live-session-without-state ()
@@ -148,8 +151,11 @@
                (lambda ()
                  (list "enkan-03:enkan-repl" "enkan-03:worker-2")))
               ((symbol-function 'enkan-repl--terminal-tmux--mirror-make)
-               (lambda (id &optional defer-refresh _path)
-                 (push (list enkan-repl--current-workspace id defer-refresh)
+               (lambda (id &optional defer-refresh path)
+                 (push (list enkan-repl--current-workspace
+                             id
+                             defer-refresh
+                             path)
                        ensured-workspaces)
                  id))
               ((symbol-function 'enkan-repl-state-save)
@@ -171,9 +177,68 @@
                                               #'string=))
                                   :target-directories)))
         (should (= 2 enkan-repl--session-counter))
-        (should (equal '(("03" "enkan-03:worker-2" t)
-                         ("03" "enkan-03:enkan-repl" t))
+        (should (equal '(("03" "enkan-03:worker-2" t "/repo/worker")
+                         ("03" "enkan-03:enkan-repl" t "/repo/enkan-repl"))
                        ensured-workspaces))))))
+
+(ert-deftest test-enkan-repl-tmux-reattach-makes-send-line-work ()
+  "After tmux reattach, `enkan-repl-send-line' sends to the live tmux pane."
+  (let ((enkan-repl-terminal-backend 'tmux)
+        (enkan-repl-tmux-bell-notify nil)
+        (enkan-repl--workspaces nil)
+        (enkan-repl--current-workspace nil)
+        (enkan-repl--current-project nil)
+        (enkan-repl-session-list nil)
+        (enkan-repl--session-counter 0)
+        (enkan-repl-project-aliases nil)
+        (enkan-repl-projects nil)
+        (enkan-repl-target-directories nil)
+        (sent-calls nil)
+        mirror-buffer)
+    (unwind-protect
+        (cl-letf (((symbol-function 'enkan-repl-state-load)
+                   (lambda (&optional _file) nil))
+                  ((symbol-function 'enkan-repl-state--list-live-tmux-sessions)
+                   (lambda (_prefix)
+                     '("enkan-03")))
+                  ((symbol-function 'enkan-repl--terminal-tmux--list-window-cwds)
+                   (lambda (_session)
+                     '(("enkan-repl" . "/repo/enkan-repl"))))
+                  ((symbol-function 'enkan-repl--terminal-list)
+                   (lambda ()
+                     '("enkan-03:enkan-repl")))
+                  ((symbol-function 'enkan-repl-state-save)
+                   (lambda (&optional _file) t))
+                  ((symbol-function 'enkan-repl--terminal-tmux--call)
+                   (lambda (args &optional _capture)
+                     (when (equal (car args) "send-keys")
+                       (setq sent-calls
+                             (append sent-calls (list args))))
+                     t)))
+          (enkan-repl-tmux-reattach)
+          (setq mirror-buffer
+                (get-buffer
+                 (let ((enkan-repl--current-workspace "03"))
+                   (enkan-repl--path->buffer-name "/repo/enkan-repl/"))))
+          (should (buffer-live-p mirror-buffer))
+          (should (equal "enkan-03:enkan-repl"
+                         (buffer-local-value 'enkan-repl--tmux-mirror-id
+                                             mirror-buffer)))
+          (with-temp-buffer
+            (insert "(+ 1 2)")
+            (should (enkan-repl-send-line)))
+          (should (equal '(("send-keys" "-t" "enkan-03:enkan-repl"
+                            "-l" "(+ 1 2)")
+                           ("send-keys" "-t" "enkan-03:enkan-repl"
+                            "Enter"))
+                         sent-calls)))
+      (dolist (buffer (buffer-list))
+        (when (and (buffer-live-p buffer)
+                   (buffer-local-boundp 'enkan-repl--tmux-mirror-id buffer)
+                   (equal (buffer-local-value 'enkan-repl--tmux-mirror-id
+                                              buffer)
+                          "enkan-03:enkan-repl"))
+          (kill-buffer buffer))))))
 
 (ert-deftest test-enkan-repl-tmux-reattach-enriches-persisted-state-with-live-cwd ()
   "Manual tmux reattach should add live cwd paths to persisted workspaces."
@@ -263,8 +328,8 @@
                                               #'string=))
                                   :target-directories)))))))
 
-(ert-deftest test-enkan-repl-tmux-reattach-skips-already-current-state ()
-  "Manual tmux reattach does not force-refresh when state is already current."
+(ert-deftest test-enkan-repl-tmux-reattach-ensures-already-current-state ()
+  "Manual tmux reattach recreates mirrors even when state is already current."
   (let* ((saved-workspaces
           '(("01" :current-project "old"
                    :session-list ((1 . "old"))
@@ -282,7 +347,8 @@
                     ("window" . ("window" . "/tmp/window"))))))
          (enkan-repl-terminal-backend 'tmux)
          (enkan-repl--workspaces saved-workspaces)
-         (enkan-repl--current-workspace "02"))
+         (enkan-repl--current-workspace "02")
+         ensured-workspaces)
     (cl-letf (((symbol-function 'enkan-repl-state-tmux-reconcile)
                (lambda (&optional _file)
                  (error "Should not use old persisted-only reconcile")))
@@ -300,17 +366,26 @@
                  '(("window" . "/tmp/window"))))
               ((symbol-function 'enkan-repl--terminal-list)
                (lambda ()
-                 (error "Should not list tmux windows when already current")))
+                 (list (format "enkan-%s:window"
+                               enkan-repl--current-workspace))))
               ((symbol-function 'enkan-repl--terminal-tmux--mirror-make)
-               (lambda (_id &optional _defer-refresh _path)
-                 (error "Should not create mirrors when already current")))
+               (lambda (id &optional defer-refresh path)
+                 (push (list enkan-repl--current-workspace
+                             id
+                             defer-refresh
+                             path)
+                       ensured-workspaces)
+                 id))
               ((symbol-function 'enkan-repl-state-save)
                (lambda (&optional _file)
                  (error "Should not save when already current"))))
       (let ((result (enkan-repl-tmux-reattach)))
         (should result)
         (should (eq saved-workspaces enkan-repl--workspaces))
-        (should (string= "02" enkan-repl--current-workspace))))))
+        (should (string= "02" enkan-repl--current-workspace))
+        (should (equal '(("02" "enkan-02:window" t "/tmp/window")
+                         ("01" "enkan-01:window" t "/tmp/window"))
+                       ensured-workspaces))))))
 
 ;; Tests for enkan-repl--get-package-directory
 (ert-deftest test-enkan-repl--get-package-directory ()
