@@ -1483,7 +1483,7 @@ Category: Command Palette"
   "Build a sparse keymap from BINDINGS of (KEY . COMMAND)."
   (let ((m (make-sparse-keymap)))
     (dolist (kv bindings)
-      (keymap-set m (car kv) (cdr kv)))
+      (define-key m (kbd (car kv)) (cdr kv)))
     m))
 
 ;; Store original keybindings for safe restoration
