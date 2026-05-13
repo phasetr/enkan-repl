@@ -44,5 +44,39 @@
       (should (equal 1 enkan-repl--session-counter))
       (should (equal "other" enkan-repl--current-project)))))
 
+(ert-deftest test-workspace-delete-preserves-target-registry-for-new-setup ()
+  "Deleting a workspace must not make unrelated project aliases unusable."
+  (let ((enkan-repl--workspaces
+         '(("01" . (:current-project "junk"
+                    :session-list ((1 . "junk"))
+                    :session-counter 1
+                    :project-aliases (("junk" . "junk"))
+                    :target-directories
+                    (("junk" . ("junk" . "/repo/junk")))))
+           ("02" . (:current-project "er"
+                    :session-list ((1 . "enkan-repl"))
+                    :session-counter 1
+                    :project-aliases (("er" . "enkan-repl"))
+                    :target-directories
+                    (("er" . ("enkan-repl" . "/repo/enkan-repl")))))))
+        (enkan-repl--current-workspace "01")
+        (enkan-repl-session-list '((1 . "junk")))
+        (enkan-repl--session-counter 1)
+        (enkan-repl--current-project "junk")
+        (enkan-repl-project-aliases '(("junk" . "junk")))
+        (enkan-repl-target-directories
+         '(("junk" . ("junk" . "/repo/junk"))
+           ("er" . ("enkan-repl" . "/repo/enkan-repl")))))
+    (cl-letf (((symbol-function 'enkan-repl--stop-workspace-terminals)
+               (lambda (_workspace-id)
+                 (list :buffers-killed 0 :tmux-killed nil))))
+      (enkan-repl--delete-workspace-completely "01")
+      (should (equal "02" enkan-repl--current-workspace))
+      (should (equal '(("er" . ("enkan-repl" . "/repo/enkan-repl"))
+                       ("junk" . ("junk" . "/repo/junk")))
+                     enkan-repl-target-directories))
+      (should (equal '("junk" . "/repo/junk")
+                     (enkan-repl--setup-project-session "junk"))))))
+
 (provide 'enkan-repl-workspace-delete-deletion-test)
 ;;; enkan-repl-workspace-delete-deletion-test.el ends here
