@@ -310,6 +310,10 @@ same user-facing send / layout commands (=enkan-repl-send-line=,
   =enkan-repl-tmux-mirror-interval= seconds.
   Disable mirroring with =(setq enkan-repl-tmux-mirror nil)= if not
   desired.
+- Mirror refresh keeps a bounded recent view by default: 320 captured
+  lines, 240 displayed lines, 256 KiB of content, and 2048 characters
+  per line before truncation.  Large diff-like/noisy blocks are still
+  compacted.
 - Mirror buffers show refresh state in the header line
   (=refreshing=, =hidden=, =fresh=, =unchanged=, =closed=).
 - Run =M-x enkan-repl-tmux-refresh-workspace= to recreate or force
