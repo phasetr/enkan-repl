@@ -569,19 +569,21 @@ latency when many background panes exist."
   :type 'integer
   :group 'enkan-repl-terminal)
 
-(defcustom enkan-repl-tmux-mirror-history-lines 160
+(defcustom enkan-repl-tmux-mirror-history-lines 320
   "Number of recent tmux lines to capture per refresh.
-The mirror is a lightweight status view, not a full transcript.  Keep this
-small enough that manual refresh remains cheap after a long idle period."
+The mirror is a bounded recent-status view, not a full transcript.  The
+default is large enough to preserve longer proposals while keeping manual
+refresh work bounded."
   :type 'integer
   :group 'enkan-repl-terminal)
 
-(defcustom enkan-repl-tmux-mirror-display-lines 80
-  "Maximum number of lines kept in a tmux mirror buffer."
+(defcustom enkan-repl-tmux-mirror-display-lines 240
+  "Maximum number of lines kept in a tmux mirror buffer.
+This limits the Emacs buffer after noisy output compaction."
   :type 'integer
   :group 'enkan-repl-terminal)
 
-(defcustom enkan-repl-tmux-mirror-max-chars (* 64 1024)
+(defcustom enkan-repl-tmux-mirror-max-chars (* 256 1024)
   "Maximum characters to apply to a tmux mirror buffer per refresh.
 When captured content is larger than this value, keep the tail of the
 capture.  This bounds main-thread work after the asynchronous tmux
@@ -599,8 +601,10 @@ process returns."
   :type 'integer
   :group 'enkan-repl-terminal)
 
-(defcustom enkan-repl-tmux-mirror-max-line-length 240
-  "Maximum line length shown verbatim in tmux mirror buffers."
+(defcustom enkan-repl-tmux-mirror-max-line-length 2048
+  "Maximum line length shown verbatim in tmux mirror buffers.
+This accommodates prose joined by `tmux capture-pane -J' while still
+truncating pathological single-line output."
   :type 'integer
   :group 'enkan-repl-terminal)
 

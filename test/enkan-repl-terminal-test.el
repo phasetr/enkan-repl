@@ -556,6 +556,31 @@ documented opt-in alternative; see README."
                    (enkan-repl--terminal-tmux--tail-append
                     "abc" "def" nil))))
 
+(ert-deftest test-enkan-repl-tmux-mirror-default-limits ()
+  "Default tmux mirror limits should preserve useful proposal context."
+  (should (= 320 enkan-repl-tmux-mirror-history-lines))
+  (should (= 240 enkan-repl-tmux-mirror-display-lines))
+  (should (= (* 256 1024) enkan-repl-tmux-mirror-max-chars))
+  (should (= 2048 enkan-repl-tmux-mirror-max-line-length)))
+
+(ert-deftest test-enkan-repl--terminal-tmux--prepare-mirror-content-keeps-proposal-defaults ()
+  "Default mirror preparation should keep a moderate proposal from the start."
+  (let ((content (test-enkan-repl-terminal--lines 1 200)))
+    (should (string-prefix-p "line 01"
+                             (enkan-repl--terminal-tmux--prepare-mirror-content
+                              content)))
+    (should (string-suffix-p "line 200"
+                             (enkan-repl--terminal-tmux--prepare-mirror-content
+                              content)))))
+
+(ert-deftest test-enkan-repl--terminal-tmux--prepare-mirror-content-keeps-joined-prose ()
+  "Default line limit should not truncate normal prose joined by capture-pane."
+  (let* ((sentence "This is a readable paragraph from a longer specification proposal. ")
+         (content (string-join (make-list 25 sentence) "")))
+    (should (string= content
+                     (enkan-repl--terminal-tmux--prepare-mirror-content
+                      content)))))
+
 (ert-deftest test-enkan-repl--terminal-tmux--prepare-mirror-content-tail-lines ()
   "Prepared tmux mirror content should keep only recent display lines."
   (let ((enkan-repl-tmux-mirror-display-lines 3)
