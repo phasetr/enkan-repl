@@ -33,6 +33,18 @@ PROJECT-REGISTRY format: ((alias . (project-name . project-path)) ...)"
          (project-path (when project-info (cdr (cdr project-info)))))
     project-path))
 
+(defun enkan-repl--layout-session-project-info (session-project project-registry)
+  "Return project info for SESSION-PROJECT from PROJECT-REGISTRY.
+SESSION-PROJECT may be either a real project name or a configured alias."
+  (when session-project
+    (or (cdr (assoc session-project project-registry))
+        (cdr
+         (cl-find-if (lambda (entry)
+                       (let ((value (cdr entry)))
+                         (and (consp value)
+                              (string= (car value) session-project))))
+                     project-registry)))))
+
 (defun enkan-repl--setup-window-terminal-buffer-pure (window session-number session-list project-registry)
   "Pure function to determine terminal buffer setup for WINDOW and SESSION-NUMBER.
 Returns cons (window . buffer-name) or nil if session not registered.
@@ -43,7 +55,10 @@ suffix."
          (project-name (enkan-repl--session-entry-project entry-value))
          (instance (enkan-repl--session-entry-instance entry-value)))
     (when project-name
-      (let ((project-path (enkan-repl--get-project-path-from-directories project-name project-registry)))
+      (let* ((project-info
+              (enkan-repl--layout-session-project-info
+               project-name project-registry))
+             (project-path (cdr project-info)))
         (when project-path
           (let* ((expanded-path (expand-file-name project-path))
                  ;; Ensure path ends with / for consistency with terminal buffer names.
@@ -73,6 +88,10 @@ not returned."
          (entry-value (cdr entry))
          (project-name (enkan-repl--session-entry-project entry-value))
          (instance (enkan-repl--session-entry-instance entry-value))
+         (project-info
+          (enkan-repl--layout-session-project-info
+           project-name enkan-repl-target-directories))
+         (resolved-project-name (or (car project-info) project-name))
          (setup (enkan-repl--setup-window-terminal-buffer-pure
                  nil session-number (enkan-repl--ws-session-list)
                  enkan-repl-target-directories))
@@ -88,8 +107,9 @@ not returned."
            (and name
                 (enkan-repl--buffer-name-matches-workspace
                  name enkan-repl--current-workspace)
-                (string= (or (enkan-repl--extract-project-name name) "")
-                         project-name)
+                (member (or (enkan-repl--extract-project-name name) "")
+                        (delete-dups
+                         (list project-name resolved-project-name)))
                 (= (enkan-repl--buffer-name->instance name) instance)
                 (enkan-repl--buffer-alive-as-terminal-p buffer))))
        (buffer-list))))))
