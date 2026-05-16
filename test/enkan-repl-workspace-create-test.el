@@ -64,6 +64,7 @@
              (enkan-repl--current-workspace nil)
              (buffer-file-name-result "/path/to/file.input.txt")
              (default-directory "/path/to/project/")
+             (layout-called nil)
              ((symbol-function 'buffer-file-name) (lambda () buffer-file-name-result))
              ((symbol-function 'enkan-repl--is-standard-file-path) (lambda (file dir) t))
              ((symbol-function 'enkan-repl--initialize-default-workspace) (lambda ()))
@@ -72,6 +73,11 @@
              ((symbol-function 'other-window) (lambda (n)))
              ((symbol-function 'enkan-repl-start-session) (lambda (&optional force)))
              ((symbol-function 'enkan-repl-open-project-input-file) (lambda ()))
+             ((symbol-function 'enkan-repl-setup-current-project-layout)
+              (lambda ()
+                (setq layout-called
+                      (list enkan-repl--current-workspace
+                            enkan-repl--current-project))))
              ((symbol-function 'message) (lambda (&rest args) nil)))
     ;; Execute enkan-repl-setup
     (enkan-repl-setup)
@@ -80,7 +86,8 @@
     (should (assoc "01" enkan-repl--workspaces))
     ;; Verify project name from directory
     (let ((ws-state (cdr (assoc "01" enkan-repl--workspaces))))
-      (should (string= (plist-get ws-state :current-project) "project")))))
+      (should (string= (plist-get ws-state :current-project) "project")))
+    (should (equal layout-called '("01" "project")))))
 
 (ert-deftest test-enkan-repl-setup-creates-workspace-center-file ()
   "Test that enkan-repl-setup creates workspace for center file."
@@ -92,6 +99,7 @@
              (enkan-repl-center-file "hmenu")
              (enkan-repl-projects '(("MyProject" "alias1")))
              (buffer-file-name-result nil)
+             (layout-called nil)
              ((symbol-function 'buffer-file-name) (lambda () buffer-file-name-result))
              ((symbol-function 'enkan-repl--is-standard-file-path) (lambda (file dir) nil))
              ((symbol-function 'enkan-repl--is-center-file-path) (lambda (file projects) t))
@@ -103,8 +111,14 @@
              ((symbol-function 'enkan-repl--setup-enable-global-mode) (lambda (buf) nil))
              ((symbol-function 'enkan-repl--setup-reset-config) (lambda (buf) nil))
              ((symbol-function 'enkan-repl--setup-set-project-aliases) (lambda (name aliases buf) nil))
-             ((symbol-function 'enkan-repl--setup-start-sessions) (lambda (aliases buf) nil))
-             ((symbol-function 'enkan-repl--ws-current-project) (lambda () nil))
+             ((symbol-function 'enkan-repl--setup-start-sessions)
+              (lambda (aliases buf)
+                (list :success-count 1 :failure-count 0)))
+             ((symbol-function 'enkan-repl-setup-current-project-layout)
+              (lambda ()
+                (setq layout-called
+                      (list enkan-repl--current-workspace
+                            enkan-repl--current-project))))
              ((symbol-function 'enkan-repl--ws-session-list) (lambda () nil))
              ((symbol-function 'enkan-repl--ws-session-counter) (lambda () 0))
              ((symbol-function 'message) (lambda (&rest args) nil)))
@@ -116,7 +130,49 @@
     ;; Verify project name and aliases
     (let ((ws-state (cdr (assoc "01" enkan-repl--workspaces))))
       (should (string= (plist-get ws-state :current-project) "MyProject"))
-      (should (equal (plist-get ws-state :project-aliases) '("alias1"))))))
+      (should (equal (plist-get ws-state :project-aliases) '("alias1"))))
+    (should (equal layout-called '("01" "MyProject")))))
+
+(ert-deftest test-enkan-repl-workspace-switch-runs-current-project-layout ()
+  "Workspace switch should apply the current project's layout after loading."
+  (let ((enkan-repl--workspaces nil)
+        (enkan-repl--current-workspace nil)
+        (enkan-repl-session-list nil)
+        (enkan-repl--session-counter 0)
+        (enkan-repl--current-project nil)
+        (enkan-repl-project-aliases nil)
+        (layout-called nil))
+    (setq enkan-repl--workspaces
+          (enkan-repl--add-workspace enkan-repl--workspaces "01"))
+    (setq enkan-repl--current-workspace "01")
+    (setq enkan-repl-session-list '((1 . "project-a")))
+    (setq enkan-repl--session-counter 1)
+    (setq enkan-repl--current-project "project-a")
+    (enkan-repl--save-workspace-state "01")
+    (setq enkan-repl--workspaces
+          (enkan-repl--add-workspace enkan-repl--workspaces "02"))
+    (setq enkan-repl--current-workspace "02")
+    (setq enkan-repl-session-list '((1 . "project-b") (2 . "project-b")))
+    (setq enkan-repl--session-counter 2)
+    (setq enkan-repl--current-project "project-b")
+    (enkan-repl--save-workspace-state "02")
+    (setq enkan-repl--current-workspace "01")
+    (enkan-repl--load-workspace-state "01")
+    (cl-letf (((symbol-function 'hmenu)
+               (lambda (prompt choices)
+                 (car choices)))
+              ((symbol-function 'enkan-repl-setup-current-project-layout)
+               (lambda ()
+                 (setq layout-called
+                       (list enkan-repl--current-workspace
+                             enkan-repl--current-project
+                             enkan-repl-session-list))))
+              ((symbol-function 'message) (lambda (&rest args) nil)))
+      (enkan-repl-workspace-switch)
+      (should (equal enkan-repl--current-workspace "02"))
+      (should (equal layout-called
+                     '("02" "project-b"
+                       ((1 . "project-b") (2 . "project-b"))))))))
 
 (ert-deftest test-enkan-repl--setup-start-sessions-reports-failures ()
   "Session setup should report failures instead of looking successful."

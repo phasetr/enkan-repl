@@ -104,7 +104,8 @@
 (declare-function enkan-repl--terminal-tmux--mirror-make "enkan-repl-terminal" (id &optional defer-refresh path))
 (declare-function enkan-repl--terminal-tmux--list-windows "enkan-repl-terminal" (session))
 (declare-function enkan-repl--terminal-tmux--list-window-cwds "enkan-repl-terminal" (session))
-(declare-function enkan-repl--terminal-tmux--make-id "enkan-repl-terminal" (session window))
+(declare-function enkan-repl--terminal-tmux--list-window-info "enkan-repl-terminal" (session))
+(declare-function enkan-repl--terminal-tmux--make-id "enkan-repl-terminal" (session window &optional pane))
 (declare-function enkan-repl--terminal-tmux--id-window "enkan-repl-terminal" (id))
 (declare-function enkan-repl--terminal-tmux-kill-workspace "enkan-repl-terminal" (workspace-id))
 (declare-function enkan-repl-tmux-refresh-workspace "enkan-repl-terminal" (&optional quiet))
@@ -153,6 +154,10 @@
 
 ;; Declare external functions from hmenu to silence byte-compiler when not loaded
 (declare-function hmenu "hmenu" (prompt choices))
+
+;; Optional example layout command.  It is loaded by examples/keybinding.el.
+(declare-function enkan-repl-setup-current-project-layout
+                  "examples/window-layouts" ())
 
 ;; Declare external functions to avoid byte-compiler warnings
 (declare-function eat "eat" (&optional program))
@@ -558,20 +563,32 @@ manually edited or may legitimately end in numeric suffixes such as foo-2."
   "Build a minimal workspace plist from live tmux SESSION.
 This uses pane cwd basenames for project/session names when available.  tmux
 window names remain the aliases used to address live tmux windows."
-  (let ((window-cwds (if (fboundp 'enkan-repl--terminal-tmux--list-window-cwds)
-                         (enkan-repl--terminal-tmux--list-window-cwds session)
-                       (mapcar (lambda (window) (cons window nil))
-                               (enkan-repl--terminal-tmux--list-windows
-                                session))))
-        (counter 0)
-        session-list
-        aliases
-        target-directories
-        current-project)
-    (dolist (window-cwd window-cwds)
-      (let* ((window (car window-cwd))
-             (cwd (cdr window-cwd))
-             (id (enkan-repl--terminal-tmux--make-id session window))
+  (let* ((window-info
+          (and (fboundp 'enkan-repl--terminal-tmux--list-window-info)
+               (enkan-repl--terminal-tmux--list-window-info session)))
+         (window-infos (cond
+                        (window-info window-info)
+                        ((fboundp 'enkan-repl--terminal-tmux--list-window-cwds)
+                         (mapcar (lambda (window-cwd)
+                                   (list :window (car window-cwd)
+                                         :cwd (cdr window-cwd)))
+                                 (enkan-repl--terminal-tmux--list-window-cwds
+                                  session)))
+                        (t
+                         (mapcar (lambda (window)
+                                   (list :window window))
+                                 (enkan-repl--terminal-tmux--list-windows
+                                  session)))))
+         (counter 0)
+         session-list
+         aliases
+         target-directories
+         current-project)
+    (dolist (info window-infos)
+      (let* ((window (plist-get info :window))
+             (cwd (plist-get info :cwd))
+             (pane (plist-get info :pane))
+             (id (enkan-repl--terminal-tmux--make-id session window pane))
              (project (enkan-repl--tmux-reattach-project-name window cwd))
              (alias (if (and (stringp window) (not (string-empty-p window)))
                         window
@@ -1566,6 +1583,21 @@ Implemented as pure function, side effects are handled by upper functions."
           (cons project-name project-path))
       (error "Project alias '%s' not found in registry" alias))))
 
+(defun enkan-repl--maybe-setup-current-project-layout (&optional context)
+  "Run the optional current project layout command.
+CONTEXT is included in error messages to identify the caller.  The layout
+command lives in examples/window-layouts.el, so core setup only calls it when
+it has been loaded by user configuration."
+  (when (and enkan-repl--current-workspace
+             (enkan-repl--ws-current-project)
+             (fboundp 'enkan-repl-setup-current-project-layout))
+    (condition-case err
+        (enkan-repl-setup-current-project-layout)
+      (error
+       (message "Failed to set up current project layout%s: %s"
+                (if context (format " after %s" context) "")
+                (error-message-string err))))))
+
 ;;;###autoload
 (defun enkan-repl-setup ()
   "Set up window layout based on context.
@@ -1592,6 +1624,7 @@ Category: Session Controller"
           ;; Move back to left window and open project input file
           (other-window -1)
           (enkan-repl-open-project-input-file)
+          (enkan-repl--maybe-setup-current-project-layout "setup")
           (message "Basic window layout setup complete with workspace %s" enkan-repl--current-workspace))
       ;; Center file mode: check if center file is specified as non-empty string
       (if (enkan-repl--is-center-file-path enkan-repl-center-file enkan-repl-projects)
@@ -1601,7 +1634,8 @@ Category: Session Controller"
             (enkan-repl--setup-create-workspace-with-project nil project-name)
             (let ((old-state (list (enkan-repl--ws-current-project)
                                    (copy-tree (enkan-repl--ws-session-list))
-                                   (enkan-repl--ws-session-counter))))
+                                   (enkan-repl--ws-session-counter)))
+                  (setup-succeeded nil))
               (with-output-to-temp-buffer buffer-name
                 (princ (format "=== ENKAN-REPL AUTO SETUP: %s ===\n\n" project-name))
                 (condition-case err
@@ -1629,11 +1663,14 @@ Category: Session Controller"
                                    (length alias-list)))))
                       ;; Set final project configuration
                       (enkan-repl--ws-set-current-project project-name)
+                      (setq setup-succeeded t)
                       (princ (format "\n✅ Setup completed for project: %s\n" project-name))
                       (princ "Arrange your preferred window configuration!\n\n")
                       (princ "=== END SETUP ===\n"))
                   (error
                    (princ (format "\n❌ Setup failed: %s\n" (error-message-string err))))))
+              (when setup-succeeded
+                (enkan-repl--maybe-setup-current-project-layout "setup"))
               (message "Center file setup complete with workspace %s" enkan-repl--current-workspace)))
         (message "Center file not configured or no projects defined")))))
 
@@ -2019,7 +2056,9 @@ new default workspace is created via `enkan-repl-setup'."
         (cond
          (remaining-workspaces
           (setq enkan-repl--current-workspace (car remaining-workspaces))
-          (enkan-repl--load-workspace-state enkan-repl--current-workspace))
+          (enkan-repl--load-workspace-state enkan-repl--current-workspace)
+          (enkan-repl--maybe-setup-current-project-layout
+           "workspace delete"))
          (t
           (enkan-repl-setup)))))
     (list :deleted t
@@ -2480,6 +2519,7 @@ Uses `hmenu' if available to show workspace ID with its project."
           (enkan-repl--save-workspace-state)
           (setq enkan-repl--current-workspace target-id)
           (enkan-repl--load-workspace-state target-id)
+          (enkan-repl--maybe-setup-current-project-layout "workspace switch")
           (message "Switched to workspace %s" target-id))))))
 
 ;;;###autoload

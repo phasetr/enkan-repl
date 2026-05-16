@@ -177,6 +177,30 @@
         (when (buffer-live-p buffer)
           (kill-buffer buffer))))))
 
+(ert-deftest test-workspace-layout-resolves-session-alias-to-project-name ()
+  "C-M-l should resolve legacy alias session entries to project buffers."
+  (let* ((project-dir "/Users/sekine/dev/self/enkan-repl/")
+         (good (generate-new-buffer
+                (format "*ws:01 enkan:%s*" project-dir)))
+         (enkan-repl--current-workspace "01")
+         (enkan-repl--current-project "er")
+         (enkan-repl-session-list '((1 . "er")))
+         (enkan-repl-target-directories
+          `(("er" . ("enkan-repl" . ,project-dir))))
+         (called nil))
+    (unwind-protect
+        (progn
+          (with-current-buffer good
+            (setq-local enkan-repl--tmux-mirror-id "enkan-01:enkan-repl"))
+          (should (equal (list good)
+                         (enkan-repl--registered-session-buffers)))
+          (cl-letf (((symbol-function 'enkan-repl-setup-1session-layout)
+                     (lambda () (setq called 'one))))
+            (enkan-repl-setup-current-project-layout)
+            (should (eq called 'one))))
+      (when (buffer-live-p good)
+        (kill-buffer good)))))
+
 (ert-deftest test-workspace-layout-deduplicates-session-list-buffer ()
   "C-M-l should not count duplicate session entries resolving to one buffer."
   (let* ((project-dir "/Users/sekine/dev/self/enkan-repl/")

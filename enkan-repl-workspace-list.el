@@ -23,6 +23,8 @@
 (declare-function enkan-repl--get-workspace-state "enkan-repl-workspace" (workspaces workspace-id))
 (declare-function enkan-repl--save-workspace-state "enkan-repl" ())
 (declare-function enkan-repl--load-workspace-state "enkan-repl" (workspace-id))
+(declare-function enkan-repl--maybe-setup-current-project-layout "enkan-repl"
+                  (&optional context))
 (declare-function enkan-repl--get-project-paths-for-current "enkan-repl" (current-project projects target-directories))
 (declare-function enkan-repl--projects-with-current-aliases "enkan-repl" (projects current-project project-aliases))
 (declare-function enkan-repl--get-project-info-from-directories "enkan-repl-utils" (alias target-directories))
@@ -133,6 +135,7 @@ TARGET-DIRECTORIES is the list of target directories."
           (setq enkan-repl--current-workspace workspace-id)
           ;; Load the new workspace state
           (enkan-repl--load-workspace-state workspace-id)
+          (enkan-repl--maybe-setup-current-project-layout "workspace list switch")
           (message "Switched to workspace %s" workspace-id))))))
 
 (defun enkan-repl-workspace-list-refresh ()
