@@ -28,7 +28,10 @@ documented opt-in alternative; see README."
   (should (string= "enkan-01:lat"
                    (enkan-repl--terminal-tmux--make-id "enkan-01" "lat")))
   (should (string= "enkan-99:my-proj-2"
-                   (enkan-repl--terminal-tmux--make-id "enkan-99" "my-proj-2"))))
+                   (enkan-repl--terminal-tmux--make-id "enkan-99" "my-proj-2")))
+  (should (string= "enkan-01:dr-remote.jp|%12"
+                   (enkan-repl--terminal-tmux--make-id
+                    "enkan-01" "dr-remote.jp" "%12"))))
 
 (ert-deftest test-enkan-repl--terminal-tmux--id-session ()
   (should (string= "enkan-01"
@@ -47,8 +50,20 @@ documented opt-in alternative; see README."
   ;; from the first colon onward.
   (should (string= "lat.0"
                    (enkan-repl--terminal-tmux--id-window "enkan-01:lat.0")))
+  (should (string= "dr-remote.jp"
+                   (enkan-repl--terminal-tmux--id-window
+                    "enkan-01:dr-remote.jp|%12")))
   (should (null (enkan-repl--terminal-tmux--id-window "no-colon")))
   (should (null (enkan-repl--terminal-tmux--id-window nil))))
+
+(ert-deftest test-enkan-repl--terminal-tmux--target-prefers-pane-id ()
+  "Tmux commands should use stable pane ids when present."
+  (should (string= "%12"
+                   (enkan-repl--terminal-tmux--target
+                    "enkan-01:dr-remote.jp|%12")))
+  (should (string= "enkan-01:lat"
+                   (enkan-repl--terminal-tmux--target
+                    "enkan-01:lat"))))
 
 (ert-deftest test-enkan-repl--terminal-tmux--id-workspace ()
   "Workspace id is parsed from tmux target session names."
@@ -394,7 +409,7 @@ documented opt-in alternative; see README."
         (buf nil)
         cwd-lookup-started)
     (unwind-protect
-          (cl-letf (((symbol-function 'enkan-repl--terminal-tmux--pane-cwd-async)
+        (cl-letf (((symbol-function 'enkan-repl--terminal-tmux--pane-cwd-async)
                    (lambda (_id _callback)
                      (setq cwd-lookup-started t)
                      nil)))
@@ -709,7 +724,7 @@ documented opt-in alternative; see README."
             (enkan-repl--terminal-tmux--mirror-refresh buf)
             (should (= 0 capture-count))
             (with-current-buffer buf
-            (should (eq enkan-repl--tmux-mirror-state 'hidden)))))
+              (should (eq enkan-repl--tmux-mirror-state 'hidden)))))
       (kill-buffer buf))))
 
 (ert-deftest test-enkan-repl--terminal-tmux--mirror-refresh-skips-minibuffer ()

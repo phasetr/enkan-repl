@@ -104,7 +104,8 @@
 (declare-function enkan-repl--terminal-tmux--mirror-make "enkan-repl-terminal" (id &optional defer-refresh path))
 (declare-function enkan-repl--terminal-tmux--list-windows "enkan-repl-terminal" (session))
 (declare-function enkan-repl--terminal-tmux--list-window-cwds "enkan-repl-terminal" (session))
-(declare-function enkan-repl--terminal-tmux--make-id "enkan-repl-terminal" (session window))
+(declare-function enkan-repl--terminal-tmux--list-window-info "enkan-repl-terminal" (session))
+(declare-function enkan-repl--terminal-tmux--make-id "enkan-repl-terminal" (session window &optional pane))
 (declare-function enkan-repl--terminal-tmux--id-window "enkan-repl-terminal" (id))
 (declare-function enkan-repl--terminal-tmux-kill-workspace "enkan-repl-terminal" (workspace-id))
 (declare-function enkan-repl-tmux-refresh-workspace "enkan-repl-terminal" (&optional quiet))
@@ -558,20 +559,32 @@ manually edited or may legitimately end in numeric suffixes such as foo-2."
   "Build a minimal workspace plist from live tmux SESSION.
 This uses pane cwd basenames for project/session names when available.  tmux
 window names remain the aliases used to address live tmux windows."
-  (let ((window-cwds (if (fboundp 'enkan-repl--terminal-tmux--list-window-cwds)
-                         (enkan-repl--terminal-tmux--list-window-cwds session)
-                       (mapcar (lambda (window) (cons window nil))
-                               (enkan-repl--terminal-tmux--list-windows
-                                session))))
-        (counter 0)
-        session-list
-        aliases
-        target-directories
-        current-project)
-    (dolist (window-cwd window-cwds)
-      (let* ((window (car window-cwd))
-             (cwd (cdr window-cwd))
-             (id (enkan-repl--terminal-tmux--make-id session window))
+  (let* ((window-info
+          (and (fboundp 'enkan-repl--terminal-tmux--list-window-info)
+               (enkan-repl--terminal-tmux--list-window-info session)))
+         (window-infos (cond
+                        (window-info window-info)
+                        ((fboundp 'enkan-repl--terminal-tmux--list-window-cwds)
+                         (mapcar (lambda (window-cwd)
+                                   (list :window (car window-cwd)
+                                         :cwd (cdr window-cwd)))
+                                 (enkan-repl--terminal-tmux--list-window-cwds
+                                  session)))
+                        (t
+                         (mapcar (lambda (window)
+                                   (list :window window))
+                                 (enkan-repl--terminal-tmux--list-windows
+                                  session)))))
+         (counter 0)
+         session-list
+         aliases
+         target-directories
+         current-project)
+    (dolist (info window-infos)
+      (let* ((window (plist-get info :window))
+             (cwd (plist-get info :cwd))
+             (pane (plist-get info :pane))
+             (id (enkan-repl--terminal-tmux--make-id session window pane))
              (project (enkan-repl--tmux-reattach-project-name window cwd))
              (alias (if (and (stringp window) (not (string-empty-p window)))
                         window

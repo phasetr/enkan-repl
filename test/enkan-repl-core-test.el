@@ -75,13 +75,13 @@
   "Manual tmux reattach restores persisted state for live tmux sessions."
   (let ((saved-workspaces
          '(("01" :current-project "old"
-                  :session-list ((1 . "old"))
-                  :session-counter 1
-                  :project-aliases nil)
+            :session-list ((1 . "old"))
+            :session-counter 1
+            :project-aliases nil)
            ("02" :current-project "proj"
-                  :session-list ((1 . "proj"))
-                  :session-counter 1
-                  :project-aliases (("p" . "proj")))))
+            :session-list ((1 . "proj"))
+            :session-counter 1
+            :project-aliases (("p" . "proj")))))
         (enkan-repl-terminal-backend 'tmux)
         (enkan-repl--workspaces nil)
         (enkan-repl--current-workspace "01")
@@ -102,6 +102,8 @@
               ((symbol-function 'enkan-repl--terminal-tmux--list-window-cwds)
                (lambda (_session)
                  '(("window" . "/tmp/window"))))
+              ((symbol-function 'enkan-repl--terminal-tmux--list-window-info)
+               (lambda (_session) nil))
               ((symbol-function 'enkan-repl--terminal-list)
                (lambda ()
                  (list (format "enkan-%s:window"
@@ -147,6 +149,8 @@
                (lambda (_session)
                  '(("enkan-repl" . "/repo/enkan-repl")
                    ("worker-2" . "/repo/worker"))))
+              ((symbol-function 'enkan-repl--terminal-tmux--list-window-info)
+               (lambda (_session) nil))
               ((symbol-function 'enkan-repl--terminal-list)
                (lambda ()
                  (list "enkan-03:enkan-repl" "enkan-03:worker-2")))
@@ -205,6 +209,8 @@
                (lambda (_session)
                  '(("proj" . "/repo/proj-a")
                    ("proj-2" . "/repo/proj-b"))))
+              ((symbol-function 'enkan-repl--terminal-tmux--list-window-info)
+               (lambda (_session) nil))
               ((symbol-function 'enkan-repl--terminal-list)
                (lambda ()
                  '("enkan-04:proj" "enkan-04:proj-2")))
@@ -242,6 +248,8 @@
               ((symbol-function 'enkan-repl--terminal-tmux--list-window-cwds)
                (lambda (_session)
                  '(("foo-2" . "/repo/foo-2"))))
+              ((symbol-function 'enkan-repl--terminal-tmux--list-window-info)
+               (lambda (_session) nil))
               ((symbol-function 'enkan-repl--terminal-list)
                (lambda ()
                  '("enkan-06:foo-2")))
@@ -280,6 +288,8 @@
                   ((symbol-function 'enkan-repl--terminal-tmux--list-window-cwds)
                    (lambda (_session)
                      '(("enkan-repl" . "/repo/enkan-repl"))))
+                  ((symbol-function 'enkan-repl--terminal-tmux--list-window-info)
+                   (lambda (_session) nil))
                   ((symbol-function 'enkan-repl--terminal-list)
                    (lambda ()
                      '("enkan-03:enkan-repl")))
@@ -320,9 +330,9 @@
   "Manual tmux reattach should add live cwd paths to persisted workspaces."
   (let ((saved-workspaces
          '(("05" :current-project "er"
-                  :session-list ((1 . "er"))
-                  :session-counter 1
-                  :project-aliases (("er" . "er")))))
+            :session-list ((1 . "er"))
+            :session-counter 1
+            :project-aliases (("er" . "er")))))
         (enkan-repl-terminal-backend 'tmux)
         (enkan-repl--workspaces nil)
         (enkan-repl--current-workspace nil)
@@ -339,6 +349,8 @@
               ((symbol-function 'enkan-repl--terminal-tmux--list-window-cwds)
                (lambda (_session)
                  '(("er" . "/Users/me/dev/enkan-repl"))))
+              ((symbol-function 'enkan-repl--terminal-tmux--list-window-info)
+               (lambda (_session) nil))
               ((symbol-function 'enkan-repl--terminal-list)
                (lambda () nil))
               ((symbol-function 'enkan-repl-state-save)
@@ -356,17 +368,17 @@
   "Reattach should keep cwd addressable when tmux window names differ."
   (let ((saved-workspaces
          '(("02" :current-project "lat"
-                  :session-list ((1 . "lat"))
-                  :session-counter 0
-                  :project-aliases (("lat" . "lat"))
-                  :target-directories
-                  (("lattice-system" . ("lattice-system" . "/old/lat"))))
+            :session-list ((1 . "lat"))
+            :session-counter 0
+            :project-aliases (("lat" . "lat"))
+            :target-directories
+            (("lattice-system" . ("lattice-system" . "/old/lat"))))
            ("05" :current-project "er"
-                  :session-list ((1 . "enkan-repl"))
-                  :session-counter 0
-                  :project-aliases (("er" . "enkan-repl"))
-                  :target-directories
-                  (("enkan-repl" . ("enkan-repl" . "/old/er"))))))
+            :session-list ((1 . "enkan-repl"))
+            :session-counter 0
+            :project-aliases (("er" . "enkan-repl"))
+            :target-directories
+            (("enkan-repl" . ("enkan-repl" . "/old/er"))))))
         (enkan-repl-terminal-backend 'tmux)
         (enkan-repl--workspaces nil)
         (enkan-repl--current-workspace nil)
@@ -387,6 +399,8 @@
                    '(("lattice-system" . "/Users/me/dev/lattice-system")))
                   ((string= session "enkan-05")
                    '(("enkan-repl" . "/Users/me/dev/enkan-repl"))))))
+              ((symbol-function 'enkan-repl--terminal-tmux--list-window-info)
+               (lambda (_session) nil))
               ((symbol-function 'enkan-repl--terminal-list)
                (lambda () nil))
               ((symbol-function 'enkan-repl-state-save)
@@ -408,19 +422,19 @@
   "Manual tmux reattach recreates mirrors even when state is already current."
   (let* ((saved-workspaces
           '(("01" :current-project "old"
-                   :session-list ((1 . "old"))
-                   :session-counter 1
-                   :project-aliases nil
-                   :target-directories
-                   (("old" . ("old" . "/tmp/window"))
-                    ("window" . ("window" . "/tmp/window"))))
+             :session-list ((1 . "old"))
+             :session-counter 1
+             :project-aliases nil
+             :target-directories
+             (("old" . ("old" . "/tmp/window"))
+              ("window" . ("window" . "/tmp/window"))))
             ("02" :current-project "proj"
-                   :session-list ((1 . "proj"))
-                   :session-counter 1
-                   :project-aliases nil
-                   :target-directories
-                   (("proj" . ("proj" . "/tmp/window"))
-                    ("window" . ("window" . "/tmp/window"))))))
+             :session-list ((1 . "proj"))
+             :session-counter 1
+             :project-aliases nil
+             :target-directories
+             (("proj" . ("proj" . "/tmp/window"))
+              ("window" . ("window" . "/tmp/window"))))))
          (enkan-repl-terminal-backend 'tmux)
          (enkan-repl--workspaces saved-workspaces)
          (enkan-repl--current-workspace "02")
@@ -440,6 +454,8 @@
               ((symbol-function 'enkan-repl--terminal-tmux--list-window-cwds)
                (lambda (_session)
                  '(("window" . "/tmp/window"))))
+              ((symbol-function 'enkan-repl--terminal-tmux--list-window-info)
+               (lambda (_session) nil))
               ((symbol-function 'enkan-repl--terminal-list)
                (lambda ()
                  (list (format "enkan-%s:window"
@@ -511,7 +527,7 @@
 (ert-deftest test-enkan-repl--find-directory-by-project-name ()
   "Test finding directory by project name."
   (let ((enkan-repl-projects '("/home/user/my-project"
-                                "/home/user/another-project"))
+                               "/home/user/another-project"))
         (enkan-repl-target-directories '("/opt/special-project")))
     ;; The function checks target-directories first
     (let ((result (enkan-repl--find-directory-by-project-name "special-project")))

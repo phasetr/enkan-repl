@@ -368,18 +368,32 @@ or nil on non-zero exit.  Otherwise return t on zero exit, nil on non-zero."
 
 (defun enkan-repl--terminal-tmux--list-window-cwds (session)
   "Return list of (WINDOW . CWD) pairs in tmux SESSION."
+  (mapcar
+   (lambda (info)
+     (cons (plist-get info :window)
+           (plist-get info :cwd)))
+   (enkan-repl--terminal-tmux--list-window-info session)))
+
+(defun enkan-repl--terminal-tmux--list-window-info (session)
+  "Return plist entries describing tmux windows in SESSION.
+Each entry contains :window, :cwd, and :pane.  :pane is the stable tmux
+pane id (for example, \"%12\") used for command targets."
   (let ((out (enkan-repl--terminal-tmux--call
               (list "list-windows" "-t" session "-F"
-                    "#{window_name}\t#{pane_current_path}")
+                    "#{window_name}\t#{pane_current_path}\t#{pane_id}")
               t)))
     (when (and out (not (string-empty-p out)))
       (delq
        nil
        (mapcar
         (lambda (line)
-          (pcase-let ((`(,window ,cwd) (split-string line "\t")))
-            (when (and window cwd (not (string-empty-p window)))
-              (cons window (unless (string-empty-p cwd) cwd)))))
+          (pcase-let ((`(,window ,cwd ,pane) (split-string line "\t")))
+            (when (and window (not (string-empty-p window)))
+              (list :window window
+                    :cwd (unless (string-empty-p cwd) cwd)
+                    :pane (and pane
+                               (not (string-empty-p pane))
+                               pane)))))
         (split-string out "\n" t))))))
 
 (defun enkan-repl--terminal-tmux--derive-base-name (dir)
@@ -399,19 +413,37 @@ Tries BASE, then BASE-2, BASE-3, ... until an unused name is found."
       (setq candidate (format "%s-%d" base n)))
     candidate))
 
-(defun enkan-repl--terminal-tmux--make-id (session window)
-  "Return tmux target identifier for SESSION:WINDOW."
-  (format "%s:%s" session window))
+(defun enkan-repl--terminal-tmux--make-id (session window &optional pane)
+  "Return enkan tmux identifier for SESSION, WINDOW, and optional PANE.
+When PANE is available, the identifier keeps WINDOW for Emacs-side metadata
+but tmux commands target the stable PANE id.  This avoids tmux parsing window
+names such as dr-remote.jp as pane selectors."
+  (if (and (stringp pane) (not (string-empty-p pane)))
+      (format "%s:%s|%s" session window pane)
+    (format "%s:%s" session window)))
 
 (defun enkan-repl--terminal-tmux--id-window (id)
-  "Return the window component of tmux ID (after the colon)."
+  "Return the window component of tmux ID."
   (when (and (stringp id) (string-match ":\\(.+\\)$" id))
+    (let ((window (match-string 1 id)))
+      (if (string-match "\\`\\(.*\\)|%[0-9]+\\'" window)
+          (match-string 1 window)
+        window))))
+
+(defun enkan-repl--terminal-tmux--id-pane (id)
+  "Return the pane id component of tmux ID, or nil for legacy IDs."
+  (when (and (stringp id) (string-match "|\\(%[0-9]+\\)\\'" id))
     (match-string 1 id)))
 
 (defun enkan-repl--terminal-tmux--id-session (id)
   "Return the session component of tmux ID (before the colon)."
   (when (and (stringp id) (string-match "^\\([^:]+\\):" id))
     (match-string 1 id)))
+
+(defun enkan-repl--terminal-tmux--target (id)
+  "Return the actual tmux target for enkan tmux ID."
+  (or (enkan-repl--terminal-tmux--id-pane id)
+      id))
 
 (defun enkan-repl--terminal-tmux-start (dir)
   "Tmux backend: start a new session/window in DIR for current workspace.
@@ -426,27 +458,37 @@ target identifier (e.g. \"enkan-01:lat\")."
     (cond
      ;; Session does not exist: create it with the first window in DIR.
      ((not (enkan-repl--terminal-tmux--has-session session))
-      (unless (enkan-repl--terminal-tmux--call
-               (list "new-session" "-d" "-s" session "-c" cdir "-n" base))
-        (user-error "Tmux new-session failed for %s" session))
-      (enkan-repl--terminal-tmux--make-id session base))
+      (let ((pane (enkan-repl--terminal-tmux--call
+                   (list "new-session" "-d" "-P" "-F" "#{pane_id}"
+                         "-s" session "-c" cdir "-n" base)
+                   t)))
+        (unless (and pane (not (string-empty-p pane)))
+          (user-error "Tmux new-session failed for %s" session))
+        (enkan-repl--terminal-tmux--make-id session base pane)))
      ;; Session exists: add a new window with a non-colliding name.
      (t
       (let ((win (enkan-repl--terminal-tmux--next-instance-name session base)))
-        (unless (enkan-repl--terminal-tmux--call
-                 (list "new-window" "-t" session "-n" win "-c" cdir))
-          (user-error "Tmux new-window failed for %s:%s" session win))
-        (enkan-repl--terminal-tmux--make-id session win))))))
+        (let ((pane (enkan-repl--terminal-tmux--call
+                     (list "new-window" "-P" "-F" "#{pane_id}"
+                           "-t" session "-n" win "-c" cdir)
+                     t)))
+          (unless (and pane (not (string-empty-p pane)))
+            (user-error "Tmux new-window failed for %s:%s" session win))
+          (enkan-repl--terminal-tmux--make-id session win pane)))))))
 
 (defun enkan-repl--terminal-tmux-send (id text &optional newline)
   "Tmux backend: send TEXT to ID via send-keys -l.
 When NEWLINE is non-nil, follow with an Enter key.  Returns t on success."
   (when (and id text)
     (and (enkan-repl--terminal-tmux--call
-          (list "send-keys" "-t" id "-l" text))
+          (list "send-keys" "-t"
+                (enkan-repl--terminal-tmux--target id)
+                "-l" text))
          (or (not newline)
              (enkan-repl--terminal-tmux--call
-              (list "send-keys" "-t" id "Enter"))))))
+              (list "send-keys" "-t"
+                    (enkan-repl--terminal-tmux--target id)
+                    "Enter"))))))
 
 (defun enkan-repl--terminal-tmux-send-key (id key)
   "Tmux backend: send special KEY (`escape', `enter', integer 1..9) to ID."
@@ -455,29 +497,42 @@ When NEWLINE is non-nil, follow with an Enter key.  Returns t on success."
                ('enter  "Enter")
                ((pred integerp) (number-to-string key))
                (_ (user-error "Unsupported terminal key: %S" key)))))
-    (enkan-repl--terminal-tmux--call (list "send-keys" "-t" id arg))))
+    (enkan-repl--terminal-tmux--call
+     (list "send-keys" "-t" (enkan-repl--terminal-tmux--target id) arg))))
 
 (defun enkan-repl--terminal-tmux-alive-p (id)
   "Tmux backend: t if SESSION:WINDOW described by ID still exists."
   (when id
     (let ((session (enkan-repl--terminal-tmux--id-session id))
+          (pane (enkan-repl--terminal-tmux--id-pane id))
           (window  (enkan-repl--terminal-tmux--id-window id)))
-      (and session window
+      (and session
            (enkan-repl--terminal-tmux--has-session session)
-           (member window (enkan-repl--terminal-tmux--list-windows session))
+           (if pane
+               (enkan-repl--terminal-tmux--call
+                (list "display-message" "-p" "-t" pane "#{pane_id}")
+                t)
+             (and window
+                  (member window
+                          (enkan-repl--terminal-tmux--list-windows session))))
            t))))
 
 (defun enkan-repl--terminal-tmux-list ()
   "Tmux backend: list all window identifiers in the current workspace's session."
   (let ((session (enkan-repl--terminal-tmux--workspace-session)))
     (when (and session (enkan-repl--terminal-tmux--has-session session))
-      (mapcar (lambda (w) (enkan-repl--terminal-tmux--make-id session w))
-              (enkan-repl--terminal-tmux--list-windows session)))))
+      (mapcar (lambda (info)
+                (enkan-repl--terminal-tmux--make-id
+                 session
+                 (plist-get info :window)
+                 (plist-get info :pane)))
+              (enkan-repl--terminal-tmux--list-window-info session)))))
 
 (defun enkan-repl--terminal-tmux-kill (id)
   "Tmux backend: kill the window described by ID."
   (when id
-    (enkan-repl--terminal-tmux--call (list "kill-window" "-t" id))))
+    (enkan-repl--terminal-tmux--call
+     (list "kill-window" "-t" (enkan-repl--terminal-tmux--target id)))))
 
 ;;;;; tmux mirror buffer
 
@@ -741,24 +796,31 @@ tmux capture process."
             0.2))
          (out (enkan-repl--terminal-tmux--call
                (list "list-windows" "-t" session "-F"
-                     "#{window_name}\t#{window_bell_flag}")
+                     "#{window_name}\t#{pane_id}\t#{window_bell_flag}")
                t)))
     (when (stringp out)
       (delq
        nil
        (mapcar
         (lambda (line)
-          (pcase-let ((`(,window ,flag) (split-string line "\t")))
-            (when (and window (string= flag "1"))
-              (enkan-repl--terminal-tmux--make-id session window))))
+          (let ((fields (split-string line "\t")))
+            (pcase fields
+              (`(,window ,pane ,flag)
+               (when (and window (string= flag "1"))
+                 (enkan-repl--terminal-tmux--make-id session window pane)))
+              (`(,window ,flag)
+               (when (and window (string= flag "1"))
+                 (enkan-repl--terminal-tmux--make-id session window))))))
         (split-string out "\n" t))))))
 
 (defun enkan-repl--terminal-tmux--all-targets (session)
   "Return all tmux target ids in SESSION."
-  (let ((windows (enkan-repl--terminal-tmux--list-windows session)))
-    (mapcar (lambda (window)
-              (enkan-repl--terminal-tmux--make-id session window))
-            windows)))
+  (mapcar (lambda (info)
+            (enkan-repl--terminal-tmux--make-id
+             session
+             (plist-get info :window)
+             (plist-get info :pane)))
+          (enkan-repl--terminal-tmux--list-window-info session)))
 
 (defun enkan-repl--terminal-tmux--alert-capture (target)
   "Return a small bounded capture from TARGET for alert detection."
@@ -777,7 +839,7 @@ tmux capture process."
          (out (enkan-repl--terminal-tmux--call
                (list "capture-pane" "-p" "-J" "-S"
                      (format "-%d" lines)
-                     "-t" target)
+                     "-t" (enkan-repl--terminal-tmux--target target))
                t)))
     (when (stringp out)
       (if (and max-chars (> (length out) max-chars))
@@ -1112,7 +1174,8 @@ CALLBACK receives the cwd string, or nil on failure."
     (user-error "Tmux executable not found: %s" enkan-repl-tmux-executable))
   (let* ((output-buffer (generate-new-buffer " *enkan-repl tmux cwd*"))
          (command (list enkan-repl-tmux-executable
-                        "display-message" "-p" "-t" id
+                        "display-message" "-p" "-t"
+                        (enkan-repl--terminal-tmux--target id)
                         "#{pane_current_path}")))
     (make-process
      :name (format "enkan-tmux-cwd %s" id)
@@ -1285,7 +1348,7 @@ arguments: CONTENT, or nil on failure, and the tmux process exit status."
   (let* ((command (list enkan-repl-tmux-executable
                         "capture-pane" "-p" "-J" "-S"
                         (format "-%d" (max 0 lines))
-                        "-t" id))
+                        "-t" (enkan-repl--terminal-tmux--target id)))
          (max-chars (and (integerp enkan-repl-tmux-mirror-max-chars)
                          (> enkan-repl-tmux-mirror-max-chars 0)
                          enkan-repl-tmux-mirror-max-chars))
@@ -1295,15 +1358,15 @@ arguments: CONTENT, or nil on failure, and the tmux process exit status."
          process)
     (cl-labels
         ((finish
-          (status)
-          (unless done
-            (setq done t)
-            (when timer
-              (cancel-timer timer)
-              (setq timer nil))
-            (funcall callback
-                     (and (integerp status) (zerop status) content)
-                     status))))
+           (status)
+           (unless done
+             (setq done t)
+             (when timer
+               (cancel-timer timer)
+               (setq timer nil))
+             (funcall callback
+                      (and (integerp status) (zerop status) content)
+                      status))))
       (setq process
             (make-process
              :name (format "enkan-tmux-capture %s" id)
