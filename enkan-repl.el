@@ -155,6 +155,10 @@
 ;; Declare external functions from hmenu to silence byte-compiler when not loaded
 (declare-function hmenu "hmenu" (prompt choices))
 
+;; Optional example layout command.  It is loaded by examples/keybinding.el.
+(declare-function enkan-repl-setup-current-project-layout
+                  "examples/window-layouts" ())
+
 ;; Declare external functions to avoid byte-compiler warnings
 (declare-function eat "eat" (&optional program))
 (declare-function eat--send-string "eat" (process string))
@@ -1579,6 +1583,21 @@ Implemented as pure function, side effects are handled by upper functions."
           (cons project-name project-path))
       (error "Project alias '%s' not found in registry" alias))))
 
+(defun enkan-repl--maybe-setup-current-project-layout (&optional context)
+  "Run the optional current project layout command.
+CONTEXT is included in error messages to identify the caller.  The layout
+command lives in examples/window-layouts.el, so core setup only calls it when
+it has been loaded by user configuration."
+  (when (and enkan-repl--current-workspace
+             (enkan-repl--ws-current-project)
+             (fboundp 'enkan-repl-setup-current-project-layout))
+    (condition-case err
+        (enkan-repl-setup-current-project-layout)
+      (error
+       (message "Failed to set up current project layout%s: %s"
+                (if context (format " after %s" context) "")
+                (error-message-string err))))))
+
 ;;;###autoload
 (defun enkan-repl-setup ()
   "Set up window layout based on context.
@@ -1614,7 +1633,8 @@ Category: Session Controller"
             (enkan-repl--setup-create-workspace-with-project nil project-name)
             (let ((old-state (list (enkan-repl--ws-current-project)
                                    (copy-tree (enkan-repl--ws-session-list))
-                                   (enkan-repl--ws-session-counter))))
+                                   (enkan-repl--ws-session-counter)))
+                  (setup-succeeded nil))
               (with-output-to-temp-buffer buffer-name
                 (princ (format "=== ENKAN-REPL AUTO SETUP: %s ===\n\n" project-name))
                 (condition-case err
@@ -1642,11 +1662,14 @@ Category: Session Controller"
                                    (length alias-list)))))
                       ;; Set final project configuration
                       (enkan-repl--ws-set-current-project project-name)
+                      (setq setup-succeeded t)
                       (princ (format "\n✅ Setup completed for project: %s\n" project-name))
                       (princ "Arrange your preferred window configuration!\n\n")
                       (princ "=== END SETUP ===\n"))
                   (error
                    (princ (format "\n❌ Setup failed: %s\n" (error-message-string err))))))
+              (when setup-succeeded
+                (enkan-repl--maybe-setup-current-project-layout "setup"))
               (message "Center file setup complete with workspace %s" enkan-repl--current-workspace)))
         (message "Center file not configured or no projects defined")))))
 
@@ -2493,6 +2516,7 @@ Uses `hmenu' if available to show workspace ID with its project."
           (enkan-repl--save-workspace-state)
           (setq enkan-repl--current-workspace target-id)
           (enkan-repl--load-workspace-state target-id)
+          (enkan-repl--maybe-setup-current-project-layout "workspace switch")
           (message "Switched to workspace %s" target-id))))))
 
 ;;;###autoload
