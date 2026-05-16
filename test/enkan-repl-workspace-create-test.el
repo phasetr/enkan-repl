@@ -64,6 +64,7 @@
              (enkan-repl--current-workspace nil)
              (buffer-file-name-result "/path/to/file.input.txt")
              (default-directory "/path/to/project/")
+             (layout-called nil)
              ((symbol-function 'buffer-file-name) (lambda () buffer-file-name-result))
              ((symbol-function 'enkan-repl--is-standard-file-path) (lambda (file dir) t))
              ((symbol-function 'enkan-repl--initialize-default-workspace) (lambda ()))
@@ -72,6 +73,11 @@
              ((symbol-function 'other-window) (lambda (n)))
              ((symbol-function 'enkan-repl-start-session) (lambda (&optional force)))
              ((symbol-function 'enkan-repl-open-project-input-file) (lambda ()))
+             ((symbol-function 'enkan-repl-setup-current-project-layout)
+              (lambda ()
+                (setq layout-called
+                      (list enkan-repl--current-workspace
+                            enkan-repl--current-project))))
              ((symbol-function 'message) (lambda (&rest args) nil)))
     ;; Execute enkan-repl-setup
     (enkan-repl-setup)
@@ -80,7 +86,8 @@
     (should (assoc "01" enkan-repl--workspaces))
     ;; Verify project name from directory
     (let ((ws-state (cdr (assoc "01" enkan-repl--workspaces))))
-      (should (string= (plist-get ws-state :current-project) "project")))))
+      (should (string= (plist-get ws-state :current-project) "project")))
+    (should (equal layout-called '("01" "project")))))
 
 (ert-deftest test-enkan-repl-setup-creates-workspace-center-file ()
   "Test that enkan-repl-setup creates workspace for center file."

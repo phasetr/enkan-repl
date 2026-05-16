@@ -6,6 +6,7 @@
 ;;; Code:
 
 (require 'ert)
+(require 'cl-lib)
 (require 'enkan-repl)
 (require 'enkan-repl-workspace-list)
 
@@ -136,6 +137,40 @@
     
     ;; Clean up
     (kill-buffer "*Enkan Workspace List*")))
+
+(ert-deftest test-workspace-list-switch-runs-current-project-layout ()
+  "Switching from the workspace list should apply the loaded workspace layout."
+  (let ((enkan-repl--workspaces
+         '(("01" . (:current-project "project-a"
+                    :project-aliases nil
+                    :session-list ((1 . "project-a"))
+                    :session-counter 1))
+           ("02" . (:current-project "project-b"
+                    :project-aliases nil
+                    :session-list ((1 . "project-b") (2 . "project-b"))
+                    :session-counter 2))))
+        (enkan-repl--current-workspace "01")
+        (enkan-repl--current-project "project-a")
+        (enkan-repl-session-list '((1 . "project-a")))
+        (enkan-repl--session-counter 1)
+        (enkan-repl-project-aliases nil)
+        (layout-called nil))
+    (with-temp-buffer
+      (insert (propertize "02 [project-b]" 'workspace-id "02"))
+      (goto-char (point-min))
+      (cl-letf (((symbol-function 'quit-window) (lambda (&rest _args) nil))
+                ((symbol-function 'enkan-repl-setup-current-project-layout)
+                 (lambda ()
+                   (setq layout-called
+                         (list enkan-repl--current-workspace
+                               enkan-repl--current-project
+                               enkan-repl-session-list))))
+                ((symbol-function 'message) (lambda (&rest _args) nil)))
+        (enkan-repl-workspace-list-switch-to-workspace)
+        (should (equal enkan-repl--current-workspace "02"))
+        (should (equal layout-called
+                       '("02" "project-b"
+                         ((1 . "project-b") (2 . "project-b")))))))))
 
 (ert-deftest test-workspace-list-empty ()
   "Test workspace list when no workspaces exist."

@@ -44,6 +44,37 @@
       (should (equal 1 enkan-repl--session-counter))
       (should (equal "other" enkan-repl--current-project)))))
 
+(ert-deftest test-workspace-delete-current-runs-current-project-layout ()
+  "Deleting the current workspace should apply layout for the loaded remainder."
+  (let ((enkan-repl--workspaces
+         '(("01" . (:current-project "test"
+                    :session-list ((1 . "test"))
+                    :session-counter 1
+                    :project-aliases nil))
+           ("02" . (:current-project "other"
+                    :session-list ((1 . "other") (2 . "other"))
+                    :session-counter 2
+                    :project-aliases nil))))
+        (enkan-repl--current-workspace "01")
+        (enkan-repl-session-list '((1 . "test")))
+        (enkan-repl--session-counter 1)
+        (enkan-repl--current-project "test")
+        (enkan-repl-project-aliases nil)
+        (layout-called nil))
+    (cl-letf (((symbol-function 'enkan-repl--stop-workspace-terminals)
+               (lambda (_workspace-id)
+                 (list :buffers-killed 0 :tmux-killed nil)))
+              ((symbol-function 'enkan-repl-setup-current-project-layout)
+               (lambda ()
+                 (setq layout-called
+                       (list enkan-repl--current-workspace
+                             enkan-repl--current-project
+                             enkan-repl-session-list)))))
+      (enkan-repl--delete-workspace-completely "01")
+      (should (equal layout-called
+                     '("02" "other"
+                       ((1 . "other") (2 . "other"))))))))
+
 (ert-deftest test-workspace-delete-preserves-target-registry-for-new-setup ()
   "Deleting a workspace must not make unrelated project aliases unusable."
   (let ((enkan-repl--workspaces

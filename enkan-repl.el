@@ -1624,6 +1624,7 @@ Category: Session Controller"
           ;; Move back to left window and open project input file
           (other-window -1)
           (enkan-repl-open-project-input-file)
+          (enkan-repl--maybe-setup-current-project-layout "setup")
           (message "Basic window layout setup complete with workspace %s" enkan-repl--current-workspace))
       ;; Center file mode: check if center file is specified as non-empty string
       (if (enkan-repl--is-center-file-path enkan-repl-center-file enkan-repl-projects)
@@ -2055,7 +2056,9 @@ new default workspace is created via `enkan-repl-setup'."
         (cond
          (remaining-workspaces
           (setq enkan-repl--current-workspace (car remaining-workspaces))
-          (enkan-repl--load-workspace-state enkan-repl--current-workspace))
+          (enkan-repl--load-workspace-state enkan-repl--current-workspace)
+          (enkan-repl--maybe-setup-current-project-layout
+           "workspace delete"))
          (t
           (enkan-repl-setup)))))
     (list :deleted t
