@@ -66,5 +66,20 @@
         (when (buffer-live-p buffer)
           (kill-buffer buffer))))))
 
+(ert-deftest test-enkan-repl--get-workspace-buffer-count-tmux-fallback-name ()
+  "Workspace counts should include tmux fallback buffers by tmux id workspace."
+  (let ((tmux (generate-new-buffer "*tmux enkan-02:lattice-system|%1*")))
+    (unwind-protect
+        (progn
+          (with-current-buffer tmux
+            (setq-local enkan-repl--tmux-mirror-id
+                        "enkan-02:lattice-system|%1"))
+          (should (= 1 (enkan-repl--get-workspace-buffer-count-pure
+                        (list tmux) "02")))
+          (should (= 0 (enkan-repl--get-workspace-buffer-count-pure
+                        (list tmux) "03"))))
+      (when (buffer-live-p tmux)
+        (kill-buffer tmux)))))
+
 (provide 'enkan-repl-workspace-buffer-count-test)
 ;;; enkan-repl-workspace-buffer-count-test.el ends here

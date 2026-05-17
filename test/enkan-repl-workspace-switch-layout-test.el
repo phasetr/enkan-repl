@@ -201,6 +201,30 @@
       (when (buffer-live-p good)
         (kill-buffer good)))))
 
+(ert-deftest test-workspace-layout-counts-tmux-fallback-name-by-id ()
+  "C-M-l should count tmux mirrors before cwd-based buffer renaming finishes."
+  (let* ((project-dir "/Users/sekine/dev/self/lattice-system/")
+         (good (generate-new-buffer "*tmux enkan-02:lattice-system|%1*"))
+         (enkan-repl--current-workspace "02")
+         (enkan-repl--current-project "lat")
+         (enkan-repl-session-list '((1 . "lat")))
+         (enkan-repl-target-directories
+          `(("lat" . ("lat" . ,project-dir))))
+         (called nil))
+    (unwind-protect
+        (progn
+          (with-current-buffer good
+            (setq-local enkan-repl--tmux-mirror-id
+                        "enkan-02:lattice-system|%1"))
+          (should (equal (list good)
+                         (enkan-repl--registered-session-buffers)))
+          (cl-letf (((symbol-function 'enkan-repl-setup-1session-layout)
+                     (lambda () (setq called 'one))))
+            (enkan-repl-setup-current-project-layout)
+            (should (eq called 'one))))
+      (when (buffer-live-p good)
+        (kill-buffer good)))))
+
 (ert-deftest test-workspace-layout-deduplicates-session-list-buffer ()
   "C-M-l should not count duplicate session entries resolving to one buffer."
   (let* ((project-dir "/Users/sekine/dev/self/enkan-repl/")

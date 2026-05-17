@@ -418,6 +418,48 @@
                                               #'string=))
                                   :target-directories)))))))
 
+(ert-deftest test-enkan-repl-tmux-reattach-restores-missing-session-list ()
+  "Reattach should restore sessions when persisted state lost session-list."
+  (let ((saved-workspaces
+         '(("02" :current-project "lat"
+            :session-list nil
+            :session-counter 0
+            :project-aliases ("lat")
+            :target-directories
+            (("lat" . ("lat" . "/Users/me/dev/lattice-system"))))))
+        (enkan-repl-terminal-backend 'tmux)
+        (enkan-repl--workspaces nil)
+        (enkan-repl--current-workspace nil)
+        (enkan-repl--current-project nil)
+        (enkan-repl-session-list nil)
+        (enkan-repl--session-counter 0)
+        (enkan-repl-project-aliases nil)
+        (enkan-repl-target-directories nil))
+    (cl-letf (((symbol-function 'enkan-repl-state-load)
+               (lambda (&optional _file)
+                 (list :workspaces saved-workspaces :current "02")))
+              ((symbol-function 'enkan-repl-state--list-live-tmux-sessions)
+               (lambda (_prefix)
+                 '("enkan-02")))
+              ((symbol-function 'enkan-repl--terminal-tmux--list-window-cwds)
+               (lambda (_session)
+                 '(("lattice-system" . "/Users/me/dev/lattice-system"))))
+              ((symbol-function 'enkan-repl--terminal-tmux--list-window-info)
+               (lambda (_session) nil))
+              ((symbol-function 'enkan-repl--terminal-list)
+               (lambda () nil))
+              ((symbol-function 'enkan-repl-state-save)
+               (lambda (&optional _file) t)))
+      (let ((result (enkan-repl-tmux-reattach)))
+        (should result)
+        (should (equal "02" enkan-repl--current-workspace))
+        (should (equal '((1 . "lat")) enkan-repl-session-list))
+        (should (= 1 enkan-repl--session-counter))
+        (should (equal '((1 . "lat"))
+                       (plist-get (cdr (assoc "02" enkan-repl--workspaces
+                                              #'string=))
+                                  :session-list)))))))
+
 (ert-deftest test-enkan-repl-tmux-reattach-ensures-already-current-state ()
   "Manual tmux reattach recreates mirrors even when state is already current."
   (let* ((saved-workspaces

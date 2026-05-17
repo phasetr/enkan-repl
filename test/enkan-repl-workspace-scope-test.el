@@ -79,6 +79,26 @@
       ;; Restore original workspace
       (setq enkan-repl--current-workspace original-ws))))
 
+(ert-deftest test-enkan-repl--get-available-buffers-tmux-fallback-workspace ()
+  "Available buffer filtering should use tmux id workspace for fallback names."
+  (let* ((enkan-repl--current-workspace "02")
+         (buffer-ws02 (generate-new-buffer "*tmux enkan-02:lattice-system|%1*"))
+         (buffer-ws03 (generate-new-buffer "*tmux enkan-03:lattice-system|%2*")))
+    (unwind-protect
+        (progn
+          (with-current-buffer buffer-ws02
+            (setq-local enkan-repl--tmux-mirror-id
+                        "enkan-02:lattice-system|%1"))
+          (with-current-buffer buffer-ws03
+            (setq-local enkan-repl--tmux-mirror-id
+                        "enkan-03:lattice-system|%2"))
+          (should (equal (enkan-repl--get-available-buffers
+                          (list buffer-ws02 buffer-ws03))
+                         (list buffer-ws02))))
+      (dolist (buffer (list buffer-ws02 buffer-ws03))
+        (when (buffer-live-p buffer)
+          (kill-buffer buffer))))))
+
 (ert-deftest test-enkan-repl--get-buffer-for-directory-with-workspace ()
   "Test that get-buffer-for-directory filters by workspace."
   ;; Save current workspace
@@ -109,6 +129,21 @@
             (kill-buffer buffer-ws02)))
       ;; Restore original workspace
       (setq enkan-repl--current-workspace original-ws))))
+
+(ert-deftest test-enkan-repl--get-buffer-for-directory-tmux-fallback ()
+  "Directory lookup should match tmux fallback buffers by window and workspace id."
+  (let* ((enkan-repl--current-workspace "02")
+         (buffer (generate-new-buffer "*tmux enkan-02:lattice-system|%1*")))
+    (unwind-protect
+        (progn
+          (with-current-buffer buffer
+            (setq-local enkan-repl--tmux-mirror-id
+                        "enkan-02:lattice-system|%1"))
+          (should (eq (enkan-repl--get-buffer-for-directory
+                       "/Users/sekine/dev/self/lattice-system/")
+                      buffer)))
+      (when (buffer-live-p buffer)
+        (kill-buffer buffer)))))
 
 (provide 'enkan-repl-workspace-scope-test)
 

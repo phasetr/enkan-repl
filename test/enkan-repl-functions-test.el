@@ -201,6 +201,27 @@
       (when (buffer-live-p buffer2)
         (kill-buffer buffer2)))))
 
+(ert-deftest test-enkan-repl--resolve-send-target-tmux-fallback-buffer ()
+  "Send target resolution should match tmux fallback buffers by tmux id."
+  (let* ((buffer (generate-new-buffer "*tmux enkan-02:lattice-system|%1*"))
+         (enkan-repl--current-workspace "02")
+         (projects '(("lat" . ("lat"))))
+         (target-directories
+          '(("lat" . ("lat" . "/Users/sekine/dev/self/lattice-system/")))))
+    (unwind-protect
+        (progn
+          (with-current-buffer buffer
+            (setq-local enkan-repl--tmux-mirror-id
+                        "enkan-02:lattice-system|%1"))
+          (let ((result (enkan-repl--resolve-send-target
+                         nil "lat" "lat" projects target-directories)))
+            (should (equal (plist-get result :status) 'selected))
+            (should (eq (plist-get result :buffer) buffer))
+            (should (equal (plist-get result :path)
+                           "/Users/sekine/dev/self/lattice-system/"))))
+      (when (buffer-live-p buffer)
+        (kill-buffer buffer)))))
+
 ;; Tests for enkan-repl--target-directory-info
 (ert-deftest test-enkan-repl--target-directory-info ()
   "Test unified project selection handling."
@@ -267,6 +288,27 @@
                  (lambda (path) (string-prefix-p "/valid" path)))))
     (should (equal (plist-get result :status) 'invalid))
     (should (equal (plist-get result :path) "/invalid/path"))))
+
+(ert-deftest test-enkan-repl--target-directory-info-tmux-fallback-buffer ()
+  "Prefix directory selection should recover the path for tmux fallback buffers."
+  (let* ((buffer (generate-new-buffer "*tmux enkan-02:lattice-system|%1*"))
+         (enkan-repl--current-workspace "02")
+         (projects '(("lat" . ("lat"))))
+         (target-directories
+          '(("lat" . ("lat" . "/Users/sekine/dev/self/lattice-system/")))))
+    (unwind-protect
+        (progn
+          (with-current-buffer buffer
+            (setq-local enkan-repl--tmux-mirror-id
+                        "enkan-02:lattice-system|%1"))
+          (let ((result (enkan-repl--target-directory-info
+                         "lat" projects target-directories
+                         "Select project:" #'stringp 1)))
+            (should (equal (plist-get result :status) 'selected))
+            (should (equal (plist-get result :path)
+                           "/Users/sekine/dev/self/lattice-system/"))))
+      (when (buffer-live-p buffer)
+        (kill-buffer buffer)))))
 
 (ert-deftest test-enkan-repl-open-project-directory-current-project-name ()
   "Open project directory when current project is a target project name."
