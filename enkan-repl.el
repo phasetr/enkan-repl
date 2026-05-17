@@ -98,6 +98,14 @@
 (declare-function enkan-repl-utils--encode-full-path "enkan-repl-utils" (path prefix separator))
 (declare-function enkan-repl-utils--decode-full-path "enkan-repl-utils" (encoded-name prefix separator))
 (declare-function enkan-repl--buffer-matches-directory "enkan-repl-utils" (buffer-name target-directory &optional instance))
+(declare-function enkan-repl--buffer-matches-target-p
+                  "enkan-repl-utils"
+                  (buffer workspace-id target-path &optional instance target-names))
+(declare-function enkan-repl--buffer-matches-workspace-p
+                  "enkan-repl-utils" (buffer workspace-id))
+(declare-function enkan-repl--buffer-tmux-id "enkan-repl-utils" (buffer))
+(declare-function enkan-repl--target-window-name-matches-p
+                  "enkan-repl-utils" (window names instance))
 (declare-function enkan-repl--buffer-alive-as-terminal-p "enkan-repl-utils" (buffer))
 (declare-function enkan-repl--terminal-tmux-alive-p "enkan-repl-terminal" (id))
 (declare-function enkan-repl--terminal-tmux-mirror-buffer-alive-p "enkan-repl-terminal" (buffer))
@@ -659,7 +667,33 @@ cwd values.  PERSISTED entries with aliases not present in LIVE are retained."
                       alias project-aliases)
                      (cdr (cdr entry)))))
        aliases live))
-     (t live))))
+	     (t live))))
+
+(defun enkan-repl--tmux-reattach-normalize-session-list (state live target-directories)
+  "Return session list for STATE reconciled with LIVE tmux data.
+Persisted session lists win when present.  When persisted state lost its
+session list, rebuild it from LIVE using TARGET-DIRECTORIES after alias
+normalization so project aliases such as lat -> lattice-system stay stable."
+  (or (plist-get state :session-list)
+      (let ((live-sessions (plist-get live :session-list)))
+        (cond
+         ((null live-sessions) nil)
+         ((= (length live-sessions) (length target-directories))
+          (cl-mapcar
+           (lambda (session-entry target-entry)
+             (let* ((entry-value (cdr session-entry))
+                    (target-info (cdr target-entry))
+                    (project (if (consp target-info)
+                                 (car target-info)
+                               (enkan-repl--session-entry-project
+                                entry-value)))
+                    (instance (enkan-repl--session-entry-instance
+                               entry-value)))
+               (cons (car session-entry)
+                     (enkan-repl--make-session-entry-value
+                      project instance))))
+           live-sessions target-directories))
+         (t live-sessions)))))
 
 (defun enkan-repl--tmux-reattach-merge-state (persisted live)
   "Merge one PERSISTED workspace state with one LIVE tmux-derived state."
@@ -671,10 +705,17 @@ cwd values.  PERSISTED entries with aliases not present in LIVE are retained."
          (target-directories
           (enkan-repl--tmux-reattach-merge-target-directories
            (plist-get persisted :target-directories)
-           live-target-directories)))
-    (if target-directories
-        (plist-put state :target-directories target-directories)
-      state)))
+           live-target-directories))
+         (session-list
+          (enkan-repl--tmux-reattach-normalize-session-list
+           state live live-target-directories)))
+    (when target-directories
+      (setq state (plist-put state :target-directories target-directories)))
+    (when (and (null (plist-get state :session-list))
+               session-list)
+      (setq state (plist-put state :session-list session-list))
+      (setq state (plist-put state :session-counter (length session-list))))
+    state))
 
 (defun enkan-repl--tmux-reattach-merge-workspaces (persisted live)
   "Merge PERSISTED and LIVE workspace alists.
@@ -1192,22 +1233,17 @@ matching buffer regardless of instance.
 Only returns buffers that belong to the current workspace."
   (let
       ((target-dir (or directory default-directory))
-       (current-ws enkan-repl--current-workspace)
+       (current-ws (or enkan-repl--current-workspace "01"))
        (matching-buffer nil))
     (cl-block search-buffers
       (dolist (buf (buffer-list))
         (let
-            ((name (buffer-name buf))
-             (eat-mode
-              (with-current-buffer buf
-                (and (boundp 'eat-mode) eat-mode))))
+            ((name (buffer-name buf)))
           (when
               (and (buffer-live-p buf)
-                   name     ; Ensure name is not nil
-                   ;; Check workspace match
-                   (enkan-repl--buffer-name-matches-workspace name current-ws)
-                   ;; Check for directory-specific enkan buffer using the buffer-name matcher
-                   (enkan-repl--buffer-matches-directory name target-dir instance))
+                   name
+                   (enkan-repl--buffer-matches-target-p
+                    buf current-ws target-dir instance nil))
             (setq matching-buffer buf)
             (cl-return-from search-buffers)))))
     matching-buffer))
@@ -1583,6 +1619,71 @@ Implemented as pure function, side effects are handled by upper functions."
           (cons project-name project-path))
       (error "Project alias '%s' not found in registry" alias))))
 
+(defun enkan-repl--restore-current-workspace-sessions-from-live-terminals ()
+  "Restore an empty current workspace session list from live tmux windows.
+This repairs stale persisted state where the workspace still has current project
+and target directory metadata, but `enkan-repl-session-list' was saved as nil.
+Returns non-nil when sessions were restored."
+  (condition-case nil
+      (when (and (eq enkan-repl-terminal-backend 'tmux)
+                 enkan-repl--current-workspace
+                 (enkan-repl--ws-current-project)
+                 (null (enkan-repl--ws-session-list))
+                 (fboundp 'enkan-repl--terminal-list)
+                 (fboundp 'enkan-repl--terminal-tmux--id-window))
+        (let* ((current-project (enkan-repl--ws-current-project))
+               (projects
+                (enkan-repl--projects-with-current-aliases
+                 enkan-repl-projects
+                 current-project
+                 enkan-repl-project-aliases))
+               (project-paths
+                (enkan-repl--get-project-paths-for-current
+                 current-project projects enkan-repl-target-directories))
+               (ids (enkan-repl--terminal-list))
+               (session-number 0)
+               session-list)
+          (dolist (project-path project-paths)
+            (let* ((alias (car project-path))
+                   (path (cdr project-path))
+                   (project-info
+                    (enkan-repl--get-project-info-from-directories
+                     alias enkan-repl-target-directories))
+                   (target-project (or (and (consp project-info)
+                                             (car project-info))
+                                       current-project))
+                   (instance (or (enkan-repl--target-alias-instance-for-path
+                                  alias path)
+                                 1))
+                   (target-names
+                    (delete-dups
+                     (delq nil
+                           (list alias current-project target-project
+                                 (enkan-repl--extract-project-name path)))))
+                   (id
+                    (cl-find-if
+                     (lambda (candidate)
+                       (enkan-repl--target-window-name-matches-p
+                        (enkan-repl--terminal-tmux--id-window candidate)
+                        target-names
+                        instance))
+                     ids)))
+              (when id
+                (setq session-number (1+ session-number))
+                (push (cons session-number
+                            (enkan-repl--make-session-entry-value
+                             target-project instance))
+                      session-list)
+                (when (fboundp 'enkan-repl--terminal-tmux--mirror-make)
+                  (ignore-errors
+                    (enkan-repl--terminal-tmux--mirror-make id t path))))))
+          (when session-list
+            (enkan-repl--ws-set-session-list (nreverse session-list))
+            (enkan-repl--ws-set-session-counter (length session-list))
+            (enkan-repl--save-workspace-state)
+            t)))
+    (error nil)))
+
 (defun enkan-repl--maybe-setup-current-project-layout (&optional context)
   "Run the optional current project layout command.
 CONTEXT is included in error messages to identify the caller.  The layout
@@ -1592,7 +1693,9 @@ it has been loaded by user configuration."
              (enkan-repl--ws-current-project)
              (fboundp 'enkan-repl-setup-current-project-layout))
     (condition-case err
-        (enkan-repl-setup-current-project-layout)
+        (progn
+          (enkan-repl--restore-current-workspace-sessions-from-live-terminals)
+          (enkan-repl-setup-current-project-layout))
       (error
        (message "Failed to set up current project layout%s: %s"
                 (if context (format " after %s" context) "")
@@ -1839,25 +1942,46 @@ Returns a plist with :status and other keys."
   (let* ((project-paths (when current-project
                           (enkan-repl--get-project-paths-for-current
                            current-project projects target-directories)))
-         ;; Helper function to convert path to buffer
-         (path-to-buffer (lambda (alias path)
-                           (get-buffer
-                            (enkan-repl--path->buffer-name
-                             path
-                             (enkan-repl--target-alias-instance-for-path
-                              alias path)))))
-         ;; Helper function to check if buffer exists
-         (get-active-buffers (lambda (paths)
-                               (cl-loop for (alias . path) in paths
-                                        for buffer = (funcall path-to-buffer alias path)
-                                        when buffer
-                                        collect (cons alias buffer)))))
+         (workspace-id (or enkan-repl--current-workspace "01"))
+         ;; Helper function to convert target metadata to a live buffer.
+         (path-to-buffer
+          (lambda (alias path)
+            (let* ((project-info
+                    (enkan-repl--get-project-info-from-directories
+                     alias target-directories))
+                   (target-project (and (consp project-info)
+                                        (car project-info)))
+                   (instance
+                    (enkan-repl--target-alias-instance-for-path
+                     alias path))
+                   (target-names
+                    (delete-dups
+                     (delq nil
+                           (list alias current-project target-project)))))
+              (cl-find-if
+               (lambda (buffer)
+                 (enkan-repl--buffer-matches-target-p
+                  buffer workspace-id path instance target-names))
+               (buffer-list)))))
+         ;; Helper function to check if buffer exists.
+         (get-active-buffers
+          (lambda (paths)
+            (cl-loop for (alias . path) in paths
+                     for buffer = (funcall path-to-buffer alias path)
+                     when buffer
+                     collect (list :alias alias
+                                   :buffer buffer
+                                   :path path)))))
     ;; Check if we have active buffers
     (let ((active-pairs (if project-paths
                             (funcall get-active-buffers project-paths)
                           ;; Fallback to all available buffers
                           (cl-loop for buffer in (enkan-repl--get-available-buffers (buffer-list))
-                                   collect (cons nil buffer)))))
+                                   collect (list :alias nil
+                                                 :buffer buffer
+                                                 :path (and (buffer-name buffer)
+                                                            (enkan-repl--buffer-name->path
+                                                             (buffer-name buffer))))))))
       (if (null active-pairs)
           (list :status 'no-buffers
                 :message (enkan-repl--no-active-sessions-message))
@@ -1866,27 +1990,43 @@ Returns a plist with :status and other keys."
          ;; Priority 1: prefix-arg based selection
          ((and pfx (numberp pfx) (> pfx 0))
           (if (<= pfx (length active-pairs))
-              (list :status 'selected
-                    :buffer (cdr (nth (1- pfx) active-pairs)))
+              (let ((pair (nth (1- pfx) active-pairs)))
+                (list :status 'selected
+                      :buffer (plist-get pair :buffer)
+                      :path (plist-get pair :path)))
             (list :status 'invalid
                   :message (format "Invalid prefix arg: %d (only %d buffers available)"
                                    pfx (length active-pairs)))))
          ;; Priority 2: alias based selection
          ((and resolved-alias (stringp resolved-alias) (not (string= "" resolved-alias)))
-          (let ((matching-pair (assoc resolved-alias active-pairs)))
+          (let ((matching-pair
+                 (cl-find resolved-alias active-pairs
+                          :key (lambda (pair)
+                                 (plist-get pair :alias))
+                          :test #'string=)))
             (if matching-pair
                 (list :status 'selected
-                      :buffer (cdr matching-pair))
+                      :buffer (plist-get matching-pair :buffer)
+                      :path (plist-get matching-pair :path))
               (list :status 'invalid
                     :message (format "No buffer found for alias '%s'" resolved-alias)))))
          ;; Priority 3: auto-select if single buffer
          ((= 1 (length active-pairs))
-          (list :status 'single
-                :buffer (cdr (car active-pairs))))
+          (let ((pair (car active-pairs)))
+            (list :status 'single
+                  :buffer (plist-get pair :buffer)
+                  :path (plist-get pair :path))))
          ;; Priority 4: multiple buffers - need interactive selection
          (t
           (list :status 'needs-selection
-                :buffers (mapcar #'cdr active-pairs))))))))
+                :buffers (mapcar (lambda (pair)
+                                   (plist-get pair :buffer))
+                                 active-pairs)
+                :buffer-paths
+                (mapcar (lambda (pair)
+                          (cons (plist-get pair :buffer)
+                                (plist-get pair :path)))
+                        active-pairs))))))))
 
 (defun enkan-repl--select-project (project-paths current-project prompt _action-fn validation-fn)
   "Handle project selection based on PROJECT-PATHS.
@@ -1960,18 +2100,21 @@ Returns a plist with :status and other relevant keys."
            (let* ((buffer (plist-get resolution :buffer))
                   (buffer-name (buffer-name buffer))
                   ;; Extract path from buffer name format: *ws:01 enkan:/path/to/project*
-                  (decoded-path (enkan-repl--buffer-name->path buffer-name)))
+                  (decoded-path (or (plist-get resolution :path)
+                                    (enkan-repl--buffer-name->path buffer-name))))
              (list :status 'selected
                    :path decoded-path)))
           ('needs-selection
            (let* ((available-buffers (plist-get resolution :buffers))
+                  (buffer-paths (plist-get resolution :buffer-paths))
                   (choices (enkan-repl--build-buffer-selection-choices available-buffers))
                   (selection (hmenu prompt choices)))
              (if selection
                  (let* ((selected-buffer (cdr (assoc selection choices)))
                         (buffer-name (buffer-name selected-buffer))
                         ;; Extract path from buffer name format: *ws:01 enkan:/path/to/project*
-                        (decoded-path (enkan-repl--buffer-name->path buffer-name)))
+                        (decoded-path (or (cdr (assq selected-buffer buffer-paths))
+                                          (enkan-repl--buffer-name->path buffer-name))))
                    (list :status 'selected
                          :path decoded-path))
                (list :status 'cancelled
@@ -2113,12 +2256,11 @@ Returns the buffers that belong to the current workspace and represent a
 live terminal session per `enkan-repl--buffer-alive-as-terminal-p'
 \(backend agnostic: covers eat process-attached buffers and tmux mirror
 buffers)."
-  (let ((current-ws enkan-repl--current-workspace))
+  (let ((current-ws (or enkan-repl--current-workspace "01")))
     (seq-filter (lambda (buffer)
                   (and (bufferp buffer)
-                       (buffer-name buffer)
-                       (enkan-repl--buffer-name-matches-workspace
-                        (buffer-name buffer) current-ws)
+                       (enkan-repl--buffer-matches-workspace-p
+                        buffer current-ws)
                        (enkan-repl--buffer-alive-as-terminal-p buffer)))
                 buffer-list)))
 
@@ -2141,8 +2283,16 @@ Resolution priority: `prefix-arg' → alias → nil (for interactive selection).
         (let* ((resolved-project (cdr alias-entry))
                (matching-buffers (seq-filter
                                   (lambda (buf)
-                                    (let ((buffer-project (enkan-repl--extract-project-name (buffer-name buf))))
-                                      (string= resolved-project buffer-project)))
+                                    (let* ((buffer-project
+                                            (enkan-repl--extract-project-name
+                                             (buffer-name buf)))
+                                           (tmux-window
+                                            (and (fboundp 'enkan-repl--terminal-tmux--id-window)
+                                                 (enkan-repl--terminal-tmux--id-window
+                                                  (enkan-repl--buffer-tmux-id buf)))))
+                                      (or (string= resolved-project buffer-project)
+                                          (string= resolved-project
+                                                   (or tmux-window "")))))
                                   buffers)))
           (car matching-buffers)))))
    ;; Priority 3: return nil for interactive selection

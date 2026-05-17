@@ -92,6 +92,7 @@ not returned."
           (enkan-repl--layout-session-project-info
            project-name enkan-repl-target-directories))
          (resolved-project-name (or (car project-info) project-name))
+         (project-path (cdr project-info))
          (setup (enkan-repl--setup-window-terminal-buffer-pure
                  nil session-number (enkan-repl--ws-session-list)
                  enkan-repl-target-directories))
@@ -104,14 +105,19 @@ not returned."
       (cl-find-if
        (lambda (buffer)
          (let ((name (buffer-name buffer)))
-           (and name
-                (enkan-repl--buffer-name-matches-workspace
-                 name enkan-repl--current-workspace)
-                (member (or (enkan-repl--extract-project-name name) "")
-                        (delete-dups
-                         (list project-name resolved-project-name)))
-                (= (enkan-repl--buffer-name->instance name) instance)
-                (enkan-repl--buffer-alive-as-terminal-p buffer))))
+           (or (and project-path
+                    (enkan-repl--buffer-matches-target-p
+                     buffer enkan-repl--current-workspace project-path instance
+                     (list project-name resolved-project-name))
+                    (enkan-repl--buffer-alive-as-terminal-p buffer))
+               (and name
+                    (enkan-repl--buffer-name-matches-workspace
+                     name enkan-repl--current-workspace)
+                    (member (or (enkan-repl--extract-project-name name) "")
+                            (delete-dups
+                             (list project-name resolved-project-name)))
+                    (= (enkan-repl--buffer-name->instance name) instance)
+                    (enkan-repl--buffer-alive-as-terminal-p buffer)))))
        (buffer-list))))))
 
 (defun enkan-repl--registered-session-buffers ()
@@ -394,6 +400,8 @@ Category: Utilities"
     (error "No current project active. Run enkan-repl-setup first"))
   (unless enkan-repl--current-workspace
     (error "No current workspace active"))
+  (when (fboundp 'enkan-repl--restore-current-workspace-sessions-from-live-terminals)
+    (enkan-repl--restore-current-workspace-sessions-from-live-terminals))
   ;; Count registered live buffers for current workspace.  Do not use every
   ;; mirror buffer with the workspace prefix: stale tmux windows can recreate
   ;; stray mirrors asynchronously, and those must not drive the layout.

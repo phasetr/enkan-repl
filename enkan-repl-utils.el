@@ -27,6 +27,10 @@
 (declare-function enkan-repl--terminal-tmux-alive-p "enkan-repl-terminal" (id))
 (declare-function enkan-repl--terminal-tmux-mirror-buffer-alive-p
                   "enkan-repl-terminal" (buffer))
+(declare-function enkan-repl--terminal-tmux--id-workspace
+                  "enkan-repl-terminal" (id))
+(declare-function enkan-repl--terminal-tmux--id-window
+                  "enkan-repl-terminal" (id))
 (defvar enkan-repl--tmux-mirror-id)
 
 ;;;; Buffer Name API (New - Compatibility Mode)
@@ -89,6 +93,33 @@ Returns t if the buffer name has the correct workspace prefix."
        (stringp workspace-id)
        (string-match-p (format "^\\*ws:%s enkan:" workspace-id) name)))
 
+(defun enkan-repl--buffer-tmux-id (buffer)
+  "Return BUFFER's tmux mirror id, or nil."
+  (when (and (bufferp buffer)
+             (buffer-live-p buffer)
+             (buffer-local-boundp 'enkan-repl--tmux-mirror-id buffer))
+    (buffer-local-value 'enkan-repl--tmux-mirror-id buffer)))
+
+(defun enkan-repl--buffer-workspace-id (buffer)
+  "Return BUFFER's workspace id from tmux metadata or buffer name."
+  (let* ((id (enkan-repl--buffer-tmux-id buffer))
+         (tmux-workspace
+          (and id
+               (fboundp 'enkan-repl--terminal-tmux--id-workspace)
+               (enkan-repl--terminal-tmux--id-workspace id))))
+    (or tmux-workspace
+        (and (bufferp buffer)
+             (buffer-name buffer)
+             (enkan-repl--extract-workspace-id (buffer-name buffer))))))
+
+(defun enkan-repl--buffer-matches-workspace-p (buffer workspace-id)
+  "Return non-nil when BUFFER belongs to WORKSPACE-ID.
+Tmux mirror metadata wins over the buffer name so fallback buffers such as
+`*tmux enkan-02:lat|%1*' are handled before cwd-based renaming finishes."
+  (and (stringp workspace-id)
+       (string= (or (enkan-repl--buffer-workspace-id buffer) "")
+                workspace-id)))
+
 (defun enkan-repl--extract-workspace-id (name)
   "Extract workspace ID from buffer NAME.
 Returns workspace ID string (e.g., \"01\") or nil if not an enkan buffer."
@@ -134,9 +165,8 @@ process-attached buffers and tmux mirror buffers)."
   (let ((count 0))
     (dolist (buffer buffer-list)
       (when (and (bufferp buffer)
-                 (buffer-name buffer)
-                 (enkan-repl--buffer-name-matches-workspace
-                  (buffer-name buffer) workspace-id)
+                 (enkan-repl--buffer-matches-workspace-p
+                  buffer workspace-id)
                  (enkan-repl--buffer-alive-as-terminal-p buffer))
         (setq count (1+ count))))
     count))
@@ -185,7 +215,7 @@ state files while allowing multi-instance bookkeeping."
   "Extract final directory name from buffer name or path for use as project name.
 Example: \\='*ws:01 enkan:/path/to/pt-tools/*\\=' -> \\='pt-tools\\='"
   (let ((path (or (enkan-repl--buffer-name->path buffer-name-or-path)
-                   buffer-name-or-path)))
+                  buffer-name-or-path)))
     (file-name-nondirectory (directory-file-name path))))
 
 (defun enkan-repl--encode-full-path (path prefix separator)
@@ -232,6 +262,55 @@ nil, any instance for that directory matches."
               (or (null instance)
                   (eql instance
                        (enkan-repl--buffer-name->instance buffer-name)))))))
+
+(defun enkan-repl--target-window-name-matches-p (window names instance)
+  "Return non-nil when tmux WINDOW matches target NAMES and INSTANCE.
+When INSTANCE is nil, any instance of the target is accepted."
+  (and (stringp window)
+       (let ((bases (delete-dups
+                     (cl-remove-if-not #'stringp (copy-sequence names)))))
+         (if (and instance (integerp instance))
+             (member window
+                     (mapcar (lambda (base)
+                               (if (> instance 1)
+                                   (format "%s-%d" base instance)
+                                 base))
+                             bases))
+           (cl-some
+            (lambda (base)
+              (or (string= window base)
+                  (string-match-p
+                   (format "\\`%s-[0-9]+\\'" (regexp-quote base))
+                   window)))
+            bases)))))
+
+(defun enkan-repl--buffer-matches-target-p
+    (buffer workspace-id target-path &optional instance target-names)
+  "Return non-nil when BUFFER matches target identity.
+WORKSPACE-ID scopes the match.  TARGET-PATH is the registered project
+directory.  INSTANCE, when non-nil, requires a specific multi-instance index.
+TARGET-NAMES are aliases or project names that may appear in tmux window ids.
+
+This function is the shared compatibility point between path-named enkan
+buffers and tmux fallback mirror buffers."
+  (and (bufferp buffer)
+       (buffer-live-p buffer)
+       (stringp target-path)
+       (enkan-repl--buffer-matches-workspace-p buffer workspace-id)
+       (let ((name (buffer-name buffer))
+             (path-base (enkan-repl--extract-project-name target-path)))
+         (or (and name
+                  (enkan-repl--buffer-matches-directory
+                   name target-path instance))
+             (let* ((id (enkan-repl--buffer-tmux-id buffer))
+                    (window
+                     (and id
+                          (fboundp 'enkan-repl--terminal-tmux--id-window)
+                          (enkan-repl--terminal-tmux--id-window id))))
+               (enkan-repl--target-window-name-matches-p
+                window
+                (append target-names (list path-base))
+                instance))))))
 
 (defun enkan-repl--extract-session-info (buffer-name buffer-live-p has-eat-process process-live-p)
   "Pure function to extract session info from buffer properties.
@@ -500,8 +579,8 @@ FUNCTIONS should be a list of function info plists from
 Returns a string containing org-mode formatted function list."
   (let* ((functions (enkan-repl-utils--extract-function-info file-path))
          (interactive-functions (cl-remove-if-not
-                                (lambda (f) (plist-get f :interactive))
-                                functions)))
+                                 (lambda (f) (plist-get f :interactive))
+                                 functions)))
     (enkan-repl-utils--generate-function-list-flat interactive-functions)))
 
 (defun enkan-repl-utils--extract-category-from-docstring (docstring)
@@ -525,11 +604,11 @@ FUNCTIONS-LIST contains plists with :name, :docstring, :category."
         (let* ((docstring (plist-get func :docstring))
                (category (enkan-repl-utils--extract-category-from-docstring docstring))
                (clean-docstring (if category
-                                   (replace-regexp-in-string "  Category: .*$" "" docstring)
-                                 docstring))
+                                    (replace-regexp-in-string "  Category: .*$" "" docstring)
+                                  docstring))
                (func-info `(:name ,(plist-get func :name)
-                           :docstring ,clean-docstring
-                           :category ,(or category "Uncategorized"))))
+                                  :docstring ,clean-docstring
+                                  :category ,(or category "Uncategorized"))))
           ;; Add to appropriate category list
           (let ((category-entry (assoc (or category "Uncategorized") categorized-functions)))
             (if category-entry
