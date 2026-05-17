@@ -225,6 +225,42 @@
       (when (buffer-live-p good)
         (kill-buffer good)))))
 
+(ert-deftest test-workspace-layout-restores-empty-session-list-from-tmux ()
+  "C-M-l should self-repair an empty session-list from live tmux targets."
+  (let ((enkan-repl-terminal-backend 'tmux)
+        (enkan-repl--current-workspace "02")
+        (enkan-repl--current-project "lat")
+        (enkan-repl-session-list nil)
+        (enkan-repl--session-counter 0)
+        (enkan-repl-project-aliases '("lat"))
+        (enkan-repl-projects '(("lat" . ("lat"))))
+        (enkan-repl-target-directories
+         '(("lat" . ("lat" . "/Users/sekine/dev/self/lattice-system/"))))
+        (called nil)
+        created-buffer)
+    (unwind-protect
+        (cl-letf (((symbol-function 'enkan-repl--terminal-list)
+                   (lambda () '("enkan-02:lattice-system|%1")))
+                  ((symbol-function 'enkan-repl--terminal-tmux--mirror-make)
+                   (lambda (id _defer-refresh path)
+                     (setq created-buffer
+                           (get-buffer-create
+                            (let ((enkan-repl--current-workspace "02"))
+                              (enkan-repl--path->buffer-name path))))
+                     (with-current-buffer created-buffer
+                       (setq-local enkan-repl--tmux-mirror-id id))
+                     created-buffer))
+                  ((symbol-function 'enkan-repl--save-workspace-state)
+                   (lambda (&optional _workspace-id) t))
+                  ((symbol-function 'enkan-repl-setup-1session-layout)
+                   (lambda () (setq called 'one))))
+          (enkan-repl-setup-current-project-layout)
+          (should (equal enkan-repl-session-list '((1 . "lat"))))
+          (should (= enkan-repl--session-counter 1))
+          (should (eq called 'one)))
+      (when (buffer-live-p created-buffer)
+        (kill-buffer created-buffer)))))
+
 (ert-deftest test-workspace-layout-deduplicates-session-list-buffer ()
   "C-M-l should not count duplicate session entries resolving to one buffer."
   (let* ((project-dir "/Users/sekine/dev/self/enkan-repl/")

@@ -104,6 +104,8 @@
 (declare-function enkan-repl--buffer-matches-workspace-p
                   "enkan-repl-utils" (buffer workspace-id))
 (declare-function enkan-repl--buffer-tmux-id "enkan-repl-utils" (buffer))
+(declare-function enkan-repl--target-window-name-matches-p
+                  "enkan-repl-utils" (window names instance))
 (declare-function enkan-repl--buffer-alive-as-terminal-p "enkan-repl-utils" (buffer))
 (declare-function enkan-repl--terminal-tmux-alive-p "enkan-repl-terminal" (id))
 (declare-function enkan-repl--terminal-tmux-mirror-buffer-alive-p "enkan-repl-terminal" (buffer))
@@ -1617,6 +1619,71 @@ Implemented as pure function, side effects are handled by upper functions."
           (cons project-name project-path))
       (error "Project alias '%s' not found in registry" alias))))
 
+(defun enkan-repl--restore-current-workspace-sessions-from-live-terminals ()
+  "Restore an empty current workspace session list from live tmux windows.
+This repairs stale persisted state where the workspace still has current project
+and target directory metadata, but `enkan-repl-session-list' was saved as nil.
+Returns non-nil when sessions were restored."
+  (condition-case nil
+      (when (and (eq enkan-repl-terminal-backend 'tmux)
+                 enkan-repl--current-workspace
+                 (enkan-repl--ws-current-project)
+                 (null (enkan-repl--ws-session-list))
+                 (fboundp 'enkan-repl--terminal-list)
+                 (fboundp 'enkan-repl--terminal-tmux--id-window))
+        (let* ((current-project (enkan-repl--ws-current-project))
+               (projects
+                (enkan-repl--projects-with-current-aliases
+                 enkan-repl-projects
+                 current-project
+                 enkan-repl-project-aliases))
+               (project-paths
+                (enkan-repl--get-project-paths-for-current
+                 current-project projects enkan-repl-target-directories))
+               (ids (enkan-repl--terminal-list))
+               (session-number 0)
+               session-list)
+          (dolist (project-path project-paths)
+            (let* ((alias (car project-path))
+                   (path (cdr project-path))
+                   (project-info
+                    (enkan-repl--get-project-info-from-directories
+                     alias enkan-repl-target-directories))
+                   (target-project (or (and (consp project-info)
+                                             (car project-info))
+                                       current-project))
+                   (instance (or (enkan-repl--target-alias-instance-for-path
+                                  alias path)
+                                 1))
+                   (target-names
+                    (delete-dups
+                     (delq nil
+                           (list alias current-project target-project
+                                 (enkan-repl--extract-project-name path)))))
+                   (id
+                    (cl-find-if
+                     (lambda (candidate)
+                       (enkan-repl--target-window-name-matches-p
+                        (enkan-repl--terminal-tmux--id-window candidate)
+                        target-names
+                        instance))
+                     ids)))
+              (when id
+                (setq session-number (1+ session-number))
+                (push (cons session-number
+                            (enkan-repl--make-session-entry-value
+                             target-project instance))
+                      session-list)
+                (when (fboundp 'enkan-repl--terminal-tmux--mirror-make)
+                  (ignore-errors
+                    (enkan-repl--terminal-tmux--mirror-make id t path))))))
+          (when session-list
+            (enkan-repl--ws-set-session-list (nreverse session-list))
+            (enkan-repl--ws-set-session-counter (length session-list))
+            (enkan-repl--save-workspace-state)
+            t)))
+    (error nil)))
+
 (defun enkan-repl--maybe-setup-current-project-layout (&optional context)
   "Run the optional current project layout command.
 CONTEXT is included in error messages to identify the caller.  The layout
@@ -1626,7 +1693,9 @@ it has been loaded by user configuration."
              (enkan-repl--ws-current-project)
              (fboundp 'enkan-repl-setup-current-project-layout))
     (condition-case err
-        (enkan-repl-setup-current-project-layout)
+        (progn
+          (enkan-repl--restore-current-workspace-sessions-from-live-terminals)
+          (enkan-repl-setup-current-project-layout))
       (error
        (message "Failed to set up current project layout%s: %s"
                 (if context (format " after %s" context) "")

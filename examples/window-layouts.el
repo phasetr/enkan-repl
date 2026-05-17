@@ -400,6 +400,8 @@ Category: Utilities"
     (error "No current project active. Run enkan-repl-setup first"))
   (unless enkan-repl--current-workspace
     (error "No current workspace active"))
+  (when (fboundp 'enkan-repl--restore-current-workspace-sessions-from-live-terminals)
+    (enkan-repl--restore-current-workspace-sessions-from-live-terminals))
   ;; Count registered live buffers for current workspace.  Do not use every
   ;; mirror buffer with the workspace prefix: stale tmux windows can recreate
   ;; stray mirrors asynchronously, and those must not drive the layout.
