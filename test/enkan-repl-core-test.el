@@ -108,6 +108,8 @@
                (lambda ()
                  (list (format "enkan-%s:window"
                                enkan-repl--current-workspace))))
+              ((symbol-function 'enkan-repl--terminal-tmux--disable-alternate-screen)
+               (lambda (_pane) nil))
               ((symbol-function 'enkan-repl--terminal-tmux--mirror-make)
                (lambda (id &optional defer-refresh path)
                  (push (list enkan-repl--current-workspace
@@ -154,6 +156,8 @@
               ((symbol-function 'enkan-repl--terminal-list)
                (lambda ()
                  (list "enkan-03:enkan-repl" "enkan-03:worker-2")))
+              ((symbol-function 'enkan-repl--terminal-tmux--disable-alternate-screen)
+               (lambda (_pane) nil))
               ((symbol-function 'enkan-repl--terminal-tmux--mirror-make)
                (lambda (id &optional defer-refresh path)
                  (push (list enkan-repl--current-workspace
@@ -214,6 +218,8 @@
               ((symbol-function 'enkan-repl--terminal-list)
                (lambda ()
                  '("enkan-04:proj" "enkan-04:proj-2")))
+              ((symbol-function 'enkan-repl--terminal-tmux--disable-alternate-screen)
+               (lambda (_pane) nil))
               ((symbol-function 'enkan-repl--terminal-tmux--mirror-make)
                (lambda (id &optional defer-refresh path)
                  (push (list id defer-refresh path) ensured-workspaces)
@@ -253,6 +259,8 @@
               ((symbol-function 'enkan-repl--terminal-list)
                (lambda ()
                  '("enkan-06:foo-2")))
+              ((symbol-function 'enkan-repl--terminal-tmux--disable-alternate-screen)
+               (lambda (_pane) nil))
               ((symbol-function 'enkan-repl--terminal-tmux--mirror-make)
                (lambda (id &optional _defer-refresh _path) id))
               ((symbol-function 'enkan-repl-state-save)
@@ -502,6 +510,8 @@
                (lambda ()
                  (list (format "enkan-%s:window"
                                enkan-repl--current-workspace))))
+              ((symbol-function 'enkan-repl--terminal-tmux--disable-alternate-screen)
+               (lambda (_pane) nil))
               ((symbol-function 'enkan-repl--terminal-tmux--mirror-make)
                (lambda (id &optional defer-refresh path)
                  (push (list enkan-repl--current-workspace
@@ -659,6 +669,33 @@
       ;; Cleanup
       (when (file-exists-p test-file)
         (delete-file test-file)))))
+
+(ert-deftest test-enkan-repl--tmux-reattach-disable-alternate-screen ()
+  "Reattach should disable the alternate screen for each live workspace pane."
+  (let ((enkan-repl-terminal-backend 'tmux)
+        (enkan-repl--current-workspace "init")
+        targets)
+    (cl-letf (((symbol-function 'enkan-repl--terminal-list)
+               (lambda ()
+                 (list (format "enkan-%s:w|%%%s"
+                               enkan-repl--current-workspace
+                               enkan-repl--current-workspace))))
+              ((symbol-function 'enkan-repl--terminal-tmux--disable-alternate-screen)
+               (lambda (pane) (push pane targets))))
+      (let ((count (enkan-repl--tmux-reattach-disable-alternate-screen
+                    '("01" "02"))))
+        (should (= 2 count))
+        (should (equal '("%02" "%01") targets))
+        (should (string= "init" enkan-repl--current-workspace))))))
+
+(ert-deftest test-enkan-repl--tmux-reattach-disable-alternate-screen-non-tmux ()
+  "Disabling the alternate screen is a no-op for non-tmux backends."
+  (let ((enkan-repl-terminal-backend 'eat)
+        called)
+    (cl-letf (((symbol-function 'enkan-repl--terminal-tmux--disable-alternate-screen)
+               (lambda (_pane) (setq called t))))
+      (should (= 0 (enkan-repl--tmux-reattach-disable-alternate-screen '("01"))))
+      (should-not called))))
 
 (provide 'enkan-repl-core-test)
 ;;; enkan-repl-core-test.el ends here
