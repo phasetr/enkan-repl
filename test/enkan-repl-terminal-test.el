@@ -615,8 +615,7 @@ documented opt-in alternative; see README."
   "Default tmux mirror limits should preserve useful proposal context."
   (should (= 320 enkan-repl-tmux-mirror-history-lines))
   (should (= 240 enkan-repl-tmux-mirror-display-lines))
-  (should (= (* 256 1024) enkan-repl-tmux-mirror-max-chars))
-  (should (= 2048 enkan-repl-tmux-mirror-max-line-length)))
+  (should (= (* 256 1024) enkan-repl-tmux-mirror-max-chars)))
 
 (ert-deftest test-enkan-repl--terminal-tmux--prepare-mirror-content-keeps-proposal-defaults ()
   "Default mirror preparation should keep a moderate proposal from the start."
@@ -639,56 +638,40 @@ documented opt-in alternative; see README."
 (ert-deftest test-enkan-repl--terminal-tmux--prepare-mirror-content-tail-lines ()
   "Prepared tmux mirror content should keep only recent display lines."
   (let ((enkan-repl-tmux-mirror-display-lines 3)
-        (enkan-repl-tmux-mirror-max-chars nil)
-        (enkan-repl-tmux-mirror-compact-noisy-blocks nil))
+        (enkan-repl-tmux-mirror-max-chars nil))
     (should (string= "line 03\nline 04\nline 05"
                      (enkan-repl--terminal-tmux--prepare-mirror-content
                       (test-enkan-repl-terminal--lines 1 5))))))
 
-(ert-deftest test-enkan-repl--terminal-tmux--prepare-mirror-content-compacts-diff ()
-  "Prepared tmux mirror content should collapse large diff-like blocks."
+(ert-deftest test-enkan-repl--terminal-tmux--prepare-mirror-content-keeps-diff-verbatim ()
+  "Diff-like blocks should be mirrored verbatim now tmux-peek handles paging."
   (let ((enkan-repl-tmux-mirror-display-lines 20)
         (enkan-repl-tmux-mirror-max-chars nil)
-        (enkan-repl-tmux-mirror-compact-noisy-blocks t)
-        (enkan-repl-tmux-mirror-noisy-block-threshold 3))
-    (should (string= "message before\n[enkan-repl: omitted 4 noisy/diff line(s)]\nmessage after"
+        (content (string-join
+                  '("message before"
+                    "+added line"
+                    "-removed line"
+                    "@@ hunk"
+                    "diff --git a/file b/file"
+                    "message after")
+                  "\n")))
+    (should (string= content
                      (enkan-repl--terminal-tmux--prepare-mirror-content
-                      (string-join
-                       '("message before"
-                         "+added line"
-                         "-removed line"
-                         "@@ hunk"
-                         "diff --git a/file b/file"
-                         "message after")
-                       "\n"))))))
+                      content)))))
 
-(ert-deftest test-enkan-repl--terminal-tmux--prepare-mirror-content-keeps-short-noisy-order ()
-  "Short noisy blocks should stay readable and preserve line order."
+(ert-deftest test-enkan-repl--terminal-tmux--prepare-mirror-content-keeps-long-lines-verbatim ()
+  "Very long single lines should no longer be truncated by the mirror."
   (let ((enkan-repl-tmux-mirror-display-lines 20)
         (enkan-repl-tmux-mirror-max-chars nil)
-        (enkan-repl-tmux-mirror-compact-noisy-blocks t)
-        (enkan-repl-tmux-mirror-noisy-block-threshold 3))
-    (should (string= "message before\n+added\n-removed\nmessage after"
+        (content (string-join
+                  (list "before"
+                        "0123456789abcdef"
+                        "abcdefghijklmnop"
+                        "after")
+                  "\n")))
+    (should (string= content
                      (enkan-repl--terminal-tmux--prepare-mirror-content
-                      (string-join
-                       '("message before" "+added" "-removed" "message after")
-                       "\n"))))))
-
-(ert-deftest test-enkan-repl--terminal-tmux--prepare-mirror-content-compacts-long-lines ()
-  "Repeated very long lines should be treated as noisy output."
-  (let ((enkan-repl-tmux-mirror-display-lines 20)
-        (enkan-repl-tmux-mirror-max-chars nil)
-        (enkan-repl-tmux-mirror-compact-noisy-blocks t)
-        (enkan-repl-tmux-mirror-noisy-block-threshold 2)
-        (enkan-repl-tmux-mirror-max-line-length 8))
-    (should (string= "before\n[enkan-repl: omitted 2 noisy/diff line(s)]\nafter"
-                     (enkan-repl--terminal-tmux--prepare-mirror-content
-                      (string-join
-                       (list "before"
-                             "0123456789abcdef"
-                             "abcdefghijklmnop"
-                             "after")
-                       "\n"))))))
+                      content)))))
 
 (ert-deftest test-enkan-repl--terminal-tmux--mirror-refresh-sticks-to-bottom ()
   "A tmux mirror window at the bottom should remain at the bottom after refresh."
@@ -851,8 +834,7 @@ documented opt-in alternative; see README."
           (setq-local enkan-repl--tmux-mirror-id "enkan-01:p")
           (insert (make-string 10000 ?x))
           (let ((enkan-repl-tmux-mirror-display-lines 80)
-                (enkan-repl-tmux-mirror-max-chars (* 64 1024))
-                (enkan-repl-tmux-mirror-compact-noisy-blocks t))
+                (enkan-repl-tmux-mirror-max-chars (* 64 1024)))
             (cl-letf (((symbol-function 'replace-buffer-contents)
                        (lambda (&rest _)
                          (error "must not diff mirror content"))))
