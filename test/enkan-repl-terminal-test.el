@@ -82,11 +82,51 @@ documented opt-in alternative; see README."
       (let ((id (enkan-repl--terminal-tmux-start "/repo/dr-remote.jp/")))
         (should (string= "enkan-01:dr-remote.jp|%12" id))
         (should (string= "%12" (enkan-repl--terminal-tmux--target id)))
-        (should (equal '(("new-session" "-d" "-P" "-F" "#{pane_id}"
-                          "-s" "enkan-01" "-c" "/repo/dr-remote.jp/"
-                          "-n" "dr-remote.jp")
-                         t)
-                       (car calls)))))))
+        (should (member '(("new-session" "-d" "-P" "-F" "#{pane_id}"
+                           "-s" "enkan-01" "-c" "/repo/dr-remote.jp/"
+                           "-n" "dr-remote.jp")
+                          t)
+                        calls))))))
+
+(ert-deftest test-enkan-repl--terminal-tmux-start-disables-alternate-screen ()
+  "Starting a session should disable the tmux alternate screen for the pane."
+  (let ((enkan-repl--current-workspace "01")
+        (enkan-repl-tmux-session-prefix "enkan-")
+        (enkan-repl-tmux-disable-alternate-screen t)
+        calls)
+    (cl-letf (((symbol-function 'enkan-repl--terminal-tmux--ensure-bell-monitor)
+               (lambda () nil))
+              ((symbol-function 'enkan-repl--terminal-tmux--has-session)
+               (lambda (_session) nil))
+              ((symbol-function 'enkan-repl--terminal-tmux--call)
+               (lambda (args &optional capture)
+                 (push (list args capture) calls)
+                 (when (member "new-session" args)
+                   "%12"))))
+      (enkan-repl--terminal-tmux-start "/repo/proj/")
+      (should (member '(("set-option" "-w" "-t" "%12" "alternate-screen" "off")
+                        nil)
+                      calls)))))
+
+(ert-deftest test-enkan-repl--terminal-tmux-start-keeps-alternate-screen-when-off ()
+  "Disabling the option should keep tmux alternate screen untouched."
+  (let ((enkan-repl--current-workspace "01")
+        (enkan-repl-tmux-session-prefix "enkan-")
+        (enkan-repl-tmux-disable-alternate-screen nil)
+        calls)
+    (cl-letf (((symbol-function 'enkan-repl--terminal-tmux--ensure-bell-monitor)
+               (lambda () nil))
+              ((symbol-function 'enkan-repl--terminal-tmux--has-session)
+               (lambda (_session) nil))
+              ((symbol-function 'enkan-repl--terminal-tmux--call)
+               (lambda (args &optional capture)
+                 (push (list args capture) calls)
+                 (when (member "new-session" args)
+                   "%12"))))
+      (enkan-repl--terminal-tmux-start "/repo/proj/")
+      (should-not (cl-find "set-option" calls
+                           :key (lambda (c) (car (car c)))
+                           :test #'equal)))))
 
 (ert-deftest test-enkan-repl--terminal-tmux--capture-pane-async-targets-pane-id ()
   "Mirror capture for dr-remote.jp should pass %pane_id to tmux -t."

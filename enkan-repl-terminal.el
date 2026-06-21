@@ -445,6 +445,17 @@ names such as dr-remote.jp as pane selectors."
   (or (enkan-repl--terminal-tmux--id-pane id)
       id))
 
+(defun enkan-repl--terminal-tmux--disable-alternate-screen (pane)
+  "Disable the tmux alternate screen for PANE's window when configured.
+PANE is a tmux pane id such as \"%29\".  This is applied right after pane
+creation, before any AI CLI starts, so the CLI renders into the normal
+screen and tmux keeps its output in scrollback."
+  (when (and enkan-repl-tmux-disable-alternate-screen
+             (stringp pane)
+             (not (string-empty-p pane)))
+    (enkan-repl--terminal-tmux--call
+     (list "set-option" "-w" "-t" pane "alternate-screen" "off"))))
+
 (defun enkan-repl--terminal-tmux-start (dir)
   "Tmux backend: start a new session/window in DIR for current workspace.
 Ensures the workspace's tmux session exists (creating it on demand) and
@@ -464,6 +475,7 @@ target identifier (e.g. \"enkan-01:lat\")."
                    t)))
         (unless (and pane (not (string-empty-p pane)))
           (user-error "Tmux new-session failed for %s" session))
+        (enkan-repl--terminal-tmux--disable-alternate-screen pane)
         (enkan-repl--terminal-tmux--make-id session base pane)))
      ;; Session exists: add a new window with a non-colliding name.
      (t
@@ -474,6 +486,7 @@ target identifier (e.g. \"enkan-01:lat\")."
                      t)))
           (unless (and pane (not (string-empty-p pane)))
             (user-error "Tmux new-window failed for %s:%s" session win))
+          (enkan-repl--terminal-tmux--disable-alternate-screen pane)
           (enkan-repl--terminal-tmux--make-id session win pane)))))))
 
 (defun enkan-repl--terminal-tmux-send (id text &optional newline)
@@ -651,6 +664,18 @@ process returns."
 This bounds how long `enkan-repl-tmux-refresh-current' can wait on a stuck
 tmux capture process."
   :type 'number
+  :group 'enkan-repl-terminal)
+
+(defcustom enkan-repl-tmux-disable-alternate-screen t
+  "When non-nil, disable the tmux alternate screen for created panes.
+Many AI CLIs render their conversation into the terminal alternate screen,
+which tmux does not keep in its scrollback (its `history_size' stays 0).
+`tmux capture-pane' can then only return the visible viewport, so external
+viewers such as tmux-peek see just the last few lines instead of the whole
+conversation.  Disabling the alternate screen makes those CLIs render into
+the normal screen so tmux retains the full scrollback and capture returns
+the complete output."
+  :type 'boolean
   :group 'enkan-repl-terminal)
 
 (defvar-local enkan-repl--tmux-mirror-id nil
