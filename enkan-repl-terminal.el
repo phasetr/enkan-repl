@@ -634,7 +634,7 @@ refresh work bounded."
 
 (defcustom enkan-repl-tmux-mirror-display-lines 240
   "Maximum number of lines kept in a tmux mirror buffer.
-This limits the Emacs buffer after noisy output compaction."
+This bounds the Emacs buffer size; captured output is mirrored verbatim."
   :type 'integer
   :group 'enkan-repl-terminal)
 
@@ -643,23 +643,6 @@ This limits the Emacs buffer after noisy output compaction."
 When captured content is larger than this value, keep the tail of the
 capture.  This bounds main-thread work after the asynchronous tmux
 process returns."
-  :type 'integer
-  :group 'enkan-repl-terminal)
-
-(defcustom enkan-repl-tmux-mirror-compact-noisy-blocks t
-  "When non-nil, collapse large diff-like or very long output blocks."
-  :type 'boolean
-  :group 'enkan-repl-terminal)
-
-(defcustom enkan-repl-tmux-mirror-noisy-block-threshold 6
-  "Minimum consecutive noisy lines collapsed into one mirror summary line."
-  :type 'integer
-  :group 'enkan-repl-terminal)
-
-(defcustom enkan-repl-tmux-mirror-max-line-length 2048
-  "Maximum line length shown verbatim in tmux mirror buffers.
-This accommodates prose joined by `tmux capture-pane -J' while still
-truncating pathological single-line output."
   :type 'integer
   :group 'enkan-repl-terminal)
 
@@ -1253,75 +1236,6 @@ When MAX-CHARS is nil or non-positive, return the full concatenation."
          "\n"))
     content))
 
-(defun enkan-repl--terminal-tmux--max-line-length ()
-  "Return the configured mirror line length limit, or nil."
-  (and (integerp enkan-repl-tmux-mirror-max-line-length)
-       (> enkan-repl-tmux-mirror-max-line-length 0)
-       enkan-repl-tmux-mirror-max-line-length))
-
-(defun enkan-repl--terminal-tmux--truncate-line (line max-length)
-  "Return LINE shortened to MAX-LENGTH characters when needed."
-  (if (and max-length (> (length line) max-length))
-      (format "%s [enkan-repl: omitted %d chars]"
-              (substring line 0 max-length)
-              (- (length line) max-length))
-    line))
-
-(defun enkan-repl--terminal-tmux--noisy-line-p (line)
-  "Return non-nil when LINE looks like generated diff/code noise."
-  (let ((max-length (enkan-repl--terminal-tmux--max-line-length)))
-    (or (and max-length
-             (> (length line) max-length))
-        (string-match-p
-         (rx string-start (* space)
-             (or "diff --git" "index " "@@ " "+++ " "--- "
-                 "```" "~~~"))
-         line)
-        (string-match-p
-         (rx string-start (* space) (or "+" "-")
-             (not (any "\n")))
-         line))))
-
-(defun enkan-repl--terminal-tmux--noisy-block-threshold ()
-  "Return the configured noisy block threshold."
-  (if (and (integerp enkan-repl-tmux-mirror-noisy-block-threshold)
-           (> enkan-repl-tmux-mirror-noisy-block-threshold 0))
-      enkan-repl-tmux-mirror-noisy-block-threshold
-    6))
-
-(defun enkan-repl--terminal-tmux--flush-noisy-lines (lines output)
-  "Append compacted or verbatim noisy LINES to OUTPUT."
-  (let ((threshold (enkan-repl--terminal-tmux--noisy-block-threshold)))
-    (if (>= (length lines) threshold)
-        (cons (format "[enkan-repl: omitted %d noisy/diff line(s)]"
-                      (length lines))
-              output)
-      (append lines output))))
-
-(defun enkan-repl--terminal-tmux--compact-noisy-content (content)
-  "Collapse large noisy blocks in CONTENT."
-  (if (not enkan-repl-tmux-mirror-compact-noisy-blocks)
-      content
-    (let ((output nil)
-          (noisy nil)
-          (max-length (enkan-repl--terminal-tmux--max-line-length)))
-      (dolist (line (split-string content "\n"))
-        (if (enkan-repl--terminal-tmux--noisy-line-p line)
-            (push (enkan-repl--terminal-tmux--truncate-line line max-length)
-                  noisy)
-          (let ((line (enkan-repl--terminal-tmux--truncate-line
-                       line max-length)))
-            (when noisy
-              (setq output
-                    (enkan-repl--terminal-tmux--flush-noisy-lines
-                     noisy output))
-              (setq noisy nil))
-            (push line output))))
-      (when noisy
-        (setq output
-              (enkan-repl--terminal-tmux--flush-noisy-lines noisy output)))
-      (string-join (reverse output) "\n"))))
-
 (defun enkan-repl--terminal-tmux--prepare-mirror-content (content)
   "Return bounded, display-ready tmux mirror CONTENT."
   (let* ((max-chars (and (integerp enkan-repl-tmux-mirror-max-chars)
@@ -1331,7 +1245,6 @@ When MAX-CHARS is nil or non-positive, return the full concatenation."
                            (> (length content) max-chars))
                       (substring content (- max-chars))
                     content)))
-    (setq content (enkan-repl--terminal-tmux--compact-noisy-content content))
     (setq content
           (enkan-repl--terminal-tmux--tail-lines
            content enkan-repl-tmux-mirror-display-lines))
