@@ -110,6 +110,8 @@
 (declare-function enkan-repl--terminal-tmux-alive-p "enkan-repl-terminal" (id))
 (declare-function enkan-repl--terminal-tmux-mirror-buffer-alive-p "enkan-repl-terminal" (buffer))
 (declare-function enkan-repl--terminal-tmux--mirror-make "enkan-repl-terminal" (id &optional defer-refresh path))
+(declare-function enkan-repl--terminal-tmux--target "enkan-repl-terminal" (id))
+(declare-function enkan-repl--terminal-tmux--disable-alternate-screen "enkan-repl-terminal" (pane))
 (declare-function enkan-repl--terminal-tmux--list-windows "enkan-repl-terminal" (session))
 (declare-function enkan-repl--terminal-tmux--list-window-cwds "enkan-repl-terminal" (session))
 (declare-function enkan-repl--terminal-tmux--list-window-info "enkan-repl-terminal" (session))
@@ -667,7 +669,7 @@ cwd values.  PERSISTED entries with aliases not present in LIVE are retained."
                       alias project-aliases)
                      (cdr (cdr entry)))))
        aliases live))
-	     (t live))))
+     (t live))))
 
 (defun enkan-repl--tmux-reattach-normalize-session-list (state live target-directories)
   "Return session list for STATE reconciled with LIVE tmux data.
@@ -783,6 +785,29 @@ Returns the total number of mirror buffers ensured."
                 (setq total (1+ total))))))
       (setq enkan-repl--current-workspace previous-workspace))))
 
+(defun enkan-repl--tmux-reattach-disable-alternate-screen (workspace-ids)
+  "Disable the tmux alternate screen for live panes in WORKSPACE-IDS.
+At session creation `enkan-repl--terminal-tmux-start' already disables the
+alternate screen, but reattach reconnects to pre-existing panes, so apply it
+here too.  This lets `tmux capture-pane' (and external viewers such as
+tmux-peek) retrieve full pane output instead of only the visible viewport.
+The program in a pane decides its rendering mode at startup, so a running
+full-screen CLI must be restarted for the change to take effect.
+
+Returns the number of panes processed."
+  (if (not (eq enkan-repl-terminal-backend 'tmux))
+      0
+    (let ((previous-workspace enkan-repl--current-workspace)
+          (total 0))
+      (unwind-protect
+          (dolist (workspace-id workspace-ids total)
+            (setq enkan-repl--current-workspace workspace-id)
+            (dolist (id (or (enkan-repl--terminal-list) nil))
+              (enkan-repl--terminal-tmux--disable-alternate-screen
+               (enkan-repl--terminal-tmux--target id))
+              (setq total (1+ total))))
+        (setq enkan-repl--current-workspace previous-workspace)))))
+
 ;;;###autoload
 (defun enkan-repl-tmux-reattach (&optional file)
   "Reconnect Emacs state to live tmux sessions.
@@ -827,6 +852,7 @@ This command is intentionally manual; enkan-repl does not reattach on load."
                         live-workspaces)))
           (setq enkan-repl--current-workspace current-id)
           (enkan-repl--load-workspace-state current-id)
+          (enkan-repl--tmux-reattach-disable-alternate-screen restored-ids)
           (message
            "Already reattached to %d workspace(s), ensured %d tmux mirror buffer(s)"
            (length loaded-workspaces)
@@ -840,6 +866,7 @@ This command is intentionally manual; enkan-repl does not reattach on load."
                       live-workspaces)))
         (setq enkan-repl--current-workspace current-id)
         (enkan-repl--load-workspace-state current-id)
+        (enkan-repl--tmux-reattach-disable-alternate-screen restored-ids)
         (when (fboundp 'enkan-repl-state-save)
           (ignore-errors (enkan-repl-state-save file)))
         (message
@@ -1650,7 +1677,7 @@ Returns non-nil when sessions were restored."
                     (enkan-repl--get-project-info-from-directories
                      alias enkan-repl-target-directories))
                    (target-project (or (and (consp project-info)
-                                             (car project-info))
+                                            (car project-info))
                                        current-project))
                    (instance (or (enkan-repl--target-alias-instance-for-path
                                   alias path)
