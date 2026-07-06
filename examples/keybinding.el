@@ -67,6 +67,7 @@ Requires magit to be installed."
        ("C-M-5"   . enkan-repl-send-5)
        ("C-M-<return>" . enkan-repl-send-region)
        ("C-M-c"   . enkan-repl-clear-input)
+       ("C-M-z"   . enkan-repl-show-transcript)
        ("C-M-@"   . enkan-repl-open-project-directory)
        ("C-t"     . other-window-or-split)
        ("C-M-b"   . enkan-repl-recenter-bottom)
