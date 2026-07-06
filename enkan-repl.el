@@ -151,8 +151,8 @@
 (declare-function enkan-repl--get-project-path-from-directories "enkan-repl-utils" (project-name target-directories))
 (declare-function enkan-repl--send-primitive "enkan-repl-utils" (text special-key-type))
 (declare-function enkan-repl--transcript-buffer-cwd "enkan-repl-transcript" (buffer))
-(declare-function enkan-repl--transcript-claude-load "enkan-repl-transcript" (cwd &optional max-turns))
-(declare-function enkan-repl--transcript-display "enkan-repl-transcript" (file text cwd))
+(declare-function enkan-repl--transcript-load "enkan-repl-transcript" (cwd &optional max-turns))
+(declare-function enkan-repl--transcript-display "enkan-repl-transcript" (kind file text cwd))
 (defvar enkan-repl-transcript-max-turns)
 (declare-function enkan-repl--buffer-name-matches-workspace "enkan-repl-utils" (name workspace-id))
 (declare-function enkan-repl--extract-workspace-id "enkan-repl-utils" (name))
@@ -1460,7 +1460,8 @@ none is available or the selection is aborted."
   "Show the AI CLI chat transcript for the target session's project.
 Full-screen CLIs (Claude Code, codex) redraw in place and keep no tmux
 scrollback, so this reads the CLI's own on-disk transcript for the target
-pane's working directory and shows it in a read-only buffer.
+pane's working directory and shows it in a read-only buffer.  Both Claude Code
+and Codex are consulted; the most recently updated transcript wins.
 - From enkan buffer: use the current buffer's session
 - Without prefix from elsewhere: interactive buffer selection
 - With numeric prefix PFX: use the session at that index (1-based)
@@ -1476,11 +1477,12 @@ Category: Utilities"
           (message "Could not determine working directory for %s"
                    (buffer-name buffer)))
          (t
-          (let ((result (enkan-repl--transcript-claude-load
+          (let ((result (enkan-repl--transcript-load
                          cwd enkan-repl-transcript-max-turns)))
             (if (null result)
-                (message "No Claude Code transcript found for %s" cwd)
+                (message "No Claude Code or Codex transcript found for %s" cwd)
               (enkan-repl--transcript-display
+               (plist-get result :kind)
                (plist-get result :file)
                (plist-get result :text)
                cwd)))))))))

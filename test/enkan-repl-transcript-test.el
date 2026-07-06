@@ -98,6 +98,65 @@ lines are skipped."
     (should (string= "▶ user\nq2"
                      (enkan-repl--transcript-claude-format lines 1)))))
 
+;;;; Codex parsing
+
+(ert-deftest test-enkan-repl--transcript-codex-extract-text ()
+  "input_text and output_text blocks contribute; other blocks are dropped."
+  (should (string= "ab"
+                   (enkan-repl--transcript-codex-extract-text
+                    (list '((type . "input_text") (text . "a"))
+                          '((type . "reasoning") (text . "x"))
+                          '((type . "output_text") (text . "b"))))))
+  (should (string= "" (enkan-repl--transcript-codex-extract-text "not-a-list"))))
+
+(ert-deftest test-enkan-repl--transcript-codex-parse-line ()
+  "Only response_item messages with role user/assistant yield a turn."
+  (should (equal '(:role "user" :text "hi")
+                 (enkan-repl--transcript-codex-parse-line
+                  "{\"type\":\"response_item\",\"payload\":{\"type\":\"message\",\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"hi\"}]}}")))
+  (should (equal '(:role "assistant" :text "ok")
+                 (enkan-repl--transcript-codex-parse-line
+                  "{\"type\":\"response_item\",\"payload\":{\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"ok\"}]}}")))
+  ;; developer messages, events, and meta are skipped.
+  (should-not (enkan-repl--transcript-codex-parse-line
+               "{\"type\":\"response_item\",\"payload\":{\"type\":\"message\",\"role\":\"developer\",\"content\":[{\"type\":\"input_text\",\"text\":\"sys\"}]}}"))
+  (should-not (enkan-repl--transcript-codex-parse-line
+               "{\"type\":\"event_msg\",\"payload\":{\"type\":\"task_started\"}}"))
+  (should-not (enkan-repl--transcript-codex-parse-line "")))
+
+(ert-deftest test-enkan-repl--transcript-codex-session-cwd ()
+  "session_meta lines expose payload.cwd; other lines return nil."
+  (should (string= "/Users/me/dev/app"
+                   (enkan-repl--transcript-codex-session-cwd
+                    "{\"type\":\"session_meta\",\"payload\":{\"cwd\":\"/Users/me/dev/app\"}}")))
+  (should-not (enkan-repl--transcript-codex-session-cwd
+               "{\"type\":\"response_item\",\"payload\":{\"type\":\"message\"}}")))
+
+(ert-deftest test-enkan-repl--transcript-codex-format ()
+  "Codex formatting reuses the shared role-marked renderer."
+  (let ((lines (list
+                "{\"type\":\"session_meta\",\"payload\":{\"cwd\":\"/x\"}}"
+                "{\"type\":\"response_item\",\"payload\":{\"type\":\"message\",\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"q\"}]}}"
+                "{\"type\":\"response_item\",\"payload\":{\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"a\"}]}}")))
+    (should (string= "▶ user\nq\n\n◀ assistant\na"
+                     (enkan-repl--transcript-codex-format lines)))))
+
+;;;; shared helpers
+
+(ert-deftest test-enkan-repl--transcript-same-dir-p ()
+  "Directory comparison ignores trailing slashes."
+  (should (enkan-repl--transcript-same-dir-p "/a/b" "/a/b/"))
+  (should-not (enkan-repl--transcript-same-dir-p "/a/b" "/a/c"))
+  (should-not (enkan-repl--transcript-same-dir-p nil "/a/b")))
+
+(ert-deftest test-enkan-repl--transcript-render-turns-max ()
+  "The shared renderer keeps only the last MAX-TURNS turns."
+  (let ((turns (list '(:role "user" :text "1")
+                     '(:role "assistant" :text "2")
+                     '(:role "user" :text "3"))))
+    (should (string= "◀ assistant\n2\n\n▶ user\n3"
+                     (enkan-repl--transcript-render-turns turns 2)))))
+
 (provide 'enkan-repl-transcript-test)
 
 ;;; enkan-repl-transcript-test.el ends here
