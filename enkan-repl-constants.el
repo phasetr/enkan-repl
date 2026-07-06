@@ -21,6 +21,7 @@
     ("enkan-repl-send-4" . "Send \\\\='4\\\\=' to enkan session buffer with optional PFX. - From enkan buffer: Send to current buffer - From other buffer without prefix: Interactive buffer selection - With numeric prefix: Send to buffer at index (1-based)  Uses unified backend with smart buffer detection.  Category: Text Sender")
     ("enkan-repl-send-5" . "Send \\\\='5\\\\=' to enkan session buffer with optional PFX. - From enkan buffer: Send to current buffer - From other buffer without prefix: Interactive buffer selection - With numeric prefix: Send to buffer at index (1-based)  Uses unified backend with smart buffer detection.  Category: Text Sender")
     ("enkan-repl-clear-input" . "Clear the input field of the target enkan session buffer with optional PFX. Sends C-u (kill to beginning of line) to the target CLI so text mistakenly typed into the wrong workspace's input box can be removed without submitting it.  No Enter is sent. - From enkan buffer: Send to current buffer - From other buffer without prefix: Interactive buffer selection - With numeric prefix: Send to buffer at index (1-based)  Uses unified backend with smart buffer detection.  Category: Text Sender")
+    ("enkan-repl-show-transcript" . "Show the AI CLI chat transcript for the target session's project. Full-screen CLIs (Claude Code, codex) redraw in place and keep no tmux scrollback, so this reads the CLI's own on-disk transcript for the target pane's working directory and shows it in a read-only buffer. - From enkan buffer: use the current buffer's session - Without prefix from elsewhere: interactive buffer selection - With numeric prefix PFX: use the session at that index (1-based)  Category: Utilities")
     ("enkan-repl-recenter-bottom" . "Recenter all enkan terminal buffers at bottom.  Category: Utilities")
     ("enkan-repl-open-project-input-file" . "Open or create project input file for DIRECTORY. If DIRECTORY is nil, use current `default-directory'. If project input file exists, open it directly. If not exists, create from template then open.  Category: Utilities")
     ("enkan-repl-start-session" . "Start a terminal session in the current directory. This is the backend-neutral session starter.  It works with both the eat and tmux terminal backends configured by `enkan-repl-terminal-backend'. FORCE is accepted for interactive compatibility and currently ignored; the command always starts a new session.  Category: Session Controller")
@@ -37,7 +38,7 @@
 Each element is a cons cell (FUNCTION-NAME . DESCRIPTION).")
 
 (defconst enkan-repl-cheat-sheet-function-count
-  22
+  23
   "Number of functions in cheat-sheet.")
 
 (provide 'enkan-repl-constants)

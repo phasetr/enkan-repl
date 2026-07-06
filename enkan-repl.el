@@ -76,6 +76,10 @@
               (unless noninteractive
                 (ignore-errors (enkan-repl-state-save))))))
 
+;; Load AI CLI transcript reader (Claude Code, codex)
+(when (locate-library "enkan-repl-transcript")
+  (require 'enkan-repl-transcript))
+
 ;; Load workspace management functions
 (when (locate-library "enkan-repl-workspace")
   (require 'enkan-repl-workspace))
@@ -146,6 +150,10 @@
 (declare-function enkan-repl--get-project-info-from-directories "enkan-repl-utils" (alias target-directories))
 (declare-function enkan-repl--get-project-path-from-directories "enkan-repl-utils" (project-name target-directories))
 (declare-function enkan-repl--send-primitive "enkan-repl-utils" (text special-key-type))
+(declare-function enkan-repl--transcript-buffer-cwd "enkan-repl-transcript" (buffer))
+(declare-function enkan-repl--transcript-claude-load "enkan-repl-transcript" (cwd &optional max-turns))
+(declare-function enkan-repl--transcript-display "enkan-repl-transcript" (file text cwd))
+(defvar enkan-repl-transcript-max-turns)
 (declare-function enkan-repl--buffer-name-matches-workspace "enkan-repl-utils" (name workspace-id))
 (declare-function enkan-repl--extract-workspace-id "enkan-repl-utils" (name))
 (declare-function enkan-repl-workspace-list--get-workspace-at-point
@@ -1421,6 +1429,61 @@ Uses unified backend with smart buffer detection.
 Category: Text Sender"
   (interactive "P")
   (enkan-repl--send-unified "\C-u" pfx :key-literal))
+
+(defun enkan-repl--pick-target-buffer (pfx prompt)
+  "Resolve a target enkan terminal buffer using PFX like the send commands.
+PROMPT labels the interactive selection.  Return the buffer, or nil when
+none is available or the selection is aborted."
+  (let* ((resolution (enkan-repl--resolve-send-target
+                      pfx nil
+                      (enkan-repl--ws-current-project)
+                      (enkan-repl--projects-with-current-aliases
+                       enkan-repl-projects
+                       (enkan-repl--ws-current-project)
+                       enkan-repl-project-aliases)
+                      enkan-repl-target-directories))
+         (status (plist-get resolution :status)))
+    (pcase status
+      ((or 'no-buffers 'invalid)
+       (message "%s" (plist-get resolution :message))
+       nil)
+      ((or 'selected 'single)
+       (plist-get resolution :buffer))
+      ('needs-selection
+       (let* ((buffers (plist-get resolution :buffers))
+              (choices (enkan-repl--build-buffer-selection-choices buffers))
+              (selection (hmenu prompt choices)))
+         (cdr (assoc selection choices)))))))
+
+;;;###autoload
+(defun enkan-repl-show-transcript (&optional pfx)
+  "Show the AI CLI chat transcript for the target session's project.
+Full-screen CLIs (Claude Code, codex) redraw in place and keep no tmux
+scrollback, so this reads the CLI's own on-disk transcript for the target
+pane's working directory and shows it in a read-only buffer.
+- From enkan buffer: use the current buffer's session
+- Without prefix from elsewhere: interactive buffer selection
+- With numeric prefix PFX: use the session at that index (1-based)
+
+Category: Utilities"
+  (interactive "P")
+  (let ((buffer (enkan-repl--pick-target-buffer
+                 pfx "Select buffer for transcript:")))
+    (when buffer
+      (let ((cwd (enkan-repl--transcript-buffer-cwd buffer)))
+        (cond
+         ((not cwd)
+          (message "Could not determine working directory for %s"
+                   (buffer-name buffer)))
+         (t
+          (let ((result (enkan-repl--transcript-claude-load
+                         cwd enkan-repl-transcript-max-turns)))
+            (if (null result)
+                (message "No Claude Code transcript found for %s" cwd)
+              (enkan-repl--transcript-display
+               (plist-get result :file)
+               (plist-get result :text)
+               cwd)))))))))
 
 
 ;;;###autoload
