@@ -659,6 +659,21 @@ process returns."
   :type 'integer
   :group 'enkan-repl-terminal)
 
+(defcustom enkan-repl-tmux-mirror-accumulate t
+  "When non-nil, accumulate tmux mirror content by appending new lines.
+Each `tmux capture-pane' returns only whatever tmux currently holds (its
+scrollback plus the visible viewport).  Full-screen AI CLIs (Claude Code,
+codex) redraw their conversation in place, so a single capture often exposes
+just a fraction of the chat history and the mirror would otherwise shrink to
+that viewport.  With accumulation on, each capture is merged into a growing
+transcript: the overlap between the accumulated tail and the new capture head
+is detected and only genuinely new lines are appended, so the mirror reliably
+keeps up to `enkan-repl-tmux-mirror-display-lines' lines of history regardless
+of tmux scrollback limits.  When nil, the mirror is replaced with each
+snapshot (legacy behavior)."
+  :type 'boolean
+  :group 'enkan-repl-terminal)
+
 (defcustom enkan-repl-tmux-mirror-capture-timeout 3.0
   "Seconds before an in-flight tmux mirror capture is cancelled.
 This bounds how long `enkan-repl-tmux-refresh-current' can wait on a stuck
@@ -704,6 +719,12 @@ the complete output."
 
 (defvar-local enkan-repl--tmux-mirror-last-content-hash nil
   "Buffer-local hash of the last captured tmux mirror content.")
+
+(defvar-local enkan-repl--tmux-mirror-accumulated nil
+  "Buffer-local accumulated tmux mirror transcript.
+Holds the growing merge of successive `tmux capture-pane' snapshots when
+`enkan-repl-tmux-mirror-accumulate' is non-nil.  Bounded to
+`enkan-repl-tmux-mirror-max-chars' characters (oldest content dropped).")
 
 (defvar enkan-repl--tmux-bell-monitor-timer nil
   "Timer used to poll tmux bell alerts for completion notifications.")
@@ -1261,6 +1282,62 @@ When MAX-CHARS is nil or non-positive, return the full concatenation."
          "\n"))
     content))
 
+(defun enkan-repl--terminal-tmux--bound-chars (content)
+  "Return CONTENT truncated to `enkan-repl-tmux-mirror-max-chars', keeping tail.
+When the limit is nil or non-positive, return CONTENT unchanged."
+  (let ((max-chars (and (integerp enkan-repl-tmux-mirror-max-chars)
+                        (> enkan-repl-tmux-mirror-max-chars 0)
+                        enkan-repl-tmux-mirror-max-chars)))
+    (if (and max-chars (> (length content) max-chars))
+        (substring content (- max-chars))
+      content)))
+
+(defun enkan-repl--terminal-tmux--strip-trailing-blank-lines (content)
+  "Return CONTENT with trailing blank (whitespace-only) lines removed.
+`tmux capture-pane' pads the viewport with blank lines up to the pane height;
+dropping them keeps the accumulated transcript clean and stabilizes overlap
+detection.  This is a pure function."
+  (let ((lines (split-string content "\n")))
+    (while (and (cdr lines)
+                (string-match-p "\\`[[:space:]]*\\'" (car (last lines))))
+      (setq lines (butlast lines)))
+    (when (and lines
+               (= (length lines) 1)
+               (string-match-p "\\`[[:space:]]*\\'" (car lines)))
+      (setq lines nil))
+    (string-join lines "\n")))
+
+(defun enkan-repl--terminal-tmux--merge-append (accumulated capture)
+  "Merge CAPTURE into the ACCUMULATED tmux transcript and return the result.
+CAPTURE is the latest `tmux capture-pane' snapshot; ACCUMULATED is the
+transcript kept so far (nil or empty on the first capture).  The longest
+overlap between the tail of ACCUMULATED and the head of CAPTURE is detected
+so a clean upward scroll appends only its genuinely new lines, giving a
+growing transcript instead of a viewport-sized snapshot.  When no overlap is
+found the whole capture is appended (simple fallback); when the capture is
+fully contained in the accumulated tail nothing is added.  This is a pure
+function."
+  (let ((capture (enkan-repl--terminal-tmux--strip-trailing-blank-lines
+                  (or capture ""))))
+    (cond
+     ((or (null accumulated) (string-empty-p accumulated)) capture)
+     ((string-empty-p capture) accumulated)
+     (t
+      (let* ((acc-lines (split-string accumulated "\n"))
+             (new-lines (split-string capture "\n"))
+             (max-k (min (length acc-lines) (length new-lines)))
+             (k 0)
+             (i max-k))
+        ;; Largest K such that the last K lines of ACCUMULATED equal the
+        ;; first K lines of CAPTURE (a clean upward scroll of the rest).
+        (while (and (> i 0) (= k 0))
+          (when (equal (last acc-lines i) (cl-subseq new-lines 0 i))
+            (setq k i))
+          (setq i (1- i)))
+        (if (= k (length new-lines))
+            accumulated
+          (string-join (append acc-lines (nthcdr k new-lines)) "\n")))))))
+
 (defun enkan-repl--terminal-tmux--prepare-mirror-content (content)
   "Return bounded, display-ready tmux mirror CONTENT."
   (let* ((max-chars (and (integerp enkan-repl-tmux-mirror-max-chars)
@@ -1353,12 +1430,20 @@ STARTED is the capture start time.  STATUS is the tmux process exit status."
          ((null content)
           (enkan-repl--terminal-tmux--mirror-mark-closed))
          (t
-          (let* ((content
-                  (enkan-repl--terminal-tmux--prepare-mirror-content content))
+          (let* ((merged
+                  (if enkan-repl-tmux-mirror-accumulate
+                      (enkan-repl--terminal-tmux--bound-chars
+                       (enkan-repl--terminal-tmux--merge-append
+                        enkan-repl--tmux-mirror-accumulated content))
+                    content))
+                 (content
+                  (enkan-repl--terminal-tmux--prepare-mirror-content merged))
                  (content-hash (secure-hash 'sha1 content))
                  (window-state (enkan-repl--terminal-tmux--mirror-window-state
                                 buffer))
                  (inhibit-read-only t))
+            (when enkan-repl-tmux-mirror-accumulate
+              (setq enkan-repl--tmux-mirror-accumulated merged))
             (setq enkan-repl--tmux-mirror-last-refresh-time (current-time))
             (setq enkan-repl--tmux-mirror-last-refresh-duration
                   (float-time

@@ -1000,5 +1000,58 @@ must be coerced to that string id."
     (should (string= "anything"
                      (enkan-repl--terminal--coerce-id "anything")))))
 
+(ert-deftest test-enkan-repl--terminal-tmux--strip-trailing-blank-lines ()
+  "Trailing blank lines are removed; interior blanks and content are kept."
+  (should (string= "a\nb"
+                   (enkan-repl--terminal-tmux--strip-trailing-blank-lines
+                    "a\nb\n\n   \n")))
+  (should (string= "a\n\nb"
+                   (enkan-repl--terminal-tmux--strip-trailing-blank-lines
+                    "a\n\nb")))
+  (should (string= ""
+                   (enkan-repl--terminal-tmux--strip-trailing-blank-lines
+                    "\n  \n"))))
+
+(ert-deftest test-enkan-repl--terminal-tmux--merge-append-first-capture ()
+  "The first capture (nil/empty accumulator) becomes the transcript."
+  (should (string= "a\nb\nc"
+                   (enkan-repl--terminal-tmux--merge-append nil "a\nb\nc\n\n")))
+  (should (string= "a\nb\nc"
+                   (enkan-repl--terminal-tmux--merge-append "" "a\nb\nc"))))
+
+(ert-deftest test-enkan-repl--terminal-tmux--merge-append-scroll ()
+  "A clean upward scroll appends only the genuinely new tail lines."
+  ;; Accumulated ends with the previous viewport [b c d]; the next capture
+  ;; [c d e f] overlaps on [c d] and contributes [e f].
+  (should (string= "a\nb\nc\nd\ne\nf"
+                   (enkan-repl--terminal-tmux--merge-append
+                    "a\nb\nc\nd" "c\nd\ne\nf"))))
+
+(ert-deftest test-enkan-repl--terminal-tmux--merge-append-contained-noop ()
+  "A capture fully contained in the accumulated tail adds nothing."
+  (should (string= "a\nb\nc\nd"
+                   (enkan-repl--terminal-tmux--merge-append
+                    "a\nb\nc\nd" "c\nd")))
+  (should (string= "a\nb\nc\nd"
+                   (enkan-repl--terminal-tmux--merge-append
+                    "a\nb\nc\nd" "b\nc\nd"))))
+
+(ert-deftest test-enkan-repl--terminal-tmux--merge-append-fresh-fallback ()
+  "With no overlap the whole capture is appended (simple fallback)."
+  (should (string= "a\nb\nx\ny"
+                   (enkan-repl--terminal-tmux--merge-append
+                    "a\nb" "x\ny"))))
+
+(ert-deftest test-enkan-repl--terminal-tmux--bound-chars ()
+  "Content longer than the limit keeps its tail; shorter content is intact."
+  (let ((enkan-repl-tmux-mirror-max-chars 4))
+    (should (string= "cdef"
+                     (enkan-repl--terminal-tmux--bound-chars "abcdef")))
+    (should (string= "ab"
+                     (enkan-repl--terminal-tmux--bound-chars "ab"))))
+  (let ((enkan-repl-tmux-mirror-max-chars 0))
+    (should (string= "abcdef"
+                     (enkan-repl--terminal-tmux--bound-chars "abcdef")))))
+
 (provide 'enkan-repl-terminal-test)
 ;;; enkan-repl-terminal-test.el ends here
