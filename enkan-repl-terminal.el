@@ -456,6 +456,16 @@ screen and tmux keeps its output in scrollback."
     (enkan-repl--terminal-tmux--call
      (list "set-option" "-w" "-t" pane "alternate-screen" "off"))))
 
+(defun enkan-repl--terminal-tmux--apply-history-limit ()
+  "Set the global tmux `history-limit' when `enkan-repl-tmux-history-limit'.
+tmux fixes a pane's scrollback size at creation time, so this must run before
+`new-session'/`new-window' for the resulting panes to keep that many lines."
+  (when (and (integerp enkan-repl-tmux-history-limit)
+             (> enkan-repl-tmux-history-limit 0))
+    (enkan-repl--terminal-tmux--call
+     (list "set-option" "-g" "history-limit"
+           (number-to-string enkan-repl-tmux-history-limit)))))
+
 (defun enkan-repl--terminal-tmux-start (dir)
   "Tmux backend: start a new session/window in DIR for current workspace.
 Ensures the workspace's tmux session exists (creating it on demand) and
@@ -466,6 +476,7 @@ target identifier (e.g. \"enkan-01:lat\")."
          (base (enkan-repl--terminal-tmux--derive-base-name dir))
          (cdir (expand-file-name dir)))
     (enkan-repl--terminal-tmux--ensure-bell-monitor)
+    (enkan-repl--terminal-tmux--apply-history-limit)
     (cond
      ;; Session does not exist: create it with the first window in DIR.
      ((not (enkan-repl--terminal-tmux--has-session session))
@@ -637,40 +648,46 @@ latency when many background panes exist."
   :type 'integer
   :group 'enkan-repl-terminal)
 
-(defcustom enkan-repl-tmux-mirror-history-lines 320
-  "Number of recent tmux lines to capture per refresh.
-The mirror is a bounded recent-status view, not a full transcript.  The
-default is large enough to preserve longer proposals while keeping manual
-refresh work bounded."
+(defcustom enkan-repl-tmux-mirror-history-lines 10000
+  "Number of tmux scrollback lines to capture per refresh (the `-S' depth).
+With the alternate screen disabled (see
+`enkan-repl-tmux-disable-alternate-screen'), tmux keeps the real, already
+de-duplicated conversation in its own scrollback, and `tmux capture-pane -S
+-N' returns it directly.  This is the depth of that read; keep it large enough
+to cover the chat history you want to see.  The pane must actually retain that
+many lines — see `enkan-repl-tmux-history-limit'."
   :type 'integer
   :group 'enkan-repl-terminal)
 
-(defcustom enkan-repl-tmux-mirror-display-lines 240
-  "Maximum number of lines kept in a tmux mirror buffer.
-This bounds the Emacs buffer size; captured output is mirrored verbatim."
+(defcustom enkan-repl-tmux-mirror-display-lines 10000
+  "Maximum number of lines kept and shown in a tmux mirror buffer.
+This bounds the Emacs buffer size; captured output is mirrored verbatim.
+Set it as large as the chat history you want visible; it is capped in
+practice by `enkan-repl-tmux-mirror-history-lines' (capture depth) and
+`enkan-repl-tmux-mirror-max-chars'."
   :type 'integer
   :group 'enkan-repl-terminal)
 
-(defcustom enkan-repl-tmux-mirror-max-chars (* 256 1024)
+(defcustom enkan-repl-tmux-mirror-max-chars (* 4 1024 1024)
   "Maximum characters to apply to a tmux mirror buffer per refresh.
 When captured content is larger than this value, keep the tail of the
 capture.  This bounds main-thread work after the asynchronous tmux
-process returns."
+process returns.  Keep it large enough that it does not truncate
+`enkan-repl-tmux-mirror-display-lines' lines (roughly display-lines times
+the average line width)."
   :type 'integer
   :group 'enkan-repl-terminal)
 
-(defcustom enkan-repl-tmux-mirror-accumulate t
+(defcustom enkan-repl-tmux-mirror-accumulate nil
   "When non-nil, accumulate tmux mirror content by appending new lines.
-Each `tmux capture-pane' returns only whatever tmux currently holds (its
-scrollback plus the visible viewport).  Full-screen AI CLIs (Claude Code,
-codex) redraw their conversation in place, so a single capture often exposes
-just a fraction of the chat history and the mirror would otherwise shrink to
-that viewport.  With accumulation on, each capture is merged into a growing
-transcript: the overlap between the accumulated tail and the new capture head
-is detected and only genuinely new lines are appended, so the mirror reliably
-keeps up to `enkan-repl-tmux-mirror-display-lines' lines of history regardless
-of tmux scrollback limits.  When nil, the mirror is replaced with each
-snapshot (legacy behavior)."
+DISABLED BY DEFAULT.  This merges successive `tmux capture-pane' viewports
+into a growing transcript by overlap detection.  It works only when the pane
+scrolls cleanly line by line.  Full-screen AI CLIs (Claude Code, codex) redraw
+their viewport in place, so consecutive captures share no clean scroll overlap
+and the whole viewport is appended every refresh — producing duplicated frames
+that evict real history.  Prefer nil and read tmux's own scrollback directly
+via `enkan-repl-tmux-mirror-history-lines'; tmux keeps the de-duplicated
+transcript for you.  Kept as an opt-in for backends that do scroll cleanly."
   :type 'boolean
   :group 'enkan-repl-terminal)
 
@@ -679,6 +696,18 @@ snapshot (legacy behavior)."
 This bounds how long `enkan-repl-tmux-refresh-current' can wait on a stuck
 tmux capture process."
   :type 'number
+  :group 'enkan-repl-terminal)
+
+(defcustom enkan-repl-tmux-history-limit 50000
+  "tmux `history-limit' (scrollback size) to apply for enkan panes.
+tmux fixes a pane's scrollback size when the pane is created (default 2000),
+so `tmux capture-pane -S -N' can never return more lines than the pane
+retained.  When non-nil, enkan sets this as the global tmux `history-limit'
+before creating a session/window so new enkan panes keep this many lines,
+letting `enkan-repl-tmux-mirror-history-lines' actually reach that far back.
+Existing (already-created) panes are not affected — restart them, or set
+`history-limit' in your tmux.conf.  Set to nil to leave tmux's value alone."
+  :type '(choice (const :tag "Leave tmux default" nil) integer)
   :group 'enkan-repl-terminal)
 
 (defcustom enkan-repl-tmux-disable-alternate-screen t
