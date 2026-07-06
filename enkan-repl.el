@@ -1406,6 +1406,22 @@ Category: Text Sender"
   (interactive "P")
   (enkan-repl--send-unified "" pfx 5))
 
+;;;###autoload
+(defun enkan-repl-clear-input (&optional pfx)
+  "Clear the input field of the target enkan session buffer with optional PFX.
+Sends C-u (kill to beginning of line) to the target CLI so text mistakenly
+typed into the wrong workspace's input box can be removed without submitting
+it.  No Enter is sent.
+- From enkan buffer: Send to current buffer
+- From other buffer without prefix: Interactive buffer selection
+- With numeric prefix: Send to buffer at index (1-based)
+
+Uses unified backend with smart buffer detection.
+
+Category: Text Sender"
+  (interactive "P")
+  (enkan-repl--send-unified "\C-u" pfx :key-literal))
+
 
 ;;;###autoload
 (defun enkan-repl-recenter-bottom ()
