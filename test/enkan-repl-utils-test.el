@@ -205,6 +205,19 @@
       (when (file-exists-p test-file)
         (delete-file test-file)))))
 
+(ert-deftest test-enkan-repl--send-primitive-key-literal ()
+  "`:key-literal' sends TEXT verbatim as a key action (no trailing CR)."
+  (let ((result (enkan-repl--send-primitive "\C-u" :key-literal)))
+    (should (string= "\C-u" (plist-get result :content)))
+    (should (eq 'key (plist-get result :action)))))
+
+(ert-deftest test-enkan-repl--send-primitive-escape-and-enter ()
+  "Existing key types keep their content and key action."
+  (should (equal '(:content "\e" :action key)
+                 (enkan-repl--send-primitive "" :escape)))
+  (should (equal '(:content "\r" :action key)
+                 (enkan-repl--send-primitive "" :enter))))
+
 (provide 'enkan-repl-utils-test)
 
 ;;; enkan-repl-utils-test.el ends here

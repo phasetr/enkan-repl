@@ -748,13 +748,17 @@ This is a pure function."
 (defun enkan-repl--send-primitive (text special-key-type)
   "Pure function to prepare send content from TEXT and SPECIAL-KEY-TYPE.
 TEXT: original text content
-SPECIAL-KEY-TYPE: :enter, :escape, number 1-9, or nil
+SPECIAL-KEY-TYPE: :enter, :escape, :key-literal, number 1-9, or nil
+`:key-literal' sends TEXT verbatim as a key action (no trailing CR), used
+for control sequences such as clearing the input line.
 Returns plist with :content (string to send) and :action (action type)."
   (cond
    ((eq special-key-type :enter)
     (list :content "\r" :action 'key))
    ((eq special-key-type :escape)
     (list :content "\e" :action 'key))
+   ((eq special-key-type :key-literal)
+    (list :content text :action 'key))
    ((and (numberp special-key-type)
          (>= special-key-type 1)
          (<= special-key-type 9))

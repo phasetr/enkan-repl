@@ -108,6 +108,45 @@ documented opt-in alternative; see README."
                         nil)
                       calls)))))
 
+(ert-deftest test-enkan-repl--terminal-tmux-start-applies-history-limit ()
+  "Starting a session should raise the global tmux history-limit first."
+  (let ((enkan-repl--current-workspace "01")
+        (enkan-repl-tmux-session-prefix "enkan-")
+        (enkan-repl-tmux-history-limit 50000)
+        calls)
+    (cl-letf (((symbol-function 'enkan-repl--terminal-tmux--ensure-bell-monitor)
+               (lambda () nil))
+              ((symbol-function 'enkan-repl--terminal-tmux--has-session)
+               (lambda (_session) nil))
+              ((symbol-function 'enkan-repl--terminal-tmux--call)
+               (lambda (args &optional capture)
+                 (push (list args capture) calls)
+                 (when (member "new-session" args)
+                   "%12"))))
+      (enkan-repl--terminal-tmux-start "/repo/proj/")
+      (should (member '(("set-option" "-g" "history-limit" "50000") nil)
+                      calls)))))
+
+(ert-deftest test-enkan-repl--terminal-tmux-start-skips-history-limit-when-nil ()
+  "A nil history-limit should leave tmux untouched."
+  (let ((enkan-repl--current-workspace "01")
+        (enkan-repl-tmux-session-prefix "enkan-")
+        (enkan-repl-tmux-history-limit nil)
+        calls)
+    (cl-letf (((symbol-function 'enkan-repl--terminal-tmux--ensure-bell-monitor)
+               (lambda () nil))
+              ((symbol-function 'enkan-repl--terminal-tmux--has-session)
+               (lambda (_session) nil))
+              ((symbol-function 'enkan-repl--terminal-tmux--call)
+               (lambda (args &optional capture)
+                 (push (list args capture) calls)
+                 (when (member "new-session" args)
+                   "%12"))))
+      (enkan-repl--terminal-tmux-start "/repo/proj/")
+      (should-not (cl-find "history-limit" calls
+                           :key (lambda (c) (nth 2 (car c)))
+                           :test #'equal)))))
+
 (ert-deftest test-enkan-repl--terminal-tmux-start-keeps-alternate-screen-when-off ()
   "Disabling the option should keep tmux alternate screen untouched."
   (let ((enkan-repl--current-workspace "01")
@@ -124,9 +163,10 @@ documented opt-in alternative; see README."
                  (when (member "new-session" args)
                    "%12"))))
       (enkan-repl--terminal-tmux-start "/repo/proj/")
-      (should-not (cl-find "set-option" calls
-                           :key (lambda (c) (car (car c)))
-                           :test #'equal)))))
+      ;; History-limit set-option may still be issued; only the alternate-screen
+      ;; option must be absent.
+      (should-not (cl-find "alternate-screen" calls
+                           :test (lambda (target call) (member target (car call))))))))
 
 (ert-deftest test-enkan-repl--terminal-tmux--capture-pane-async-targets-pane-id ()
   "Mirror capture for dr-remote.jp should pass %pane_id to tmux -t."
@@ -652,10 +692,13 @@ documented opt-in alternative; see README."
                     "abc" "def" nil))))
 
 (ert-deftest test-enkan-repl-tmux-mirror-default-limits ()
-  "Default tmux mirror limits should preserve useful proposal context."
-  (should (= 320 enkan-repl-tmux-mirror-history-lines))
-  (should (= 240 enkan-repl-tmux-mirror-display-lines))
-  (should (= (* 256 1024) enkan-repl-tmux-mirror-max-chars)))
+  "Default tmux mirror limits should expose a large real chat history."
+  (should (= 10000 enkan-repl-tmux-mirror-history-lines))
+  (should (= 10000 enkan-repl-tmux-mirror-display-lines))
+  (should (= (* 4 1024 1024) enkan-repl-tmux-mirror-max-chars))
+  ;; Append accumulation duplicates frames for in-place-redraw TUIs, so it is
+  ;; off by default; tmux scrollback is read directly instead.
+  (should-not enkan-repl-tmux-mirror-accumulate))
 
 (ert-deftest test-enkan-repl--terminal-tmux--prepare-mirror-content-keeps-proposal-defaults ()
   "Default mirror preparation should keep a moderate proposal from the start."
@@ -999,6 +1042,59 @@ must be coerced to that string id."
   (let ((enkan-repl-terminal-backend 'eat))
     (should (string= "anything"
                      (enkan-repl--terminal--coerce-id "anything")))))
+
+(ert-deftest test-enkan-repl--terminal-tmux--strip-trailing-blank-lines ()
+  "Trailing blank lines are removed; interior blanks and content are kept."
+  (should (string= "a\nb"
+                   (enkan-repl--terminal-tmux--strip-trailing-blank-lines
+                    "a\nb\n\n   \n")))
+  (should (string= "a\n\nb"
+                   (enkan-repl--terminal-tmux--strip-trailing-blank-lines
+                    "a\n\nb")))
+  (should (string= ""
+                   (enkan-repl--terminal-tmux--strip-trailing-blank-lines
+                    "\n  \n"))))
+
+(ert-deftest test-enkan-repl--terminal-tmux--merge-append-first-capture ()
+  "The first capture (nil/empty accumulator) becomes the transcript."
+  (should (string= "a\nb\nc"
+                   (enkan-repl--terminal-tmux--merge-append nil "a\nb\nc\n\n")))
+  (should (string= "a\nb\nc"
+                   (enkan-repl--terminal-tmux--merge-append "" "a\nb\nc"))))
+
+(ert-deftest test-enkan-repl--terminal-tmux--merge-append-scroll ()
+  "A clean upward scroll appends only the genuinely new tail lines."
+  ;; Accumulated ends with the previous viewport [b c d]; the next capture
+  ;; [c d e f] overlaps on [c d] and contributes [e f].
+  (should (string= "a\nb\nc\nd\ne\nf"
+                   (enkan-repl--terminal-tmux--merge-append
+                    "a\nb\nc\nd" "c\nd\ne\nf"))))
+
+(ert-deftest test-enkan-repl--terminal-tmux--merge-append-contained-noop ()
+  "A capture fully contained in the accumulated tail adds nothing."
+  (should (string= "a\nb\nc\nd"
+                   (enkan-repl--terminal-tmux--merge-append
+                    "a\nb\nc\nd" "c\nd")))
+  (should (string= "a\nb\nc\nd"
+                   (enkan-repl--terminal-tmux--merge-append
+                    "a\nb\nc\nd" "b\nc\nd"))))
+
+(ert-deftest test-enkan-repl--terminal-tmux--merge-append-fresh-fallback ()
+  "With no overlap the whole capture is appended (simple fallback)."
+  (should (string= "a\nb\nx\ny"
+                   (enkan-repl--terminal-tmux--merge-append
+                    "a\nb" "x\ny"))))
+
+(ert-deftest test-enkan-repl--terminal-tmux--bound-chars ()
+  "Content longer than the limit keeps its tail; shorter content is intact."
+  (let ((enkan-repl-tmux-mirror-max-chars 4))
+    (should (string= "cdef"
+                     (enkan-repl--terminal-tmux--bound-chars "abcdef")))
+    (should (string= "ab"
+                     (enkan-repl--terminal-tmux--bound-chars "ab"))))
+  (let ((enkan-repl-tmux-mirror-max-chars 0))
+    (should (string= "abcdef"
+                     (enkan-repl--terminal-tmux--bound-chars "abcdef")))))
 
 (provide 'enkan-repl-terminal-test)
 ;;; enkan-repl-terminal-test.el ends here
