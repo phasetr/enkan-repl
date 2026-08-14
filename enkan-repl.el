@@ -2893,8 +2893,14 @@ and vice versa.  Buffers needing neither change are omitted entirely."
 (defun enkan-repl--check-workspace-buffer-rename-plan (plan)
   "Signal `user-error' on any rename collision in PLAN.
 A collision is a PLAN entry's :new-name already naming a live buffer that
-PLAN itself is not also renaming away."
-  (let ((sources (mapcar (lambda (entry) (plist-get entry :buffer)) plan)))
+PLAN itself is not also renaming away.  Only entries that actually carry a
+:new-name count as \"renaming away\" -- a PLAN entry present solely for a
+:new-mirror-id update keeps its current buffer name forever, so it must
+still count as a collision target for any other entry's :new-name."
+  (let ((sources (delq nil (mapcar (lambda (entry)
+                                     (and (plist-get entry :new-name)
+                                          (plist-get entry :buffer)))
+                                   plan))))
     (dolist (entry plan)
       (let* ((new-name (plist-get entry :new-name))
              (existing (and new-name (get-buffer new-name))))
@@ -2926,7 +2932,7 @@ entries applied."
 Fills a numbering gap left by a deleted workspace; the `max+1' logic in
 `enkan-repl--generate-next-workspace-id' for newly created workspaces is
 left untouched.  All validation -- id well-formedness, tmux target
-collision, and buffer-name collision -- happens before any state is
+collision, and buffer name collision -- happens before any state is
 touched: the buffer rename plan is built and checked first so a buffer
 collision cannot be discovered mid-rename, after tmux has already moved.
 Only once every check has passed does it rename the live tmux session (if

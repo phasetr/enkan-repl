@@ -365,6 +365,24 @@ pointing at the pre-rename tmux session."
                                                 manual-buffer)))))
       (when (buffer-live-p manual-buffer) (kill-buffer manual-buffer)))))
 
+(ert-deftest test-enkan-repl--check-workspace-buffer-rename-plan-catches-static-name-collision ()
+  "A plan entry present only for a :new-mirror-id update (its own name never
+changes) must still count as a collision target for another entry's
+:new-name -- it is not \"being renamed away\" just because it happens to
+be in the plan."
+  (let* ((static-buffer (generate-new-buffer "*ws:02 enkan:/repo/b/*"))
+         (moving-buffer (generate-new-buffer "*ws:03 enkan:/repo/b/*"))
+         (plan (list (list :buffer static-buffer :new-name nil
+                            :new-mirror-id "enkan-02:lat|%9")
+                     (list :buffer moving-buffer
+                           :new-name "*ws:02 enkan:/repo/b/*"
+                           :new-mirror-id nil))))
+    (unwind-protect
+        (should-error (enkan-repl--check-workspace-buffer-rename-plan plan)
+                      :type 'user-error)
+      (when (buffer-live-p static-buffer) (kill-buffer static-buffer))
+      (when (buffer-live-p moving-buffer) (kill-buffer moving-buffer)))))
+
 (ert-deftest test-enkan-repl-workspace-renumber-rejects-non-numeric-input ()
   "Empty or non-numeric interactive input must not silently become \"00\"."
   (let ((enkan-repl--workspaces '(("01" . (:current-project "a"))
