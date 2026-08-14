@@ -340,6 +340,31 @@ now looks occupied."
       (when (buffer-live-p source-buffer) (kill-buffer source-buffer))
       (when (buffer-live-p colliding-buffer) (kill-buffer colliding-buffer)))))
 
+(ert-deftest test-enkan-repl--workspace-buffer-rename-plan-updates-mirror-id-for-manual-names ()
+  "A mirror buffer's tmux-mirror-id must be rewritten even when the buffer's
+own name does not match either the canonical `*ws:NN enkan:...*' form or
+the raw `*tmux <id>*' fallback -- e.g. the user manually renamed it. Such a
+buffer still belongs to the workspace (per
+`enkan-repl--buffer-matches-workspace-p') and must not be silently left
+pointing at the pre-rename tmux session."
+  (let* ((enkan-repl-tmux-session-prefix "enkan-")
+         (manual-buffer (generate-new-buffer "my-custom-terminal-name")))
+    (unwind-protect
+        (progn
+          (with-current-buffer manual-buffer
+            (setq-local enkan-repl--tmux-mirror-id "enkan-03:lat|%1"))
+          (let ((plan (enkan-repl--workspace-buffer-rename-plan "03" "02")))
+            (should (= 1 (length plan)))
+            (should (eq manual-buffer (plist-get (car plan) :buffer)))
+            (should-not (plist-get (car plan) :new-name))
+            (should (equal "enkan-02:lat|%1" (plist-get (car plan) :new-mirror-id)))
+            (enkan-repl--apply-workspace-buffer-rename-plan plan)
+            (should (equal "my-custom-terminal-name" (buffer-name manual-buffer)))
+            (should (equal "enkan-02:lat|%1"
+                           (buffer-local-value 'enkan-repl--tmux-mirror-id
+                                                manual-buffer)))))
+      (when (buffer-live-p manual-buffer) (kill-buffer manual-buffer)))))
+
 (ert-deftest test-enkan-repl-workspace-renumber-rejects-non-numeric-input ()
   "Empty or non-numeric interactive input must not silently become \"00\"."
   (let ((enkan-repl--workspaces '(("01" . (:current-project "a"))

@@ -2857,11 +2857,13 @@ buffer-local `enkan-repl--tmux-mirror-id'."
    (buffer-list)))
 
 (defun enkan-repl--workspace-buffer-rename-plan (old-id new-id)
-  "Return a rename plan for every live buffer belonging to OLD-ID, without
-mutating anything.  Each plan entry is a plist `(:buffer BUFFER :new-name
-NEW-NAME :new-mirror-id NEW-MIRROR-ID-OR-NIL)' describing what
-`enkan-repl--apply-workspace-buffer-rename-plan' would do to that buffer.
-Buffers whose name is unaffected by the rename are omitted."
+  "Return a plan for moving every live buffer of OLD-ID's session to NEW-ID.
+Does not mutate anything.  Each plan entry is a plist `(:buffer BUFFER
+:new-name NEW-NAME-OR-NIL :new-mirror-id NEW-MIRROR-ID-OR-NIL)' describing
+what `enkan-repl--apply-workspace-buffer-rename-plan' would do to that
+buffer; :new-name is nil when the buffer's name does not need to change
+even though its mirror id does (e.g. a manually renamed mirror buffer),
+and vice versa.  Buffers needing neither change are omitted entirely."
   (let ((new-session (concat enkan-repl-tmux-session-prefix new-id)))
     (delq nil
           (mapcar
@@ -2875,41 +2877,48 @@ Buffers whose name is unaffected by the rename are omitted."
                                           (enkan-repl--terminal-tmux--id-with-session
                                            mirror-id new-session)))
                       (old-name (buffer-name buffer))
-                      (new-name (or (enkan-repl--buffer-name-with-workspace-id
-                                     old-name new-id)
-                                    (and new-mirror-id
-                                         (string= old-name fallback-name)
-                                         (format "*tmux %s*" new-mirror-id)))))
-                 (when (and new-name (not (string= new-name old-name)))
-                   (list :buffer buffer :new-name new-name
-                         :new-mirror-id new-mirror-id)))))
+                      (renamed-name (or (enkan-repl--buffer-name-with-workspace-id
+                                         old-name new-id)
+                                        (and new-mirror-id
+                                             (string= old-name fallback-name)
+                                             (format "*tmux %s*" new-mirror-id))))
+                      (name-changed (and renamed-name (not (string= renamed-name old-name))))
+                      (mirror-changed (and new-mirror-id (not (equal new-mirror-id mirror-id)))))
+                 (when (or name-changed mirror-changed)
+                   (list :buffer buffer
+                         :new-name (and name-changed renamed-name)
+                         :new-mirror-id (and mirror-changed new-mirror-id))))))
            (enkan-repl--workspace-member-buffers old-id)))))
 
 (defun enkan-repl--check-workspace-buffer-rename-plan (plan)
-  "Signal `user-error' when PLAN would rename a buffer onto a name already
-taken by a live buffer outside the plan itself (buffers the plan is also
-renaming away don't count as collisions)."
+  "Signal `user-error' on any rename collision in PLAN.
+A collision is a PLAN entry's :new-name already naming a live buffer that
+PLAN itself is not also renaming away."
   (let ((sources (mapcar (lambda (entry) (plist-get entry :buffer)) plan)))
     (dolist (entry plan)
-      (let ((existing (get-buffer (plist-get entry :new-name))))
+      (let* ((new-name (plist-get entry :new-name))
+             (existing (and new-name (get-buffer new-name))))
         (when (and existing (not (memq existing sources)))
           (user-error
            "Cannot renumber: buffer %s already exists (would collide with renaming %s)"
-           (plist-get entry :new-name) (buffer-name (plist-get entry :buffer))))))))
+           new-name (buffer-name (plist-get entry :buffer))))))))
 
 (defun enkan-repl--apply-workspace-buffer-rename-plan (plan)
-  "Apply PLAN (from `enkan-repl--workspace-buffer-rename-plan'), rewriting
-each buffer's `enkan-repl--tmux-mirror-id' and renaming it.  Callers must
-validate PLAN with `enkan-repl--check-workspace-buffer-rename-plan' first;
-this function assumes it will not encounter a collision.  Returns the
-number of buffers renamed."
+  "Apply PLAN from `enkan-repl--workspace-buffer-rename-plan'.
+Rewrites each entry's buffer-local `enkan-repl--tmux-mirror-id' and/or
+renames the buffer, whichever :new-mirror-id / :new-name call for.
+Callers must validate PLAN with
+`enkan-repl--check-workspace-buffer-rename-plan' first; this function
+assumes it will not encounter a collision.  Returns the number of plan
+entries applied."
   (dolist (entry plan)
     (let ((buffer (plist-get entry :buffer)))
       (when (buffer-live-p buffer)
         (with-current-buffer buffer
           (when (plist-get entry :new-mirror-id)
             (setq enkan-repl--tmux-mirror-id (plist-get entry :new-mirror-id)))
-          (rename-buffer (plist-get entry :new-name))))))
+          (when (plist-get entry :new-name)
+            (rename-buffer (plist-get entry :new-name)))))))
   (length plan))
 
 (defun enkan-repl--renumber-workspace (old-id new-id)
