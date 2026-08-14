@@ -176,9 +176,47 @@ cwd-based name yet) is renamed to match the new session too."
               ((symbol-function 'message)
                (lambda (fmt &rest args)
                  (setq warned (apply #'format fmt args)))))
-      (enkan-repl--renumber-workspace "03" "02")
+      (let ((result (enkan-repl--renumber-workspace "03" "02")))
+        (should (equal "02" (plist-get result :new-id)))
+        (should-not (plist-get result :saved)))
       (should (stringp warned))
       (should (string-match-p "failed to persist" warned)))))
+
+(ert-deftest test-enkan-repl-workspace-renumber-reports-save-failure ()
+  "The interactive command must not claim success when persisting failed;
+the final minibuffer message is what the user actually reads, so an
+internal warning that gets overwritten by an unconditional success message
+is a real UX bug, not just an internal detail."
+  (let* ((enkan-repl--workspaces '(("01" . (:current-project "a"))
+                                    ("03" . (:current-project "b"))))
+         (enkan-repl--current-workspace "01")
+         (final-message nil))
+    (cl-letf (((symbol-function 'enkan-repl--terminal-tmux-rename-workspace)
+               (lambda (_old-id _new-id) t))
+              ((symbol-function 'enkan-repl-state-save)
+               (lambda (&optional _file) nil))
+              ((symbol-function 'message)
+               (lambda (fmt &rest args)
+                 (setq final-message (apply #'format fmt args)))))
+      (enkan-repl-workspace-renumber "03" "02")
+      (should (stringp final-message))
+      (should (string-match-p "failed to persist" final-message)))))
+
+(ert-deftest test-enkan-repl-workspace-renumber-reports-success ()
+  "When persisting succeeds, the interactive command reports plain success."
+  (let* ((enkan-repl--workspaces '(("01" . (:current-project "a"))
+                                    ("03" . (:current-project "b"))))
+         (enkan-repl--current-workspace "01")
+         (final-message nil))
+    (cl-letf (((symbol-function 'enkan-repl--terminal-tmux-rename-workspace)
+               (lambda (_old-id _new-id) t))
+              ((symbol-function 'enkan-repl-state-save)
+               (lambda (&optional _file) t))
+              ((symbol-function 'message)
+               (lambda (fmt &rest args)
+                 (setq final-message (apply #'format fmt args)))))
+      (enkan-repl-workspace-renumber "03" "02")
+      (should (equal "Renumbered workspace 03 to 02" final-message)))))
 
 (provide 'enkan-repl-workspace-renumber-test)
 ;;; enkan-repl-workspace-renumber-test.el ends here

@@ -2908,7 +2908,10 @@ left untouched.  Renames the live tmux session (if any) and every buffer
 belonging to OLD-ID before updating `enkan-repl--workspaces' and
 `enkan-repl--current-workspace', then persists state to disk.  Signals
 `user-error' (without touching state) when the rename is invalid or the
-live tmux session refuses to rename.  Returns NEW-ID."
+live tmux session refuses to rename.  Returns a plist `(:new-id NEW-ID
+:saved SAVED-P)'; callers that report success to the user must check
+:saved rather than assuming persistence succeeded just because no error
+was signaled."
   (unless (enkan-repl--can-rename-workspace enkan-repl--workspaces old-id new-id)
     (user-error "Cannot rename workspace %s to %s" old-id new-id))
   (when (and (fboundp 'enkan-repl--terminal-tmux-rename-workspace)
@@ -2925,8 +2928,8 @@ live tmux session refuses to rename.  Returns NEW-ID."
                     (ignore-errors (enkan-repl-state-save)))))
     (unless saved
       (message "Warning: renumbered workspace %s to %s but failed to persist state to disk"
-               old-id new-id)))
-  new-id)
+               old-id new-id))
+    (list :new-id new-id :saved saved)))
 
 (defun enkan-repl-workspace-renumber (&optional old-id new-id)
   "Renumber a workspace, filling a numbering gap left by a deleted one.
@@ -2954,8 +2957,11 @@ Category: Session Controller"
      ((not (enkan-repl--can-rename-workspace enkan-repl--workspaces old new))
       (user-error "Cannot rename workspace %s to %s" old new))
      (t
-      (enkan-repl--renumber-workspace old new)
-      (message "Renumbered workspace %s to %s" old new)))))
+      (let ((result (enkan-repl--renumber-workspace old new)))
+        (if (plist-get result :saved)
+            (message "Renumbered workspace %s to %s" old new)
+          (message "Renumbered workspace %s to %s, but failed to persist state to disk"
+                   old new)))))))
 
 (provide 'enkan-repl)
 
