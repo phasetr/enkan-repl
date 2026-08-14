@@ -120,6 +120,15 @@ Tmux mirror metadata wins over the buffer name so fallback buffers such as
        (string= (or (enkan-repl--buffer-workspace-id buffer) "")
                 workspace-id)))
 
+(defun enkan-repl--buffer-name-with-workspace-id (name new-workspace-id)
+  "Return NAME with its leading `ws:NN' segment replaced by NEW-WORKSPACE-ID.
+Returns nil when NAME is not an enkan buffer name."
+  (when (enkan-repl--extract-workspace-id name)
+    (replace-regexp-in-string
+     "^\\*ws:[0-9]\\{2\\} enkan:"
+     (format "*ws:%s enkan:" new-workspace-id)
+     name)))
+
 (defun enkan-repl--extract-workspace-id (name)
   "Extract workspace ID from buffer NAME.
 Returns workspace ID string (e.g., \"01\") or nil if not an enkan buffer."

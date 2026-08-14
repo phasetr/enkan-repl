@@ -156,6 +156,9 @@
 (defvar enkan-repl-transcript-max-turns)
 (declare-function enkan-repl--buffer-name-matches-workspace "enkan-repl-utils" (name workspace-id))
 (declare-function enkan-repl--extract-workspace-id "enkan-repl-utils" (name))
+(declare-function enkan-repl--buffer-name-with-workspace-id "enkan-repl-utils" (name new-workspace-id))
+(declare-function enkan-repl--terminal-tmux-rename-workspace "enkan-repl-terminal" (old-id new-id))
+(declare-function enkan-repl--terminal-tmux--id-with-session "enkan-repl-terminal" (id new-session))
 (declare-function enkan-repl-workspace-list--get-workspace-at-point
                   "enkan-repl-workspace-list" ())
 (declare-function enkan-repl-workspace-list-refresh
@@ -169,6 +172,8 @@
 (declare-function enkan-repl--can-delete-workspace "enkan-repl-workspace" (workspace-id workspaces))
 (declare-function enkan-repl--delete-workspace "enkan-repl-workspace" (workspaces workspace-id))
 (declare-function enkan-repl--list-workspace-ids "enkan-repl-workspace" (workspaces))
+(declare-function enkan-repl--can-rename-workspace "enkan-repl-workspace" (workspaces old-id new-id))
+(declare-function enkan-repl--rename-workspace-id "enkan-repl-workspace" (workspaces old-id new-id))
 
 ;; Declare external functions from hmenu to silence byte-compiler when not loaded
 (declare-function hmenu "hmenu" (prompt choices))
@@ -2837,6 +2842,84 @@ Category: Session Controller"
         (when (and workspace-at-point
                    (fboundp 'enkan-repl-workspace-list-refresh))
           (enkan-repl-workspace-list-refresh)))))))
+
+(defun enkan-repl--rename-workspace-buffers (old-id new-id)
+  "Rename every live buffer belonging to OLD-ID so it addresses NEW-ID.
+For tmux mirror buffers, the buffer-local `enkan-repl--tmux-mirror-id' is
+also rewritten so it keeps pointing at the renamed tmux session.  Returns
+the number of buffers renamed."
+  (let ((buffers (enkan-repl--workspace-terminal-buffers old-id))
+        (new-session (concat enkan-repl-tmux-session-prefix new-id))
+        (renamed 0))
+    (dolist (buffer buffers)
+      (when (buffer-live-p buffer)
+        (with-current-buffer buffer
+          (when (and (fboundp 'enkan-repl--terminal-tmux--id-with-session)
+                     (buffer-local-boundp 'enkan-repl--tmux-mirror-id buffer)
+                     enkan-repl--tmux-mirror-id)
+            (let ((new-mirror-id
+                   (enkan-repl--terminal-tmux--id-with-session
+                    enkan-repl--tmux-mirror-id new-session)))
+              (when new-mirror-id
+                (setq enkan-repl--tmux-mirror-id new-mirror-id))))
+          (let* ((old-name (buffer-name buffer))
+                 (new-name (enkan-repl--buffer-name-with-workspace-id
+                            old-name new-id)))
+            (when (and new-name (not (string= new-name old-name)))
+              (rename-buffer new-name t)
+              (setq renamed (1+ renamed)))))))
+    renamed))
+
+(defun enkan-repl--renumber-workspace (old-id new-id)
+  "Renumber workspace OLD-ID to NEW-ID.
+Fills a numbering gap left by a deleted workspace; the `max+1' logic in
+`enkan-repl--generate-next-workspace-id' for newly created workspaces is
+left untouched.  Renames the live tmux session (if any) and every buffer
+belonging to OLD-ID before updating `enkan-repl--workspaces' and
+`enkan-repl--current-workspace', then persists state to disk.
+Returns NEW-ID."
+  (unless (enkan-repl--can-rename-workspace enkan-repl--workspaces old-id new-id)
+    (user-error "Cannot rename workspace %s to %s" old-id new-id))
+  (when (fboundp 'enkan-repl--terminal-tmux-rename-workspace)
+    (enkan-repl--terminal-tmux-rename-workspace old-id new-id))
+  (enkan-repl--rename-workspace-buffers old-id new-id)
+  (setq enkan-repl--workspaces
+        (enkan-repl--rename-workspace-id enkan-repl--workspaces old-id new-id))
+  (when (and enkan-repl--current-workspace
+             (string= enkan-repl--current-workspace old-id))
+    (setq enkan-repl--current-workspace new-id))
+  (when (fboundp 'enkan-repl-state-save)
+    (ignore-errors (enkan-repl-state-save)))
+  new-id)
+
+(defun enkan-repl-workspace-renumber (&optional old-id new-id)
+  "Renumber a workspace, filling a numbering gap left by a deleted one.
+Interactively prompts for OLD-ID among existing workspaces and for a free
+NEW-ID.  Updates the live tmux session (if any) and every buffer belonging
+to OLD-ID so both stay addressable under the new number.  Noninteractive
+OLD-ID/NEW-ID renumber directly.
+Category: Session Controller"
+  (interactive)
+  (let* ((workspace-ids (enkan-repl--list-workspace-ids enkan-repl--workspaces))
+         (old (or old-id
+                  (and workspace-ids
+                       (completing-read "Renumber workspace: " workspace-ids nil t))))
+         (new (or new-id
+                  (and old
+                       (format "%02d"
+                               (string-to-number
+                                (read-string
+                                 (format "New id for workspace %s: " old))))))))
+    (cond
+     ((null workspace-ids)
+      (message "No workspaces to renumber"))
+     ((null old)
+      (user-error "No workspace selected"))
+     ((not (enkan-repl--can-rename-workspace enkan-repl--workspaces old new))
+      (user-error "Cannot rename workspace %s to %s" old new))
+     (t
+      (enkan-repl--renumber-workspace old new)
+      (message "Renumbered workspace %s to %s" old new)))))
 
 (provide 'enkan-repl)
 

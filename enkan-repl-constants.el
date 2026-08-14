@@ -33,12 +33,13 @@
     ("enkan-repl-open-center-file" . "Open or create the center file based on enkan-repl-center-file configuration.  Category: Center File Operations")
     ("enkan-repl-print-setup-to-buffer" . "Print current setup variables for debugging. Displays enkan-repl-projects, enkan-repl-target-directories, enkan-repl-project-aliases, and current session state.  Category: Debugging")
     ("enkan-repl-workspace-switch" . "Switch to another workspace. Uses `hmenu' if available to show workspace ID with its project.")
-    ("enkan-repl-workspace-delete" . "Delete a workspace and stop all associated terminal resources. This is the only interactive workspace deletion command.  In `enkan-repl-workspace-list-mode', delete the workspace at point; otherwise delete the current workspace.  With prefix ARG, prompt for a workspace. Noninteractive string ARG deletes that workspace ID.  All paths use `enkan-repl--delete-workspace-completely'. Category: Session Controller"))
+    ("enkan-repl-workspace-delete" . "Delete a workspace and stop all associated terminal resources. This is the only interactive workspace deletion command.  In `enkan-repl-workspace-list-mode', delete the workspace at point; otherwise delete the current workspace.  With prefix ARG, prompt for a workspace. Noninteractive string ARG deletes that workspace ID.  All paths use `enkan-repl--delete-workspace-completely'. Category: Session Controller")
+    ("enkan-repl-workspace-renumber" . "Renumber a workspace, filling a numbering gap left by a deleted one. Interactively prompts for OLD-ID among existing workspaces and for a free NEW-ID.  Updates the live tmux session (if any) and every buffer belonging to OLD-ID so both stay addressable under the new number.  Noninteractive OLD-ID/NEW-ID renumber directly. Category: Session Controller"))
   "Precompiled list of cheat-sheet candidates.
 Each element is a cons cell (FUNCTION-NAME . DESCRIPTION).")
 
 (defconst enkan-repl-cheat-sheet-function-count
-  23
+  24
   "Number of functions in cheat-sheet.")
 
 (provide 'enkan-repl-constants)
