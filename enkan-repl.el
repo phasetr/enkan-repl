@@ -2843,31 +2843,61 @@ Category: Session Controller"
                    (fboundp 'enkan-repl-workspace-list-refresh))
           (enkan-repl-workspace-list-refresh)))))))
 
+(defun enkan-repl--workspace-member-buffers (workspace-id)
+  "Return live buffers belonging to WORKSPACE-ID via tmux metadata or name.
+Unlike `enkan-repl--workspace-terminal-buffers' (name-only, used for
+deletion cleanup so stale unmatched buffers still get killed), this also
+matches tmux mirror buffers still under a fallback name such as
+`*tmux enkan-03:lat|%1*', whose workspace is known only through their
+buffer-local `enkan-repl--tmux-mirror-id'."
+  (seq-filter
+   (lambda (buffer)
+     (and (buffer-live-p buffer)
+          (enkan-repl--buffer-matches-workspace-p buffer workspace-id)))
+   (buffer-list)))
+
+(defun enkan-repl--workspace-has-tmux-mirror-p (workspace-id)
+  "Return non-nil when a live buffer's tmux mirror id belongs to WORKSPACE-ID.
+`buffer-local-boundp' alone is insufficient here: `enkan-repl--tmux-mirror-id'
+is declared with `defvar-local' and defaults to nil, so every buffer counts
+as \"bound\" even without ever mirroring tmux.  Check the actual value via
+`enkan-repl--buffer-tmux-id' instead."
+  (seq-some #'enkan-repl--buffer-tmux-id
+            (enkan-repl--workspace-member-buffers workspace-id)))
+
 (defun enkan-repl--rename-workspace-buffers (old-id new-id)
   "Rename every live buffer belonging to OLD-ID so it addresses NEW-ID.
 For tmux mirror buffers, the buffer-local `enkan-repl--tmux-mirror-id' is
-also rewritten so it keeps pointing at the renamed tmux session.  Returns
+rewritten so it keeps pointing at the renamed tmux session; buffers still
+under the raw `*tmux <id>*' fallback name are renamed to match.  Returns
 the number of buffers renamed."
-  (let ((buffers (enkan-repl--workspace-terminal-buffers old-id))
+  (let ((buffers (enkan-repl--workspace-member-buffers old-id))
         (new-session (concat enkan-repl-tmux-session-prefix new-id))
         (renamed 0))
     (dolist (buffer buffers)
       (when (buffer-live-p buffer)
         (with-current-buffer buffer
-          (when (and (fboundp 'enkan-repl--terminal-tmux--id-with-session)
-                     (buffer-local-boundp 'enkan-repl--tmux-mirror-id buffer)
-                     enkan-repl--tmux-mirror-id)
-            (let ((new-mirror-id
-                   (enkan-repl--terminal-tmux--id-with-session
-                    enkan-repl--tmux-mirror-id new-session)))
+          (let ((fallback-name nil)
+                (new-mirror-id nil))
+            (when (and (fboundp 'enkan-repl--terminal-tmux--id-with-session)
+                       (buffer-local-boundp 'enkan-repl--tmux-mirror-id buffer)
+                       enkan-repl--tmux-mirror-id)
+              (setq fallback-name (format "*tmux %s*" enkan-repl--tmux-mirror-id))
+              (setq new-mirror-id
+                    (enkan-repl--terminal-tmux--id-with-session
+                     enkan-repl--tmux-mirror-id new-session))
               (when new-mirror-id
-                (setq enkan-repl--tmux-mirror-id new-mirror-id))))
-          (let* ((old-name (buffer-name buffer))
-                 (new-name (enkan-repl--buffer-name-with-workspace-id
-                            old-name new-id)))
-            (when (and new-name (not (string= new-name old-name)))
-              (rename-buffer new-name t)
-              (setq renamed (1+ renamed)))))))
+                (setq enkan-repl--tmux-mirror-id new-mirror-id)))
+            (let* ((old-name (buffer-name buffer))
+                   (new-name
+                    (or (enkan-repl--buffer-name-with-workspace-id
+                         old-name new-id)
+                        (and new-mirror-id
+                             (string= old-name fallback-name)
+                             (format "*tmux %s*" new-mirror-id)))))
+              (when (and new-name (not (string= new-name old-name)))
+                (rename-buffer new-name t)
+                (setq renamed (1+ renamed))))))))
     renamed))
 
 (defun enkan-repl--renumber-workspace (old-id new-id)
@@ -2876,11 +2906,14 @@ Fills a numbering gap left by a deleted workspace; the `max+1' logic in
 `enkan-repl--generate-next-workspace-id' for newly created workspaces is
 left untouched.  Renames the live tmux session (if any) and every buffer
 belonging to OLD-ID before updating `enkan-repl--workspaces' and
-`enkan-repl--current-workspace', then persists state to disk.
-Returns NEW-ID."
+`enkan-repl--current-workspace', then persists state to disk.  Signals
+`user-error' (without touching state) when the rename is invalid or the
+live tmux session refuses to rename.  Returns NEW-ID."
   (unless (enkan-repl--can-rename-workspace enkan-repl--workspaces old-id new-id)
     (user-error "Cannot rename workspace %s to %s" old-id new-id))
-  (when (fboundp 'enkan-repl--terminal-tmux-rename-workspace)
+  (when (and (fboundp 'enkan-repl--terminal-tmux-rename-workspace)
+             (or (eq enkan-repl-terminal-backend 'tmux)
+                 (enkan-repl--workspace-has-tmux-mirror-p old-id)))
     (enkan-repl--terminal-tmux-rename-workspace old-id new-id))
   (enkan-repl--rename-workspace-buffers old-id new-id)
   (setq enkan-repl--workspaces
@@ -2888,8 +2921,11 @@ Returns NEW-ID."
   (when (and enkan-repl--current-workspace
              (string= enkan-repl--current-workspace old-id))
     (setq enkan-repl--current-workspace new-id))
-  (when (fboundp 'enkan-repl-state-save)
-    (ignore-errors (enkan-repl-state-save)))
+  (let ((saved (and (fboundp 'enkan-repl-state-save)
+                    (ignore-errors (enkan-repl-state-save)))))
+    (unless saved
+      (message "Warning: renumbered workspace %s to %s but failed to persist state to disk"
+               old-id new-id)))
   new-id)
 
 (defun enkan-repl-workspace-renumber (&optional old-id new-id)

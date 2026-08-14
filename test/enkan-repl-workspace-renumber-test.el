@@ -94,11 +94,91 @@ and every live buffer (including tmux mirror ids) belonging to the workspace."
       (when (buffer-live-p mirror-buffer) (kill-buffer mirror-buffer)))))
 
 (ert-deftest test-enkan-repl--renumber-workspace-rejects-invalid-target ()
-  "Renumbering into an occupied or nonexistent id signals a user-error."
+  "Renumbering into an occupied, nonexistent, or malformed id signals a
+user-error."
   (let ((enkan-repl--workspaces '(("01" . (:current-project "a"))
                                    ("02" . (:current-project "b")))))
     (should-error (enkan-repl--renumber-workspace "01" "02") :type 'user-error)
-    (should-error (enkan-repl--renumber-workspace "99" "05") :type 'user-error)))
+    (should-error (enkan-repl--renumber-workspace "99" "05") :type 'user-error)
+    (should-error (enkan-repl--renumber-workspace "01" "100") :type 'user-error)
+    (should-error (enkan-repl--renumber-workspace "01" "-1") :type 'user-error)))
+
+(ert-deftest test-enkan-repl--renumber-workspace-skips-tmux-without-mirrors ()
+  "On the eat backend with no tmux mirror buffers, tmux is never called."
+  (let* ((enkan-repl--workspaces '(("01" . (:current-project "a"))
+                                    ("03" . (:current-project "b"))))
+         (enkan-repl--current-workspace "01")
+         (enkan-repl-terminal-backend 'eat)
+         (calls 0)
+         (eat-buffer (generate-new-buffer "*ws:03 enkan:/repo/b/*")))
+    (unwind-protect
+        (cl-letf (((symbol-function 'enkan-repl--terminal-tmux-rename-workspace)
+                   (lambda (_old-id _new-id) (setq calls (1+ calls)) t))
+                  ((symbol-function 'enkan-repl-state-save)
+                   (lambda (&optional _file) t)))
+          (enkan-repl--renumber-workspace "03" "02")
+          (should (equal 0 calls))
+          (should (equal "*ws:02 enkan:/repo/b/*" (buffer-name eat-buffer))))
+      (when (buffer-live-p eat-buffer) (kill-buffer eat-buffer)))))
+
+(ert-deftest test-enkan-repl--renumber-workspace-aborts-on-tmux-failure ()
+  "When the live tmux session refuses to rename, no other state changes."
+  (let* ((enkan-repl--workspaces '(("01" . (:current-project "a"))
+                                    ("03" . (:current-project "b"))))
+         (enkan-repl--current-workspace "03")
+         (enkan-repl-terminal-backend 'tmux)
+         (eat-buffer (generate-new-buffer "*ws:03 enkan:/repo/b/*")))
+    (unwind-protect
+        (cl-letf (((symbol-function 'enkan-repl--terminal-tmux-rename-workspace)
+                   (lambda (_old-id _new-id) (user-error "tmux refused"))))
+          (should-error (enkan-repl--renumber-workspace "03" "02")
+                        :type 'user-error)
+          (should (equal '(("01" . (:current-project "a"))
+                            ("03" . (:current-project "b")))
+                         enkan-repl--workspaces))
+          (should (equal "03" enkan-repl--current-workspace))
+          (should (equal "*ws:03 enkan:/repo/b/*" (buffer-name eat-buffer))))
+      (when (buffer-live-p eat-buffer) (kill-buffer eat-buffer)))))
+
+(ert-deftest test-enkan-repl--renumber-workspace-renames-fallback-mirror-buffer ()
+  "A tmux mirror buffer still under its raw `*tmux <id>*' fallback name (no
+cwd-based name yet) is renamed to match the new session too."
+  (let* ((enkan-repl--workspaces '(("01" . (:current-project "a"))
+                                    ("03" . (:current-project "b"))))
+         (enkan-repl--current-workspace "01")
+         (enkan-repl-tmux-session-prefix "enkan-")
+         (fallback-buffer (generate-new-buffer "*tmux enkan-03:lat|%1*")))
+    (unwind-protect
+        (progn
+          (with-current-buffer fallback-buffer
+            (setq-local enkan-repl--tmux-mirror-id "enkan-03:lat|%1"))
+          (cl-letf (((symbol-function 'enkan-repl--terminal-tmux-rename-workspace)
+                     (lambda (_old-id _new-id) t))
+                    ((symbol-function 'enkan-repl-state-save)
+                     (lambda (&optional _file) t)))
+            (enkan-repl--renumber-workspace "03" "02"))
+          (should (equal "*tmux enkan-02:lat|%1*" (buffer-name fallback-buffer)))
+          (should (equal "enkan-02:lat|%1"
+                         (buffer-local-value 'enkan-repl--tmux-mirror-id
+                                              fallback-buffer))))
+      (when (buffer-live-p fallback-buffer) (kill-buffer fallback-buffer)))))
+
+(ert-deftest test-enkan-repl--renumber-workspace-warns-on-save-failure ()
+  "A failed disk persist is reported, not silently swallowed as success."
+  (let* ((enkan-repl--workspaces '(("01" . (:current-project "a"))
+                                    ("03" . (:current-project "b"))))
+         (enkan-repl--current-workspace "01")
+         (warned nil))
+    (cl-letf (((symbol-function 'enkan-repl--terminal-tmux-rename-workspace)
+               (lambda (_old-id _new-id) t))
+              ((symbol-function 'enkan-repl-state-save)
+               (lambda (&optional _file) nil))
+              ((symbol-function 'message)
+               (lambda (fmt &rest args)
+                 (setq warned (apply #'format fmt args)))))
+      (enkan-repl--renumber-workspace "03" "02")
+      (should (stringp warned))
+      (should (string-match-p "failed to persist" warned)))))
 
 (provide 'enkan-repl-workspace-renumber-test)
 ;;; enkan-repl-workspace-renumber-test.el ends here

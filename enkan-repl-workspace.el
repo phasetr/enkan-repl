@@ -67,10 +67,14 @@ Returns updated alist without the specified workspace."
 
 (defun enkan-repl--can-rename-workspace (workspaces old-id new-id)
   "Check whether OLD-ID can be renamed to NEW-ID in WORKSPACES.
-Requires OLD-ID to exist, NEW-ID to differ from OLD-ID, and NEW-ID to be
-unused.  Fills a numbering gap left by a deleted workspace, distinct from
-`enkan-repl--generate-next-workspace-id' which only ever grows."
+Requires OLD-ID to exist, NEW-ID to be a well-formed two-digit workspace id
+(matching the format `enkan-repl--extract-workspace-id' recognizes in buffer
+names) that differs from OLD-ID and is unused.  Fills a numbering gap left
+by a deleted workspace, distinct from `enkan-repl--generate-next-workspace-id'
+which only ever grows."
   (and (assoc old-id workspaces #'string=)
+       (stringp new-id)
+       (string-match-p "\\`[0-9][0-9]\\'" new-id)
        (not (string= old-id new-id))
        (not (assoc new-id workspaces #'string=))))
 
