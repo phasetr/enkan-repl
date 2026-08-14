@@ -317,6 +317,29 @@ that layout/routing code looking for the canonical name cannot find."
       (when (buffer-live-p source-buffer) (kill-buffer source-buffer))
       (when (buffer-live-p colliding-buffer) (kill-buffer colliding-buffer)))))
 
+(ert-deftest test-enkan-repl--renumber-workspace-checks-buffer-collision-before-tmux ()
+  "The buffer-collision check must run before the tmux session is renamed,
+so a collision aborts the whole operation cleanly instead of leaving tmux
+already renamed while the buffer/alist rename fails -- an inconsistent
+state that also makes retrying impossible, since the target session name
+now looks occupied."
+  (let* ((enkan-repl--workspaces '(("01" . (:current-project "a"))
+                                    ("03" . (:current-project "b"))))
+         (enkan-repl--current-workspace "01")
+         (tmux-called nil)
+         (source-buffer (generate-new-buffer "*ws:03 enkan:/repo/b/*"))
+         (colliding-buffer (generate-new-buffer "*ws:02 enkan:/repo/b/*")))
+    (unwind-protect
+        (cl-letf (((symbol-function 'executable-find) (lambda (&rest _) "/usr/bin/tmux"))
+                  ((symbol-function 'enkan-repl--terminal-tmux-rename-workspace)
+                   (lambda (&rest _) (setq tmux-called t) t)))
+          (should-error (enkan-repl--renumber-workspace "03" "02")
+                        :type 'user-error)
+          (should-not tmux-called)
+          (should (equal "*ws:03 enkan:/repo/b/*" (buffer-name source-buffer))))
+      (when (buffer-live-p source-buffer) (kill-buffer source-buffer))
+      (when (buffer-live-p colliding-buffer) (kill-buffer colliding-buffer)))))
+
 (ert-deftest test-enkan-repl-workspace-renumber-rejects-non-numeric-input ()
   "Empty or non-numeric interactive input must not silently become \"00\"."
   (let ((enkan-repl--workspaces '(("01" . (:current-project "a"))
