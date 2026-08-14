@@ -2887,7 +2887,11 @@ the number of buffers renamed."
                              (string= old-name fallback-name)
                              (format "*tmux %s*" new-mirror-id)))))
               (when (and new-name (not (string= new-name old-name)))
-                (rename-buffer new-name t)
+                (when (get-buffer new-name)
+                  (user-error
+                   "Cannot renumber: buffer %s already exists (would collide with renaming %s)"
+                   new-name old-name))
+                (rename-buffer new-name)
                 (setq renamed (1+ renamed))))))))
     renamed))
 

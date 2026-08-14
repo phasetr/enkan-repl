@@ -298,6 +298,25 @@ never explicitly saved is not discarded by renaming a stale plist."
                    (plist-get (cdr (assoc "02" enkan-repl--workspaces #'string=))
                               :session-list)))))
 
+(ert-deftest test-enkan-repl--renumber-workspace-rejects-buffer-name-collision ()
+  "If a buffer already occupies the target name, renaming must signal a
+clear error instead of letting `rename-buffer' silently pick a `<2>'
+suffix, which would leave the renumbered session under an unexpected name
+that layout/routing code looking for the canonical name cannot find."
+  (let* ((enkan-repl--workspaces '(("01" . (:current-project "a"))
+                                    ("03" . (:current-project "b"))))
+         (enkan-repl--current-workspace "01")
+         (source-buffer (generate-new-buffer "*ws:03 enkan:/repo/b/*"))
+         (colliding-buffer (generate-new-buffer "*ws:02 enkan:/repo/b/*")))
+    (unwind-protect
+        (cl-letf (((symbol-function 'executable-find) (lambda (&rest _) nil))
+                  ((symbol-function 'enkan-repl-state-save) (lambda (&optional _file) t)))
+          (should-error (enkan-repl--renumber-workspace "03" "02")
+                        :type 'user-error)
+          (should (equal "*ws:03 enkan:/repo/b/*" (buffer-name source-buffer))))
+      (when (buffer-live-p source-buffer) (kill-buffer source-buffer))
+      (when (buffer-live-p colliding-buffer) (kill-buffer colliding-buffer)))))
+
 (ert-deftest test-enkan-repl-workspace-renumber-rejects-non-numeric-input ()
   "Empty or non-numeric interactive input must not silently become \"00\"."
   (let ((enkan-repl--workspaces '(("01" . (:current-project "a"))
