@@ -2856,15 +2856,6 @@ buffer-local `enkan-repl--tmux-mirror-id'."
           (enkan-repl--buffer-matches-workspace-p buffer workspace-id)))
    (buffer-list)))
 
-(defun enkan-repl--workspace-has-tmux-mirror-p (workspace-id)
-  "Return non-nil when a live buffer's tmux mirror id belongs to WORKSPACE-ID.
-`buffer-local-boundp' alone is insufficient here: `enkan-repl--tmux-mirror-id'
-is declared with `defvar-local' and defaults to nil, so every buffer counts
-as \"bound\" even without ever mirroring tmux.  Check the actual value via
-`enkan-repl--buffer-tmux-id' instead."
-  (seq-some #'enkan-repl--buffer-tmux-id
-            (enkan-repl--workspace-member-buffers workspace-id)))
-
 (defun enkan-repl--rename-workspace-buffers (old-id new-id)
   "Rename every live buffer belonging to OLD-ID so it addresses NEW-ID.
 For tmux mirror buffers, the buffer-local `enkan-repl--tmux-mirror-id' is
@@ -2915,8 +2906,8 @@ was signaled."
   (unless (enkan-repl--can-rename-workspace enkan-repl--workspaces old-id new-id)
     (user-error "Cannot rename workspace %s to %s" old-id new-id))
   (when (and (fboundp 'enkan-repl--terminal-tmux-rename-workspace)
-             (or (eq enkan-repl-terminal-backend 'tmux)
-                 (enkan-repl--workspace-has-tmux-mirror-p old-id)))
+             (boundp 'enkan-repl-tmux-executable)
+             (executable-find enkan-repl-tmux-executable))
     (enkan-repl--terminal-tmux-rename-workspace old-id new-id))
   (enkan-repl--rename-workspace-buffers old-id new-id)
   (setq enkan-repl--workspaces

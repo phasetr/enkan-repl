@@ -84,7 +84,8 @@ and every live buffer (including tmux mirror ids) belonging to the workspace."
         (progn
           (with-current-buffer mirror-buffer
             (setq-local enkan-repl--tmux-mirror-id "enkan-03:lat|%29"))
-          (cl-letf (((symbol-function 'enkan-repl--terminal-tmux-rename-workspace)
+          (cl-letf (((symbol-function 'executable-find) (lambda (&rest _) "/usr/bin/tmux"))
+                    ((symbol-function 'enkan-repl--terminal-tmux-rename-workspace)
                      (lambda (old-id new-id)
                        (push (cons old-id new-id) rename-calls)
                        t))
@@ -115,8 +116,14 @@ user-error."
     (should-error (enkan-repl--renumber-workspace "01" "100") :type 'user-error)
     (should-error (enkan-repl--renumber-workspace "01" "-1") :type 'user-error)))
 
-(ert-deftest test-enkan-repl--renumber-workspace-skips-tmux-without-mirrors ()
-  "On the eat backend with no tmux mirror buffers, tmux is never called."
+(ert-deftest test-enkan-repl--renumber-workspace-skips-tmux-when-executable-missing ()
+  "When the tmux executable itself is unavailable, tmux is never called (so
+renumbering still works on an eat-only machine without tmux installed at
+all).  Whether the *workspace* currently uses eat or has no mirror buffers
+must NOT gate this call -- only tmux's actual availability may, otherwise a
+live orphan target session or an unmirrored live source session could be
+silently left inconsistent (regression: this used to be gated on backend /
+mirror presence instead)."
   (let* ((enkan-repl--workspaces '(("01" . (:current-project "a"))
                                     ("03" . (:current-project "b"))))
          (enkan-repl--current-workspace "01")
@@ -124,13 +131,34 @@ user-error."
          (calls 0)
          (eat-buffer (generate-new-buffer "*ws:03 enkan:/repo/b/*")))
     (unwind-protect
-        (cl-letf (((symbol-function 'enkan-repl--terminal-tmux-rename-workspace)
+        (cl-letf (((symbol-function 'executable-find) (lambda (&rest _) nil))
+                  ((symbol-function 'enkan-repl--terminal-tmux-rename-workspace)
                    (lambda (_old-id _new-id) (setq calls (1+ calls)) t))
                   ((symbol-function 'enkan-repl-state-save)
                    (lambda (&optional _file) t)))
           (enkan-repl--renumber-workspace "03" "02")
           (should (equal 0 calls))
           (should (equal "*ws:02 enkan:/repo/b/*" (buffer-name eat-buffer))))
+      (when (buffer-live-p eat-buffer) (kill-buffer eat-buffer)))))
+
+(ert-deftest test-enkan-repl--renumber-workspace-checks-tmux-even-on-eat-backend ()
+  "When tmux IS available, the tmux rename/collision check always runs, even
+on the eat backend with no mirror buffers for the workspace being
+renumbered -- a live orphan target session must still be caught."
+  (let* ((enkan-repl--workspaces '(("01" . (:current-project "a"))
+                                    ("03" . (:current-project "b"))))
+         (enkan-repl--current-workspace "01")
+         (enkan-repl-terminal-backend 'eat)
+         (calls 0)
+         (eat-buffer (generate-new-buffer "*ws:03 enkan:/repo/b/*")))
+    (unwind-protect
+        (cl-letf (((symbol-function 'executable-find) (lambda (&rest _) "/usr/bin/tmux"))
+                  ((symbol-function 'enkan-repl--terminal-tmux-rename-workspace)
+                   (lambda (_old-id _new-id) (setq calls (1+ calls)) t))
+                  ((symbol-function 'enkan-repl-state-save)
+                   (lambda (&optional _file) t)))
+          (enkan-repl--renumber-workspace "03" "02")
+          (should (equal 1 calls)))
       (when (buffer-live-p eat-buffer) (kill-buffer eat-buffer)))))
 
 (ert-deftest test-enkan-repl--renumber-workspace-aborts-on-tmux-failure ()
@@ -141,7 +169,8 @@ user-error."
          (enkan-repl-terminal-backend 'tmux)
          (eat-buffer (generate-new-buffer "*ws:03 enkan:/repo/b/*")))
     (unwind-protect
-        (cl-letf (((symbol-function 'enkan-repl--terminal-tmux-rename-workspace)
+        (cl-letf (((symbol-function 'executable-find) (lambda (&rest _) "/usr/bin/tmux"))
+                  ((symbol-function 'enkan-repl--terminal-tmux-rename-workspace)
                    (lambda (_old-id _new-id) (user-error "tmux refused"))))
           (should-error (enkan-repl--renumber-workspace "03" "02")
                         :type 'user-error)
@@ -164,7 +193,8 @@ cwd-based name yet) is renamed to match the new session too."
         (progn
           (with-current-buffer fallback-buffer
             (setq-local enkan-repl--tmux-mirror-id "enkan-03:lat|%1"))
-          (cl-letf (((symbol-function 'enkan-repl--terminal-tmux-rename-workspace)
+          (cl-letf (((symbol-function 'executable-find) (lambda (&rest _) "/usr/bin/tmux"))
+                    ((symbol-function 'enkan-repl--terminal-tmux-rename-workspace)
                      (lambda (_old-id _new-id) t))
                     ((symbol-function 'enkan-repl-state-save)
                      (lambda (&optional _file) t)))
