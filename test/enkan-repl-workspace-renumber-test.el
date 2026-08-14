@@ -383,14 +383,35 @@ be in the plan."
       (when (buffer-live-p static-buffer) (kill-buffer static-buffer))
       (when (buffer-live-p moving-buffer) (kill-buffer moving-buffer)))))
 
+(ert-deftest test-enkan-repl-workspace-renumber-prompt-shows-project-name ()
+  "The old-id prompt must show each workspace's project name (like
+`enkan-repl-workspace-switch' does: \"ID [project]\"), not a bare list of
+IDs -- otherwise there is no way to tell which workspace is which when
+picking the one to renumber."
+  (let* ((enkan-repl--workspaces '(("01" . (:current-project "alpha"))
+                                    ("03" . (:current-project "beta"))))
+         (offered nil))
+    (cl-letf (((symbol-function 'hmenu)
+               (lambda (_prompt choices)
+                 (setq offered choices)
+                 (car choices)))
+              ((symbol-function 'read-string) (lambda (&rest _) "99"))
+              ((symbol-function 'executable-find) (lambda (&rest _) nil))
+              ((symbol-function 'enkan-repl-state-save) (lambda (&optional _file) t)))
+      (enkan-repl-workspace-renumber))
+    (should (member "01 [alpha]" offered))
+    (should (member "03 [beta]" offered))))
+
 (ert-deftest test-enkan-repl-workspace-renumber-rejects-non-numeric-input ()
   "Empty or non-numeric interactive input must not silently become \"00\"."
   (let ((enkan-repl--workspaces '(("01" . (:current-project "a"))
-                                   ("03" . (:current-project "b")))))
-    (cl-letf (((symbol-function 'completing-read) (lambda (&rest _) "03"))
+                                   ("03" . (:current-project "b"))))
+        (pick-03 (lambda (_prompt choices)
+                   (seq-find (lambda (c) (string-prefix-p "03 " c)) choices))))
+    (cl-letf (((symbol-function 'hmenu) pick-03)
               ((symbol-function 'read-string) (lambda (&rest _) "")))
       (should-error (enkan-repl-workspace-renumber) :type 'user-error))
-    (cl-letf (((symbol-function 'completing-read) (lambda (&rest _) "03"))
+    (cl-letf (((symbol-function 'hmenu) pick-03)
               ((symbol-function 'read-string) (lambda (&rest _) "abc")))
       (should-error (enkan-repl-workspace-renumber) :type 'user-error))))
 

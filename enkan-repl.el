@@ -2987,7 +2987,21 @@ Category: Session Controller"
   (let* ((workspace-ids (enkan-repl--list-workspace-ids enkan-repl--workspaces))
          (old (or old-id
                   (and workspace-ids
-                       (completing-read "Renumber workspace: " workspace-ids nil t))))
+                       (let* ((items
+                               (mapcar
+                                (lambda (ws-id)
+                                  (let* ((state (enkan-repl--get-workspace-state
+                                                 enkan-repl--workspaces ws-id))
+                                         (proj (or (plist-get state :current-project)
+                                                   "<none>")))
+                                    (cons (format "%s [%s]" ws-id proj) ws-id)))
+                                workspace-ids))
+                              (display
+                               (if (and (fboundp 'hmenu) items)
+                                   (hmenu "Renumber workspace:" (mapcar #'car items))
+                                 (completing-read "Renumber workspace: "
+                                                  (mapcar #'car items) nil t))))
+                         (cdr (assoc display items #'string=))))))
          (new (or new-id
                   (and old
                        (let ((input (read-string
