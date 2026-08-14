@@ -65,6 +65,28 @@ Returns updated alist without the specified workspace."
                   (string= (car ws) workspace-id))
                 workspaces))
 
+(defun enkan-repl--can-rename-workspace (workspaces old-id new-id)
+  "Check whether OLD-ID can be renamed to NEW-ID in WORKSPACES.
+Requires OLD-ID to exist, NEW-ID to be a well-formed two-digit workspace id
+(matching the format `enkan-repl--extract-workspace-id' recognizes in buffer
+names) that differs from OLD-ID and is unused.  Fills a numbering gap left
+by a deleted workspace, distinct from `enkan-repl--generate-next-workspace-id'
+which only ever grows."
+  (and (assoc old-id workspaces #'string=)
+       (stringp new-id)
+       (string-match-p "\\`[0-9][0-9]\\'" new-id)
+       (not (string= old-id new-id))
+       (not (assoc new-id workspaces #'string=))))
+
+(defun enkan-repl--rename-workspace-id (workspaces old-id new-id)
+  "Rename OLD-ID to NEW-ID in WORKSPACES alist, preserving state and order.
+Assumes `enkan-repl--can-rename-workspace' already validated the rename."
+  (mapcar (lambda (ws)
+            (if (string= (car ws) old-id)
+                (cons new-id (cdr ws))
+              ws))
+          workspaces))
+
 (defun enkan-repl--list-workspace-ids (workspaces)
   "List all workspace IDs from WORKSPACES alist.
 Returns sorted list of unique ID strings."

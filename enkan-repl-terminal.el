@@ -440,6 +440,15 @@ names such as dr-remote.jp as pane selectors."
   (when (and (stringp id) (string-match "^\\([^:]+\\):" id))
     (match-string 1 id)))
 
+(defun enkan-repl--terminal-tmux--id-with-session (id new-session)
+  "Return tmux ID with its session component replaced by NEW-SESSION.
+ID keeps its window and, if present, pane components."
+  (when (stringp id)
+    (enkan-repl--terminal-tmux--make-id
+     new-session
+     (enkan-repl--terminal-tmux--id-window id)
+     (enkan-repl--terminal-tmux--id-pane id))))
+
 (defun enkan-repl--terminal-tmux--target (id)
   "Return the actual tmux target for enkan tmux ID."
   (or (enkan-repl--terminal-tmux--id-pane id)
@@ -1102,6 +1111,30 @@ Returns non-nil when a live tmux session was killed."
                       (concat enkan-repl-tmux-session-prefix workspace-id))))
     (when (and session (enkan-repl--terminal-tmux--has-session session))
       (enkan-repl--terminal-tmux--call (list "kill-session" "-t" session)))))
+
+(defun enkan-repl--terminal-tmux-rename-workspace (old-id new-id)
+  "Rename the live tmux session backing OLD-ID to the one for NEW-ID.
+Returns non-nil when a live tmux session was actually renamed; nil when no
+tmux session exists for OLD-ID (nothing to do).  Signals `user-error' when
+NEW-ID's session name is already taken by an orphan live session (checked
+even when OLD-ID has no live session of its own, so callers never adopt an
+unrelated tmux session's identity just because there was nothing to rename
+away from), or when a live OLD-ID session exists but tmux refuses the
+rename.  Either way callers do not proceed to rename workspace state and
+buffers against a tmux session that never moved or that belongs to someone
+else."
+  (let ((old-session (and old-id (concat enkan-repl-tmux-session-prefix old-id)))
+        (new-session (and new-id (concat enkan-repl-tmux-session-prefix new-id))))
+    (when (and new-session (enkan-repl--terminal-tmux--has-session new-session))
+      (user-error "Tmux session %s already exists; cannot renumber into it"
+                  new-session))
+    (when (and old-session
+               (enkan-repl--terminal-tmux--has-session old-session))
+      (unless (enkan-repl--terminal-tmux--call
+               (list "rename-session" "-t" old-session new-session))
+        (user-error "Failed to rename tmux session %s to %s"
+                    old-session new-session))
+      t)))
 
 (defun enkan-repl--terminal-tmux--window-at-bottom-p (window)
   "Return non-nil when WINDOW is displaying the current buffer bottom."
