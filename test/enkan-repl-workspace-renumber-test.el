@@ -260,5 +260,16 @@ is a real UX bug, not just an internal detail."
       (enkan-repl-workspace-renumber "03" "02")
       (should (equal "Renumbered workspace 03 to 02" final-message)))))
 
+(ert-deftest test-enkan-repl-workspace-renumber-rejects-non-numeric-input ()
+  "Empty or non-numeric interactive input must not silently become \"00\"."
+  (let ((enkan-repl--workspaces '(("01" . (:current-project "a"))
+                                   ("03" . (:current-project "b")))))
+    (cl-letf (((symbol-function 'completing-read) (lambda (&rest _) "03"))
+              ((symbol-function 'read-string) (lambda (&rest _) "")))
+      (should-error (enkan-repl-workspace-renumber) :type 'user-error))
+    (cl-letf (((symbol-function 'completing-read) (lambda (&rest _) "03"))
+              ((symbol-function 'read-string) (lambda (&rest _) "abc")))
+      (should-error (enkan-repl-workspace-renumber) :type 'user-error))))
+
 (provide 'enkan-repl-workspace-renumber-test)
 ;;; enkan-repl-workspace-renumber-test.el ends here

@@ -2922,6 +2922,7 @@ was signaled."
                old-id new-id))
     (list :new-id new-id :saved saved)))
 
+;;;###autoload
 (defun enkan-repl-workspace-renumber (&optional old-id new-id)
   "Renumber a workspace, filling a numbering gap left by a deleted one.
 Interactively prompts for OLD-ID among existing workspaces and for a free
@@ -2936,10 +2937,11 @@ Category: Session Controller"
                        (completing-read "Renumber workspace: " workspace-ids nil t))))
          (new (or new-id
                   (and old
-                       (format "%02d"
-                               (string-to-number
-                                (read-string
-                                 (format "New id for workspace %s: " old))))))))
+                       (let ((input (read-string
+                                     (format "New id for workspace %s: " old))))
+                         (unless (string-match-p "\\`[0-9]+\\'" input)
+                           (user-error "New workspace id must be numeric: %s" input))
+                         (format "%02d" (string-to-number input)))))))
     (cond
      ((null workspace-ids)
       (message "No workspaces to renumber"))
