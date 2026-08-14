@@ -77,6 +77,14 @@ and every live buffer (including tmux mirror ids) belonging to the workspace."
             ("03" . (:current-project "b"))))
          (enkan-repl--current-workspace "03")
          (enkan-repl-tmux-session-prefix "enkan-")
+         ;; Matches the "03" plist above so the pre-rename state flush
+         ;; (enkan-repl--save-workspace-state) is a no-op change here; the
+         ;; flush itself is covered by
+         ;; test-enkan-repl--renumber-workspace-flushes-current-session-first.
+         (enkan-repl--current-project "b")
+         (enkan-repl-session-list nil)
+         (enkan-repl--session-counter 0)
+         (enkan-repl-project-aliases nil)
          (rename-calls nil)
          (eat-buffer (generate-new-buffer "*ws:03 enkan:/repo/b/*"))
          (mirror-buffer (generate-new-buffer "*ws:03 enkan:/repo/c/*")))
@@ -93,8 +101,14 @@ and every live buffer (including tmux mirror ids) belonging to the workspace."
                      (lambda (&optional _file) t)))
             (enkan-repl--renumber-workspace "03" "02"))
 
-          (should (equal '(("01" . (:current-project "a"))
-                            ("02" . (:current-project "b")))
+          ;; The pre-rename flush (enkan-repl--save-workspace-state) moves the
+          ;; renumbered entry to the front of the alist as a side effect;
+          ;; content, not position, is what this test cares about.
+          (should (equal '(("02" . (:current-project "b"
+                                     :session-list nil
+                                     :session-counter 0
+                                     :project-aliases nil))
+                            ("01" . (:current-project "a")))
                          enkan-repl--workspaces))
           (should (equal "02" enkan-repl--current-workspace))
           (should (equal '(("03" . "02")) rename-calls))
@@ -259,6 +273,30 @@ is a real UX bug, not just an internal detail."
                  (setq final-message (apply #'format fmt args)))))
       (enkan-repl-workspace-renumber "03" "02")
       (should (equal "Renumbered workspace 03 to 02" final-message)))))
+
+(ert-deftest test-enkan-repl--renumber-workspace-flushes-current-session-first ()
+  "Renumbering the current workspace must sync live globals into
+`enkan-repl--workspaces' first, so in-progress session state that was
+never explicitly saved is not discarded by renaming a stale plist."
+  (let* ((enkan-repl--workspaces
+          '(("03" . (:current-project "stale"
+                     :session-list nil
+                     :session-counter 0
+                     :project-aliases nil))))
+         (enkan-repl--current-workspace "03")
+         (enkan-repl--current-project "fresh")
+         (enkan-repl-session-list '((1 . "fresh-session")))
+         (enkan-repl--session-counter 1)
+         (enkan-repl-project-aliases nil))
+    (cl-letf (((symbol-function 'executable-find) (lambda (&rest _) nil))
+              ((symbol-function 'enkan-repl-state-save) (lambda (&optional _file) t)))
+      (enkan-repl--renumber-workspace "03" "02"))
+    (should (equal "fresh"
+                   (plist-get (cdr (assoc "02" enkan-repl--workspaces #'string=))
+                              :current-project)))
+    (should (equal '((1 . "fresh-session"))
+                   (plist-get (cdr (assoc "02" enkan-repl--workspaces #'string=))
+                              :session-list)))))
 
 (ert-deftest test-enkan-repl-workspace-renumber-rejects-non-numeric-input ()
   "Empty or non-numeric interactive input must not silently become \"00\"."

@@ -2895,20 +2895,30 @@ the number of buffers renamed."
   "Renumber workspace OLD-ID to NEW-ID.
 Fills a numbering gap left by a deleted workspace; the `max+1' logic in
 `enkan-repl--generate-next-workspace-id' for newly created workspaces is
-left untouched.  Renames the live tmux session (if any) and every buffer
-belonging to OLD-ID before updating `enkan-repl--workspaces' and
-`enkan-repl--current-workspace', then persists state to disk.  Signals
-`user-error' (without touching state) when the rename is invalid or the
-live tmux session refuses to rename.  Returns a plist `(:new-id NEW-ID
-:saved SAVED-P)'; callers that report success to the user must check
-:saved rather than assuming persistence succeeded just because no error
-was signaled."
+left untouched.  Renames the live tmux session (if any); when that
+succeeds and OLD-ID is the current workspace, flushes the live global
+session variables into `enkan-repl--workspaces' (mirroring
+`enkan-repl-workspace-switch') before renaming the alist key, so an
+unsynced in-progress session is not silently discarded by renaming a
+stale plist.  Renames every buffer belonging to OLD-ID, then updates
+`enkan-repl--workspaces' and `enkan-repl--current-workspace', then persists
+state to disk.  Signals `user-error' (without touching any state) when the
+rename is invalid or the live tmux session refuses to rename.  Returns a
+plist `(:new-id NEW-ID :saved SAVED-P)'; callers that report success to the
+user must check :saved rather than assuming persistence succeeded just
+because no error was signaled."
   (unless (enkan-repl--can-rename-workspace enkan-repl--workspaces old-id new-id)
     (user-error "Cannot rename workspace %s to %s" old-id new-id))
   (when (and (fboundp 'enkan-repl--terminal-tmux-rename-workspace)
              (boundp 'enkan-repl-tmux-executable)
              (executable-find enkan-repl-tmux-executable))
     (enkan-repl--terminal-tmux-rename-workspace old-id new-id))
+  ;; Only flush live globals once the tmux step (which may abort via
+  ;; user-error) has succeeded, so a failed rename leaves nothing changed.
+  (when (and enkan-repl--current-workspace
+             (string= enkan-repl--current-workspace old-id)
+             (fboundp 'enkan-repl--save-workspace-state))
+    (enkan-repl--save-workspace-state old-id))
   (enkan-repl--rename-workspace-buffers old-id new-id)
   (setq enkan-repl--workspaces
         (enkan-repl--rename-workspace-id enkan-repl--workspaces old-id new-id))
