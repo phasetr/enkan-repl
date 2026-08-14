@@ -42,6 +42,18 @@
                  (enkan-repl--terminal-tmux--id-with-session
                   "enkan-01:lat|%29" "enkan-02"))))
 
+(ert-deftest test-enkan-repl--terminal-tmux-rename-workspace-rejects-live-target ()
+  "Rename must reject an already-live target session even when the source
+session does not exist, so a renumber never silently adopts an unrelated
+orphan tmux session's identity."
+  (let ((enkan-repl-tmux-session-prefix "enkan-"))
+    (cl-letf (((symbol-function 'enkan-repl--terminal-tmux--has-session)
+               (lambda (session) (string= session "enkan-02")))
+              ((symbol-function 'enkan-repl--terminal-tmux--call)
+               (lambda (&rest _) (error "rename-session should not be called"))))
+      (should-error (enkan-repl--terminal-tmux-rename-workspace "03" "02")
+                    :type 'user-error))))
+
 ;;; Pure function tests: enkan-repl-utils.el
 
 (ert-deftest test-enkan-repl--buffer-name-with-workspace-id ()

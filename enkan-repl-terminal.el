@@ -1115,13 +1115,20 @@ Returns non-nil when a live tmux session was killed."
 (defun enkan-repl--terminal-tmux-rename-workspace (old-id new-id)
   "Rename the live tmux session backing OLD-ID to the one for NEW-ID.
 Returns non-nil when a live tmux session was actually renamed; nil when no
-tmux session exists for OLD-ID (nothing to do).  Signals `user-error' when a
-session exists but tmux refuses the rename (e.g. NEW-ID's session name is
-already taken by an orphan live session), so callers do not proceed to
-rename workspace state and buffers against a session that never moved."
+tmux session exists for OLD-ID (nothing to do).  Signals `user-error' when
+NEW-ID's session name is already taken by an orphan live session (checked
+even when OLD-ID has no live session of its own, so callers never adopt an
+unrelated tmux session's identity just because there was nothing to rename
+away from), or when a live OLD-ID session exists but tmux refuses the
+rename.  Either way callers do not proceed to rename workspace state and
+buffers against a tmux session that never moved or that belongs to someone
+else."
   (let ((old-session (and old-id (concat enkan-repl-tmux-session-prefix old-id)))
         (new-session (and new-id (concat enkan-repl-tmux-session-prefix new-id))))
-    (when (and old-session new-session
+    (when (and new-session (enkan-repl--terminal-tmux--has-session new-session))
+      (user-error "Tmux session %s already exists; cannot renumber into it"
+                  new-session))
+    (when (and old-session
                (enkan-repl--terminal-tmux--has-session old-session))
       (unless (enkan-repl--terminal-tmux--call
                (list "rename-session" "-t" old-session new-session))
