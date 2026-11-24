@@ -5,6 +5,7 @@
 
 This package builds upon the excellent work of:
 - [[https://github.com/tmux/tmux][tmux]] - Terminal multiplexer (current default backend)
+- [[https://github.com/akermu/emacs-libvterm][vterm]] - Direct tmux display on macOS and GNU/Linux (optional)
 - [[https://github.com/akib/emacs-eat][eat]] - Terminal emulator inside Emacs (legacy / opt-in backend)
 - [[https://github.com/cpoile/claudemacs][claudemacs]] - Claude AI integration for Emacs
 
@@ -16,8 +17,9 @@ As of the terminal-backend abstraction work, =enkan-repl= ships with
 =tmux= as the default backend.  Heavy modern TUIs (e.g. Claude Code's
 welcome screen, codex) overwhelmed eat's pure-elisp output processing
 and could lock Emacs's main loop.  Delegating the terminal to an
-external tmux server keeps that work entirely outside Emacs and
-preserves session continuity across Emacs restarts.
+external tmux server preserves session continuity across Emacs restarts.
+On macOS and GNU/Linux, an already installed, working =vterm= displays the
+session directly.  Other environments retain the read-only mirror display.
 
 eat remains fully supported as an opt-in backend; both share the same
 front-end API (=enkan-repl-send-line=, etc.).  See [[#terminal-backend]]
@@ -110,21 +112,24 @@ purpose-built backend chosen via the =enkan-repl-terminal-backend=
 defcustom:
 
 - =tmux= (default) -- external [[https://github.com/tmux/tmux][tmux]] server.
-  Heavy TUIs and large output volumes are processed by tmux outside of
-  Emacs, so they cannot stall Emacs's main loop.  Sessions also survive
-  Emacs restart and can be attached from any other terminal application.
+  Sessions survive Emacs restart and can be attached from other terminals.
+  Display uses native =vterm= when available on macOS/GNU/Linux, with a
+  read-only mirror as the fallback.  Direct display still involves Emacs
+  redraw work; tmux keeps the actual CLI processes independent of Emacs.
 - =eat= (legacy / opt-in) -- in-Emacs [[https://github.com/akib/emacs-eat][eat]] terminal emulator.
   Kept as a rollback path for users whose workflow does not involve
   heavy TUIs and who prefer a fully in-Emacs terminal.
 
 See [[#terminal-backend]] for switch / configuration / migration details.
 
-*** No Default Keybindings
-We intentionally provide no default keybindings for several reasons:
+*** No Global Default Keybindings
+We intentionally provide no global default keybindings for several reasons:
 - Org-mode itself already has a vast number of features and keybindings
 - Serious Emacs users (especially those who don't "cheat" with VSCode)
   may have their own customization patterns
 - Avoiding conflicts with existing user workflows
+
+The direct tmux vterm buffers reserve =C-M-w= locally for workspace switching.
 
 Even if your Emacs configuration is heavily customized with no available keybindings,
 the interactive cheat-sheet (=M-x enkan-repl-cheat-sheet=) provides quick access
@@ -296,6 +301,74 @@ same user-facing send / layout commands (=enkan-repl-send-line=,
 =enkan-repl-setup-current-project-layout=, etc.).
 
 **** tmux backend specifics
+
+***** Direct vterm display (macOS / GNU/Linux default when available)
+
+#+begin_src emacs-lisp
+;; Default: use installed vterm on macOS/Linux; otherwise keep mirrors.
+(setq enkan-repl-tmux-display-method 'auto)
+
+;; Optional: require vterm, reporting an error if it is unavailable.
+;; (setq enkan-repl-tmux-display-method 'vterm)
+
+;; Optional: always use the previous read-only display (e.g. native Windows).
+;; (setq enkan-repl-tmux-display-method 'mirror)
+#+end_src
+
+Starting a session displays a vterm attached directly with
+~tmux attach-session -t =enkan-NN~ (the leading equals sign requests an
+exact session name).  =M-x enkan-repl-tmux-vterm= also opens the current
+workspace's attached client.  Attach runs directly as the terminal process,
+without sending a command to a shell and waiting for its prompt.
+The configured =enkan-repl-tmux-executable= and session prefix are respected.
+
+Each workspace owns one reusable vterm buffer, named =*enkan-tmux:NN*=.
+=enkan-repl-workspace-switch= (=C-M-w= in the example configuration and
+inside these vterms) replaces the visible workspace terminal while keeping
+the input window selected.  This also works without loading
+=examples/window-layouts.el=.  The example's automatic layout command
+uses this same single workspace view; the older multiple Emacs terminal
+columns remain available with =mirror= or =eat=.
+
+Projects remain tmux windows within that session.  Select them with tmux's
+normal window commands (by default =C-b n=, =C-b p=, or =C-b w=).
+Displaying a particular project through the terminal API selects its tmux
+window.  All clients attached to the same session, including external
+terminals, share its current window; we use one view per workspace to avoid
+multiple Emacs views unexpectedly selecting each other's projects.
+
+Project buffers remain as send-target metadata for the existing region,
+line, numbered-session, and transcript commands.  While vterm display is
+active, mirror captures and timers do not write pane output into them,
+including results from captures started before changing display mode.
+Bell/prompt/completion notification monitoring is independent and may still
+perform small bounded captures.  No mirror refresh is needed for live output.
+
+Closing a vterm buffer detaches that client and keeps the CLI alive in tmux;
+opening it again creates a new client.  Workspace deletion stops its tmux
+session and removes its viewer; workspace renumbering preserves the viewer.
+An empty workspace hides the previous workspace's terminal until a session
+is started.  =enkan-repl-tmux-attach= still opens an external terminal.
+
+Vterm is optional: detection loads its existing native module first and
+never offers to install or compile one.  Native Windows and systems without
+a loadable module use mirrors in =auto= mode.  This fallback does not provide
+tmux on Windows: a working tmux environment (for example Linux in WSL) is
+still required, or select the legacy =eat= backend for your environment.
+To change an already open mirror view, run =enkan-repl-tmux-vterm= or switch
+workspaces.  To revert, set =mirror= and rerun your project layout command.
+
+The default ERT suite tests display selection, attach reuse, switching,
+renumbering, and capture suppression with stubs.  An optional real integration
+test uses its own temporary tmux socket and never touches your normal server:
+
+#+begin_src sh
+ENKAN_REPL_VTERM_INTEGRATION=1 emacs --batch -Q -L . \
+  -L /path/to/already-installed/vterm \
+  -l test/enkan-repl-vterm-integration-test.el -f ert-run-tests-batch-and-exit
+#+end_src
+
+***** Session mapping and legacy mirror display
 
 - Workspace =NN= maps to tmux session =enkan-NN= (prefix is
   configurable via =enkan-repl-tmux-session-prefix=).

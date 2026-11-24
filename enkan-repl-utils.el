@@ -107,7 +107,10 @@ Returns t if the buffer name has the correct workspace prefix."
           (and id
                (fboundp 'enkan-repl--terminal-tmux--id-workspace)
                (enkan-repl--terminal-tmux--id-workspace id))))
-    (or tmux-workspace
+    (or (and (buffer-live-p buffer)
+             (buffer-local-boundp 'enkan-repl--tmux-vterm-workspace buffer)
+             (buffer-local-value 'enkan-repl--tmux-vterm-workspace buffer))
+        tmux-workspace
         (and (bufferp buffer)
              (buffer-name buffer)
              (enkan-repl--extract-workspace-id (buffer-name buffer))))))
@@ -139,7 +142,9 @@ Returns workspace ID string (e.g., \"01\") or nil if not an enkan buffer."
 ;;;; Workspace Buffer Count Pure Functions
 
 (defun enkan-repl--buffer-alive-as-terminal-p (buffer)
-  "Return non-nil if BUFFER represents a live terminal session.
+  "Return non-nil if BUFFER represents a live project terminal session.
+Workspace vterm views are excluded: they display multiple projects and must
+not become extra send targets or inflate the project session count.
 Backend-agnostic check, in priority order:
 1. BUFFER's buffer-local `eat--process' is a live process (kephale eat).
 2. BUFFER has a live OS process attached via `get-buffer-process'
@@ -149,6 +154,8 @@ Backend-agnostic check, in priority order:
    tmux liveness checks while scanning `buffer-list'."
   (and (bufferp buffer)
        (buffer-live-p buffer)
+       (not (and (buffer-local-boundp 'enkan-repl--tmux-vterm-workspace buffer)
+                 (buffer-local-value 'enkan-repl--tmux-vterm-workspace buffer)))
        (or
         ;; (1) buffer-local eat--process points at a live process
         (with-current-buffer buffer

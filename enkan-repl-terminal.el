@@ -27,10 +27,9 @@
 ;;   `enkan-repl--terminal-display'       -- present a session inside Emacs
 ;;   `enkan-repl--terminal-find-by-name'  -- resolve a session by project alias
 ;;
-;; The active backend is selected via `enkan-repl-terminal-backend'.  Phase 1
-;; ships only the eat backend, which wraps the existing in-tree behavior
-;; without changing semantics.  tmux backend functions are stubs that raise
-;; `user-error' until implemented in a later phase.
+;; The active backend is selected via `enkan-repl-terminal-backend'.  The tmux
+;; backend can display a workspace directly in vterm, or use read-only mirrors
+;; on systems without vterm.  Transport and session persistence stay in tmux.
 
 ;;; Code:
 
@@ -45,8 +44,9 @@
   "Terminal backend used by enkan-repl.
 
 `tmux' (default) -- external tmux server.  Heavy TUIs (claude code CLI,
-                    codex, etc.) run outside Emacs and cannot block
-                    Emacs's main loop with repaint storms.  Sessions
+                    codex, etc.) run outside Emacs.  Display uses vterm
+                    or read-only mirrors, as configured by
+                    `enkan-repl-tmux-display-method'.  Sessions
                     survive Emacs restart and can be attached from any
                     terminal application via `enkan-repl-tmux-attach'.
 `eat'            -- in-Emacs terminal emulator (legacy / rollback path).
@@ -66,6 +66,7 @@ migrated when the value changes."
 (declare-function eat--send-input "eat" (terminal input))
 (declare-function enkan-repl--path->buffer-name "enkan-repl-utils" (path &optional instance))
 (declare-function enkan-repl--buffer-name->instance "enkan-repl-utils" (name))
+(declare-function enkan-repl--buffer-name->path "enkan-repl-utils" (name))
 (declare-function enkan-repl--buffer-name-matches-workspace
                   "enkan-repl-utils" (name workspace-id))
 (declare-function enkan-repl-state--list-live-tmux-sessions
@@ -74,6 +75,14 @@ migrated when the value changes."
                   "enkan-repl-mac-notify" (&optional message))
 (defvar eat--process)
 (defvar enkan-repl--current-workspace)
+(defvar enkan-repl-tmux-disable-alternate-screen)
+(defvar enkan-repl-tmux-history-limit)
+(declare-function vterm-mode "vterm" ())
+(declare-function enkan-repl-workspace-switch "enkan-repl" ())
+(defvar vterm-shell)
+(defvar vterm-environment)
+(defvar vterm-buffer-name-string)
+(defvar vterm-kill-buffer-on-exit)
 
 ;;;; Backend dispatch helpers
 
@@ -567,12 +576,145 @@ When NEWLINE is non-nil, follow with an Enter key.  Returns t on success."
     (enkan-repl--terminal-tmux--call
      (list "kill-window" "-t" (enkan-repl--terminal-tmux--target id)))))
 
+;;;;; tmux display selection and direct vterm client
+
+(defcustom enkan-repl-tmux-display-method 'auto
+  "How to display tmux sessions inside Emacs.
+`auto' uses vterm on macOS and GNU/Linux when its native module is already
+installed and loadable; otherwise it uses the legacy read-only mirrors.
+`vterm' requires working vterm and reports an error when unavailable.
+`mirror' always uses the legacy mirrors, including their refresh commands.
+This option changes display only; tmux still owns all terminal sessions.
+No packages or native modules are installed or compiled automatically."
+  :type '(choice (const auto) (const vterm) (const mirror))
+  :group 'enkan-repl-terminal)
+
+(defvar-local enkan-repl--tmux-vterm-workspace nil
+  "Workspace ID displayed by this buffer's attached tmux client.
+This buffer represents the entire workspace, not an individual project.")
+
+(defun enkan-repl--terminal-tmux--vterm-available-p ()
+  "Return non-nil if installed vterm can load without compiling its module."
+  (and module-file-suffix
+       (condition-case nil
+           ;; Load the native module first: requiring vterm alone may offer
+           ;; to download/build dependencies when the module is missing.
+           (and (require 'vterm-module nil t)
+                (require 'vterm nil t))
+         (error nil))))
+
+(defun enkan-repl--terminal-tmux--use-vterm-p ()
+  "Return non-nil if the tmux display should use vterm.
+An explicitly requested but unavailable vterm raises `user-error'."
+  (and (eq enkan-repl-terminal-backend 'tmux)
+       (pcase enkan-repl-tmux-display-method
+         ('auto (and (memq system-type '(darwin gnu/linux))
+                     (enkan-repl--terminal-tmux--vterm-available-p)))
+         ('vterm (or (enkan-repl--terminal-tmux--vterm-available-p)
+                     (user-error "Vterm unavailable; use tmux display method `mirror'")))
+         ('mirror nil)
+         (_ (user-error "Unknown tmux display method: %S"
+                        enkan-repl-tmux-display-method)))))
+
+(defun enkan-repl--terminal-tmux--vterm-live-p (buffer)
+  "Return non-nil if BUFFER has a live attached tmux client."
+  (let ((process (and (buffer-live-p buffer) (get-buffer-process buffer))))
+    (and process (process-live-p process))))
+
+(defun enkan-repl--terminal-tmux--vterm-buffer (workspace)
+  "Return a live vterm attached to WORKSPACE, creating it if necessary.
+Killing this buffer detaches its client; it does not kill the tmux session."
+  (unless (enkan-repl--terminal-tmux--vterm-available-p)
+    (user-error "Vterm and its native module are unavailable"))
+  (let* ((session (concat enkan-repl-tmux-session-prefix workspace))
+         (buffer (cl-find-if
+                  (lambda (candidate)
+                    (equal (buffer-local-value
+                            'enkan-repl--tmux-vterm-workspace candidate)
+                           workspace))
+                  (buffer-list))))
+    (unless (enkan-repl--terminal-tmux--has-session session)
+      (user-error "Tmux session %s does not exist" session))
+    (when (and buffer (not (enkan-repl--terminal-tmux--vterm-live-p buffer)))
+      (kill-buffer buffer)
+      (setq buffer nil))
+    (or buffer
+        (let* ((buffer (generate-new-buffer (format "*enkan-tmux:%s*" workspace)))
+               ;; A direct exec avoids shell init and input timing races.
+               (vterm-shell
+                (mapconcat #'shell-quote-argument
+                           (list enkan-repl-tmux-executable "attach-session"
+                                 "-t" (concat "=" session)) " "))
+               (vterm-buffer-name-string nil)
+               (vterm-kill-buffer-on-exit t)
+               (vterm-environment (append '("TMUX" "TMUX_PANE")
+                                          (and (boundp 'vterm-environment)
+                                               vterm-environment)))
+               (process-environment (copy-sequence process-environment)))
+          (setenv "TMUX" nil)
+          (setenv "TMUX_PANE" nil)
+          (condition-case err
+              (with-current-buffer buffer
+                ;; Always attach to local tmux, even when invoked from TRAMP
+                ;; or after a project's directory has been removed.
+                (setq default-directory temporary-file-directory)
+                (vterm-mode)
+                (setq-local enkan-repl--tmux-vterm-workspace workspace)
+                (setq-local vterm-buffer-name-string nil)
+                (setq-local vterm-kill-buffer-on-exit t)
+                (use-local-map (copy-keymap (current-local-map)))
+                (local-set-key (kbd "C-M-w") #'enkan-repl-workspace-switch)
+                (when-let* ((process (get-buffer-process buffer)))
+                  (set-process-query-on-exit-flag process nil))
+                buffer)
+            (error
+             (when (buffer-live-p buffer) (kill-buffer buffer))
+             (signal (car err) (cdr err))))))))
+
+;;;###autoload
+(defun enkan-repl-tmux-vterm (&optional workspace)
+  "Display WORKSPACE's tmux session directly in vterm in the current window.
+WORKSPACE defaults to the current workspace.  Reuse its attached client.
+Native Windows users can use the mirror display or an external terminal."
+  (interactive)
+  (unless (eq enkan-repl-terminal-backend 'tmux)
+    (user-error "Current terminal backend is not tmux"))
+  (let ((buffer (enkan-repl--terminal-tmux--vterm-buffer
+                 (or workspace enkan-repl--current-workspace
+                     (user-error "No current workspace")))))
+    (pop-to-buffer-same-window buffer)
+    buffer))
+
+(defun enkan-repl--terminal-tmux-display-workspace ()
+  "Show the current workspace's vterm while preserving the input window.
+Reuse a visible enkan vterm window, or let `display-buffer' create one.
+Hide the previous workspace's viewer if the new session does not exist."
+  (let* ((workspace enkan-repl--current-workspace)
+         (session (enkan-repl--terminal-tmux--workspace-session))
+         (windows (cl-remove-if-not
+                   (lambda (candidate)
+                     (buffer-local-value 'enkan-repl--tmux-vterm-workspace
+                                         (window-buffer candidate)))
+                   (window-list))))
+    (if (and session (enkan-repl--terminal-tmux--has-session session))
+        (let ((buffer (enkan-repl--terminal-tmux--vterm-buffer workspace)))
+          (if windows
+              (dolist (window windows) (set-window-buffer window buffer))
+            (display-buffer buffer '(display-buffer-reuse-window
+                                     display-buffer-pop-up-window)))
+          buffer)
+      (dolist (window windows)
+        (set-window-buffer window (get-buffer-create "*scratch*")))
+      (message "Workspace %s has no tmux session; run enkan-repl-start-session"
+               (or workspace "<none>"))
+      nil)))
+
 ;;;;; tmux mirror buffer
 
 (defcustom enkan-repl-tmux-mirror t
-  "Whether tmux backend mirrors pane content to a read-only Emacs buffer.
-When non-nil, a periodic `tmux capture-pane' refresh is scheduled per
-mirror buffer."
+  "Whether to display read-only buffers when the mirror method is selected.
+Refresh is manual unless `enkan-repl-tmux-mirror-auto-refresh' is non-nil.
+This option does not disable direct vterm display or project metadata."
   :type 'boolean
   :group 'enkan-repl-terminal)
 
@@ -830,6 +972,7 @@ Holds the growing merge of successive `tmux capture-pane' snapshots when
 (defun enkan-repl--terminal-tmux--mirror-auto-refresh-enabled-p ()
   "Return non-nil when tmux mirror auto-refresh should run."
   (and enkan-repl-tmux-mirror-auto-refresh
+       (not (enkan-repl--terminal-tmux--use-vterm-p))
        (numberp enkan-repl-tmux-mirror-interval)
        (> enkan-repl-tmux-mirror-interval 0)))
 
@@ -1482,7 +1625,8 @@ arguments: CONTENT, or nil on failure, and the tmux process exit status."
     (buffer id started content status)
   "Apply async tmux capture CONTENT to BUFFER for ID.
 STARTED is the capture start time.  STATUS is the tmux process exit status."
-  (when (buffer-live-p buffer)
+  (when (and (buffer-live-p buffer)
+             (not (enkan-repl--terminal-tmux--use-vterm-p)))
     (with-current-buffer buffer
       (when (equal enkan-repl--tmux-mirror-id id)
         (setq enkan-repl--tmux-mirror-refresh-process nil)
@@ -1525,7 +1669,8 @@ STARTED is the capture start time.  STATUS is the tmux process exit status."
   "Refresh mirror BUFFER by capturing current tmux pane content.
 Skips when BUFFER is dead, hidden, has no bound id, or the tmux pane is gone.
 When FORCE is non-nil, refresh even when BUFFER is hidden."
-  (when (buffer-live-p buffer)
+  (when (and (buffer-live-p buffer)
+             (not (enkan-repl--terminal-tmux--use-vterm-p)))
     (with-current-buffer buffer
       (enkan-repl--terminal-tmux--mirror-update-status)
       (let ((id enkan-repl--tmux-mirror-id))
@@ -1630,10 +1775,15 @@ the asynchronous lookup returns."
     buf))
 
 (defun enkan-repl--terminal-tmux-display (id)
-  "Tmux backend: present ID as a read-only mirror buffer in the current window.
+  "Tmux backend: present ID using the configured display method.
 When `enkan-repl-tmux-mirror' is nil, instead message a hint to attach
-externally via `enkan-repl-tmux-attach'."
+externally via `enkan-repl-tmux-attach' when using mirror display."
   (cond
+   ((enkan-repl--terminal-tmux--use-vterm-p)
+    (unless (enkan-repl--terminal-tmux--call
+             (list "select-window" "-t" (enkan-repl--terminal-tmux--target id)))
+      (user-error "Cannot select tmux window: %s" id))
+    (enkan-repl-tmux-vterm (enkan-repl--terminal-tmux--id-workspace id)))
    ((not enkan-repl-tmux-mirror)
     (message (concat "tmux mirror is disabled. "
                      "Run M-x enkan-repl-tmux-attach to attach in a terminal,"

@@ -137,6 +137,9 @@
 (declare-function enkan-repl--terminal-list "enkan-repl-terminal" ())
 (declare-function enkan-repl--terminal-kill "enkan-repl-terminal" (id))
 (declare-function enkan-repl--terminal-display "enkan-repl-terminal" (id))
+(declare-function enkan-repl--terminal-tmux--use-vterm-p "enkan-repl-terminal" ())
+(declare-function enkan-repl--terminal-tmux-display-workspace "enkan-repl-terminal" ())
+(defvar enkan-repl--tmux-vterm-workspace)
 (declare-function enkan-repl--terminal-id-instance "enkan-repl-terminal" (id))
 (declare-function enkan-repl--terminal-tmux-id-instance-for-path "enkan-repl-terminal" (id path))
 (declare-function enkan-repl-state-load "enkan-repl-state" (&optional file))
@@ -1593,9 +1596,8 @@ Dispatches to `enkan-repl--terminal-start' so the active backend (eat or
 tmux, per `enkan-repl-terminal-backend') decides how to spawn the
 session.
 
-For the tmux backend, an Emacs-side mirror buffer is created eagerly so
-that layout / lookup code (which iterates over `buffer-list') can find
-the session even though the actual terminal lives outside Emacs.
+For tmux, create project metadata eagerly for layout and send-target lookup.
+When direct vterm display is selected, show the attached workspace client.
 
 Category: Session Controller"
   (let* ((target-dir default-directory)
@@ -1624,6 +1626,8 @@ Category: Session Controller"
          enkan-repl--current-project
          instance)
         (enkan-repl--save-workspace-state))
+      (when (enkan-repl--terminal-tmux--use-vterm-p)
+        (enkan-repl--terminal-display term-id))
       (message "Started terminal session in: %s" target-dir))))
 
 ;;;###autoload
@@ -1798,21 +1802,23 @@ Returns non-nil when sessions were restored."
     (error nil)))
 
 (defun enkan-repl--maybe-setup-current-project-layout (&optional context)
-  "Run the optional current project layout command.
-CONTEXT is included in error messages to identify the caller.  The layout
-command lives in examples/window-layouts.el, so core setup only calls it when
-it has been loaded by user configuration."
-  (when (and enkan-repl--current-workspace
-             (enkan-repl--ws-current-project)
-             (fboundp 'enkan-repl-setup-current-project-layout))
-    (condition-case err
-        (progn
-          (enkan-repl--restore-current-workspace-sessions-from-live-terminals)
-          (enkan-repl-setup-current-project-layout))
-      (error
-       (message "Failed to set up current project layout%s: %s"
-                (if context (format " after %s" context) "")
-                (error-message-string err))))))
+  "Display the current workspace using vterm or the optional layout command.
+CONTEXT is included in layout error messages to identify the caller.  Mirror
+and eat layouts live in examples/window-layouts.el and must be loaded by user
+configuration.  Direct vterm display does not require that extension."
+  (if (enkan-repl--terminal-tmux--use-vterm-p)
+      (enkan-repl--terminal-tmux-display-workspace)
+    (when (and enkan-repl--current-workspace
+               (enkan-repl--ws-current-project)
+               (fboundp 'enkan-repl-setup-current-project-layout))
+      (condition-case err
+          (progn
+            (enkan-repl--restore-current-workspace-sessions-from-live-terminals)
+            (enkan-repl-setup-current-project-layout))
+        (error
+         (message "Failed to set up current project layout%s: %s"
+                  (if context (format " after %s" context) "")
+                  (error-message-string err)))))))
 
 ;;;###autoload
 (defun enkan-repl-setup ()
@@ -2260,8 +2266,7 @@ from workspace state are still cleaned up."
    (lambda (buffer)
      (let ((name (buffer-name buffer)))
        (and name
-            (enkan-repl--is-enkan-buffer-name name)
-            (enkan-repl--buffer-name-matches-workspace name workspace-id))))
+            (enkan-repl--buffer-matches-workspace-p buffer workspace-id))))
    (buffer-list)))
 
 (defun enkan-repl--stop-workspace-terminals (workspace-id)
@@ -2845,11 +2850,9 @@ Category: Session Controller"
 
 (defun enkan-repl--workspace-member-buffers (workspace-id)
   "Return live buffers belonging to WORKSPACE-ID via tmux metadata or name.
-Unlike `enkan-repl--workspace-terminal-buffers' (name-only, used for
-deletion cleanup so stale unmatched buffers still get killed), this also
-matches tmux mirror buffers still under a fallback name such as
-`*tmux enkan-03:lat|%1*', whose workspace is known only through their
-buffer-local `enkan-repl--tmux-mirror-id'."
+Include workspace vterm viewers and mirrors under fallback names such as
+`*tmux enkan-03:lat|%1*', whose workspace is known through their buffer-local
+metadata rather than their name."
   (seq-filter
    (lambda (buffer)
      (and (buffer-live-p buffer)
@@ -2859,11 +2862,13 @@ buffer-local `enkan-repl--tmux-mirror-id'."
 (defun enkan-repl--workspace-buffer-rename-plan (old-id new-id)
   "Return a plan for moving every live buffer of OLD-ID's session to NEW-ID.
 Does not mutate anything.  Each plan entry is a plist `(:buffer BUFFER
-:new-name NEW-NAME-OR-NIL :new-mirror-id NEW-MIRROR-ID-OR-NIL)' describing
+:new-name NEW-NAME-OR-NIL :new-mirror-id NEW-MIRROR-ID-OR-NIL
+:new-vterm-workspace NEW-WORKSPACE-OR-NIL)' describing
 what `enkan-repl--apply-workspace-buffer-rename-plan' would do to that
 buffer; :new-name is nil when the buffer's name does not need to change
 even though its mirror id does (e.g. a manually renamed mirror buffer),
-and vice versa.  Buffers needing neither change are omitted entirely."
+and vice versa.  Vterm viewers also receive the new workspace metadata.
+Buffers needing no change are omitted entirely."
   (let ((new-session (concat enkan-repl-tmux-session-prefix new-id)))
     (delq nil
           (mapcar
@@ -2876,17 +2881,22 @@ and vice versa.  Buffers needing neither change are omitted entirely."
                       (new-mirror-id (and mirror-id
                                           (enkan-repl--terminal-tmux--id-with-session
                                            mirror-id new-session)))
+                      (viewer-workspace enkan-repl--tmux-vterm-workspace)
                       (old-name (buffer-name buffer))
                       (renamed-name (or (enkan-repl--buffer-name-with-workspace-id
                                          old-name new-id)
+                                        (and viewer-workspace
+                                             (string= old-name (format "*enkan-tmux:%s*" old-id))
+                                             (format "*enkan-tmux:%s*" new-id))
                                         (and new-mirror-id
                                              (string= old-name fallback-name)
                                              (format "*tmux %s*" new-mirror-id))))
                       (name-changed (and renamed-name (not (string= renamed-name old-name))))
                       (mirror-changed (and new-mirror-id (not (equal new-mirror-id mirror-id)))))
-                 (when (or name-changed mirror-changed)
+                 (when (or name-changed mirror-changed viewer-workspace)
                    (list :buffer buffer
                          :new-name (and name-changed renamed-name)
+                         :new-vterm-workspace (and viewer-workspace new-id)
                          :new-mirror-id (and mirror-changed new-mirror-id))))))
            (enkan-repl--workspace-member-buffers old-id)))))
 
@@ -2911,8 +2921,8 @@ still count as a collision target for any other entry's :new-name."
 
 (defun enkan-repl--apply-workspace-buffer-rename-plan (plan)
   "Apply PLAN from `enkan-repl--workspace-buffer-rename-plan'.
-Rewrites each entry's buffer-local `enkan-repl--tmux-mirror-id' and/or
-renames the buffer, whichever :new-mirror-id / :new-name call for.
+Rewrite each entry's tmux mirror ID or vterm workspace metadata and rename
+the buffer as requested by :new-mirror-id, :new-vterm-workspace, :new-name.
 Callers must validate PLAN with
 `enkan-repl--check-workspace-buffer-rename-plan' first; this function
 assumes it will not encounter a collision.  Returns the number of plan
@@ -2923,6 +2933,9 @@ entries applied."
         (with-current-buffer buffer
           (when (plist-get entry :new-mirror-id)
             (setq enkan-repl--tmux-mirror-id (plist-get entry :new-mirror-id)))
+          (when (plist-get entry :new-vterm-workspace)
+            (setq enkan-repl--tmux-vterm-workspace
+                  (plist-get entry :new-vterm-workspace)))
           (when (plist-get entry :new-name)
             (rename-buffer (plist-get entry :new-name)))))))
   (length plan))

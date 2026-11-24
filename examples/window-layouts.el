@@ -410,6 +410,8 @@ Category: Utilities"
     (message "Setting up layout for %d actual sessions in workspace '%s' for project '%s'..."
       session-count enkan-repl--current-workspace (enkan-repl--ws-current-project))
     (cond
+      ((enkan-repl--terminal-tmux--use-vterm-p)
+        (enkan-repl--terminal-tmux-display-workspace))
       ((= session-count 0)
         (message "⚠️  No active sessions found in workspace '%s'" enkan-repl--current-workspace))
       ((= session-count 1)
