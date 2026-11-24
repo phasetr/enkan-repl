@@ -129,6 +129,16 @@ entries that resolve to the same buffer are collapsed."
     (dolist (entry (sort (copy-sequence (enkan-repl--ws-session-list))
                          (lambda (a b) (< (car a) (car b)))))
       (let ((buffer (enkan-repl--registered-session-buffer-for-entry entry)))
+        ;; Replace the display of an existing project buffer when vterm becomes
+        ;; available; keep the same session slot, name and layout selection.
+        (when (and buffer
+                   (enkan-repl--buffer-tmux-id buffer)
+                   (enkan-repl--terminal-tmux--use-vterm-p)
+                   (not (with-current-buffer buffer (derived-mode-p 'vterm-mode))))
+          (setq buffer
+                (enkan-repl--terminal-tmux--mirror-make
+                 (enkan-repl--buffer-tmux-id buffer) t
+                 (enkan-repl--buffer-name->path (buffer-name buffer)))))
         (when (and buffer (not (memq buffer buffers)))
           (push buffer buffers))))
     (nreverse buffers)))
@@ -410,8 +420,6 @@ Category: Utilities"
     (message "Setting up layout for %d actual sessions in workspace '%s' for project '%s'..."
       session-count enkan-repl--current-workspace (enkan-repl--ws-current-project))
     (cond
-      ((enkan-repl--terminal-tmux--use-vterm-p)
-        (enkan-repl--terminal-tmux-display-workspace))
       ((= session-count 0)
         (message "⚠️  No active sessions found in workspace '%s'" enkan-repl--current-workspace))
       ((= session-count 1)

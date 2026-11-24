@@ -122,14 +122,12 @@ defcustom:
 
 See [[#terminal-backend]] for switch / configuration / migration details.
 
-*** No Global Default Keybindings
-We intentionally provide no global default keybindings for several reasons:
+*** No Default Keybindings
+We intentionally provide no default keybindings for several reasons:
 - Org-mode itself already has a vast number of features and keybindings
 - Serious Emacs users (especially those who don't "cheat" with VSCode)
   may have their own customization patterns
 - Avoiding conflicts with existing user workflows
-
-The direct tmux vterm buffers reserve =C-M-w= locally for workspace switching.
 
 Even if your Emacs configuration is heavily customized with no available keybindings,
 the interactive cheat-sheet (=M-x enkan-repl-cheat-sheet=) provides quick access
@@ -315,51 +313,41 @@ same user-facing send / layout commands (=enkan-repl-send-line=,
 ;; (setq enkan-repl-tmux-display-method 'mirror)
 #+end_src
 
-Starting a session displays a vterm attached directly with
-~tmux attach-session -t =enkan-NN~ (the leading equals sign requests an
-exact session name).  =M-x enkan-repl-tmux-vterm= also opens the current
-workspace's attached client.  Attach runs directly as the terminal process,
-without sending a command to a shell and waiting for its prompt.
-The configured =enkan-repl-tmux-executable= and session prefix are respected.
+Each existing project terminal buffer, such as =*ws:01 enkan:/path/to/project/*=,
+is displayed as vterm instead of a read-only mirror.  Its name, project identity,
+send target, session number, and workspace membership stay the same.  The vterm
+runs =tmux attach-session= directly without typing into an intermediate shell.
 
-Each workspace owns one reusable vterm buffer, named =*enkan-tmux:NN*=.
-=enkan-repl-workspace-switch= (=C-M-w= in the example configuration and
-inside these vterms) replaces the visible workspace terminal while keeping
-the input window selected.  This also works without loading
-=examples/window-layouts.el=.  The example's automatic layout command
-uses this same single workspace view; the older multiple Emacs terminal
-columns remain available with =mirror= or =eat=.
+Continue using =examples/keybinding.el= and =examples/window-layouts.el=:
+=C-M-l= restores the center file and separate project columns; =C-M-w= restores
+the selected workspace's project layout.  Region/line sends, Enter, numbered
+responses, Escape, transcript commands, and =C-M-b= retain their existing
+bindings and targets.  =C-M-g= recreates missing project terminals and reconnects
+dead displays; live vterm output does not need a mirror capture.  Keys remain
+controlled by =enkan-repl-global-minor-bindings= and the existing mode toggle.
 
-Projects remain tmux windows within that session.  Select them with tmux's
-normal window commands (by default =C-b n=, =C-b p=, or =C-b w=).
-Displaying a particular project through the terminal API selects its tmux
-window.  All clients attached to the same session, including external
-terminals, share its current window; we use one view per workspace to avoid
-multiple Emacs views unexpectedly selecting each other's projects.
+To convert already open mirrors, reload the package and use the existing
+=C-M-l= or =C-M-r= workflow.  =M-x enkan-repl-tmux-vterm= can also open the
+current or a selected project terminal directly.  To revert, choose =mirror=
+and use =C-M-g= or =C-M-r= to recreate the project displays.
 
-Project buffers remain as send-target metadata for the existing region,
-line, numbered-session, and transcript commands.  While vterm display is
-active, mirror captures and timers do not write pane output into them,
-including results from captures started before changing display mode.
-Bell/prompt/completion notification monitoring is independent and may still
-perform small bounded captures.  No mirror refresh is needed for live output.
+Multiple projects in one workspace stay visible simultaneously.  Internally,
+each vterm attaches through a private tmux session linked only to the
+project's existing window.  The original CLI process is shared, while each
+project keeps its own display.  These temporary sessions do not use the workspace session prefix
+and are removed when the view closes.  Closing a buffer preserves the project
+CLI in the original =enkan-NN= session.  Workspace deletion closes its views
+and stops its project processes; renumbering preserves project buffer identity.
+The configured tmux executable and session prefix are respected.
 
-Closing a vterm buffer detaches that client and keeps the CLI alive in tmux;
-opening it again creates a new client.  Workspace deletion stops its tmux
-session and removes its viewer; workspace renumbering preserves the viewer.
-An empty workspace hides the previous workspace's terminal until a session
-is started.  =enkan-repl-tmux-attach= still opens an external terminal.
+Mirror capture callbacks never write into native vterm buffers.  Notification
+monitoring is separate and may still perform bounded captures.  Vterm detection
+loads its existing native module first and never installs or compiles one.
+Native Windows and systems without a loadable module keep mirrors in =auto=
+mode.  A working tmux environment is still required for the tmux backend.
 
-Vterm is optional: detection loads its existing native module first and
-never offers to install or compile one.  Native Windows and systems without
-a loadable module use mirrors in =auto= mode.  This fallback does not provide
-tmux on Windows: a working tmux environment (for example Linux in WSL) is
-still required, or select the legacy =eat= backend for your environment.
-To change an already open mirror view, run =enkan-repl-tmux-vterm= or switch
-workspaces.  To revert, set =mirror= and rerun your project layout command.
-
-The default ERT suite tests display selection, attach reuse, switching,
-renumbering, and capture suppression with stubs.  An optional real integration
+The default ERT suite tests project identity, independent displays, existing
+keybindings and layouts, platform fallback, and capture suppression with stubs.  An optional real integration
 test uses its own temporary tmux socket and never touches your normal server:
 
 #+begin_src sh
