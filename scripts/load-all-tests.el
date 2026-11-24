@@ -40,7 +40,12 @@
 
 ;; Run all ERT tests
 (require 'ert)
-(ert-run-tests-batch-and-exit)
+;; Existing terminal/layout tests describe the mirror display.  Keep that
+;; fixture deterministic even if vterm is on the batch Emacs load-path.
+;; Vterm selection tests bind `auto' themselves; the opt-in integration
+;; test explicitly binds `vterm'.
+(let ((enkan-repl-tmux-display-method 'mirror))
+  (ert-run-tests-batch-and-exit))
 
 (provide 'load-all-tests)
 ;;; load-all-tests.el ends here

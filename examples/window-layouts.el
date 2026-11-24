@@ -129,6 +129,16 @@ entries that resolve to the same buffer are collapsed."
     (dolist (entry (sort (copy-sequence (enkan-repl--ws-session-list))
                          (lambda (a b) (< (car a) (car b)))))
       (let ((buffer (enkan-repl--registered-session-buffer-for-entry entry)))
+        ;; Replace the display of an existing project buffer when vterm becomes
+        ;; available; keep the same session slot, name and layout selection.
+        (when (and buffer
+                   (enkan-repl--buffer-tmux-id buffer)
+                   (enkan-repl--terminal-tmux--use-vterm-p)
+                   (not (with-current-buffer buffer (derived-mode-p 'vterm-mode))))
+          (setq buffer
+                (enkan-repl--terminal-tmux--mirror-make
+                 (enkan-repl--buffer-tmux-id buffer) t
+                 (enkan-repl--buffer-name->path (buffer-name buffer)))))
         (when (and buffer (not (memq buffer buffers)))
           (push buffer buffers))))
     (nreverse buffers)))

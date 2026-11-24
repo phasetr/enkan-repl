@@ -2270,9 +2270,11 @@ For tmux this kills the whole workspace tmux session, then kills every
 matching Emacs mirror buffer so buffer-local timers are cancelled.  For
 eat it kills every matching Emacs terminal buffer.  Returns a plist with
 `:buffers-killed' and `:tmux-killed'."
-  (let ((buffers (enkan-repl--workspace-terminal-buffers workspace-id))
-        (tmux-killed nil)
-        (buffers-killed 0))
+  (let* ((buffers (enkan-repl--workspace-terminal-buffers workspace-id))
+         (tmux-killed nil)
+         ;; The tmux backend may close attached view buffers while stopping
+         ;; their private clients, before the explicit buffer cleanup below.
+         (buffers-killed (length buffers)))
     (when (and (or (eq enkan-repl-terminal-backend 'tmux)
                    (seq-some
                     (lambda (buffer)
@@ -2284,8 +2286,7 @@ eat it kills every matching Emacs terminal buffer.  Returns a plist with
               (enkan-repl--terminal-tmux-kill-workspace workspace-id))))
     (dolist (buffer buffers)
       (when (buffer-live-p buffer)
-        (kill-buffer buffer)
-        (setq buffers-killed (1+ buffers-killed))))
+        (kill-buffer buffer)))
     (list :buffers-killed buffers-killed
           :tmux-killed tmux-killed)))
 
